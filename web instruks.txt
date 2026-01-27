@@ -1,0 +1,478 @@
+
+
+---
+
+# CSS Trend Platform — Web Development Governance (v1.1)
+
+**Audience:** Data Engineering, Backend/Infra, Web Engineering, Analytics/Statistics, Product
+**Scope:** Pipeline → Published dataset contract → Website built from scratch
+**Non-negotiables:** price-agnostic, non-predictive, descriptive only, verifiable-not-reproducible, legal non-invertibility, robust build/caching hygiene
+
+---
+
+## 0) Product doctrine and hard constraints
+
+### 0.1 Hard product constraints
+
+* **No price data, no price charts, no price proxies, no predictions, no recommendations, no advisory language.**
+* The platform is **100% descriptive**, not prescriptive.
+* Target users: **amateurs + professionals**.
+
+  * Every concept must be explainable in **Basic** and **Advanced** form.
+
+### 0.2 Hard methodology constraints
+
+* **All metrics must be explainable** (no black-box outputs).
+* All results must include (where applicable):
+  **(a)** what it is, **(b)** how computed (at allowable detail), **(c)** why included, **(d)** user value.
+
+### 0.3 Hard legal constraint: non-invertibility
+
+* The product must never enable reconstruction of upstream/source raw data.
+* Therefore:
+
+  * outputs intended for publication must be **non-invertible by construction** (many-to-one transforms),
+  * and methodology must **not** disclose parameters that make inversion feasible.
+* The system must support **verifiability without reproducibility** of proprietary parameterization.
+
+### 0.4 Hard data-dimension explicitness
+
+Every displayed number/graph must have explicit handling/metadata for:
+
+* Time horizon/window
+* Coverage and missingness behavior
+* Freshness (lag)
+* Confidence / quality
+* Units and transformations
+* Historical reference context
+* Chain-specific caveats
+
+### 0.5 Hard language constraint
+
+* **All website text is English.**
+* Internal docs may be Norwegian.
+
+---
+
+## 1) Data pipeline: how data is produced and where it lives
+
+The website is strictly a consumer. The pipeline is the producer.
+
+### 1.1 Pipeline stages (data-only)
+
+**Stage A — RAW ingestion**
+
+* Downloads missing daily raw inputs into:
+
+  * `data/raw/<chain>/blocks/YYYY-MM-DD/...` and related subfolders.
+
+**Stage B — Daily features (parquet)**
+
+* Aggregates raw into daily parquet feature files:
+
+  * `pipeline/_work/prod/features_agg/<chain>/YYYY-MM-DD.parquet`
+
+**Stage C — Gold timeseries (parquet + weekly)**
+
+* Builds gold timeseries parquet:
+
+  * `pipeline/_work/prod/gold/<chain>.parquet`
+* Builds weekly aggregations:
+
+  * `pipeline/_work/prod/gold_weekly/...`
+* Produces status outputs:
+
+  * `pipeline/_work/prod/ml_status/...`
+
+**Stage D — Calculated JSON histories (internal)**
+The pipeline exports “calculated” JSON histories for internal use/debugging:
+
+* `data/calculated/gold/<chain>/YYYY-MM-DD.json`
+* `data/calculated/meta/<chain>/YYYY-MM-DD.json`
+* `data/calculated/derived/<chain>/YYYY-MM-DD.json`
+  And convenience files:
+* `latest.json`
+* `last7d.json`, `last30d.json`, `last90d.json`, `last180d.json`, `last365d.json`
+
+**Stage E — Published dataset (the public contract)**
+The pipeline publishes a stable, web-consumable dataset contract:
+
+✅ **The website must only read from:**
+
+* `data/published/v1/` (locally), or
+* a cloud/CDN base URL hosting the exact same directory structure.
+
+Published structure:
+
+* `data/published/v1/dataset.json` (global entry point)
+* `data/published/v1/<genre>/<chain>/manifest.json`
+* `data/published/v1/<genre>/<chain>/YYYY-MM-DD.json`
+* `data/published/v1/<genre>/<chain>/latest.json`
+* `data/published/v1/<genre>/<chain>/lastXd.json`
+
+Where:
+
+* `genre ∈ {gold, meta, derived}`
+* `chain ∈ {bitcoin, ethereum, arbitrum, base}`
+
+### 1.2 Backup & reconstruction requirement (hard)
+
+* The entire website must be reconstructable from:
+
+  * the web build output (static assets), plus
+  * the published dataset directory (`published/v1`) as a standalone backup.
+* Therefore, the published dataset contract must be:
+
+  * deterministic in structure,
+  * self-describing via `dataset.json` and per-chain manifests,
+  * portable to object storage/CDN without modification.
+
+---
+
+## 2) Published dataset contract (exact consumption semantics)
+
+### 2.1 Global bootstrap: `dataset.json`
+
+Purpose: first fetch performed by the web client.
+
+Required fields:
+
+* `dataset_id` (string)
+* `revision_id` (int)
+* `computed_at_utc` (ISO string)
+* `supported_chains` (array)
+* `supported_genres` (array)
+* `windows_supported` (array; e.g. [7,30,90,180,365])
+* `schema_versions` (object per genre)
+* `methodology_version` (string)
+* `asof_by_genre_chain` (object [genre][chain] → last available date)
+* **Freshness policy surface**: the dataset must allow per-chain lag display.
+
+  * If the pipeline cannot provide explicit lag values yet, the web must compute lag as:
+
+    * `lag_days = today_utc_date - asof_date` per chain/genre, shown in UI.
+  * The UI must explicitly highlight that Base/Arbitrum can lag materially (often about a week), while BTC/ETH are typically more current.
+
+**Web rule (hard):**
+
+* If `dataset.json` fails to fetch/parse, show a hard error page (no silent fallback).
+
+### 2.2 Per chain/genre index: `manifest.json`
+
+Purpose: deterministic file discovery and coverage.
+
+Required fields:
+
+* `dataset_id`, `revision_id`, `computed_at_utc`
+* `genre`, `chain`
+* `asof`
+* `available_days` (sorted ISO list)
+* `available_days_count`
+* `windows_supported`
+* `files.latest` and `files.windows`
+
+**Web rule (hard):**
+
+* No guessing, no directory listing, no implicit file existence assumptions.
+* All time horizon switching should prefer `lastXd.json` first (fast path).
+
+### 2.3 Daily files and window files
+
+* `YYYY-MM-DD.json` is the atomic daily record.
+* `lastXd.json` is a list of daily records for the last X days.
+* `latest.json` is the most recent daily record.
+
+**Web rule (hard):**
+
+* Horizon selector must switch by loading `lastXd.json` (7/30/90/180/365) to keep interaction instantaneous.
+* Full-history loads are allowed only on explicit user action (“Load full history”), and must be lazy.
+
+---
+
+## 3) Methodology & disclosure governance (trust without leakage)
+
+### 3.1 Open vs Protected policy (mandatory)
+
+**Open (fully specified):**
+
+* What each displayed metric represents conceptually.
+* Units, transformations at a high level (e.g. “rolling mean over 30 days”).
+* Missingness behavior (nulls, gaps, no interpolation unless explicitly stated).
+* Time windows and horizon definitions.
+
+**Protected (verifiable, not reproducible):**
+
+* Calibration constants, thresholds, mapping functions, regime transition hysteresis.
+* Any parameters that can enable inversion or raw-source reconstruction.
+
+### 3.2 Verifiability via invariants (mandatory)
+
+We publish testable invariants instead of sensitive parameters, e.g.:
+
+* monotonicity constraints where relevant,
+* robustness constraints,
+* persistence constraints for “notables/regimes,”
+* confidence must decrease with worse freshness/coverage/missingness.
+
+### 3.3 Non-invertibility controls (mandatory)
+
+UI and documentation must not expose combinations that allow back-solving.
+Explicit prohibitions:
+
+* Do not show raw-like counts and normalized/standardized equivalents side-by-side if it increases inversion risk.
+* Do not disclose baseline distributions, normalization constants, or percentiles that allow reconstruction.
+
+---
+
+## 4) Website must be built from scratch: source-of-truth and anti-ghosting
+
+This directly addresses the historical failure mode: old drafts showing up via caching.
+
+### 4.1 Single source of truth (hard)
+
+* The new website must exist under a single clean root (example): `site/`.
+* No reuse of any legacy `web/` folder or older projects.
+* The server must serve only the current build output for this web project.
+
+### 4.2 Environment-configured data base URL (hard)
+
+The web must never assume local filesystem structure.
+
+* The website reads data from a single configurable base URL:
+
+  * `DATA_BASE_URL` (e.g. `/data/published/v1` in local dev)
+  * or `https://cdn.example.com/published/v1` in production
+
+**Hard requirement:** changing base URL must require **zero code changes** (only config).
+
+### 4.3 Dev caching policy (hard)
+
+Dev server must send:
+
+* `Cache-Control: no-store`
+* `Pragma: no-cache`
+* `Expires: 0`
+
+Also:
+
+* No Service Worker.
+* No PWA defaults.
+* No app-shell caching.
+
+### 4.4 Production caching policy (hard)
+
+To prevent old drafts in production:
+
+* Static assets must be content-hashed (e.g. `app.<hash>.js`).
+* `index.html` must be revalidated or short-TTL.
+* `dataset.json` and `manifest.json` must be:
+
+  * short-TTL or revalidated, and
+  * the client must add a safe cache-buster query using `dataset_id` (e.g. `?d=<dataset_id>`).
+
+### 4.5 Build proof (hard)
+
+UI must display at all times:
+
+* `dataset_id`
+* `revision_id`
+* `computed_at_utc`
+  and ideally:
+* per-chain `asof` and computed lag-days.
+
+---
+
+## 5) Development strategy: data-proof first, then product layers
+
+### Phase 1: Data contract proof (mandatory before any UX)
+
+Deliverable: “12 Proof Charts”
+
+* 4 chains × 3 genres = 12 charts
+* Each chart plots one metric across time with hover tooltips.
+* Horizon switching must be wired immediately (7/30/90/180/365), using `lastXd.json`.
+
+**Acceptance criteria (hard):**
+
+* The app successfully fetches:
+
+  * `dataset.json`
+  * all 12 manifests
+  * at least one window file per chart (e.g. last90d)
+* If any file missing: explicit error state with actionable message.
+* No silent fallback and no partial rendering without explanation.
+
+### Phase 2: Routing skeleton
+
+Routes must exist early even if minimal:
+
+* `/` landing
+* `/chain/:chain`
+* `/methodology`
+* `/wiki`
+* `/proof` (kept as internal diagnostic route even in later versions)
+
+### Phase 3: Landing page + chain pages
+
+* Landing: per-chain summary cards and “What changed?” blocks (descriptive only).
+* Chain pages: grouped metric sections, horizon selector, confidence overlays.
+
+### Phase 4: Methodology + Wiki expansion
+
+* Expand metric-by-metric.
+* Basic/Advanced toggles everywhere.
+
+### Phase 5: Context blocks and notables (pipeline-driven)
+
+* Context blocks must be produced in `derived` by pipeline (protected logic stays out of browser).
+* UI only renders.
+
+---
+
+## 6) Tech stack constraints (lean, stable, cloud-ready)
+
+Recommended baseline:
+
+* TypeScript
+* React + Vite (leanest path; SSR is optional later)
+* Schema validation (Zod) for dataset.json and manifest.json (hard requirement)
+* Charting library chosen for:
+
+  * fast rendering
+  * tooltip support
+  * multiple series per chart
+  * minimal bundle
+
+Non-goals in v1:
+
+* user accounts
+* real-time streaming
+* backend compute
+* alerts / notifications
+
+---
+
+## 7) Mandatory web module boundaries (maintainability + correctness)
+
+### 7.1 Data access layer is exclusive (hard)
+
+UI components must not fetch data directly.
+All network calls must go through a single “DataClient” module that:
+
+* reads `DATA_BASE_URL`,
+* fetches dataset.json → manifests → window/day files,
+* enforces cache policy,
+* validates schema,
+* exposes typed results or typed errors.
+
+### 7.2 Error handling policy (hard)
+
+Errors must be:
+
+* visible (banner/page)
+* specific (“missing manifest.json for gold/base”)
+* actionable (suggest which file is missing)
+
+No “silent console errors”.
+
+---
+
+## 8) Interpretation governance (context without prediction)
+
+### 8.1 What “interpretation” means here
+
+Interpretation is **descriptive contextualization**, not advice and not forecasting.
+
+Allowed:
+
+* “This combination historically corresponds to higher usage intensity relative to fees.”
+  Not allowed:
+* “This is bullish/bearish.”
+* “You should buy/sell.”
+* “This will lead to…”
+
+### 8.2 Implementation rule (hard)
+
+* All context blocks must be computed pipeline-side into derived outputs.
+* Browser must not contain the protected decision logic.
+
+### 8.3 Format (recommended)
+
+In `derived`, attach:
+
+* `context_blocks[]` items with:
+
+  * `id`, `title`
+  * `basic_text`, `advanced_text`
+  * `evidence` (references to input metrics as bands/categories, not raw thresholds)
+  * `confidence`
+
+---
+
+## 9) Quality gates & governance
+
+### 9.1 Data gating (hard)
+
+Pipeline must run validation on `published/v1`:
+
+* manifests exist
+* lastXd exists for supported windows
+* dates sorted, no duplicates
+
+### 9.2 Web gating (hard)
+
+CI must include:
+
+* TypeScript build
+* schema validation tests
+* proof page smoke test
+
+### 9.3 Change governance (hard)
+
+If calculations or meaning change:
+
+* increment `methodology_version`
+* document in changelog
+* keep “Previously” references so pros can track changes
+
+---
+
+## 10) Security & anti-abuse controls (plan now, enforce before public release)
+
+* Static hosting via CDN recommended.
+* ToS must forbid scraping/reverse engineering.
+* Production must not expose raw payload dumps or “JSON inspector” views without gating.
+
+---
+
+## 11) Day-1 acceptance checklist (must pass)
+
+1. Pipeline produces `data/published/v1/dataset.json`
+2. All 12 manifests exist (`gold/meta/derived × 4 chains`)
+3. For each chain/genre:
+
+   * `latest.json` exists if any days exist
+   * all required `lastXd.json` exist
+4. Web `/proof` renders 12 charts (or explicit “no data” states)
+5. UI shows `dataset_id`, `revision_id`, `computed_at_utc`
+6. Dev mode cannot serve old drafts:
+
+   * no-store headers
+   * no service worker
+   * clean build outputs
+
+---
+
+## 12) Explicit “must not” list (hard)
+
+* Do not reuse any legacy web folder or codebase.
+* Do not implement protected scoring/regime/context logic client-side.
+* Do not include price data, predictions, or advisory language.
+* Do not expose invertible parameters or baseline distributions.
+* Do not rely on directory listing for data discovery.
+* Do not hide missing data; show it explicitly.
+
+---
+
+
+
