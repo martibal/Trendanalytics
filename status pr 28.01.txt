@@ -1,0 +1,169 @@
+Her er en **prompt du kan lime inn i en ny chat** for å få den nye chatten 100% oppdatert på status, filer, dataflyt, pipeline og hva som må avklares før neste steg.
+
+---
+
+Du er et team av seniororakler i webutvikling + statistikere, og du skal fortsette et pågående prosjekt.
+
+## 0) Overordnet mål og absolutte krav
+
+Vi bygger en internasjonal (ENG) webplattform for krypto-onchain trendanalyse som er abonnementsverdig og behovsstyrt. Primærbrukere er amatører og profesjonelle investorer som er lei av daglige/intradag-prisrapporter. Plattformen skal være pedagogisk (Basic) men også tilby metodisk dybde (Advanced) og eksport i JSON for proffer.
+
+**Absolutte krav:**
+
+* ALDRI prisdata, prisgrafer, prognoser eller rådgivende/imperativt språk.
+* Kun deskriptive observasjoner og historisk kontekst.
+* Alt må kunne forklares fullt ut (“hva, hvordan beregnet, hvorfor, verdi”).
+* Alle datadimensjoner må være eksplisitte: tidsvindu, dekning, freshness/lag, kvalitet/konfidens, enheter/transformasjoner, historisk referanse.
+* Chain-spesifikk kontekst er obligatorisk: BTC/ETH/ARB/BASE har ulike metrikker/semantikk og kan ikke tvangsstandardiseres.
+* Basic/Advanced forklaringer i UI.
+* Notables skal være deskriptive basert på avvik + persistens, ikke råd.
+
+## 1) Prosjektstruktur og “ground truth” stier
+
+Rot: `D:\css\main\`
+
+* Pipeline genererer JSON under `D:\css\main\data\published\v1\...`
+* Next.js app ligger i: `D:\css\main\web-v1\`
+
+Viktig: Vi hadde tidligere “-kopi”/backup-filer i rot som ble plukket opp av søk/build og forvirret hvem som skrev `last365d.json`. Disse backup-filene er nå flyttet UT av rot, og pipeline + web fungerer etter det.
+
+## 2) Pipeline (hva den gjør, på høyt nivå)
+
+Pipeline henter daglige data fra AWS (kjedespesifikt) og produserer “published/v1”-datasett for hver chain (bitcoin/ethereum/arbitrum/base). Pipeline orkestreres via GUI-runner `css_gui_pipeline` som kjører full pipeline når man trykker “kjør pipeline” og populærer `D:\css\main\data\` med nye JSON-er.
+
+Pipeline produserer tre hoved-JSON-formater per chain:
+
+* `gold` = daglige rå/deskriptive metrikker per dato (grunnlaget for all visualisering)
+* `derived` = pipeline-deriverte features (bl.a. glidende snitt for mange metrics)
+* `meta` = kvalitet/status/freshness/konfidens/regime/scorecards/lag-policy
+
+Den publiserte strukturen vi bruker i web:
+`/data/published/v1/<genre>/<chain>/...`
+der `<genre>` ∈ {gold, derived, meta}
+
+Viktig praktisk funn: `last365d.json` var tidligere feil (ca 228–245 dager) pga feil logikk/filkilde. Vi verifiserte server vs lokal fil ved å hashe innholdet og telle rader, og fant at “served” og “local” var identiske, men `last365d.json` representerte ikke 365 datapunkter. Etter å fjerne/ flytte backup/-kopi filer og kjøre pipeline på nytt fikk alle chains “pass”.
+
+## 3) Webapp: hva vi har bygget så langt (Next.js App Router)
+
+Vi initierte `web-v1` med Next.js/TS/Tailwind/app-router.
+
+### 3.1 Datahenting i web
+
+Web leser JSON statisk via relative paths under:
+`NEXT_PUBLIC_DATA_BASE_URL` (default `/data/published/v1`)
+Vi har verifisert at `/data/published/v1/gold/<chain>/last365d.json` lastes korrekt.
+
+Vi har eksplisitt testet “hele historikken” via last365d og bekreftet at web klarer å lese hele vinduet. Vi verifiserte også at web og pipeline peker på samme filsti.
+
+### 3.2 Chain detail-side: `/chains/[chain]`
+
+Filen: `D:\css\main\web-v1\src\app\chains\[chain]\page.tsx`
+Dette er en client-side side (use client) som:
+
+* Leser dataset: `/data/published/v1/dataset.json` for supported chains og windows.
+* Leser gold: `/data/published/v1/gold/<chain>/latest.json`
+* Leser gold-window: `/data/published/v1/gold/<chain>/last{N}d.json` (prefer 365 om støttet)
+* Rendrer en liste av metrikker per chain (chain-aware preferred list + “extras” som fallback)
+* Viser Basic/Advanced chain interpretation context (midlertidig hardkodet i page.tsx i denne versjonen)
+* Viser “Status” per metrikk (Elevated/Typical/Depressed) basert på 52-ukers baseline av weekly medians:
+
+  * ukentlig median per 7-dagers bucket
+  * 52-week distribusjon av weekly medians
+  * percentile av siste ukes weekly median
+  * “distance vs norm” i IQR-units
+* Ingen anbefalinger: status er deskriptiv (“higher than typical relative to the past year”, osv.)
+
+### 3.3 Interaktive grafer med 3 serier (daily + MA7 + MA30)
+
+Ny komponentfil: `D:\css\main\web-v1\src\components\MetricChart.tsx`
+
+* Bruker Recharts.
+* Bygger en kontinuerlig dagserie fra rows (fyller manglende datoer med null -> faktisk null? NEI: setter value=null).
+* Beregner SMA 7 og SMA 30.
+* SMA er “strict”: hvis det finnes null/manglende i vinduet blir MA null (ingen fake smoothing over hull).
+* Tooltip på hover viser dato + daily + MA7 + MA30.
+* Palette kan settes per chain for “proffe nyanser”.
+
+Chain page.tsx bruker MetricChart per metrikk, med chain-spesifikk palett for MA-linjene.
+
+Recharts må være installert: `npm i recharts`.
+
+### 3.4 Visual theme (globals + layout)
+
+Vi implementerte et mørkt “premium” design-token system i Tailwind globals.
+
+Filer:
+
+* `D:\css\main\web-v1\src\app\layout.tsx`:
+
+  * importerer `./globals.css`
+  * bruker `next/font/google` for Inter (var `--font-primary`) + Geist_Mono (var `--font-mono`)
+* `D:\css\main\web-v1\src\app\globals.css`:
+
+  * Tailwind directives øverst
+  * CSS tokens: background, borders, shadows, gradients, text hierarchy
+  * helper-classes: `css-card`, `css-panel`, `css-hero`, `css-label`, `css-mono`
+  * inputs styling, focus styling, reduced-motion
+
+Vi hadde en build-feil pga `@import` i globals.css (Tailwind krever @import før @tailwind). Vi fjernet @import helt og gikk over til next/font. Vi måtte også slette `.next` cache for å bli kvitt stale error.
+
+Debug-gating:
+
+* `NEXT_PUBLIC_INTERNAL_DEBUG=1` brukes for å vise/ skjule debug-detaljer i intern build. Prod skal ikke vise debug.
+
+## 4) Hva som er “done” funksjonelt
+
+* Web leser gold JSON for alle chains og viser 365d historikk.
+* Interaktive charts med daily + MA7 + MA30 + hover tooltip.
+* “Status” og “distance vs norm” basert på 52-week weekly median baseline.
+* Chain switch dropdown fungerer og chain-spesifikk metric-set håndteres (BTC kan mangle metrikker).
+* Dark theme tokens og typografi er satt opp.
+
+## 5) Hva som IKKE er bygget ennå (plan videre)
+
+Planen er 2-lags IA:
+
+1. Landing/overview-side (scan dashboard) med “rask oversikt” per chain, fargerikt men proft, med de viktigste grafene og tallene og “worth noting” teasers. Klikk inn til chain detail.
+2. Chain detail (vi har den) som blir dypere, mer metodikk, flere moduler.
+
+Innholdsmessig har vi masse igjen:
+
+* Utnytte `meta` og `derived` fullt ut i UI (freshness/lag, data confidence, regime, scorecards).
+* Bygge “Notables” som faktisk forklarer hva som er verdt å merke seg, deskriptivt, med persistens og alternative forklaringer.
+* Lage Methodology/Wiki Basic+Advanced og info-bokser per metrikk.
+* Lage eksport-/API-modell (meta- og gold-JSON) med abonnementsstyrt historikk.
+
+## 6) Kritiske oppfølgingsspørsmål neste chat må avklare før vi bygger mer
+
+Neste chat MÅ avklare med meg (bruker) før videre utvikling:
+
+A) “Data catalog / prioritering”
+
+* Hvordan vil vi involvere investor-panel og statistikere for å velge hvilke metrikker/derived/meta som blir “core” per chain?
+* Skal vi lage en intern `/catalog`-side som scanner JSON og viser keys, coverage, null-rate, min/median/max, og lar panelet kommentere?
+
+B) Landing page scope
+
+* Hvilke 3–5 metrikker per chain skal vises på landing (per chain, ikke global standard)?
+* Hvordan skal landing vise “worth noting”: badge + 1-liner eller mer?
+
+C) Notables v2
+
+* Hva er ønsket terskel/definisjon av “notable” (percentile cutoffs, IQR-units, persistenskrav)?
+* Hvordan skal Basic vs Advanced tekst se ut (kort vs metodisk)?
+
+D) Meta/freshness
+
+* Hvordan skal vi eksponere datalag/freshness/lag-policy tydelig på landing og detail?
+* Skal vi ha “data confidence” badges, og hvor synlige?
+
+E) Vedlikehold/arkitektur
+
+* Skal chain-spesifikke metric-defs flyttes ut av `page.tsx` til en dedikert registry-fil (for enklere vedlikehold), og hvordan skal den struktureres?
+
+F) Visual direction
+
+* Ønsket “palette system”: per chain, per metric, eller begge? (må være konsistent og ikke for “gaming”).
+* Ønsker vi å standardisere kort-komponenter for landing (ChainCard, MetricPanel) nå?
+
+Start neste chat med å spørre meg disse avklaringene (A–F) og deretter levere én fil av gangen, med minst mulig ping-pong.
