@@ -1,0 +1,356 @@
+Du er webutvikler-teamet mitt og skal ta over et eksisterende Next.js-prosjekt (web-v1). Målet er å bygge en deskriptiv krypto on-chain innsiktsplattform (ingen prisdata/grafer, ingen prognoser, ingen anbefalinger). Plattformen viser robuste trender/regimer og “Notables” (deskriptive avvik + persistens), med Basic/Advanced forklaringsnivå, og eksplisitte datadimensjoner (tidsvindu, dekning, freshness/lag, datakvalitet/konfidens, enheter/transformasjoner, historisk referanse).
+
+0) Repo / stack / constraints
+
+Repo: D:\css\main\web-v1
+
+Framework: Next.js (App Router), TypeScript, Tailwind-ish styling.
+
+Strengt produktkrav: 100% deskriptivt. Ingen pris, forecasting eller rådgivende språk.
+
+UI språk: Engelsk (selv om denne prompten er norsk).
+
+1) Hva vi har bygget (funksjonelt)
+
+Vi har nå en fungerende webapp som:
+
+Leser publiserte JSON “gold” datasett fra lokal path (via HTTP fetch av statiske filer/endepunkt i appen).
+
+Har en intern katalog-side som skanner dataset og viser:
+
+metadata (dataset_id, computed_at_utc, chain freshness)
+
+warnings (manglende metrikker osv.)
+
+tabell for “gold metrics (observed)”
+
+(tidligere besluttet) panel for “Declared-but-not-observed” (core) som en kvalitets-/publiserings-sjekk.
+
+Har en chain-detaljside per chain (/chains/[chain]) som viser:
+
+toppmetadata (“Latest (gold)”, computed_at, etc.)
+
+regime-seksjoner (nå implementert):
+
+Activity Regime + Notables
+
+Fee / Capacity Regime + Notables
+
+metrikkliste og flere charts (daglig serie + MA7/MA30)
+
+Basic/Advanced toggle, og “Show details” for Notables.
+
+2) Nøkkelruter (App Router)
+
+I dagens kodebase (fra zip) ser rute-strukturen ut som dette:
+
+/ (home)
+
+/_not-found (Next intern)
+
+/chains/[chain] (chain detail side)
+
+/internal/catalog (internal dataset catalog)
+
+/proof (test / proof page)
+
+3) Hva som skjedde underveis (viktige problemer + løsninger)
+Problem A: Next.js prerender/build-feil (“workUnitAsyncStorage”)
+
+Vi fikk repeterende build-feil i next build:
+
+Invariant: Expected workUnitAsyncStorage to have a store. This is a bug in Next.js.
+Feilen trigget ved prerender av sider som /internal/catalog, /, /_global-error, /_not-found.
+
+Løsning vi gikk for (minste invasive endring):
+
+Flyttet “tung UI + fetch” til Client Components (f.eks. CatalogClient, HomeClient).
+
+Lot page.tsx for relevante ruter bli en tynn Server wrapper som kun rendrer client-komponenten.
+
+La på eksplisitte Next-flags på noen pages for å unngå caching/prerender issues:
+
+export const dynamic = "force-dynamic";
+
+export const fetchCache = "force-no-store";
+(Dette er for å tvinge runtime behavior som ikke forsøker å prerendre / cache på måter som trigget invariant-bug.)
+
+Problem B: TypeScript props mismatch i MetricChart
+
+Feil:
+
+Property 'chain' does not exist on type MetricChartProps
+Årsak: MetricChart tar rows + metricKey, ikke chain.
+
+Løsning:
+
+I chain-siden bygges rows (timeseries) for riktig chain og sendes inn som:
+
+<MetricChart rows={rows} metricKey={m.key} />
+
+Problem C: “Module not found: Can't resolve './CatalogClient'”
+
+Årsak: Filnavn/import mismatch.
+
+Løsning:
+
+Sørget for at src/app/internal/catalog/CatalogClient.tsx eksisterer og at page.tsx importerer korrekt:
+
+import CatalogClient from "./CatalogClient";
+
+Problem D: Node/npm rot (Windows EPERM, “next not recognized”, nvm)
+
+Vi traff EPERM unlink lightningcss...node under npm ci (typisk Windows file-lock/AV).
+
+Vi fikk også situasjoner der next ikke var i PATH etter at node_modules ble slettet.
+
+Vi testet NVM for Windows; fikk PATH/symlink issues, måtte legge til $env:NVM_SYMLINK i PATH for at node skulle finnes.
+
+Vi endte med Node v22.11.0 i en periode, men hovedpoenget: vi ønsker ikke OS-endringer fremover; kun minimale kodeendringer.
+
+Status nå:
+
+npm run build kjører og fullfører (vi har skjermbilde der build lykkes og lister routes).
+
+Det kom fortsatt en warning om at Next “workspace root may not be correct” pga flere lockfiles. Dette er en hygiene-ting vi kan adressere senere (evt. turbopack.root i next config eller rydde lockfile-lokasjoner).
+
+4) Hvilke filer/komponenter som gjør hva (high-level map)
+
+Dette er hvordan koden nå er organisert konseptuelt:
+
+A) src/app/internal/catalog/page.tsx
+
+Server wrapper.
+
+Rendrer <CatalogClient />.
+
+Har typisk dynamic/no-store flags for å unngå build/prerender issues.
+
+B) src/app/internal/catalog/CatalogClient.tsx
+
+"use client"
+
+Rendrer Internal Catalog UI:
+
+Dataset meta
+
+Warnings
+
+“Declared but NOT observed (CORE)” panel
+
+“Gold metrics (observed)” tabell
+
+Vi la til unit/scale badges i tabellen (kolonne “unit / scale”), derivert fra metricsuffix og/eller scan diagnostics:
+
+Eksempler: sec, daily, rate 0..1, pct 0..1 varies, wei varies.
+
+Merk: “varies” brukes når unit/scale avviker per chain og må dokumenteres eksplisitt før bred eksponering.
+
+C) src/app/chains/[chain]/page.tsx
+
+Chain detail side (rendrer chain “insights”).
+
+Har Basic/Advanced toggle.
+
+Viser:
+
+Chain header + introtekst (per chain)
+
+Dataset metadata (dataset_id, computed_at, latest date)
+
+Activity Regime seksjon:
+
+dimensjoner som TX activity + address participation
+
+regime-status (low/mid/high relatert til chainens egen historikk)
+
+Notables med “Show details”
+
+Fee / Capacity Regime seksjon:
+
+dimensjoner: median_tx_fee_native (fees) + gas_utilization_pct (capacity usage)
+
+Notables: bounded deviation, divergence etc.
+
+“Latest (gold)” key/value-liste
+
+Charts per metrikk via MetricChart
+
+D) src/components/MetricChart.tsx
+
+Recharts-komponent for timeseries.
+
+Props: { rows, metricKey } (ikke chain).
+
+Viser daily + MA7 + MA30 (legend).
+
+E) src/catalog/scan/* (scan/diagnostics)
+
+scanGoldDataset() og underliggende:
+
+loadDataset() → fetcher dataset JSON fra base path
+
+analyserer chains_present, missing_rate, min/median/max
+
+genererer warnings og “declared vs observed” checks
+
+F) src/lib/dataClient.ts
+
+Har server-helpers (bruker next/headers) for å bygge base URL osv.
+
+Viktig: må ikke importeres i client-komponenter (server-only).
+
+G) src/app/global-error.tsx, src/app/not-found.tsx
+
+Lagt til/justert for å unngå build/SSR edge cases.
+
+Skal være enkle, uten server actions/eksotiske imports.
+
+5) Hva vi har oppnådd i UI/produktlogikk
+
+Vi har etablert en regime/trend-ramme som følger produktkrav:
+
+deskriptivt språk (“elevated relative to own history”, “subdued”, “bounded deviation”)
+
+tydelig “No price charts, no recommendations, no forecasting”
+
+Vi har implementert Notables som et lag over regime-seksjoner:
+
+basert på historisk avvik + persistens
+
+Basic/Advanced visning
+
+“Show details” for metodisk forklaring
+
+Vi har startet dokumentasjon (forklaringsbokser) for følgende metrikker:
+
+gas_utilization_pct
+
+failed_tx_rate
+
+value_transferred_native
+
+median_tx_value_native
+
+avg_block_time_sec
+
+block_count_daily
+(Dette er “docs” i UI: korte forklaringer per metrikk, med Basic/Advanced.)
+
+6) Hva som er neste trinn i utviklingen (prioritert)
+
+Stabilisere build uten OS-endringer
+
+Målet er at npm run build alltid fungerer på Windows uten nvm-triksing.
+
+Vi må unngå imports som trekker inn Next server internals i client eller prerender.
+
+Minimal endring i struktur; kun nødvendige patches.
+
+Harde opp datadimensjoner i UI
+
+For hver metrikk/regime: eksplisitt vise:
+
+window (last365d)
+
+chain coverage
+
+freshness/lag (BTC/ETH vs Base/Arb)
+
+enhet/scale (sec, wei, rate 0..1 osv.)
+
+transformasjoner (MA7/MA30)
+
+referanse (egen historikk, percentiler osv.)
+
+Utvide regimes
+
+Activity regime er på plass (TX + Address participation).
+
+Fee/Capacity regime er på plass (Fees + gas utilization).
+
+Neste regime å vurdere: “Reliability / Execution” (failed_tx_rate), eller “Value flow” (value_transferred_native + median_tx_value_native), men uten normativ tolkning.
+
+Notables: gjøre kriterier helt eksplisitte
+
+Definisjon av “notable” basert på:
+
+avvik i forhold til historisk distribusjon (percentile/zscore-ish men forklarbart)
+
+persistens (uavbrutt N uker)
+
+Alltid Basic/Advanced og alternative forklaringer.
+
+Catalog hygiene
+
+“Declared-but-not-observed” panel skal være robust, men må ikke blokkere build.
+
+Rydde opp i warnings: “metric exists but all missing” (kan vente, men pipeline bør merkes).
+
+Unit badges: definere canonical mapping pr metric_id (ikke bare heuristikk).
+
+7) Spørsmål jeg (produkt-eier) må besvare for å avklare videre drift
+
+Svar på disse før du implementerer mer:
+
+A. Deploy-modell
+
+Skal dette deployes som:
+
+(1) ren statisk site (SSG/export),
+
+(2) SSR/server-runtime (Node server),
+
+(3) hybrid?
+Dette påvirker caching, fetch, og hvor datafilene må ligge.
+
+B. Data access
+2) Er data alltid lokale filer under /data/published/... (som nå), eller skal det også støtte remote (S3/CDN)?
+3) Skal API/JSON være tilgjengelig offentlig eller bak auth senere?
+
+C. Regime-definisjoner
+4) For Activity regime: hvilke dimensjoner er “definitivt inne” for alle chains?
+
+tx_count_daily, unique_active_addresses (proxy), kanskje block_count_daily?
+
+For Fee/Capacity: er “fees” alltid median_tx_fee_native, og “capacity” alltid gas_utilization_pct (EVM-only)?
+
+Hva gjør vi for Bitcoin (ikke EVM)? Skal Fee/Capacity regime skjules, eller ha BTC-spesifikke proxies?
+
+D. Notables
+6) Hva er minimum persistens-krav (uker) for at en notable skal vises?
+7) Skal vi cap’e antall Notables per regime (f.eks. max 2) slik UI ikke blir støy?
+
+E. Basic/Advanced
+8) Hvor detaljert skal Advanced være i UI vs flyttes til en Methodology/Wiki-side?
+
+F. Scope
+9) Skal internal catalog være kun for dev/internal, eller et produktpanel bak “admin”?
+
+8) Viktig operasjonell praksis (for neste assistent)
+
+Ta én endring av gangen.
+
+Lever alltid hele filer uavkortet når du ber om at jeg skal erstatte en fil.
+
+Når du sier “lim inn her”, må du gi:
+
+eksakt “tekst over” + “tekst under” (ankerlinjer) slik det er umulig å plassere feil.
+
+Ikke foreslå OS-endringer. Kun nødvendige kodeendringer i repo.
+
+9) Status akkurat nå
+
+Appen fungerer i dev (localhost) og henter data.
+
+Vi har hatt en lengre build-krise, men build har nå kjørt til completion (route listing i terminal).
+
+Det gjenstår:
+
+å sikre at build alltid er stabil uten miljø-hacks
+
+å stramme opp turbolockfile warning / workspace root warning (sekundært)
+
+å fortsette regime + notables + docs metodisk
+
+Din jobb nå: foreslå minimale kodeendringer for å gjøre build 100% robust, og deretter fortsette med neste regime/notables/docs etter at jeg har besvart spørsmålene over.

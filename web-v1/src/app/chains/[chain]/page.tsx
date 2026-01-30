@@ -4,6 +4,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import MetricChart from "@/components/MetricChart";
+import {
+  type MetricKey,
+  metricExplainForChain,
+  metricFormatForChain,
+  metricTitleForChain,
+  metricUnitForChain,
+  orderedMetricKeysForChain,
+  CHAINS,
+} from "@/lib/metricRegistry";
 
 type Chain = "bitcoin" | "ethereum" | "arbitrum" | "base";
 type ExplainMode = "Basic" | "Advanced";
@@ -51,6 +60,34 @@ function safeKeys(row: Record<string, any> | null | undefined): string[] {
   return Object.keys(row ?? {}).filter((k) => k !== "chain" && k !== "date");
 }
 
+
+type MetricCard = {
+  key: MetricKey;
+  title: string;
+  unit: "count" | "sec" | "native" | "pct" | "unknown";
+  basic: string;
+  advanced: string;
+  format?: {
+    decimals?: number;
+    pctIsFraction?: boolean;
+  };
+};
+
+function buildMetricCards(chain: Chain, keysInData: string[]): MetricCard[] {
+  const ordered = orderedMetricKeysForChain(chain, keysInData as MetricKey[]);
+  return ordered.map((key) => {
+    const explain = metricExplainForChain(chain, key);
+    return {
+      key,
+      title: metricTitleForChain(chain, key),
+      unit: metricUnitForChain(chain, key),
+      basic: explain?.basic ?? "",
+      advanced: explain?.advanced ?? explain?.basic ?? "",
+      format: metricFormatForChain(chain, key),
+    };
+  });
+}
+
 function median(nums: number[]): number | null {
   if (!nums.length) return null;
   const a = [...nums].sort((x, y) => x - y);
@@ -84,118 +121,8 @@ function clamp01(x: number): number {
   return Math.min(1, Math.max(0, x));
 }
 
-// ---------- chain context + metric labels ----------
-type MetricDef = {
-  key: string;
-  title: string;
-  unit: "count" | "sec" | "native" | "pct";
-  basic: string;
-  advanced?: string;
-};
-
-const CHAIN_CONTEXT: Record<Chain, { basic: string; advanced: string }> = {
-  bitcoin: {
-    basic:
-      "Bitcoin’s on-chain activity is most often interpreted through transaction counts, block production cadence, and transfer aggregates. Some EVM-centric metrics may be absent or not meaningful.",
-    advanced:
-      "BTC metrics are non-EVM and can diverge in semantics vs EVM L1/L2. Treat ‘active addresses’ and value aggregates as coarse proxies. Fee/size dynamics reflect UTXO behavior and batching.",
-  },
-  ethereum: {
-    basic:
-      "Ethereum L1 activity can be described using transaction counts, address participation proxies, fee environment, and capacity usage. Values are presented descriptively and relative to Ethereum’s own history.",
-    advanced:
-      "Ethereum is account-based and EIP-1559 changed fee structure. Address participation is not user identity. Interpret capacity/fees as descriptive context; no forecasting is implied.",
-  },
-  arbitrum: {
-    basic:
-      "Arbitrum is an L2 where activity and participation can be shaped by batching and application mix. Metrics are shown relative to Arbitrum’s own history for descriptive context.",
-    advanced:
-      "L2 semantics differ from L1. Transaction ‘granularity’ can vary with batching and sequencer behavior; cross-chain absolute comparisons are not assumed.",
-  },
-  base: {
-    basic:
-      "Base is an L2 where activity and participation can be shaped by batching and application mix. Metrics are shown relative to Base’s own history for descriptive context.",
-    advanced:
-      "L2 semantics differ from L1. Transaction ‘granularity’ can vary with batching and sequencer behavior; cross-chain absolute comparisons are not assumed.",
-  },
-};
-
-const METRICS: MetricDef[] = [
-  {
-    key: "tx_count_daily",
-    title: "Transactions (daily)",
-    unit: "count",
-    basic: "Daily count of on-chain transactions (chain-specific semantics).",
-    advanced:
-      "A transaction is defined by the chain’s canonical model. This is a descriptive count and is not a measure of economic value.",
-  },
-  {
-    key: "unique_active_addresses",
-    title: "Active addresses (daily)",
-    unit: "count",
-    basic: "Daily count of unique addresses observed as active (proxy, not users).",
-    advanced:
-      "Addresses are not identities. One entity can control many addresses; one address can represent many users via contracts/exchanges.",
-  },
-  {
-    key: "median_tx_fee_native",
-    title: "Median tx fee (native)",
-    unit: "native",
-    basic: "Median fee paid per transaction, in native base units (sat/wei).",
-    advanced:
-      "Fees are descriptive of blockspace competition. Units differ across chains (sat vs wei) and are not made comparable here.",
-  },
-  {
-    key: "gas_utilization_pct",
-    title: "Gas utilization",
-    unit: "pct",
-    basic: "Share of available gas capacity used in blocks (EVM chains).",
-    advanced:
-      "A capacity usage descriptor derived from gas_used / gas_limit. Not applicable on non-EVM chains.",
-  },
-  {
-    key: "failed_tx_rate",
-    title: "Failed tx rate",
-    unit: "pct",
-    basic: "Fraction of transactions with failed/reverted execution (EVM chains).",
-    advanced:
-      "Failure semantics depend on chain and source. This is descriptive outcome context, not a security or reliability judgement.",
-  },
-  {
-    key: "value_transferred_native",
-    title: "Value transferred (native)",
-    unit: "native",
-    basic: "Total native asset value transferred per day (sat/wei), descriptive only.",
-    advanced:
-      "Value extraction is chain-dependent. On UTXO chains, treatment of change affects totals; on EVM, internal transfers may matter.",
-  },
-  {
-    key: "median_tx_value_native",
-    title: "Median tx value (native)",
-    unit: "native",
-    basic: "Median native value moved per transaction (sat/wei), descriptive only.",
-    advanced:
-      "Median summarizes typical transfer size and is robust to a small number of large transfers; cross-chain comparison is not assumed.",
-  },
-  {
-    key: "avg_block_time_sec",
-    title: "Avg block time (sec)",
-    unit: "sec",
-    basic: "Average time between blocks (seconds), operational context.",
-    advanced:
-      "Measured from block timestamps; noisy and chain-dependent. On L2s this can reflect sequencer policy rather than decentralized consensus.",
-  },
-  {
-    key: "block_count_daily",
-    title: "Blocks (daily)",
-    unit: "count",
-    basic: "Daily number of blocks produced; operational context for daily capacity.",
-    advanced:
-      "Block cadence is chain-dependent and can vary for probabilistic systems; L2 block concepts are not directly comparable to L1 blocks.",
-  },
-];
-
 // ---------- shared UI helpers ----------
+
 type Band = "lower" | "mid" | "upper";
 
 function bandFromPercentile(p: number): Band {
@@ -448,7 +375,6 @@ function computeActivityRegime(rows: GoldRow[] | null): { regime: ActivityRegime
   const lastWk = labels.length ? labels[labels.length - 1].weekKey : null;
   if (!lastWk) return { regime, notables };
 
-  // Divergence notable
   const divergenceNow = Math.abs(txPct - adPct);
   if (divergenceNow >= 25) {
     notables.push({
@@ -469,7 +395,6 @@ function computeActivityRegime(rows: GoldRow[] | null): { regime: ActivityRegime
     });
   }
 
-  // Ratio-based notables (compression/expansion)
   const ratioNowEntry = ratioSeries.find((x) => x.weekKey === lastWk) ?? ratioSeries[ratioSeries.length - 1];
   if (ratioNowEntry && ratioSorted.length >= 20) {
     const ratioPct = percentileRank(ratioSorted, ratioNowEntry.ratio);
@@ -634,6 +559,13 @@ function computeFeeCapacityRegime(rows: GoldRow[] | null): { regime: FeeCapacity
   const feeSeries = buildWeeklyMedianSeries(rows, "median_tx_fee_native");
   const utilSeries = buildWeeklyMedianSeries(rows, "gas_utilization_pct");
 
+  // Coverage guard (last ~6 weeks): avoid notables when one input is effectively missing.
+  const last6Fee = feeSeries.slice(-6);
+  const last6Util = utilSeries.slice(-6);
+  const feeOk = last6Fee.filter((p) => p.nDays >= 5).length >= 4;
+  const utilOk = last6Util.filter((p) => p.nDays >= 5).length >= 4;
+  const coverageOk = feeOk && utilOk;
+
   const feeCur = pickLatestCompleteishWeek(feeSeries);
   const utilCur = pickLatestCompleteishWeek(utilSeries);
   if (!feeCur || !utilCur) return { regime: null, notables: [] };
@@ -658,6 +590,9 @@ function computeFeeCapacityRegime(rows: GoldRow[] | null): { regime: FeeCapacity
   const notables: FeeNotableModel[] = [];
   if (!regime.isVisible) return { regime, notables };
 
+  // If coverage is weak, show regime but do not produce notables.
+  if (!coverageOk) return { regime, notables };
+
   const divergence = Math.abs(feePct - utilPct);
   if (Number.isFinite(divergence) && divergence >= 25) {
     notables.push({
@@ -681,7 +616,7 @@ function computeFeeCapacityRegime(rows: GoldRow[] | null): { regime: FeeCapacity
     });
   }
 
-  if ((feePct >= 90 || feePct <= 10) && persistedWeeks >= 3) {
+  if (feePct >= 90 || feePct <= 10) {
     notables.push({
       kind: "short_term_fee_deviation",
       title: "Short-term fee deviation (bounded)",
@@ -787,8 +722,15 @@ export default function ChainPage() {
   const feeCap = useMemo(() => computeFeeCapacityRegime(goldWindow), [goldWindow]);
   const feeCapRegime = feeCap.regime;
   const feeCapNotables = feeCap.notables;
+
+  // EVM-only: Fee/Capacity is not applicable on Bitcoin
   const isEvmChain = routeChain !== "bitcoin";
 
+  // Visible metric charts by chain (registry-driven)
+  const metricsVisible = useMemo(() => {
+    const keysInData = goldWindow && goldWindow.length ? safeKeys(goldWindow[0]) : [];
+    return buildMetricCards(routeChain, keysInData);
+  }, [routeChain, goldWindow]);
 
   return (
     <div className="mx-auto max-w-6xl p-6">
@@ -797,7 +739,7 @@ export default function ChainPage() {
           <div className="text-xs uppercase tracking-wider text-white/50">Chain</div>
           <h1 className="mt-1 text-2xl font-semibold capitalize">{routeChain}</h1>
           <div className="mt-1 text-sm text-white/70">
-            {mode === "Basic" ? CHAIN_CONTEXT[routeChain].basic : CHAIN_CONTEXT[routeChain].advanced}
+            {mode === "Basic" ? CHAINS[routeChain].interpretation.basic : CHAINS[routeChain].interpretation.advanced}
           </div>
         </div>
 
@@ -1043,9 +985,8 @@ export default function ChainPage() {
         </div>
       ) : null}
 
-      {/* Fee / Capacity Regime + Notables */}
+      {/* Fee / Capacity Regime + Notables (EVM-only) */}
       {isEvmChain && feeCapRegime?.isVisible ? (
-
         <div className="mt-6">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1139,7 +1080,6 @@ export default function ChainPage() {
                 </div>
               </div>
             ) : null}
-            
           </div>
 
           {/* Notables under Fee / Capacity regime */}
@@ -1150,7 +1090,9 @@ export default function ChainPage() {
             </div>
 
             {feeCapNotables.length === 0 ? (
-              <div className="mt-3 text-sm text-white/80">No notable deviations within the current fee/capacity regime.</div>
+              <div className="mt-3 text-sm text-white/80">
+                No notable deviations within the current fee/capacity regime (or coverage is limited).
+              </div>
             ) : (
               <div className="mt-4 space-y-3">
                 {feeCapNotables.map((n) => {
@@ -1270,9 +1212,9 @@ export default function ChainPage() {
         )}
       </div>
 
-      {/* Existing charts */}
+      {/* Charts (filtered by chain) */}
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-        {METRICS.slice(0, 4).map((m) => (
+        {metricsVisible.slice(0, 4).map((m) => (
           <div key={m.key} className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -1289,7 +1231,7 @@ export default function ChainPage() {
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        {METRICS.slice(4).map((m) => (
+        {metricsVisible.slice(4).map((m) => (
           <div key={m.key} className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="flex items-start justify-between gap-2">
               <div>

@@ -284,9 +284,10 @@ export const CHAINS: Record<Chain, ChainProfile> = {
         note: "Not applicable for Bitcoin’s non-EVM gas model in this product.",
       },
       failed_tx_rate: {
-        // Often null/NA depending on upstream, but we keep it in secondary (may exist as nulls).
-        note: "May be null depending on upstream classification; treat as optional coverage.",
+        hidden: true,
+        note: "Not applicable / not consistently available for Bitcoin in this product.",
       },
+
       median_tx_fee_native: {
         title: "Median fee (BTC)",
         format: { decimals: 8 },
