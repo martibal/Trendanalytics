@@ -1,34 +1,18 @@
-import type { Metadata } from "next";
 import "./globals.css";
-import { Inter, Geist_Mono } from "next/font/google";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "force-no-store";
-
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-primary",
-});
-
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-});
+import type { Metadata } from "next";
+import { AppShell } from "@/components/ui/AppShell";
 
 export const metadata: Metadata = {
-  title: "CSS",
-  description: "Descriptive on-chain trend analytics (no price).",
+  title: "Blockchain Trends (Price-Agnostic)",
+  description: "Descriptive, price-agnostic on-chain trend analytics.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${geistMono.variable}`}>
-      <body className="antialiased">{children}</body>
+    <html lang="en">
+      <body>
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }
