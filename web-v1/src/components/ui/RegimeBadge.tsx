@@ -1,15 +1,16 @@
 import clsx from "clsx";
 
 export function RegimeBadge({ label }: { label: string }) {
-  const key = label.toUpperCase();
+  const key = String(label ?? "").toUpperCase();
+
   const tone =
     key === "STABLE"
-      ? "border-emerald-900/60 bg-emerald-950/40 text-emerald-200"
+      ? "border-ui-ok/30 bg-ui-ok/10 text-ui-ok"
       : key === "HEATING"
-      ? "border-amber-900/60 bg-amber-950/40 text-amber-200"
+      ? "border-ui-warn/30 bg-ui-warn/10 text-ui-warn"
       : key === "COOLING"
-      ? "border-sky-900/60 bg-sky-950/40 text-sky-200"
-      : "border-zinc-800 bg-zinc-950 text-zinc-200";
+      ? "border-ui-accent2/30 bg-ui-accent2/10 text-ui-accent2"
+      : "ui-border bg-ui-surface text-ui-muted";
 
   return (
     <span className={clsx("rounded-full border px-2.5 py-1 text-[11px] font-medium", tone)}>

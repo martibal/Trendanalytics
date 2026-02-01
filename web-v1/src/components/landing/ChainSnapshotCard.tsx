@@ -11,7 +11,13 @@ import { MetricTriLineChart } from "@/components/charts/MetricTriLineChart";
 
 import { pickDefaultMetricKeyForChain, getMetricLabel } from "@/lib/registry/metricRegistry";
 
-import { resolveTriSeriesKeys, buildTriSeries, countTriCoverage, type DerivedSeriesRow, type TriSeriesPoint } from "@/lib/series/triSeries";
+import {
+  resolveTriSeriesKeys,
+  buildTriSeries,
+  countTriCoverage,
+  type DerivedSeriesRow,
+  type TriSeriesPoint,
+} from "@/lib/series/triSeries";
 
 function chainDisplayName(chain: ChainId) {
   switch (chain) {
@@ -85,12 +91,7 @@ function buildHighlights(meta: any): string[] {
   return out.slice(0, 3);
 }
 
-export function ChainSnapshotCard(props: {
-  chain: ChainId;
-  metaAsof?: string;
-  derivedAsof?: string;
-  goldAsof?: string;
-}) {
+export function ChainSnapshotCard(props: { chain: ChainId; metaAsof?: string; derivedAsof?: string; goldAsof?: string }) {
   const { chain, metaAsof, derivedAsof, goldAsof } = props;
 
   const bundleDate = useMemo(() => {
@@ -125,7 +126,10 @@ export function ChainSnapshotCard(props: {
 
       setRowsLoading(true);
 
-      const [derivedRaw, goldRaw] = await Promise.all([fetchDerivedSeries(chain, chartDates), fetchGoldSeries(chain, chartDates)]);
+      const [derivedRaw, goldRaw] = await Promise.all([
+        fetchDerivedSeries(chain, chartDates),
+        fetchGoldSeries(chain, chartDates),
+      ]);
       if (!alive) return;
 
       const derivedByDate = new Map<string, Record<string, number | null | undefined>>();
@@ -201,31 +205,31 @@ export function ChainSnapshotCard(props: {
   const highlights = useMemo(() => buildHighlights(meta), [meta]);
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-sm">
+    <div className="rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-sm transition hover:bg-ui-surface2">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold">{displayName}</div>
-          <div className="mt-1 text-[11px] text-zinc-400">
-            Snapshot: <span className="text-zinc-200">{bundleDate ?? "—"}</span>
+          <div className="text-sm font-semibold text-ui-text">{displayName}</div>
+          <div className="mt-1 text-[11px] text-ui-muted">
+            Snapshot: <span className="text-ui-text">{bundleDate ?? "—"}</span>
           </div>
         </div>
         {regimeLabel ? <RegimeBadge label={regimeLabel} /> : null}
       </div>
 
       {/* Primer (short, pedagogical) */}
-      <div className="mt-3 text-xs text-zinc-300">{primerText}</div>
+      <div className="mt-3 text-xs text-ui-text">{primerText}</div>
 
       {/* Default trend */}
       <div className="mt-4">
-        <div className="text-[11px] text-zinc-400">Default trend</div>
-        <div className="mt-1 text-xs text-zinc-200">{metricLabel}</div>
+        <div className="text-[11px] text-ui-muted">Default trend</div>
+        <div className="mt-1 text-xs text-ui-text">{metricLabel}</div>
 
         {/* IMPORTANT: explicit height so recharts ResponsiveContainer can render */}
         <div className="mt-2 h-28 min-h-[112px] w-full">
           {bundleLoading || rowsLoading ? (
-            <div className="flex h-full items-center justify-center text-xs text-zinc-400">Loading…</div>
+            <div className="flex h-full items-center justify-center text-xs text-ui-muted">Loading…</div>
           ) : triSeries.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-xs text-zinc-400">No chart data.</div>
+            <div className="flex h-full items-center justify-center text-xs text-ui-muted">No chart data.</div>
           ) : (
             <MetricTriLineChart data={triSeries} />
           )}
@@ -235,10 +239,10 @@ export function ChainSnapshotCard(props: {
       {/* Highlights (2–3 bullets) */}
       <div className="mt-3 space-y-1">
         {highlights.length === 0 ? (
-          <div className="text-xs text-zinc-500">No snapshot highlights available.</div>
+          <div className="text-xs text-ui-faint">No snapshot highlights available.</div>
         ) : (
           highlights.map((h, i) => (
-            <div key={i} className="text-xs text-zinc-300">
+            <div key={i} className="text-xs text-ui-text">
               • {h}
             </div>
           ))
@@ -248,7 +252,7 @@ export function ChainSnapshotCard(props: {
       <div className="mt-4">
         <Link
           href={`/chains/${chain}`}
-          className="inline-flex items-center rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-100 hover:bg-zinc-800"
+          className="inline-flex items-center rounded-xl border border-ui-border bg-ui-surface2 px-3 py-2 text-xs text-ui-text hover:bg-ui-surface focus:outline-none focus:ring-2 focus:ring-ui-accent/30"
         >
           Open diagnostics
         </Link>

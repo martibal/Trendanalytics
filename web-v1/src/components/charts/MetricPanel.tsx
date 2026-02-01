@@ -31,7 +31,7 @@ function fmtPct(x: number) {
 }
 
 function deltaBadge(daily: number | null, ma: number | null) {
-  if (daily == null || ma == null) return { text: "—", tone: "text-zinc-400 border-zinc-800" };
+  if (daily == null || ma == null) return { text: "—", tone: "text-ui-muted border-ui-border" };
 
   const diff = daily - ma;
   const denom = Math.abs(ma) > 0 ? Math.abs(ma) : 0;
@@ -39,11 +39,7 @@ function deltaBadge(daily: number | null, ma: number | null) {
 
   // Tone only; no “good/bad” semantics.
   const tone =
-    diff > 0
-      ? "text-zinc-200 border-zinc-700"
-      : diff < 0
-      ? "text-zinc-200 border-zinc-700"
-      : "text-zinc-400 border-zinc-800";
+    diff !== 0 ? "text-ui-text border-ui-border" : "text-ui-muted border-ui-border";
 
   const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
   const diffTxt = `${sign}${fmtNum(Math.abs(diff))}`;
@@ -82,25 +78,25 @@ export function MetricPanel(props: {
   const hasAny = data && data.length > 0;
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+    <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
       {/* HEADER */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-zinc-100">{title}</div>
-          {subtitle ? <div className="mt-1 text-xs text-zinc-500">{subtitle}</div> : null}
+          <div className="truncate text-sm font-semibold text-ui-text">{title}</div>
+          {subtitle ? <div className="mt-1 text-xs text-ui-muted">{subtitle}</div> : null}
         </div>
 
         {/* Micro summary: Today vs MA7/MA30 */}
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <div className="text-[11px] text-zinc-500">Today vs MA</div>
+          <div className="text-[11px] text-ui-muted">Today vs MA</div>
           <div className="flex items-center gap-2">
             <div className={`rounded-lg border px-2 py-1 text-[11px] ${d7.tone}`}>
-              <span className="text-zinc-500">MA7</span>{" "}
-              <span className="text-zinc-200">{d7.text}</span>
+              <span className="text-ui-muted">MA7</span>{" "}
+              <span className="text-ui-text">{d7.text}</span>
             </div>
             <div className={`rounded-lg border px-2 py-1 text-[11px] ${d30.tone}`}>
-              <span className="text-zinc-500">MA30</span>{" "}
-              <span className="text-zinc-200">{d30.text}</span>
+              <span className="text-ui-muted">MA30</span>{" "}
+              <span className="text-ui-text">{d30.text}</span>
             </div>
           </div>
         </div>
@@ -109,7 +105,7 @@ export function MetricPanel(props: {
       {/* CHART */}
       <div className="mt-3 h-56 min-h-[220px] w-full">
         {!hasAny ? (
-          <div className="flex h-full items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950 text-sm text-zinc-400">
+          <div className="flex h-full items-center justify-center rounded-xl border border-ui-border bg-ui-surface2 text-sm text-ui-muted">
             No data for window.
           </div>
         ) : (
@@ -119,14 +115,14 @@ export function MetricPanel(props: {
 
       {/* FOOTER: compact toggle + optional explanation */}
       <div className="mt-3 flex items-center justify-between gap-3">
-        <div className="text-[11px] text-zinc-500">
+        <div className="text-[11px] text-ui-muted">
           {last?.date ? (
             <>
-              Last point: <span className="text-zinc-300">{last.date}</span>
+              Last point: <span className="text-ui-text">{last.date}</span>
               {today != null ? (
                 <>
                   {" "}
-                  · Daily: <span className="text-zinc-300">{fmtNum(today)}</span>
+                  · Daily: <span className="text-ui-text">{fmtNum(today)}</span>
                 </>
               ) : null}
             </>
@@ -138,21 +134,21 @@ export function MetricPanel(props: {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-100 hover:bg-zinc-800"
+          className="rounded-xl border border-ui-border bg-ui-surface2 px-3 py-2 text-xs text-ui-text hover:bg-ui-surface focus:outline-none focus:ring-2 focus:ring-ui-accent/30"
         >
           {open ? "Hide explanation" : "Show explanation"}
         </button>
       </div>
 
       {open ? (
-        <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-          <div className="text-xs font-semibold text-zinc-200">What you&apos;re seeing</div>
-          <div className="mt-1 text-sm text-zinc-300">
+        <div className="mt-3 rounded-xl border border-ui-border bg-ui-surface2 p-3">
+          <div className="text-xs font-semibold text-ui-text">What you&apos;re seeing</div>
+          <div className="mt-1 text-sm text-ui-text">
             {explain ??
               "Daily value plus MA7 and MA30 to make trend shifts visually obvious. Missing values render as gaps (null), never as zeros."}
           </div>
 
-          <div className="mt-2 text-[11px] text-zinc-500">
+          <div className="mt-2 text-[11px] text-ui-muted">
             Reading tip: if Daily diverges from MA7 and MA30, the move is recent; if MA7 crosses MA30, the shift is more
             persistent.
           </div>
