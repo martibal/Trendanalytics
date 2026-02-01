@@ -1,6 +1,7 @@
 export type DerivedSeriesRow = {
   date: string;
-  metrics: Record<string, number>;
+  // Allow null/undefined: missing values must become gaps, never zeros.
+  metrics: Record<string, number | null | undefined>;
 };
 
 export type TriSeriesKeys = {
@@ -17,79 +18,62 @@ export type TriSeriesPoint = {
   ma30: number | null;
 };
 
-function pickNumber(v: unknown): number | null {
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
+function normalizeBaseKey(requestedKey: string): { base: string } {
+  const parts = requestedKey.split("__");
+  const base = parts[0] ?? requestedKey;
+  return { base };
 }
 
-function stripMA(key: string): string {
-  return key.split("__")[0] ?? key;
+function toNumOrNull(x: unknown): number | null {
+  return typeof x === "number" && Number.isFinite(x) ? x : null;
 }
 
-/**
- * Resolves daily+MA keys for a chosen metric.
- *
- * Default contract:
- * - baseKey = strip "__ma7/__ma30"
- * - dailyKey = baseKey (preferred)
- * - ma7Key   = `${baseKey}__ma7`
- * - ma30Key  = `${baseKey}__ma30`
- *
- * If dailyKey not present but `${baseKey}_daily` exists, we use that as dailyKey.
- */
 export function resolveTriSeriesKeys(args: {
   requestedKey: string;
-  availableKeys: Set<string>;
+  availableKeys?: Set<string> | null;
 }): TriSeriesKeys {
-  const baseKey = stripMA(args.requestedKey);
+  const { requestedKey, availableKeys } = args;
+  const { base } = normalizeBaseKey(requestedKey);
 
-  const candidateDailyA = baseKey;
-  const candidateDailyB = `${baseKey}_daily`;
+  const dailyKey = base;
+  const ma7Key = `${base}__ma7`;
+  const ma30Key = `${base}__ma30`;
 
-  const dailyKey = args.availableKeys.has(candidateDailyA)
-    ? candidateDailyA
-    : args.availableKeys.has(candidateDailyB)
-    ? candidateDailyB
-    : candidateDailyA; // keep deterministic even if missing
+  // If base isn't present but MA is, use MA as the daily line (prevents empty charts on MA-only chains).
+  if (availableKeys && !availableKeys.has(dailyKey)) {
+    if (availableKeys.has(ma7Key)) return { baseKey: base, dailyKey: ma7Key, ma7Key, ma30Key };
+    if (availableKeys.has(ma30Key)) return { baseKey: base, dailyKey: ma30Key, ma7Key, ma30Key };
+  }
 
-  return {
-    baseKey,
-    dailyKey,
-    ma7Key: `${baseKey}__ma7`,
-    ma30Key: `${baseKey}__ma30`,
-  };
+  return { baseKey: base, dailyKey, ma7Key, ma30Key };
 }
 
 /**
- * Builds tri-series points (daily + MA7 + MA30) from derived rows.
- * Missing lines become null (not zero).
+ * IMPORTANT: do NOT filter out "all-null" days.
+ * Keeping dates with nulls preserves time continuity and renders true gaps in charts.
  */
-export function buildTriSeries(args: {
-  rows: DerivedSeriesRow[];
-  keys: TriSeriesKeys;
-}): TriSeriesPoint[] {
+export function buildTriSeries(args: { rows: DerivedSeriesRow[]; keys: TriSeriesKeys }): TriSeriesPoint[] {
   const { rows, keys } = args;
 
   return rows.map((r) => {
     const m = r.metrics ?? {};
-    return {
-      date: r.date,
-      daily: pickNumber(m[keys.dailyKey]),
-      ma7: pickNumber(m[keys.ma7Key]),
-      ma30: pickNumber(m[keys.ma30Key]),
-    };
+    const daily = toNumOrNull(m[keys.dailyKey]);
+    const ma7 = toNumOrNull(m[keys.ma7Key]);
+    const ma30 = toNumOrNull(m[keys.ma30Key]);
+    return { date: r.date, daily, ma7, ma30 };
   });
 }
 
-/**
- * Utility: counts how many points exist for each line.
- * Useful for diagnostics / QA.
- */
-export function countTriCoverage(points: TriSeriesPoint[]) {
-  let daily = 0, ma7 = 0, ma30 = 0;
+export function countTriCoverage(points: { daily: number | null; ma7: number | null; ma30: number | null }[]) {
+  let daily = 0;
+  let ma7 = 0;
+  let ma30 = 0;
+
   for (const p of points) {
-    if (p.daily != null) daily++;
-    if (p.ma7 != null) ma7++;
-    if (p.ma30 != null) ma30++;
+    if (p.daily !== null) daily += 1;
+    if (p.ma7 !== null) ma7 += 1;
+    if (p.ma30 !== null) ma30 += 1;
   }
+
   return { daily, ma7, ma30, total: points.length };
 }

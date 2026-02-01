@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -8,79 +9,102 @@ import {
   YAxis,
   Tooltip,
   Legend,
+  CartesianGrid,
 } from "recharts";
 
-export type TriLinePoint = {
-  date: string;
-  daily: number | null;
-  ma7: number | null;
-  ma30: number | null;
-};
+import type { TriSeriesPoint } from "@/lib/series/triSeries";
 
-function formatNumber(x: unknown) {
-  if (typeof x !== "number" || !Number.isFinite(x)) return "—";
-  const abs = Math.abs(x);
-  if (abs >= 1_000_000) return `${(x / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${(x / 1_000).toFixed(1)}k`;
-  // keep small values readable without over-rounding
-  if (abs > 0 && abs < 1) return x.toFixed(4);
-  return `${x.toFixed(2)}`;
-}
+// Optional convenience re-export (prevents “exported member” issues if someone imports from this module)
+export type { TriSeriesPoint } from "@/lib/series/triSeries";
 
-export function MetricTriLineChart({
-  data,
-  yLabel,
-}: {
-  data: TriLinePoint[];
-  yLabel?: string;
-}) {
+export function MetricTriLineChart({ data }: { data: TriSeriesPoint[] }) {
+  // Compact number formatting for tooltip + axis
+  const fmt = (x: unknown) => {
+    if (x == null) return "—";
+    const n = Number(x);
+    if (!Number.isFinite(n)) return "—";
+    const abs = Math.abs(n);
+    if (abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
+    if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+    if (abs >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+    if (abs > 0 && abs < 1) return n.toFixed(6);
+    return n.toFixed(2);
+  };
+
+  // Show shorter dates on axis, keep full in tooltip label
+  const fmtDateTick = (iso: string) => {
+    // expecting YYYY-MM-DD
+    if (typeof iso !== "string" || iso.length < 10) return iso;
+    return iso.slice(5); // MM-DD
+  };
+
   return (
-    <div className="h-80 w-full">
+    <div className="h-full w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
-          <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-          <YAxis tick={{ fontSize: 10 }} width={54} label={yLabel ? { value: yLabel, angle: -90, position: "insideLeft" } : undefined} />
+        <LineChart data={data} margin={{ top: 8, right: 12, bottom: 8, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+
+          <XAxis
+            dataKey="date"
+            tickFormatter={fmtDateTick}
+            minTickGap={18}
+            tick={{ fontSize: 11, fill: "#a1a1aa" }}
+            axisLine={{ stroke: "#27272a" }}
+            tickLine={{ stroke: "#27272a" }}
+          />
+
+          <YAxis
+            tickFormatter={fmt}
+            tick={{ fontSize: 11, fill: "#a1a1aa" }}
+            axisLine={{ stroke: "#27272a" }}
+            tickLine={{ stroke: "#27272a" }}
+            width={64}
+          />
+
           <Tooltip
-            formatter={(value: unknown, name: string) => [formatNumber(value), name]}
+            labelFormatter={(label) => String(label)}
+            formatter={(value: unknown, name: string) => [fmt(value), name]}
             contentStyle={{
               background: "rgba(9, 9, 11, 0.95)",
               border: "1px solid rgba(39, 39, 42, 1)",
               borderRadius: 12,
+              color: "#e4e4e7",
+              fontSize: 12,
             }}
-            labelStyle={{ color: "rgba(228, 228, 231, 1)" }}
+            itemStyle={{ color: "#e4e4e7" }}
+            labelStyle={{ color: "#e4e4e7" }}
           />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
 
-          {/* Daily (raw) */}
+          <Legend
+            wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }}
+            iconType="plainline"
+          />
+
+          {/* IMPORTANT: connectNulls={false} => null becomes gaps (not interpolated) */}
           <Line
             type="monotone"
             dataKey="daily"
             name="Daily"
             dot={false}
             strokeWidth={1.5}
-            stroke="#e4e4e7"
             connectNulls={false}
           />
 
-          {/* MA7 */}
           <Line
             type="monotone"
             dataKey="ma7"
             name="MA7"
             dot={false}
             strokeWidth={2}
-            stroke="#60a5fa"
             connectNulls={false}
           />
 
-          {/* MA30 */}
           <Line
             type="monotone"
             dataKey="ma30"
             name="MA30"
             dot={false}
-            strokeWidth={2.5}
-            stroke="#fbbf24"
+            strokeWidth={2}
             connectNulls={false}
           />
         </LineChart>
