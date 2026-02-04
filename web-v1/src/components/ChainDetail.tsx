@@ -209,7 +209,6 @@ function buildWhatToWatch(args: {
   const { meta, primaryPanels } = args;
   const bullets: string[] = [];
 
-  // 1) Confidence + lag: always useful, purely descriptive
   const conf = meta?.confidence?.confidence_score;
   if (typeof conf === "number") {
     bullets.push(`Confidence (7d) is ${conf.toFixed(2)} — lower values usually indicate weaker coverage in the window.`);
@@ -222,7 +221,6 @@ function buildWhatToWatch(args: {
     bullets.push(`Publish lag policy is ${lag} days — recent dates may have partial coverage depending on the chain.`);
   }
 
-  // 2) Simple “divergence” scan: daily vs MA30 on primary charts (descriptive, no advice)
   const scored: Array<{ label: string; ratioAbs: number; daily: number; ma30: number }> = [];
 
   for (const p of primaryPanels) {
@@ -251,7 +249,6 @@ function buildWhatToWatch(args: {
     );
   }
 
-  // 3) If meta has a strong driver, mention it (still descriptive)
   const drivers: any[] = Array.isArray(meta?.regime?.drivers) ? meta.regime.drivers : [];
   const best = drivers
     .filter((d) => typeof d?.z_robust === "number" && d?.metric != null)
@@ -291,19 +288,15 @@ export function ChainDetail({ chain }: { chain: string }) {
 
   const chartDates = useMemo(() => (derivedAsof ? buildDateRangeISO(derivedAsof, 180) : []), [derivedAsof]);
 
-  // merged rows (derived + gold for daily canonical)
   const [rows, setRows] = useState<DerivedSeriesRow[]>([]);
   const [rowsLoading, setRowsLoading] = useState(false);
   const [windowMetricKeys, setWindowMetricKeys] = useState<string[] | null>(null);
 
-  // selection (single chart dropdown; still useful in Advanced)
   const [metricKey, setMetricKey] = useState<string>("tx_count_daily");
   const lastAutoSetRef = useRef<string | null>(null);
 
-  // triSeries for the selected dropdown (kept)
   const [triSeries, setTriSeries] = useState<TriSeriesPoint[]>([]);
 
-  // Advanced-only diagnostics (optional – keep if you want)
   const [diag, setDiag] = useState<null | {
     selected: string;
     baseKey: string;
@@ -327,7 +320,6 @@ export function ChainDetail({ chain }: { chain: string }) {
     return m;
   }, [metricOptions]);
 
-  // Pull merged series rows once per chain/date window
   useEffect(() => {
     let alive = true;
 
@@ -337,7 +329,10 @@ export function ChainDetail({ chain }: { chain: string }) {
 
       setRowsLoading(true);
 
-      const [derivedRaw, goldRaw] = await Promise.all([fetchDerivedSeries(chainId, chartDates), fetchGoldSeries(chainId, chartDates)]);
+      const [derivedRaw, goldRaw] = await Promise.all([
+        fetchDerivedSeries(chainId, chartDates),
+        fetchGoldSeries(chainId, chartDates),
+      ]);
       if (!alive) return;
 
       const derivedByDate = new Map<string, Record<string, number>>();
@@ -377,7 +372,6 @@ export function ChainDetail({ chain }: { chain: string }) {
     };
   }, [chainId, derivedAsof, chartDates]);
 
-  // pick a chain-specific default metric once availability is known
   useEffect(() => {
     if (!chainId) return;
     if (!windowMetricKeys || windowMetricKeys.length === 0) return;
@@ -390,7 +384,6 @@ export function ChainDetail({ chain }: { chain: string }) {
     setMetricKey(next);
   }, [chainId, windowMetricKeys, metricKey]);
 
-  // build tri-series for the dropdown-selected metric
   useEffect(() => {
     if (!rows || rows.length === 0) {
       setTriSeries([]);
@@ -453,7 +446,6 @@ export function ChainDetail({ chain }: { chain: string }) {
     return buildNotables({ meta, explainMode, metricLabelByKey });
   }, [meta, explainMode, metricLabelByKey]);
 
-  // ---------- Basic-first chart grid ----------
   const primaryBaseKeys = useMemo(() => (chainId ? getPrimaryBaseKeys(chainId) : []), [chainId]);
 
   const primaryPanels = useMemo(() => {
@@ -482,7 +474,6 @@ export function ChainDetail({ chain }: { chain: string }) {
     return buildWhatToWatch({ meta, primaryPanels });
   }, [meta, primaryPanels]);
 
-  // Advanced: all metrics (render-limited with Show more)
   const [advancedLimit, setAdvancedLimit] = useState<number>(18);
 
   const advancedPanels = useMemo(() => {
@@ -513,13 +504,13 @@ export function ChainDetail({ chain }: { chain: string }) {
 
   if (!chainId) {
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
-        <div className="text-sm text-zinc-300">
+      <div className="rounded-2xl border border-ui-border bg-ui-surface p-6">
+        <div className="text-sm text-ui-text">
           Unknown chain: <span className="font-mono">{chain}</span>
         </div>
-        <div className="mt-3 text-xs text-zinc-500">Supported: {CHAINS.join(", ")}</div>
+        <div className="mt-3 text-xs text-ui-faint">Supported: {CHAINS.join(", ")}</div>
         <div className="mt-4">
-          <Link href="/" className="text-sm text-zinc-200 underline">
+          <Link href="/" className="text-sm text-ui-muted underline">
             Back
           </Link>
         </div>
@@ -533,71 +524,70 @@ export function ChainDetail({ chain }: { chain: string }) {
 
   const summary = buildInterpretationSummary(meta, explainMode);
 
-  // Diagnostics content rendered either:
-  // - inline (advanced), or
-  // - inside <details> (basic)
   const Diagnostics = () => (
     <div className="space-y-6">
-      {/* LAYER COHERENCE (Advanced-like diagnostic) */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-        <div className="text-sm font-semibold">Layer coherence</div>
-        <div className="mt-1 text-xs text-zinc-500">
+      {/* LAYER COHERENCE */}
+      <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
+        <div className="text-sm font-semibold text-ui-text">Layer coherence</div>
+        <div className="mt-1 text-xs text-ui-faint">
           Snapshot is a deterministic bundle: meta + derived + gold for the same chain/date partition.
         </div>
 
         {bundleLoading ? (
-          <div className="mt-3 text-sm text-zinc-400">Loading bundle…</div>
+          <div className="mt-3 text-sm text-ui-muted">Loading bundle…</div>
         ) : bundleError ? (
-          <div className="mt-3 text-sm text-zinc-400">Bundle load error. Check published paths.</div>
+          <div className="mt-3 text-sm text-ui-muted">Bundle load error. Check published paths.</div>
         ) : !bundle ? (
-          <div className="mt-3 text-sm text-zinc-400">No bundle available.</div>
+          <div className="mt-3 text-sm text-ui-muted">No bundle available.</div>
         ) : (
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2">
-              <div className="text-[11px] text-zinc-400">meta</div>
-              <div className="mt-1 text-sm text-zinc-200">{layerMetaOk ? "loaded" : "missing"}</div>
-              <div className="mt-1 text-[11px] text-zinc-500">top-level keys: {safeObjectKeysCount(bundle.meta)}</div>
+            <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-3 py-2">
+              <div className="text-[11px] text-ui-faint">meta</div>
+              <div className="mt-1 text-sm text-ui-text">{layerMetaOk ? "loaded" : "missing"}</div>
+              <div className="mt-1 text-[11px] text-ui-faint">top-level keys: {safeObjectKeysCount(bundle.meta)}</div>
             </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2">
-              <div className="text-[11px] text-zinc-400">derived (snapshot)</div>
-              <div className="mt-1 text-sm text-zinc-200">{layerDerivedOk ? "loaded" : "missing"}</div>
-              <div className="mt-1 text-[11px] text-zinc-500">top-level keys: {safeObjectKeysCount(bundle.derived)}</div>
+            <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-3 py-2">
+              <div className="text-[11px] text-ui-faint">derived (snapshot)</div>
+              <div className="mt-1 text-sm text-ui-text">{layerDerivedOk ? "loaded" : "missing"}</div>
+              <div className="mt-1 text-[11px] text-ui-faint">
+                top-level keys: {safeObjectKeysCount(bundle.derived)}
+              </div>
             </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2">
-              <div className="text-[11px] text-zinc-400">gold</div>
-              <div className="mt-1 text-sm text-zinc-200">{layerGoldOk ? "loaded" : "missing"}</div>
-              <div className="mt-1 text-[11px] text-zinc-500">top-level keys: {safeObjectKeysCount(bundle.gold)}</div>
+            <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-3 py-2">
+              <div className="text-[11px] text-ui-faint">gold</div>
+              <div className="mt-1 text-sm text-ui-text">{layerGoldOk ? "loaded" : "missing"}</div>
+              <div className="mt-1 text-[11px] text-ui-faint">top-level keys: {safeObjectKeysCount(bundle.gold)}</div>
             </div>
           </div>
         )}
       </div>
 
       {/* NOTABLES */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+      <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold">Notables</div>
-            <div className="mt-1 text-xs text-zinc-500">
+            <div className="text-sm font-semibold text-ui-text">Notables</div>
+            <div className="mt-1 text-xs text-ui-faint">
               Descriptive highlights based on deviation, ranks, and coverage (no causal claims).
             </div>
           </div>
-          <Link href="/methodology" className="text-xs text-zinc-300 underline">
+          <Link href="/methodology" className="text-xs text-ui-muted underline">
             Methodology
           </Link>
         </div>
 
         <div className="mt-4 space-y-3">
           {bundleLoading ? (
-            <div className="text-sm text-zinc-400">Loading…</div>
+            <div className="text-sm text-ui-muted">Loading…</div>
           ) : !meta ? (
-            <div className="text-sm text-zinc-400">No meta available for the bundle date.</div>
+            <div className="text-sm text-ui-muted">No meta available for the bundle date.</div>
           ) : notables.length === 0 ? (
-            <div className="text-sm text-zinc-400">No notables available for this snapshot.</div>
+            <div className="text-sm text-ui-muted">No notables available for this snapshot.</div>
           ) : (
             notables.map((n) => (
-              <div key={n.title} className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3">
-                <div className="text-xs font-semibold text-zinc-200">{n.title}</div>
-                <div className="mt-1 text-sm text-zinc-300">{explainMode === "advanced" ? n.advanced : n.basic}</div>
+              <div key={n.title} className="rounded-xl border border-ui-border bg-ui-bg/30 px-4 py-3">
+                <div className="text-xs font-semibold text-ui-text">{n.title}</div>
+                <div className="mt-1 text-sm text-ui-muted">{explainMode === "advanced" ? n.advanced : n.basic}</div>
               </div>
             ))
           )}
@@ -608,15 +598,15 @@ export function ChainDetail({ chain }: { chain: string }) {
       {bundleLoading ? null : !meta?.scorecard ? null : <ScorecardView scorecard={meta.scorecard} explainMode={explainMode} />}
 
       {/* SINGLE-METRIC DROPDOWN */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+      <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold">Single metric explorer</div>
-            <div className="mt-1 text-xs text-zinc-500">Useful when you want to isolate one metric.</div>
+            <div className="text-sm font-semibold text-ui-text">Single metric explorer</div>
+            <div className="mt-1 text-xs text-ui-faint">Useful when you want to isolate one metric.</div>
           </div>
 
           <select
-            className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-200"
+            className="rounded-xl border border-ui-border bg-ui-bg/30 px-3 py-2 text-xs text-ui-text focus:outline-none focus:ring-2 focus:ring-ui-accent/30"
             value={metricKey}
             onChange={(e) => {
               lastAutoSetRef.current = null;
@@ -632,19 +622,19 @@ export function ChainDetail({ chain }: { chain: string }) {
         </div>
 
         {explainMode === "advanced" ? (
-          <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-[11px] text-zinc-400">
+          <div className="mt-3 rounded-xl border border-ui-border bg-ui-bg/20 px-3 py-2 text-[11px] text-ui-muted">
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               <div>
-                selected: <span className="font-mono text-zinc-200">{diag?.selected ?? "—"}</span>
+                selected: <span className="font-mono text-ui-text">{diag?.selected ?? "—"}</span>
               </div>
               <div>
-                dailyKey: <span className="font-mono text-zinc-200">{diag?.dailyKey ?? "—"}</span>
+                dailyKey: <span className="font-mono text-ui-text">{diag?.dailyKey ?? "—"}</span>
               </div>
               <div>
-                ma7Key: <span className="font-mono text-zinc-200">{diag?.ma7Key ?? "—"}</span>
+                ma7Key: <span className="font-mono text-ui-text">{diag?.ma7Key ?? "—"}</span>
               </div>
               <div>
-                ma30Key: <span className="font-mono text-zinc-200">{diag?.ma30Key ?? "—"}</span>
+                ma30Key: <span className="font-mono text-ui-text">{diag?.ma30Key ?? "—"}</span>
               </div>
             </div>
           </div>
@@ -652,9 +642,9 @@ export function ChainDetail({ chain }: { chain: string }) {
 
         <div className="mt-3">
           {rowsLoading ? (
-            <div className="text-sm text-zinc-400">Loading series…</div>
+            <div className="text-sm text-ui-muted">Loading series…</div>
           ) : triSeries.length === 0 ? (
-            <div className="text-sm text-zinc-400">No series available for this window.</div>
+            <div className="text-sm text-ui-muted">No series available for this window.</div>
           ) : (
             <MetricPanel
               title={getMetricLabel(metricKey)}
@@ -669,29 +659,29 @@ export function ChainDetail({ chain }: { chain: string }) {
       </div>
 
       {/* GOLD LAYER */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-        <div className="text-sm font-semibold">Gold layer (diagnostic outputs)</div>
-        <div className="mt-1 text-xs text-zinc-500">Canonical daily metrics and export-ready diagnostics (read-only).</div>
+      <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
+        <div className="text-sm font-semibold text-ui-text">Gold layer (diagnostic outputs)</div>
+        <div className="mt-1 text-xs text-ui-faint">Canonical daily metrics and export-ready diagnostics (read-only).</div>
 
         {bundleLoading ? (
-          <div className="mt-3 text-sm text-zinc-400">Loading gold…</div>
+          <div className="mt-3 text-sm text-ui-muted">Loading gold…</div>
         ) : !bundle ? (
-          <div className="mt-3 text-sm text-zinc-400">No bundle available.</div>
+          <div className="mt-3 text-sm text-ui-muted">No bundle available.</div>
         ) : !gold ? (
-          <div className="mt-3 text-sm text-zinc-400">
-            Gold missing for bundle date <span className="font-mono">{bundle.date}</span>.
+          <div className="mt-3 text-sm text-ui-muted">
+            Gold missing for bundle date <span className="font-mono text-ui-text">{bundle.date}</span>.
           </div>
         ) : (
           <div className="mt-3">
-            <div className="text-xs text-zinc-400">
-              Loaded gold for <span className="font-mono text-zinc-200">{bundle.date}</span> · top-level keys:{" "}
-              <span className="text-zinc-200">{safeObjectKeysCount(gold)}</span>
+            <div className="text-xs text-ui-muted">
+              Loaded gold for <span className="font-mono text-ui-text">{bundle.date}</span> · top-level keys:{" "}
+              <span className="text-ui-text">{safeObjectKeysCount(gold)}</span>
             </div>
 
             {explainMode === "advanced" ? (
-              <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                <div className="text-[11px] text-zinc-400">Gold JSON (truncated preview)</div>
-                <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-[11px] text-zinc-300">
+              <div className="mt-3 rounded-xl border border-ui-border bg-ui-bg/20 p-3">
+                <div className="text-[11px] text-ui-muted">Gold JSON (truncated preview)</div>
+                <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-[11px] text-ui-muted">
                   {JSON.stringify(gold, null, 2).slice(0, 4000)}
                   {JSON.stringify(gold, null, 2).length > 4000 ? "\n… (truncated)" : ""}
                 </pre>
@@ -710,22 +700,22 @@ export function ChainDetail({ chain }: { chain: string }) {
       </div>
 
       {/* DATA FRESHNESS */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-        <div className="text-sm font-semibold">Data freshness and coverage</div>
+      <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
+        <div className="text-sm font-semibold text-ui-text">Data freshness and coverage</div>
         <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2">
-            <div className="text-[11px] text-zinc-400">Updated through</div>
-            <div className="mt-1 text-sm text-zinc-200">{meta?.updated_through ?? "—"}</div>
+          <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-3 py-2">
+            <div className="text-[11px] text-ui-faint">Updated through</div>
+            <div className="mt-1 text-sm text-ui-text">{meta?.updated_through ?? "—"}</div>
           </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2">
-            <div className="text-[11px] text-zinc-400">Confidence (7d)</div>
-            <div className="mt-1 text-sm text-zinc-200">
+          <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-3 py-2">
+            <div className="text-[11px] text-ui-faint">Confidence (7d)</div>
+            <div className="mt-1 text-sm text-ui-text">
               {meta?.confidence?.confidence_score != null ? meta.confidence.confidence_score.toFixed(2) : "—"}
             </div>
           </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2">
-            <div className="text-[11px] text-zinc-400">Lag policy (days)</div>
-            <div className="mt-1 text-sm text-zinc-200">{meta?.publish_lag_days_policy ?? "—"}</div>
+          <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-3 py-2">
+            <div className="text-[11px] text-ui-faint">Lag policy (days)</div>
+            <div className="mt-1 text-sm text-ui-text">{meta?.publish_lag_days_policy ?? "—"}</div>
           </div>
         </div>
       </div>
@@ -737,50 +727,54 @@ export function ChainDetail({ chain }: { chain: string }) {
       {/* HEADER */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold capitalize tracking-tight">{chainId}</h1>
-          <div className="mt-1 text-xs text-zinc-400">
-            Bundle date: <span className="text-zinc-200">{bundleDate ?? "—"}</span> · Meta as-of:{" "}
-            <span className="text-zinc-200">{metaAsof ?? "—"}</span> · Derived as-of:{" "}
-            <span className="text-zinc-200">{derivedAsof ?? "—"}</span> · Gold as-of:{" "}
-            <span className="text-zinc-200">{goldAsof ?? "—"}</span>
+          <h1 className="text-2xl font-semibold capitalize tracking-tight text-ui-text">{chainId}</h1>
+          <div className="mt-1 text-xs text-ui-muted">
+            Bundle date: <span className="text-ui-text">{bundleDate ?? "—"}</span> · Meta as-of:{" "}
+            <span className="text-ui-text">{metaAsof ?? "—"}</span> · Derived as-of:{" "}
+            <span className="text-ui-text">{derivedAsof ?? "—"}</span> · Gold as-of:{" "}
+            <span className="text-ui-text">{goldAsof ?? "—"}</span>
           </div>
         </div>
         {meta?.regime?.label ? <RegimeBadge label={meta.regime.label} /> : null}
       </div>
 
-      {/* AT-A-GLANCE (compact, chart-first) */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+      {/* AT-A-GLANCE */}
+      <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold">At-a-glance</div>
-            <div className="mt-1 text-xs text-zinc-500">Quick snapshot from meta (descriptive only).</div>
+            <div className="text-sm font-semibold text-ui-text">At-a-glance</div>
+            <div className="mt-1 text-xs text-ui-faint">Quick snapshot from meta (descriptive only).</div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
-              Regime: <span className="text-zinc-100">{meta?.regime?.label ?? "—"}</span>
+            <div className="ui-badge px-3 py-2 text-xs text-ui-muted">
+              Regime: <span className="text-ui-text">{meta?.regime?.label ?? "—"}</span>
             </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
-              Demand: <span className="text-zinc-100">{meta?.regime?.axes?.demand?.trend ?? "—"}</span>
+            <div className="ui-badge px-3 py-2 text-xs text-ui-muted">
+              Demand: <span className="text-ui-text">{meta?.regime?.axes?.demand?.trend ?? "—"}</span>
             </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
-              Friction: <span className="text-zinc-100">{meta?.regime?.axes?.friction?.trend ?? "—"}</span>
+            <div className="ui-badge px-3 py-2 text-xs text-ui-muted">
+              Friction: <span className="text-ui-text">{meta?.regime?.axes?.friction?.trend ?? "—"}</span>
             </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
-              Capacity: <span className="text-zinc-100">{meta?.regime?.axes?.capacity?.trend ?? "—"}</span>
+            <div className="ui-badge px-3 py-2 text-xs text-ui-muted">
+              Capacity: <span className="text-ui-text">{meta?.regime?.axes?.capacity?.trend ?? "—"}</span>
             </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
+            <div className="ui-badge px-3 py-2 text-xs text-ui-muted">
               Confidence (7d):{" "}
-              <span className="text-zinc-100">
+              <span className="text-ui-text">
                 {meta?.confidence?.confidence_score != null ? meta.confidence.confidence_score.toFixed(2) : "—"}
               </span>
             </div>
           </div>
         </div>
 
-        <details className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-          <summary className="cursor-pointer text-xs font-semibold text-zinc-200">Read the interpretation summary</summary>
-          <div className="mt-2 text-sm text-zinc-300">{explainMode === "advanced" ? summary.advanced : summary.basic}</div>
+        <details className="mt-4 rounded-xl border border-ui-border bg-ui-bg/20 p-3">
+          <summary className="cursor-pointer text-xs font-semibold text-ui-text">
+            Read the interpretation summary
+          </summary>
+          <div className="mt-2 text-sm text-ui-muted">
+            {explainMode === "advanced" ? summary.advanced : summary.basic}
+          </div>
 
           <div className="mt-4">
             <InfoBox
@@ -792,11 +786,11 @@ export function ChainDetail({ chain }: { chain: string }) {
         </details>
       </div>
 
-      {/* PRIMARY METRICS (Basic-first) */}
+      {/* PRIMARY METRICS */}
       <div className="space-y-3">
         <div>
-          <div className="text-sm font-semibold">Primary metrics</div>
-          <div className="mt-1 text-xs text-zinc-500">
+          <div className="text-sm font-semibold text-ui-text">Primary metrics</div>
+          <div className="mt-1 text-xs text-ui-faint">
             {explainMode === "basic"
               ? "Basic view shows the chain’s market-relevant metrics as default charts."
               : "In Advanced view you can still scan primary metrics first, then expand to all metrics below."}
@@ -804,9 +798,9 @@ export function ChainDetail({ chain }: { chain: string }) {
         </div>
 
         {rowsLoading ? (
-          <div className="text-sm text-zinc-400">Loading series…</div>
+          <div className="text-sm text-ui-muted">Loading series…</div>
         ) : primaryPanels.length === 0 ? (
-          <div className="text-sm text-zinc-400">No primary metric series available for this window.</div>
+          <div className="text-sm text-ui-muted">No primary metric series available for this window.</div>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {primaryPanels.map((p) => (
@@ -824,14 +818,14 @@ export function ChainDetail({ chain }: { chain: string }) {
         )}
       </div>
 
-      {/* WHAT TO WATCH (descriptive, no advice) */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-        <div className="text-sm font-semibold">What to watch</div>
-        <div className="mt-1 text-xs text-zinc-500">Descriptive context derived from the latest window.</div>
+      {/* WHAT TO WATCH */}
+      <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
+        <div className="text-sm font-semibold text-ui-text">What to watch</div>
+        <div className="mt-1 text-xs text-ui-faint">Descriptive context derived from the latest window.</div>
 
         <div className="mt-3 space-y-2">
           {whatToWatch.map((b, i) => (
-            <div key={i} className="text-sm text-zinc-300">
+            <div key={i} className="text-sm text-ui-muted">
               • {b}
             </div>
           ))}
@@ -843,14 +837,14 @@ export function ChainDetail({ chain }: { chain: string }) {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold">All metrics</div>
-              <div className="mt-1 text-xs text-zinc-500">
+              <div className="text-sm font-semibold text-ui-text">All metrics</div>
+              <div className="mt-1 text-xs text-ui-faint">
                 Every available metric rendered as a tri-line chart (daily + MA7 + MA30), ordered by chain semantics.
               </div>
             </div>
             <button
               onClick={() => setAdvancedLimit((n) => Math.min(n + 18, advancedPanels.length))}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-100 hover:bg-zinc-800 disabled:opacity-50"
+              className="rounded-xl border border-ui-border bg-ui-surface2 px-3 py-2 text-xs text-ui-text hover:bg-ui-surface focus:outline-none focus:ring-2 focus:ring-ui-accent/30 disabled:opacity-50"
               disabled={advancedLimit >= advancedPanels.length}
             >
               Show more
@@ -873,14 +867,12 @@ export function ChainDetail({ chain }: { chain: string }) {
         </div>
       ) : null}
 
-      {/* DIAGNOSTICS:
-          - Advanced: show inline
-          - Basic: keep behind collapsible details */}
+      {/* DIAGNOSTICS */}
       {explainMode === "advanced" ? (
         <Diagnostics />
       ) : (
-        <details className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-zinc-200">
+        <details className="rounded-2xl border border-ui-border bg-ui-surface p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-ui-text">
             Open diagnostics (advanced details)
           </summary>
           <div className="mt-4">
@@ -890,7 +882,7 @@ export function ChainDetail({ chain }: { chain: string }) {
       )}
 
       <div>
-        <Link href="/" className="text-sm text-zinc-300 underline">
+        <Link href="/" className="text-sm text-ui-muted underline">
           Back to overview
         </Link>
       </div>

@@ -9,18 +9,24 @@ To:
   data/published/v1/{gold,meta,derived}/<chain>/*.json
 Plus:
   data/published/v1/dataset.json
+  data/published/v1/index.json                (BACK-COMPAT ALIAS)
   data/published/v1/{genre}/{chain}/manifest.json
+Plus:
+  data/published/v1/landing/index.json
+  data/published/v1/landing/<chain>/hero.json
 
 Notes:
-- This is the single source of truth for the website later.
-- Today it is a "copy/publish" step. Later we can add filtering/sanitization here to enforce
-  non-invertibility and any legal constraints, without changing calculated outputs.
+- Published dataset is the single intended input for the website.
+- Landing export is intentionally "pointers + chart specs", not duplicated data.
+- IMPORTANT: Published JSON must be valid JSON for browsers. That means NO NaN/Infinity.
+  We sanitize all floats (NaN/Inf -> null).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -34,9 +40,56 @@ def _read_json(p: Path) -> Any:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def _sanitize_json(obj: Any) -> Any:
+    """
+    Recursively replace NaN / +/-Infinity with None so output is strict JSON.
+    """
+    if obj is None:
+        return None
+
+    # bool is subclass of int in Python -> check bool before (int,float)
+    if isinstance(obj, bool):
+        return obj
+
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+
+    if isinstance(obj, (int, str)):
+        return obj
+
+    if isinstance(obj, list):
+        return [_sanitize_json(x) for x in obj]
+
+    if isinstance(obj, dict):
+        return {str(k): _sanitize_json(v) for k, v in obj.items()}
+
+    # Fallback: try to serialize unknown numeric-like objects
+    try:
+        if hasattr(obj, "__float__"):
+            f = float(obj)  # type: ignore[arg-type]
+            if math.isnan(f) or math.isinf(f):
+                return None
+            return f
+    except Exception:
+        pass
+
+    return obj
+
+
 def _write_json(p: Path, obj: Any) -> None:
+    """
+    Write JSON atomically, strict for browsers:
+      - NaN/Infinity are not allowed (we sanitize before writing)
+      - allow_nan=False ensures we crash early if something slips through
+    """
     tmp = p.with_suffix(p.suffix + ".tmp")
-    tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+    safe = _sanitize_json(obj)
+    tmp.write_text(
+        json.dumps(safe, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False),
+        encoding="utf-8",
+    )
     tmp.replace(p)
 
 
@@ -67,22 +120,36 @@ def _collect_days(chain_dir: Path) -> List[str]:
 
 
 def _copy_chain_files(src_chain: Path, dst_chain: Path) -> Tuple[int, str]:
+    """
+    Copy (SANITIZED):
+      - day files: YYYY-MM-DD.json
+      - latest.json
+      - lastXd.json
+
+    Return: (copied_count, asof_date)
+    """
     _ensure_dir(dst_chain)
     copied = 0
 
     day_files = sorted(src_chain.glob("????-??-??.json"))
     asof = day_files[-1].stem if day_files else ""
 
+    # Day files
     for fp in day_files:
-        (dst_chain / fp.name).write_bytes(fp.read_bytes())
+        obj = _read_json(fp)
+        _write_json(dst_chain / fp.name, obj)
         copied += 1
 
+    # latest.json
     for fp in src_chain.glob("latest.json"):
-        (dst_chain / fp.name).write_bytes(fp.read_bytes())
+        obj = _read_json(fp)
+        _write_json(dst_chain / fp.name, obj)
         copied += 1
 
+    # lastXd.json files
     for fp in src_chain.glob("last*d.json"):
-        (dst_chain / fp.name).write_bytes(fp.read_bytes())
+        obj = _read_json(fp)
+        _write_json(dst_chain / fp.name, obj)
         copied += 1
 
     return copied, asof
@@ -109,6 +176,202 @@ def _read_or_bump_revision(published_root: Path, dataset_id: str) -> int:
 
 def _schema_version(genre: str) -> str:
     return f"{genre}.v1"
+
+
+def _rel_from_published(published_root: Path, target: Path) -> str:
+    rel = target.relative_to(published_root)
+    return rel.as_posix()
+
+
+def _landing_chart_specs(chain: str) -> List[Dict[str, Any]]:
+    """
+    Hero charts: "slående" men 100% deskriptivt.
+    Referer til published window-filer (lastXd) så web kan tegne store interaktive charts.
+    """
+    evm = chain in ("ethereum", "arbitrum", "base")
+    charts: List[Dict[str, Any]] = []
+
+    charts.append(
+        {
+            "id": "tx_count_daily",
+            "title": "Daily transactions",
+            "genre": "gold",
+            "window_days": 90,
+            "x": "date",
+            "y": "tx_count_daily",
+            "format": "int",
+            "hint_basic": "How many transactions were included per day (last 90 days).",
+            "hint_advanced": "Directly from the published gold window file; no smoothing.",
+        }
+    )
+
+    charts.append(
+        {
+            "id": "median_tx_fee_native",
+            "title": "Median transaction fee (native)",
+            "genre": "gold",
+            "window_days": 90,
+            "x": "date",
+            "y": "median_tx_fee_native",
+            "format": "float",
+            "hint_basic": "Median fee paid per transaction (native units).",
+            "hint_advanced": "Median of per-transaction fee distribution; null where unavailable.",
+        }
+    )
+
+    charts.append(
+        {
+            "id": "avg_block_time_sec",
+            "title": "Average block time (seconds)",
+            "genre": "gold",
+            "window_days": 90,
+            "x": "date",
+            "y": "avg_block_time_sec",
+            "format": "float",
+            "hint_basic": "Average seconds between blocks (last 90 days).",
+            "hint_advanced": "Computed from daily aggregation; descriptive only.",
+        }
+    )
+
+    if evm:
+        charts.append(
+            {
+                "id": "gas_utilization_pct",
+                "title": "Gas utilization (%)",
+                "genre": "gold",
+                "window_days": 90,
+                "x": "date",
+                "y": "gas_utilization_pct",
+                "format": "pct",
+                "hint_basic": "How full blocks are on average (last 90 days).",
+                "hint_advanced": "Null where unavailable.",
+            }
+        )
+        charts.append(
+            {
+                "id": "failed_tx_rate",
+                "title": "Failed transaction rate",
+                "genre": "gold",
+                "window_days": 90,
+                "x": "date",
+                "y": "failed_tx_rate",
+                "format": "pct",
+                "hint_basic": "Share of transactions that failed (last 90 days).",
+                "hint_advanced": "Null where unavailable.",
+            }
+        )
+    else:
+        charts.append(
+            {
+                "id": "block_count_daily",
+                "title": "Blocks per day",
+                "genre": "gold",
+                "window_days": 90,
+                "x": "date",
+                "y": "block_count_daily",
+                "format": "int",
+                "hint_basic": "How many blocks were produced per day (last 90 days).",
+                "hint_advanced": "Descriptive count; useful to spot anomalies in cadence.",
+            }
+        )
+
+    return charts
+
+
+def _export_landing(
+    published_root: Path,
+    dataset_id: str,
+    revision_id: int,
+    computed_at_utc: str,
+    chains: List[str],
+    genres: List[str],
+    windows: List[int],
+) -> None:
+    landing_root = published_root / "landing"
+    _ensure_dir(landing_root)
+
+    cards: List[Dict[str, Any]] = []
+
+    for chain in chains:
+        chain_dir = landing_root / chain
+        _ensure_dir(chain_dir)
+
+        files: Dict[str, Any] = {}
+        asof: Dict[str, str] = {}
+
+        for genre in genres:
+            gdir = published_root / genre / chain
+            if not gdir.exists():
+                files[genre] = {"latest": None, "windows": {}, "manifest": None}
+                asof[genre] = ""
+                continue
+
+            manifest_path = gdir / "manifest.json"
+            manifest = _read_json(manifest_path) if manifest_path.exists() else {}
+            asof[genre] = str(manifest.get("asof", "")) if isinstance(manifest, dict) else ""
+
+            latest_path = gdir / "latest.json"
+            win_paths: Dict[int, str] = {}
+            for w in windows:
+                fp = gdir / f"last{w}d.json"
+                if fp.exists():
+                    win_paths[w] = _rel_from_published(published_root, fp)
+
+            files[genre] = {
+                "manifest": _rel_from_published(published_root, manifest_path) if manifest_path.exists() else None,
+                "latest": _rel_from_published(published_root, latest_path) if latest_path.exists() else None,
+                "windows": {str(k): v for k, v in win_paths.items()},
+            }
+
+        hero_charts = []
+        for spec in _landing_chart_specs(chain):
+            genre = spec["genre"]
+            window_days = int(spec["window_days"])
+            window_file = None
+            if genre in files:
+                window_file = files[genre]["windows"].get(str(window_days))
+            hero_charts.append({**spec, "source_file": window_file})
+
+        hero = {
+            "dataset_id": dataset_id,
+            "revision_id": revision_id,
+            "computed_at_utc": computed_at_utc,
+            "chain": chain,
+            "windows_supported": windows,
+            "asof": asof,
+            "files": files,
+            "hero": {
+                "headline": "Network activity & execution conditions",
+                "charts": hero_charts,
+                "notes": [
+                    "Landing hero is descriptive only (no prices, no forecasts).",
+                    "Charts reference published window files; web renders interactive tooltips on hover.",
+                ],
+            },
+        }
+        _write_json(chain_dir / "hero.json", hero)
+
+        cards.append(
+            {
+                "chain": chain,
+                "hero_file": _rel_from_published(published_root, chain_dir / "hero.json"),
+                "asof": asof,
+            }
+        )
+
+    landing_index = {
+        "dataset_id": dataset_id,
+        "revision_id": revision_id,
+        "computed_at_utc": computed_at_utc,
+        "chains": chains,
+        "genres": genres,
+        "windows_supported": windows,
+        "cards": cards,
+        "schema_version": "landing.v1",
+    }
+    _write_json(landing_root / "index.json", landing_index)
+
+    print(f"[PUBLISH] landing export OK: {landing_root}")
 
 
 def main() -> int:
@@ -186,11 +449,28 @@ def main() -> int:
         "asof_by_genre_chain": asof_by_genre_chain,
         "copied_file_counts": copied_counts,
         "notes": [
-            "Published dataset is the only intended input for the future website.",
-            "Calculated outputs remain internal; publish step can later enforce sanitization/legal constraints.",
+            "Published dataset is the only intended input for the website.",
+            "Published JSON is sanitized for strict browser JSON (NaN/Inf -> null).",
         ],
     }
+
+    # Primary dataset contract
     _write_json(published / "dataset.json", dataset)
+
+    # Back-compat aliases (some web code fetches these)
+    _write_json(published / "index.json", dataset)
+    _write_json(published / "latest.json", dataset)
+
+    # Landing export (website depends on it)
+    _export_landing(
+        published_root=published,
+        dataset_id=dataset_id,
+        revision_id=revision_id,
+        computed_at_utc=computed_at_utc,
+        chains=chains,
+        genres=genres,
+        windows=windows,
+    )
 
     print(f"[PUBLISH] OK dataset_id={dataset_id} revision_id={revision_id} published_root={published}")
     return 0

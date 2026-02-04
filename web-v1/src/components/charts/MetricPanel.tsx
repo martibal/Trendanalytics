@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+
 import { MetricTriLineChart } from "@/components/charts/MetricTriLineChart";
 import type { TriSeriesPoint } from "@/lib/series/triSeries";
 
@@ -38,8 +39,7 @@ function deltaBadge(daily: number | null, ma: number | null) {
   const pct = denom > 0 ? diff / denom : null;
 
   // Tone only; no “good/bad” semantics.
-  const tone =
-    diff !== 0 ? "text-ui-text border-ui-border" : "text-ui-muted border-ui-border";
+  const tone = diff !== 0 ? "text-ui-text border-ui-border" : "text-ui-muted border-ui-border";
 
   const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
   const diffTxt = `${sign}${fmtNum(Math.abs(diff))}`;
@@ -58,10 +58,7 @@ export function MetricPanel(props: {
 }) {
   const { title, subtitle, data, basicExplain, advancedExplain, explainMode } = props;
 
-  const explain =
-    explainMode === "advanced"
-      ? advancedExplain ?? basicExplain ?? null
-      : basicExplain ?? null;
+  const explain = explainMode === "advanced" ? advancedExplain ?? basicExplain ?? null : basicExplain ?? null;
 
   // Default: Basic = collapsed (more charts, less text). Advanced = expanded.
   const [open, setOpen] = useState<boolean>(explainMode === "advanced");
@@ -75,10 +72,10 @@ export function MetricPanel(props: {
   const d7 = useMemo(() => deltaBadge(today, ma7), [today, ma7]);
   const d30 = useMemo(() => deltaBadge(today, ma30), [today, ma30]);
 
-  const hasAny = data && data.length > 0;
+  const hasAny = Array.isArray(data) && data.length > 0;
 
   return (
-    <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
+    <div className="rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-sm">
       {/* HEADER */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -90,11 +87,11 @@ export function MetricPanel(props: {
         <div className="flex shrink-0 flex-col items-end gap-1">
           <div className="text-[11px] text-ui-muted">Today vs MA</div>
           <div className="flex items-center gap-2">
-            <div className={`rounded-lg border px-2 py-1 text-[11px] ${d7.tone}`}>
+            <div className={`rounded-lg border border-ui-border bg-ui-bg/20 px-2 py-1 text-[11px] ${d7.tone}`}>
               <span className="text-ui-muted">MA7</span>{" "}
               <span className="text-ui-text">{d7.text}</span>
             </div>
-            <div className={`rounded-lg border px-2 py-1 text-[11px] ${d30.tone}`}>
+            <div className={`rounded-lg border border-ui-border bg-ui-bg/20 px-2 py-1 text-[11px] ${d30.tone}`}>
               <span className="text-ui-muted">MA30</span>{" "}
               <span className="text-ui-text">{d30.text}</span>
             </div>

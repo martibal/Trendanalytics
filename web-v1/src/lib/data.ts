@@ -1,5 +1,12 @@
 import useSWR from "swr";
-import type { DatasetIndex, ChainId, MetaFile, DerivedFile } from "@/lib/types";
+import type {
+  DatasetIndex,
+  ChainId,
+  MetaFile,
+  DerivedFile,
+  LandingHeroFile,
+  LandingWindowFile,
+} from "@/lib/types";
 
 /**
  * Gold typing:
@@ -25,6 +32,17 @@ const fetcher = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
   return (await res.json()) as T;
+};
+
+// Safe fetcher for optional files (returns null on 404 / error)
+const fetcherOrNull = async <T,>(url: string): Promise<T | null> => {
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
 };
 
 export function useDatasetIndex() {
@@ -92,11 +110,25 @@ export function useBundle(chain: ChainId, date?: string) {
 }
 
 /**
- * SERIES HELPERS
- *
- * IMPORTANT FOR TYPES:
- * We return ONLY numeric values in metrics (Record<string, number>)
- * so downstream logic (DerivedSeriesRow.metrics: Record<string, number>) is satisfied.
+ * Landing: hero + per-window
+ */
+
+export function useLandingHero(chain: ChainId) {
+  const url = `/data/published/v1/landing/${chain}/hero.json`;
+  return useSWR<LandingHeroFile | null>(url, fetcherOrNull, { revalidateOnFocus: false });
+}
+
+export function useLandingHeroWindow(chain: ChainId, windowDays: number | null | undefined) {
+  const url =
+    typeof windowDays === "number" && windowDays > 0
+      ? `/data/published/v1/landing/${chain}/last${windowDays}d.json`
+      : null;
+
+  return useSWR<LandingWindowFile | null>(url, fetcherOrNull, { revalidateOnFocus: false });
+}
+
+/**
+ * SERIES HELPERS (existing)
  */
 
 function onlyFiniteNumbers(obj: any): Record<string, number> {
@@ -115,12 +147,10 @@ export async function fetchDerivedSeries(chain: ChainId, dates: string[]) {
   for (const d of dates) {
     try {
       const file = await fetcher<DerivedFile>(`/data/published/v1/derived/${chain}/${d}.json`);
-
-      // derived metrics live at: file.derived.metrics
       const raw = (file as any)?.derived?.metrics ?? {};
       out.push({ date: String((file as any)?.date ?? d), metrics: onlyFiniteNumbers(raw) });
     } catch {
-      // missing day: skip
+      // skip
     }
   }
 
@@ -133,12 +163,10 @@ export async function fetchGoldSeries(chain: ChainId, dates: string[]) {
   for (const d of dates) {
     try {
       const file = await fetcher<GoldFile>(`/data/published/v1/gold/${chain}/${d}.json`);
-
-      // gold metrics are top-level (excluding date/chain)
       const { date, chain: _c, ...rest } = file as any;
       out.push({ date: String(date ?? d), metrics: onlyFiniteNumbers(rest) });
     } catch {
-      // missing day: skip
+      // skip
     }
   }
 

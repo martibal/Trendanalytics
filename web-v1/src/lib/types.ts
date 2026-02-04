@@ -81,3 +81,50 @@ export type GoldFile = {
   date: string;
   [metric: string]: string | number;
 };
+
+/**
+ * Landing contract (published by pipeline/tools/export_landing_hero.py)
+ */
+
+export type LandingHeroPoint = {
+  date: string;
+  daily: number | null;
+  ma7: number | null;
+  ma30: number | null;
+  confidence: number | null;
+  regime: string | null;
+};
+
+export type LandingMicroMetric = {
+  metric: string;
+  date: string;
+  daily: number | null;
+  ma7: number | null;
+  ma30: number | null;
+  ma7_vs_ma30_pct: number | null;
+};
+
+export type LandingMicro = {
+  date: string;
+  confidence: number | null;
+  regime: string | null;
+  activity: LandingMicroMetric;
+  friction: LandingMicroMetric;
+  capacity: LandingMicroMetric;
+};
+
+export type LandingWindowFile = {
+  chain: ChainId;
+  window_days: number;
+  hero_metric: string;
+  series: LandingHeroPoint[];
+  micro: LandingMicro | Record<string, never>;
+};
+
+export type LandingHeroFile = {
+  chain: ChainId;
+  default_window_days: number | null;
+  windows_available: number[];
+  hero_metric: string;
+  default: LandingWindowFile | null;
+};

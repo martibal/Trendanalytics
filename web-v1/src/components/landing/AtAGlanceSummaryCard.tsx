@@ -30,58 +30,61 @@ export function AtAGlanceSummaryCard(props: {
   const earliestAcrossLayers = minNonEmptyISO([metaMin, derivedMin, goldMin]);
 
   return (
-    <div className="relative -mt-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-sm md:-mt-10">
+    <div className="relative -mt-8 rounded-2xl border border-ui-border bg-ui-surface p-5 shadow-sm md:-mt-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold">At a glance</div>
-          <div className="mt-1 text-xs text-zinc-500">
+          <div className="text-sm font-semibold text-ui-text">At a glance</div>
+          <div className="mt-1 text-xs text-ui-faint">
             Quick context about freshness and coverage across published layers.
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-[11px] text-zinc-400">
+        {/* Top-right metadata pill */}
+        <div className="rounded-xl border border-ui-border bg-ui-bg/40 px-3 py-2 text-[11px] text-ui-muted backdrop-blur">
           <div>
-            Computed (UTC): <span className="text-zinc-200">{fmtISOOrDash(computedAtUtc)}</span>
+            Computed (UTC): <span className="text-ui-text">{fmtISOOrDash(computedAtUtc)}</span>
           </div>
           <div>
-            Methodology: <span className="text-zinc-200">{fmtISOOrDash(methodologyVersion)}</span>
+            Methodology: <span className="text-ui-text">{fmtISOOrDash(methodologyVersion)}</span>
           </div>
         </div>
       </div>
 
+      {/* Three cards */}
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3">
-          <div className="text-[11px] uppercase tracking-wide text-zinc-500">Chains</div>
-          <div className="mt-1 text-sm text-zinc-200">{supportedChains.length}</div>
-          <div className="mt-1 text-xs text-zinc-500">Supported: {supportedChains.join(", ")}</div>
+        <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-4 py-3 transition hover:bg-ui-bg/40">
+          <div className="text-[11px] uppercase tracking-wide text-ui-faint">Chains</div>
+          <div className="mt-1 text-sm text-ui-text">{supportedChains.length}</div>
+          <div className="mt-1 text-xs text-ui-faint">Supported: {supportedChains.join(", ")}</div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3">
-          <div className="text-[11px] uppercase tracking-wide text-zinc-500">Layer as-of (min)</div>
-          <div className="mt-2 space-y-1 text-xs text-zinc-400">
+        <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-4 py-3 transition hover:bg-ui-bg/40">
+          <div className="text-[11px] uppercase tracking-wide text-ui-faint">Layer as-of (min)</div>
+          <div className="mt-2 space-y-1 text-xs text-ui-muted">
             <div>
-              meta: <span className="text-zinc-200">{fmtISOOrDash(metaMin)}</span>
+              meta: <span className="text-ui-text">{fmtISOOrDash(metaMin)}</span>
             </div>
             <div>
-              derived: <span className="text-zinc-200">{fmtISOOrDash(derivedMin)}</span>
+              derived: <span className="text-ui-text">{fmtISOOrDash(derivedMin)}</span>
             </div>
             <div>
-              gold: <span className="text-zinc-200">{fmtISOOrDash(goldMin)}</span>
+              gold: <span className="text-ui-text">{fmtISOOrDash(goldMin)}</span>
             </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3">
-          <div className="text-[11px] uppercase tracking-wide text-zinc-500">Coherent bundle date</div>
-          <div className="mt-1 text-sm text-zinc-200">{fmtISOOrDash(earliestAcrossLayers)}</div>
-          <div className="mt-1 text-xs text-zinc-500">
+        <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-4 py-3 transition hover:bg-ui-bg/40">
+          <div className="text-[11px] uppercase tracking-wide text-ui-faint">Coherent bundle date</div>
+          <div className="mt-1 text-sm text-ui-text">{fmtISOOrDash(earliestAcrossLayers)}</div>
+          <div className="mt-1 text-xs text-ui-faint">
             We prefer the earliest common date to maximize the chance all layers exist for a given snapshot.
           </div>
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-xs text-zinc-400">
-        <span className="text-zinc-200">Guardrails:</span> descriptive only. Missing values are gaps (null), never zeros.
+      {/* Guardrails strip */}
+      <div className="mt-4 rounded-xl border border-ui-border bg-ui-bg/20 px-4 py-3 text-xs text-ui-muted">
+        <span className="text-ui-text">Guardrails:</span> descriptive only. Missing values are gaps (null), never zeros.
       </div>
     </div>
   );

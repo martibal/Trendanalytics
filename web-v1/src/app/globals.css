@@ -14,25 +14,25 @@
   /* =============================
      Premium deep-navy foundation
      ============================= */
-  /* Backgrounds (from design params direction: #0A0E1A etc.) */
-  --bg: 10 14 26;          /* #0A0E1A */
-  --surface: 20 24 37;     /* #141825 */
-  --surface-2: 29 34 53;   /* #1D2235 */
+  /* Backgrounds */
+  --bg: 10 14 26;        /* #0A0E1A */
+  --surface: 20 24 37;   /* #141825 */
+  --surface-2: 29 34 53; /* #1D2235 */
 
-  /* Borders: subtle, not chalky */
-  --border: 255 255 255;   /* used with low alpha */
-  --border-soft: 255 255 255;
+  /* Borders + separators (use with alpha) */
+  --border: 255 255 255;      /* subtle with alpha */
+  --border-soft: 255 255 255; /* even softer with alpha */
 
   /* Typography: cool-neutral */
-  --text: 229 231 235;       /* slate-200/gray-200 */
+  --text: 229 231 235;       /* slate-200 */
   --text-muted: 156 163 175; /* gray-400 */
   --text-faint: 107 114 128; /* gray-500 */
 
-  /* Accent: calm blue + indigo (no cyan) */
-  --accent: 59 130 246;    /* #3B82F6 */
-  --accent-2: 99 102 241;  /* #6366F1 */
+  /* Accent: calm blue + indigo */
+  --accent: 59 130 246;   /* #3B82F6 */
+  --accent-2: 99 102 241; /* #6366F1 */
 
-  /* Status: keep but use sparingly */
+  /* Status */
   --ok: 34 197 94;
   --warn: 234 179 8;
   --bad: 248 113 113;
@@ -40,36 +40,9 @@
   /* =============================
      Chart series (neutral + calm)
      ============================= */
-  /* Keep charts readable, not neon */
   --chart-daily: 229 231 235; /* close to --text */
   --chart-ma7: 156 163 175;   /* muted */
   --chart-ma30: 107 114 128;  /* faint */
-
-  /* =============================
-     Aliases used by components
-     ============================= */
-  /* MetricTriLineChart reads these as CSS vars (strings). We provide them as RGB triplets,
-     and the component can still use fallbacks if it expects hex; but we also define
-     derived hex-like equivalents via rgb() in-line in usage (see below). */
-
-  /* Provide "ui" vars as *strings* that are valid CSS colors.
-     We do this by defining them as actual colors, not triplets. */
-  --ui-text: rgb(var(--text));
-  --ui-muted: rgb(var(--text-muted));
-  --ui-faint: rgb(var(--text-faint));
-
-  /* Border tokens (used for axes/tooltips) */
-  --ui-border: rgba(255, 255, 255, 0.10);
-  --ui-border-soft: rgba(255, 255, 255, 0.06);
-
-  /* Surfaces (tooltips, overlays) */
-  --ui-surface: rgba(10, 14, 26, 0.92);
-  --ui-surface2: rgba(20, 24, 37, 0.70);
-
-  /* Chart line tokens as CSS colors */
-  --ui-chart-daily: rgb(var(--chart-daily));
-  --ui-chart-ma7: rgb(var(--chart-ma7));
-  --ui-chart-ma30: rgb(var(--chart-ma30));
 }
 
 html,
@@ -82,12 +55,12 @@ body {
   color: rgb(var(--text));
 }
 
-/* Optional: consistent selection style */
+/* Consistent selection style */
 ::selection {
   background: rgb(var(--accent) / 0.22);
 }
 
-/* Optional: nicer focus ring default (subtle blue) */
+/* Subtle, consistent focus ring */
 :focus-visible {
   outline: 2px solid rgb(var(--accent) / 0.55);
   outline-offset: 2px;
@@ -103,7 +76,7 @@ body {
     background-color: rgb(var(--surface));
   }
 
-  .ui-surface-2 {
+  .ui-surface2 {
     background-color: rgb(var(--surface-2));
   }
 
@@ -151,7 +124,8 @@ body {
 
   /* Hover lift (use on clickable cards/buttons if desired) */
   .ui-lift {
-    transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+    transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease,
+      background-color 150ms ease;
   }
 
   .ui-lift:hover {
@@ -160,38 +134,5 @@ body {
       0 1px 0 rgb(255 255 255 / 0.04),
       0 18px 45px rgb(0 0 0 / 0.42);
     border-color: rgb(var(--border) / 0.14);
-  }
-}
-
-@layer components {
-  .ui-card {
-    border: 1px solid rgb(var(--border));
-    background: rgb(var(--surface));
-    border-radius: 1rem;
-  }
-
-  .ui-card-hero {
-    border: 1px solid rgb(var(--border));
-    background: rgb(var(--bg));
-    border-radius: 1.5rem;
-  }
-
-  .ui-btn {
-    border: 1px solid rgb(var(--border));
-    background: rgb(var(--surface-2));
-    color: rgb(var(--text));
-    border-radius: 0.75rem;
-  }
-
-  .ui-btn:hover {
-    background: rgb(var(--surface));
-  }
-
-  .ui-muted {
-    color: rgb(var(--text-muted));
-  }
-
-  .ui-faint {
-    color: rgb(var(--text-faint));
   }
 }

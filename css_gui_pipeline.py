@@ -181,35 +181,36 @@ class App(tk.Tk):
         return True
 
     def _sync_web_data(self) -> bool:
+        """Sync published artifacts into the Next.js public data folder.
+
+        This project’s authoritative dataset is produced under:
+          data\published\v1
+
+        The website (web-v1) reads from:
+          web-v1\public\data\published\v1
+
+        For backwards compatibility, we also support a legacy:
+          web\public\data\published\v1
+
+        The sync script itself decides which web folder to use (web-v1 preferred).
         """
-        Legacy helper: sync calculated data into an old web folder.
-
-        IMPORTANT:
-        - This project will build a fresh website later from scratch.
-        - The authoritative, web-ready dataset is produced by the pipeline under:
-            data\published\v1\...
-
-        Therefore:
-        - If legacy web assets/scripts are missing (expected), we skip silently.
-        - If they exist, we still allow syncing for backwards compatibility.
-        """
-        web_dir = self.root_dir / "web"
-        if not web_dir.exists():
-            self._log("Skipping legacy web sync (web/ folder not present). Published artifacts are ready under data/published/v1.")
-            return True
-
         if not self.ps_sync_web_data.exists():
-            self._log("Skipping legacy web sync (sync_web_data.ps1 not present).")
+            self._log("Skipping web sync (pipeline/tools/sync_web_data.ps1 not present).")
             return True
 
-        self._log("Starting legacy sync: data/calculated -> web/public/data ...")
-        rc = self._run_powershell_script(self.ps_sync_web_data, [])
+        # Only attempt sync if at least one known web folder exists.
+        if not ((self.root_dir / "web-v1").exists() or (self.root_dir / "web").exists()):
+            self._log("Skipping web sync (no web-v1/ or web/ folder present). Published artifacts are ready under data/published/v1.")
+            return True
+
+        self._log("Syncing published dataset -> web public folder ...")
+        rc = self._run_powershell_script(self.ps_sync_web_data, ["-Root", str(self.root_dir)])
         if rc != 0:
-            self._log(f"Legacy web data sync failed (exit code {rc})")
+            self._log(f"Web data sync failed (exit code {rc})")
             messagebox.showerror("Sync feilet", f"Exit code: {rc}\nSe loggen for detaljer.")
             return False
 
-        self._log("Legacy web data sync OK.")
+        self._log("Web data sync OK.")
         return True
 
     def _log_published_summary(self) -> None:
@@ -280,13 +281,14 @@ class App(tk.Tk):
         if self.busy:
             return
 
-        # Legacy website handler. If web/ is not present (expected), inform and exit.
-        if not (self.root_dir / "web").exists():
+        # If no website folder exists, inform and exit.
+        if not ((self.root_dir / "web-v1").exists() or (self.root_dir / "web").exists()):
             messagebox.showinfo(
                 "Nettside ikke satt opp",
-                "Det finnes ingen web/ i dette prosjektet (bevisst).\n\n"
+                "Fant ingen web-v1/ eller web/ i dette prosjektet.\n\n"
                 "Pipeline produserer web-klare artefakter her:\n  data/published/v1\n\n"
-                "Når vi starter web fra scratch, vil den lese kun fra published/v1.",
+                "Nettsiden leser fra:\n  web-v1/public/data/published/v1\n"
+                "(via sync_web_data.ps1).",
             )
             return
 
@@ -303,11 +305,11 @@ class App(tk.Tk):
             try:
                 # Existing legacy behavior retained (only runs if web/ exists).
                 # Any further legacy web handling remains as in your original file.
-                self._log("Legacy web open requested, but this project will move to a fresh web from scratch.")
+                self._log("Web open requested. (This GUI currently keeps web start separate from data pipeline.)")
                 messagebox.showinfo(
-                    "Legacy web",
-                    "Legacy web er ikke en del av den nye løsningen.\n"
-                    "Bruk published artifacts i data/published/v1 som input til ny web senere.",
+                    "Web start",
+                    "Start web (Next.js) via ditt vanlige web-v1-oppsett (npm dev/build).\n"
+                    "Data blir synket automatisk etter pipeline-run.",
                 )
             finally:
                 self.after(0, lambda: self._set_busy(False, "Idle"))

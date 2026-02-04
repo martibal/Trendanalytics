@@ -23,32 +23,11 @@ function Copy-Tree([string]$src, [string]$dst) {
   Ensure-Dir $dst
 
   Write-Log "Copy: $src -> $dst"
-
   if ($DryRun) { return }
 
-  # Mirror semantics without deleting destination by default.
-  # We copy everything over; existing files are overwritten.
-  # This keeps the operation safe even if someone has extra files locally.
   robocopy $src $dst /E /NFL /NDL /NJH /NJS /NP /R:2 /W:1 | Out-Null
   $rc = $LASTEXITCODE
-
-  # Robocopy return codes: 0-7 are OK (success or minor differences). >=8 is failure.
   if ($rc -ge 8) { throw "Robocopy failed (exit code $rc) copying $src -> $dst" }
-}
-
-function Find-NodeExe() {
-  $node = (Get-Command node.exe -ErrorAction SilentlyContinue)
-  if ($node -and $node.Source) { return $node.Source }
-
-  $node = (Get-Command node -ErrorAction SilentlyContinue)
-  if ($node -and $node.Source) { return $node.Source }
-
-  $pf = $env:ProgramFiles
-  if (-not $pf) { $pf = 'C:\Program Files' }
-  $candidate = Join-Path $pf 'nodejs\node.exe'
-  if (Test-Path $candidate) { return $candidate }
-
-  return $null
 }
 
 try {
@@ -61,47 +40,32 @@ try {
     $Root = Resolve-Path $Root | Select-Object -ExpandProperty Path
   }
 
-  $calcGold = Join-Path $Root 'data\calculated\gold'
-  $calcMeta = Join-Path $Root 'data\calculated\meta'
+  $published = Join-Path $Root 'data\published\v1'
 
-  $webDir   = Join-Path $Root 'web'
-  $webGold  = Join-Path $webDir 'data\css_json'
-  $webMeta  = Join-Path $webDir 'data\css_json_meta'
-  $syncMjs  = Join-Path $webDir 'scripts\sync-data.mjs'
+  $webV1 = Join-Path $Root 'web-v1'
+  $webLegacy = Join-Path $Root 'web'
+
+  $targetWeb = $null
+  if (Test-Path $webV1) {
+    $targetWeb = $webV1
+  } elseif (Test-Path $webLegacy) {
+    $targetWeb = $webLegacy
+  } else {
+    throw "Neither web-v1 nor web folder found under root. Expected: $webV1 or $webLegacy"
+  }
+
+  $dst = Join-Path $targetWeb 'public\data\published\v1'
 
   Write-Log "=== SYNC WEB DATA START ==="
-  Write-Log "root      = $Root"
-  Write-Log "calcGold  = $calcGold"
-  Write-Log "calcMeta  = $calcMeta"
-  Write-Log "webGold   = $webGold"
-  Write-Log "webMeta   = $webMeta"
-  Write-Log "syncMjs   = $syncMjs"
-  Write-Log "dryRun    = $($DryRun.IsPresent)"
+  Write-Log "root        = $Root"
+  Write-Log "published   = $published"
+  Write-Log "targetWeb   = $targetWeb"
+  Write-Log "dst         = $dst"
+  Write-Log "dryRun      = $($DryRun.IsPresent)"
 
-  if (-not (Test-Path $calcGold)) { throw "Missing calculated gold folder: $calcGold" }
-  if (-not (Test-Path $calcMeta)) { throw "Missing calculated meta folder: $calcMeta" }
-  if (-not (Test-Path $webDir))   { throw "Missing web folder: $webDir" }
-  if (-not (Test-Path $syncMjs))  { throw "Missing web script: $syncMjs" }
+  if (-not (Test-Path $published)) { throw "Missing published dataset folder: $published" }
 
-  # 1) Copy calculated -> web/data/*
-  Copy-Tree $calcGold $webGold
-  Copy-Tree $calcMeta $webMeta
-
-  # 2) Run web sync into public/data/*
-  $nodeExe = Find-NodeExe
-  if (-not $nodeExe) { throw "Could not find node.exe. Install Node.js or ensure it is on PATH." }
-
-  Write-Log "Run: node scripts/sync-data.mjs (cwd=$webDir)"
-  if (-not $DryRun) {
-    Push-Location $webDir
-    try {
-      & $nodeExe 'scripts/sync-data.mjs'
-      if ($LASTEXITCODE -ne 0) { throw "scripts/sync-data.mjs failed rc=$LASTEXITCODE" }
-    }
-    finally {
-      Pop-Location
-    }
-  }
+  Copy-Tree $published $dst
 
   Write-Log "=== SYNC WEB DATA OK ==="
   exit 0
