@@ -9,6 +9,7 @@ import sys
 from typing import Dict, List, Set, Tuple
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
 S3_BASE = {
     "ethereum": "s3://aws-public-blockchain/v1.0/eth",
     "bitcoin":  "s3://aws-public-blockchain/v1.0/btc",
@@ -39,11 +40,27 @@ def local_day_dir(raw_root: str, chain: str, table: str, day: str) -> Tuple[str,
     return a, b
 
 def aws_run(cmd: List[str]) -> subprocess.CompletedProcess:
-    # Important: flush progress quickly even under GUI by not capturing stdout unless necessary.
     return subprocess.run(cmd, capture_output=True, text=True)
 
+def _parse_day_from_prefix(name: str) -> str | None:
+    """
+    Accept both:
+      - date=YYYY-MM-DD
+      - YYYY-MM-DD
+    """
+    name = name.rstrip("/").strip()
+    if name.startswith("date="):
+        cand = name.split("=", 1)[1].strip()
+        return cand if DATE_RE.match(cand) else None
+    return name if DATE_RE.match(name) else None
+
 def aws_list_available_days(chain: str, table: str, base: str) -> Set[str]:
-    """List available days on S3 by listing the table prefix once."""
+    """
+    List available days on S3 by listing the table prefix once.
+    Works for BOTH layouts:
+      - .../<table>/date=YYYY-MM-DD/
+      - .../<table>/YYYY-MM-DD/
+    """
     prefix = f"{base}/{table}/"
     p = aws_run(["aws", "s3", "ls", prefix, "--no-sign-request"])
     if p.returncode != 0:
@@ -53,33 +70,38 @@ def aws_list_available_days(chain: str, table: str, base: str) -> Set[str]:
         return set()
 
     days: Set[str] = set()
-    # Expect lines like: '                           PRE date=2026-01-10/'
+    # aws s3 ls prints lines like:
+    #   PRE date=2026-02-03/
+    #   PRE 2026-02-03/
     for line in p.stdout.splitlines():
         line = line.strip()
         if not line:
             continue
-        # aws s3 ls prints 'PRE <name>/' for "folders"
         if line.startswith("PRE "):
-            name = line[4:].rstrip("/").strip()
-            if name.startswith("date="):
-                cand = name.split("=", 1)[1]
-                if DATE_RE.match(cand):
-                    days.add(cand)
+            name = line[4:].strip()
+            d = _parse_day_from_prefix(name)
+            if d:
+                days.add(d)
+
     return days
 
 def aws_sync_day(src: str, dst: str) -> int:
-    # Only-show-errors keeps output small; we provide our own progress lines.
     return subprocess.run(
         ["aws", "s3", "sync", src, dst, "--no-sign-request", "--only-show-errors"]
     ).returncode
+
+def chain_cutoff(chain: str, today: dt.date, lag_l1: int, lag_l2: int) -> dt.date:
+    lag = lag_l2 if chain in ("arbitrum", "base") else lag_l1
+    return today - dt.timedelta(days=max(0, int(lag)))
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True, help="Repo root (for reports/)")
     ap.add_argument("--raw-root", required=True, help="Local raw root")
     ap.add_argument("--start", required=True, help="ISO date YYYY-MM-DD (inclusive)")
-    ap.add_argument("--publish-lag-days", type=int, default=1,
-                    help="Safety lag; do not try to ingest the newest N days")
+    ap.add_argument("--chains", default="bitcoin,ethereum,arbitrum,base", help="Comma-separated chains")
+    ap.add_argument("--lag-l1-days", type=int, default=1, help="Safety lag for L1 (BTC/ETH)")
+    ap.add_argument("--lag-l2-days", type=int, default=7, help="Safety lag for L2 (ARB/BASE)")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -88,18 +110,27 @@ def main() -> None:
     except ValueError:
         raise SystemExit(f"--start must be YYYY-MM-DD, got: {args.start}")
 
+    chains = [c.strip().lower() for c in (args.chains or "").split(",") if c.strip()]
+    for c in chains:
+        if c not in S3_BASE:
+            raise SystemExit(f"Unknown chain in --chains: {c}")
+
     today = dt.date.today()
-    cutoff = today - dt.timedelta(days=max(0, int(args.publish_lag_days)))
 
     report: Dict[str, object] = {
         "started_at": dt.datetime.now().isoformat(timespec="seconds"),
         "start": args.start,
-        "cutoff": cutoff.isoformat(),
         "dry_run": bool(args.dry_run),
+        "lags": {"l1_days": int(args.lag_l1_days), "l2_days": int(args.lag_l2_days)},
+        "cutoff_by_chain": {c: chain_cutoff(c, today, args.lag_l1_days, args.lag_l2_days).isoformat() for c in chains},
         "summary": {},
         "failures": [],
         "planned_downloads": [],
         "skipped_existing": [],
+        "notes": [
+            "Supports both S3 layouts: .../date=YYYY-MM-DD/ and .../YYYY-MM-DD/",
+            "Downloads are limited to [start, cutoff_by_chain] per chain (safety lag).",
+        ],
     }
 
     # Sanity: aws cli must exist
@@ -112,7 +143,10 @@ def main() -> None:
     except FileNotFoundError:
         raise SystemExit("AWS CLI not found. Install 'aws' and ensure it is on PATH.")
 
-    for chain, base in S3_BASE.items():
+    for chain in chains:
+        base = S3_BASE[chain]
+        cutoff = chain_cutoff(chain, today, args.lag_l1_days, args.lag_l2_days)
+
         for table in TABLES:
             print(f"[INFO] Listing available days on S3: {chain}/{table}", flush=True)
             available = aws_list_available_days(chain, table, base)
@@ -151,16 +185,32 @@ def main() -> None:
                     print(f"[DRYRUN] would download: {chain} {table} {day}", flush=True)
                     continue
 
-                src = f"{base}/{table}/date={day}/"
+                # Try both S3 layouts:
+                #   .../<table>/date=YYYY-MM-DD/
+                #   .../<table>/YYYY-MM-DD/
+                src_a = f"{base}/{table}/date={day}/"
+                src_b = f"{base}/{table}/{day}/"
+
                 dst = os.path.join(args.raw_root, chain, table, day)
                 ensure_dir(dst)
+
                 print(f"[GET] {chain} {table} {day}", flush=True)
-                rc = aws_sync_day(src, dst)
+
+                rc = aws_sync_day(src_a, dst)
                 if rc != 0 or not local_has_parquet(dst):
-                    eprint(f"[FAIL] {chain} {table} {day} (rc={rc})")
-                    report["failures"].append({"chain": chain, "table": table, "day": day, "reason": f"sync failed rc={rc}"})
+                    # fallback layout
+                    rc2 = aws_sync_day(src_b, dst)
+                    if rc2 != 0 or not local_has_parquet(dst):
+                        eprint(f"[FAIL] {chain} {table} {day} (rc_a={rc}, rc_b={rc2})")
+                        report["failures"].append({
+                            "chain": chain, "table": table, "day": day,
+                            "reason": f"sync failed rc_a={rc} rc_b={rc2}",
+                            "tried": [src_a, src_b],
+                        })
+                    else:
+                        print(f"[OK] {chain} {table} {day} (layout=plain)", flush=True)
                 else:
-                    print(f"[OK] {chain} {table} {day}", flush=True)
+                    print(f"[OK] {chain} {table} {day} (layout=date=)", flush=True)
 
     out = os.path.join(args.root, "reports", "download_up_to_date_minimal.json")
     ensure_dir(os.path.dirname(out))

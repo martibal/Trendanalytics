@@ -91,7 +91,12 @@ def main() -> None:
     ap.add_argument("--out-root", required=True, help="Output root for meta json (main/data/calculated/meta)")
     ap.add_argument("--start", required=True, help="Start date YYYY-MM-DD (inclusive)")
     ap.add_argument("--force", action="store_true", help="Overwrite existing files")
-    ap.add_argument("--mode", default=os.environ.get("CSS_PIPELINE_MODE","incremental"), choices=["incremental","rebuild"], help="incremental=preserve existing day files; rebuild=overwrite history")
+    ap.add_argument(
+        "--mode",
+        default=os.environ.get("CSS_PIPELINE_MODE", "incremental"),
+        choices=["incremental", "rebuild"],
+        help="incremental=preserve existing day files; rebuild=overwrite history",
+    )
     ap.add_argument("--windows", default="7,30,90,180,365", help="Comma-separated window sizes to materialize as lastXd.json")
     args = ap.parse_args()
 
@@ -131,6 +136,7 @@ def main() -> None:
         df = _load_gold_df(chain, "daily")
         if df is None or df.empty:
             continue
+
         last_iso = _last_gold_date_iso(df)
         if not last_iso:
             continue
@@ -156,10 +162,11 @@ def main() -> None:
 
             slice_df = d[d["date"] <= cur]
             profile = get_chain_profile(chain)
+
             conf = _confidence_asof(
                 chain=chain,
                 day=cur,
-                gold_df=d,
+                gold_df=d,  # full df is fine; function slices internally
                 gold_status=gs,
                 load_conf_series=_load_confidence_series,
                 compute_conf_from_gold=_compute_confidence_from_gold,
@@ -183,6 +190,8 @@ def main() -> None:
             status = _status_from_regime_and_scorecard(regime, scorecard)
 
             obj: Dict[str, Any] = {
+                # ✅ IMPORTANT: make date explicit at top level (web expects this)
+                "date": cur.isoformat(),
                 "chain": chain,
                 "missing": False,
                 "profile": profile,
@@ -198,7 +207,6 @@ def main() -> None:
 
             out_file.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
             cur += dt.timedelta(days=1)
-
 
         # Always refresh latest.json and materialized windows (views)
         try:
@@ -217,16 +225,30 @@ def main() -> None:
             if day_paths:
                 latest_day = day_paths[-1]
                 latest_obj = json.loads(latest_day.read_text(encoding="utf-8"))
+
+                # ✅ Ensure latest has top-level date even if older history lacks it
+                if not isinstance(latest_obj, dict):
+                    latest_obj = {"date": latest_day.stem, "missing": True, "chain": chain}
+                if "date" not in latest_obj or not latest_obj.get("date"):
+                    latest_obj["date"] = latest_day.stem
+
                 (ch_out / "latest.json").write_text(json.dumps(latest_obj, ensure_ascii=False, indent=2), encoding="utf-8")
 
                 for n in windows:
                     if n <= 0:
                         continue
                     slice_paths = day_paths[-n:]
-                    payload = [json.loads(p.read_text(encoding="utf-8")) for p in slice_paths]
+                    payload = []
+                    for p in slice_paths:
+                        o = json.loads(p.read_text(encoding="utf-8"))
+                        if isinstance(o, dict) and ("date" not in o or not o.get("date")):
+                            o["date"] = p.stem
+                        payload.append(o)
+
                     (ch_out / f"last{n}d.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
+
 
 if __name__ == "__main__":
     main()

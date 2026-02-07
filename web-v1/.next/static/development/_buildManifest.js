@@ -1,1 +1,1 @@
-self.__BUILD_MANIFEST = (function(a){return {__rewrites:{afterFiles:[{has:void 0,source:a,destination:a}],beforeFiles:[],fallback:[]},sortedPages:["\u002F_app"]}}("\u002Fdata\u002F:path*"));self.__BUILD_MANIFEST_CB && self.__BUILD_MANIFEST_CB()
+self.__BUILD_MANIFEST = (function(a){return {__rewrites:{afterFiles:[],beforeFiles:[],fallback:[]},__routerFilterStatic:a,__routerFilterDynamic:a,sortedPages:["\u002F_app"]}}(void 0));self.__BUILD_MANIFEST_CB && self.__BUILD_MANIFEST_CB()

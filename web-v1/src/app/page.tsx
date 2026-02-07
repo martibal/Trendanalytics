@@ -1,10 +1,93 @@
 // src/app/page.tsx
+import Link from "next/link";
 import LandingHero from "@/components/landing/LandingHero";
 
-export default function Page() {
+function Card(props: { title: string; children: React.ReactNode }) {
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm backdrop-blur">
+      <div className="text-lg font-semibold text-white">{props.title}</div>
+      <div className="mt-3 text-sm text-white/70">{props.children}</div>
+    </div>
+  );
+}
+
+function PillLink(props: { href: string; label: string }) {
+  return (
+    <Link
+      href={props.href}
+      className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-semibold text-white/70 hover:border-white/20 hover:text-white"
+    >
+      {props.label}
+    </Link>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <main className="space-y-8">
+      {/* Landing cards (2x2) */}
       <LandingHero />
+
+      {/* How to read */}
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Card title="How to read the charts">
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <span className="text-white/85">Daily</span> is the raw value for the date.
+            </li>
+            <li>
+              <span className="text-white/85">MA7</span> and <span className="text-white/85">MA30</span> smooth noise to show sustained movement.
+            </li>
+            <li>
+              Hover the chart to see <span className="text-white/85">confidence</span>, and (when available) <span className="text-white/85">z-score</span> / <span className="text-white/85">percentile</span>.
+            </li>
+            <li>
+              Missing values are shown as <span className="text-white/85">gaps</span> (never interpolated).
+            </li>
+          </ul>
+        </Card>
+
+        <Card title="What the labels mean">
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <span className="text-white/85">Level</span>: Low / Typical / Elevated / Extreme vs historical reference.
+            </li>
+            <li>
+              <span className="text-white/85">Trend</span>: Rising / Falling / Flat using MA30 slope over the selected window.
+            </li>
+            <li>
+              <span className="text-white/85">Stability</span>: Stable / Variable / Highly variable based on dispersion of daily values.
+            </li>
+            <li>
+              These are <span className="text-white/85">descriptive</span> summaries only — no advice, no forecasts, no prices.
+            </li>
+          </ul>
+        </Card>
+      </section>
+
+      {/* Quick links */}
+      <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-lg font-semibold text-white">Start exploring</div>
+            <div className="mt-1 text-sm text-white/70">
+              Chain dashboards, methodology, and raw exports are all accessible from the navigation bar.
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <PillLink href="/chains/bitcoin" label="Bitcoin dashboard" />
+            <PillLink href="/chains/ethereum" label="Ethereum dashboard" />
+            <PillLink href="/methodology" label="Methodology" />
+            <PillLink href="/wiki" label="Wiki" />
+            <PillLink href="/about" label="About / contract" />
+          </div>
+        </div>
+
+        <div className="mt-4 text-xs text-white/50">
+          Data is served from published artifacts under <span className="font-mono">public/data/published/v1</span> and is auditable via dataset_id and revision_id.
+        </div>
+      </section>
     </main>
   );
 }

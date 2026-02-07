@@ -1,15 +1,15 @@
+// D:\css\main\web-v1\next.config.js
+import path from "node:path";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  // Data is served from /public/data -> /data/...
-  // Rewrites are optional, but we keep them explicit to avoid ambiguity if hosting changes.
-  async rewrites() {
-    return [
-      {
-        source: '/data/:path*',
-        destination: '/data/:path*',
-      },
-    ];
+  // Fix: Next inferred wrong workspace root due to multiple lockfiles.
+  // This pins tracing root to this project directory.
+  outputFileTracingRoot: path.join(process.cwd()),
+
+  images: {
+    // Mitigation: disables Next.js image optimization pipeline
+    unoptimized: true,
   },
 };
 

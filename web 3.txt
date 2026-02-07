@@ -1,0 +1,317 @@
+
+---
+
+# 🔁 OVERLEVERING – BLOCKCHAIN TREND CONTEXT (PRICE-AGNOSTIC)
+
+## 1. Formål og produktdefinisjon (viktig kontekst)
+
+Dette prosjektet er en **deskriptiv, pris-agnostisk analyseplattform for blockchain-aktivitet**, med fokus på:
+
+* **Bitcoin**
+* **Ethereum**
+* **Arbitrum**
+* **Base**
+
+Plattformen:
+
+* viser **trender, nivåer og stabilitet** i nettverksaktivitet
+* gir **kontekstualisert innsikt**, ikke signaler eller anbefalinger
+* **inkluderer aldri prisdata, prognoser eller rådgivende språk**
+* er bygget for både:
+
+  * **amatører** (enkle forklaringer, paneler, tekst)
+  * **profesjonelle** (full metodikk, rådata, JSON, revisjonsspor)
+
+All data er **reproduserbar, revisjonerbar og audit-vennlig**.
+
+---
+
+## 2. Overordnet arkitektur
+
+Systemet består av **tre hovedlag**:
+
+### A) Data pipeline (offline / batch)
+
+* Laster ned **rå blockchain-data** (blocks + transactions) daglig fra AWS
+* Aggregerer dette til:
+
+  * **daily features**
+  * **gold timeseries**
+  * **weekly gold**
+* Eksporterer:
+
+  * `gold`
+  * `derived`
+  * `meta`
+* Publiserer et **immutabelt dataset** per kjøring:
+
+  ```
+  data/published/v1/
+    └── {genre}/{chain}/
+         ├── day/
+         ├── latest.json
+         ├── lastXd.json
+         └── manifest.json
+  ```
+
+Pipeline er:
+
+* **inkrementell**
+* **robust mot manglende dager**
+* **ikke avhengig av full rekjøring**
+
+---
+
+### B) Web API (Next.js App Router)
+
+Web-laget leser **kun fra `public/data/published/v1`**
+→ ingen direkte kobling til pipeline eller rådata.
+
+Alle API-endepunkter er **read-only** og deterministiske.
+
+#### Viktige API-ruter:
+
+* `GET /api/series`
+* `GET /api/summary`
+* `GET /api/health`
+
+---
+
+### C) UI / Frontend (Next.js + React)
+
+Frontend er bygget som et **pedagogisk, eksplorativt dashboard**:
+
+* Landing (Trend Context)
+* Chains
+* Notables
+* Methodology
+* Wiki
+* About
+
+Hver visning:
+
+* er **100 % deskriptiv**
+* viser **rå + smooth data**
+* forklarer:
+
+  * hva du ser
+  * hvorfor det er relevant
+  * hvilke begrensninger som finnes
+
+---
+
+## 3. Hva som er ferdig og på plass (status nå)
+
+### ✅ Data & pipeline
+
+* Rådata lastes daglig fra AWS (verifisert)
+* Inkrementell catch-up fungerer
+* Gold / Derived / Meta er konsistente
+* `asof` er verifisert lik i:
+
+  * calculated
+  * published
+  * web-served data
+* Forskjellig latency per chain er eksplisitt håndtert:
+
+  * BTC / ETH: near-real-time
+  * Arbitrum / Base: ca. 1 uke forsinkelse
+
+---
+
+### ✅ Web API (implementert og i bruk)
+
+**`/api/series`**
+
+* Returnerer timeserie (raw + smooth)
+* Krever eksplisitt:
+
+  * `chain`
+  * `metric`
+  * `start`
+  * `end`
+* Leser direkte fra published gold JSON
+
+**`/api/summary`**
+
+* Returnerer:
+
+  * level
+  * trend
+  * stability
+  * forklarende tekst
+* Samme datakontrakt som UI-panelene
+
+**`/api/health`**
+
+* Validerer:
+
+  * tilgjengelige chains
+  * genres
+  * asof-konsistens
+* Tolerant mot formatendringer i meta
+
+---
+
+### ✅ UI / Frontend
+
+* Trend Context landing fungerer
+* 4 kjeder vises korrekt
+* Paneler viser:
+
+  * Level
+  * Trend
+  * Stability
+* Forklarende tekst er til stede
+* Rå + smooth linjer i chart
+* Data notes (asof, latency) vises tydelig
+* “Raw reports” lenker er eksponert
+
+Dette er **ikke en prototype**, men et sammenhengende system.
+
+---
+
+## 4. Viktige filer og hvor ting skjer
+
+### Pipeline (ikke i fokus for videre web-arbeid, men viktig å forstå)
+
+* `pipeline/tools/full_pipeline.ps1`
+* `pipeline/src/feature_daily_agg.py`
+* `pipeline/src/build_gold_timeseries.py`
+* `pipeline/src/build_gold_weekly.py`
+* `pipeline/tools/sync_web_data.ps1`
+
+---
+
+### Web API (kritisk for videre arbeid)
+
+* `src/app/api/series/route.ts`
+* `src/app/api/summary/route.ts`
+* `src/app/api/health/route.ts`
+
+Disse er **store filer** med:
+
+* validering
+* parsing
+* domain-logikk
+* forklarings-mapping
+
+---
+
+### Frontend (utdrag)
+
+* `src/app/page.tsx` (landing)
+* `src/components/MetricPanel.tsx`
+* `src/components/TrendChart.tsx`
+* `src/lib/metrics.ts` (mapping)
+* `src/lib/text.ts` (forklaringer)
+
+---
+
+## 5. KRAVLISTE – GJENSTÅENDE ARBEID (for godkjenning)
+
+Dette er **ny godkjenningsliste**, tilsvarende den forrige, men nå **kun for det som gjenstår**.
+
+---
+
+### 🔲 1. API-kontrakt: ergonomi & stabilitet
+
+* [ ] Støtt `window=N` som alternativ til `start/end` (back-compat)
+* [ ] Dokumenter eksplisitt alle query-parametre
+* [ ] Gi maskinlesbare feilmeldinger (JSON) ved 400
+
+---
+
+### 🔲 2. Caching & ytelse
+
+* [ ] Definer eksplisitt caching-policy for API:
+
+  * `Cache-Control`
+  * evt. `revalidate`
+* [ ] Avklar hvilke endepunkter som kan caches hardt vs soft
+
+---
+
+### 🔲 3. Kontrakttester
+
+* [ ] Legg inn automatiske tester som verifiserer:
+
+  * `/api/series` → shape + datoorden
+  * `/api/summary` → panelfelter
+  * `/api/health` → konsistens
+* [ ] Test mot ekte published-data
+
+---
+
+### 🔲 4. Metrikk-mapping (kritisk for faglig korrekthet)
+
+* [ ] Én eksplisitt mapping-tabell:
+
+  * metric → forklaring → smoothing → panelbruk
+* [ ] Sikre at UI-tekst = metodikk = data
+* [ ] Ingen “stille” default-antagelser
+
+---
+
+### 🔲 5. Methodology / Wiki (profesjonelt nivå)
+
+* [ ] Full metodikk per metrikk:
+
+  * hva det er
+  * hvordan det beregnes
+  * hvorfor det er inkludert
+  * begrensninger
+* [ ] Basic vs Advanced visning
+
+---
+
+### 🔲 6. Endrings- og revisjonshåndtering
+
+* [ ] Vis dataset_id og revision_id i UI
+* [ ] Forklar hva en revisjon betyr for brukeren
+* [ ] Ingen “magiske” oppdateringer
+
+---
+
+### 🔲 7. UI-polish og UX-klarhet
+
+* [ ] Gjør latency (near-real-time vs delayed) ekstremt tydelig
+* [ ] Sørg for konsistent språk (deskriptivt, ikke normativt)
+* [ ] Forbedre lesbarhet for ikke-eksperter uten å forringe presisjon
+
+---
+
+### 🔲 8. Dokumentasjon for videre drift
+
+* [ ] README: “How data flows end-to-end”
+* [ ] README: “How to add a new metric”
+* [ ] README: “How to add a new chain”
+
+---
+
+## 6. Absolutte føringer (må respekteres)
+
+* ❌ Ingen prisdata
+* ❌ Ingen prognoser
+* ❌ Ingen anbefalinger
+* ❌ Ingen ubegrunnede modeller
+* ✅ Kun forklarbar, deskriptiv statistikk
+* ✅ All usikkerhet skal kommuniseres eksplisitt
+
+---
+
+## 7. Sluttkommentar
+
+Dette prosjektet er **teknisk ferdig langt på vei**, men krever nå:
+
+* rydding
+* kontraktfesting
+* dokumentasjon
+* profesjonalisering
+
+Neste team skal **ikke finne opp noe nytt**, men:
+
+> gjøre det eksisterende systemet ferdig, robust og eksplisitt.
+
+---
+

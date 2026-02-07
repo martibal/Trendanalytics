@@ -4,7 +4,7 @@
 Publish calculated artifacts into a stable, web-ready contract:
 
 From:
-  data/calculated/{gold,meta,derived}/<chain>/*.json
+  data/calculated/{gold_json,meta,derived}/<chain>/*.json
 To:
   data/published/v1/{gold,meta,derived}/<chain>/*.json
 Plus:
@@ -41,9 +41,7 @@ def _read_json(p: Path) -> Any:
 
 
 def _sanitize_json(obj: Any) -> Any:
-    """
-    Recursively replace NaN / +/-Infinity with None so output is strict JSON.
-    """
+    """Recursively replace NaN / +/-Infinity with None so output is strict JSON."""
     if obj is None:
         return None
 
@@ -185,8 +183,8 @@ def _rel_from_published(published_root: Path, target: Path) -> str:
 
 def _landing_chart_specs(chain: str) -> List[Dict[str, Any]]:
     """
-    Hero charts: "slående" men 100% deskriptivt.
-    Referer til published window-filer (lastXd) så web kan tegne store interaktive charts.
+    Hero charts: striking but 100% descriptive.
+    Refers to published window files (lastXd) so web can render interactive charts.
     """
     evm = chain in ("ethereum", "arbitrum", "base")
     charts: List[Dict[str, Any]] = []
@@ -374,6 +372,23 @@ def _export_landing(
     print(f"[PUBLISH] landing export OK: {landing_root}")
 
 
+def _source_dir_for_genre(calculated_root: Path, genre: str) -> Path:
+    """
+    IMPORTANT FIX:
+    Our pipeline writes GOLD day-json under data/calculated/gold_json/<chain>/...
+    (not data/calculated/gold/<chain>/...)
+    so publishing must read gold from gold_json.
+    """
+    if genre == "gold":
+        # Prefer gold_json if it exists
+        gj = calculated_root / "gold_json"
+        if gj.exists():
+            return gj
+        # Fallback (older layouts)
+        return calculated_root / "gold"
+    return calculated_root / genre
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True, help="Project root (e.g. d:/css/main)")
@@ -400,7 +415,7 @@ def main() -> int:
     copied_counts: Dict[str, Dict[str, int]] = {g: {} for g in genres}
 
     for genre in genres:
-        src_genre = calculated / genre
+        src_genre = _source_dir_for_genre(calculated, genre)
         dst_genre = published / genre
         _ensure_dir(dst_genre)
 
@@ -451,6 +466,7 @@ def main() -> int:
         "notes": [
             "Published dataset is the only intended input for the website.",
             "Published JSON is sanitized for strict browser JSON (NaN/Inf -> null).",
+            "IMPORTANT: GOLD is sourced from data/calculated/gold_json if present.",
         ],
     }
 

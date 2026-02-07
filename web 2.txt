@@ -1,0 +1,746 @@
+
+
+# CSS Blockchain Analytics — Complete Product & Dev Specification
+
+**Document ID:** CSS-BA-ENDGAME-SPEC
+**Version:** 1.0 (Final)
+**Scope:** Full end-to-end system: pipeline → published dataset → web → API → UX → docs (methodology + wiki)
+**UI Language:** English only
+**Core constraints (absolute):** Price-agnostic; descriptive only; explainable; no forecasts; no advice; explicit dimensions; Basic+Advanced for everything; cloud-operable without local PC.
+
+---
+
+## 1) Executive Product Definition
+
+### 1.1 Product promise (what the user gets)
+
+A one-stop, price-agnostic blockchain trend analytics platform for **Bitcoin, Ethereum, Arbitrum, Base**, delivering:
+
+* a **30-second landing snapshot**: “what matters now, in historical context”
+* **deep chain dashboards**: “metric-by-metric, with context & methodology”
+* a **Methodology** knowledge base: “how every number is computed, with caveats”
+* a **Wiki** glossary: “terms & concepts, pedagogical”
+* a consistent **API export layer** so customers can build their own analysis.
+
+### 1.2 Pages (fixed: exactly 7)
+
+1. `/` Landing — 30-second snapshot across all 4 chains
+2. `/chains/bitcoin` — chain dashboard
+3. `/chains/ethereum` — chain dashboard
+4. `/chains/arbitrum` — chain dashboard
+5. `/chains/base` — chain dashboard
+6. `/methodology` — full computation transparency
+7. `/wiki` — glossary and learning resources
+
+### 1.3 Non-negotiable content rules
+
+* No price data, no price charts, no price proxies
+* No predictions, no “likely”, no “expect”, no “bull/bear”, no “should”
+* Only descriptive statements, always paired with explicit caveats when applicable
+* Every metric shown must have: **What / How / Why / Value**
+* Every view shows explicit dimensions: time window, coverage, freshness/lag, confidence, units/transforms, historical reference.
+
+---
+
+## 2) System Architecture (Cloud-first, maintainable)
+
+### 2.1 Components
+
+**A) Pipeline (batch)**
+
+* Triggered initially by GUI button (`css_gui_pipeline`).
+* In production, runs scheduled (cron / cloud scheduler) daily.
+* Outputs artifacts into `data/published/v1`.
+
+**B) Published dataset contract (static, web-ready)**
+
+* Single immutable dataset per run: `dataset_id`, `revision_id`.
+* Contains gold/meta/derived + landing descriptors.
+
+**C) Web app (Next.js)**
+
+* Consumes only `public/data/published/v1/**`.
+* Provides interactive analytics via server routes:
+
+  * `/api/series` for timeseries assembly from daily JSONs
+  * `/api/summary` for deterministic interpretation & statistics
+  * `/api/export/*` for customer API export
+
+**D) Storage / hosting**
+
+* Static files served by CDN/object store or web server.
+* API runs in same Next deployment or separate serverless endpoints.
+
+### 2.2 Cloud deployment requirement
+
+A deployment must be possible with:
+
+* Pipeline job container (Python + PowerShell support if kept, but should be runnable in Linux too if possible; Windows-only is allowed only if required by toolchain).
+* Web container.
+* Shared object storage or artifact volume for `data/published/v1` that web reads from (or publish step syncs into web’s public directory).
+
+**Accepted cloud patterns:**
+
+1. **Monorepo single host**: pipeline writes to shared disk; Next serves public from same disk.
+2. **Artifacts to object storage**: pipeline uploads `published/v1`; web serves via CDN path `/data/published/v1`.
+3. **CI publish**: pipeline runs in CI, commits artifacts to release bucket, web reads it.
+
+**Mandatory:** local PC must not be required for runtime.
+
+---
+
+## 3) Data Contract (Published Dataset is the only truth)
+
+### 3.1 Required file structure
+
+Web and API must assume:
+
+* `/data/published/v1/dataset.json`
+* `/data/published/v1/landing/index.json`
+* `/data/published/v1/landing/<chain>/hero.json`
+* `/data/published/v1/{gold,meta,derived}/<chain>/manifest.json`
+* `/data/published/v1/{gold,meta,derived}/<chain>/YYYY-MM-DD.json`
+* `/data/published/v1/{gold,meta,derived}/<chain>/latest.json`
+* `/data/published/v1/{gold,meta,derived}/<chain>/last{7,30,90,180,365}d.json`
+
+### 3.2 Manifest contract (required fields)
+
+Each `{genre}/{chain}/manifest.json` must contain:
+
+* `asof` (YYYY-MM-DD)
+* `available_days[]` (sorted)
+* `available_days_count`
+* `windows_supported[]`
+* `files.latest` and `files.windows.{w}` existence flags
+
+**Web must treat manifest as source of truth for:**
+
+* “latest date”
+* “range of selectable start dates”
+* coverage (missing days)
+
+### 3.3 Verified gold fields (minimum expected)
+
+From your existing gold samples, web must support these keys when present:
+
+* `tx_count_daily` *(int)*
+* `median_tx_fee_native` *(float)*
+* `avg_block_time_sec` *(float)*
+* `block_count_daily` *(int)*
+* `gas_utilization_pct` *(float 0..1 or 0..100 depending on pipeline; web treats as 0..1 unless meta says otherwise—see units rules)*
+* `failed_tx_rate` *(float 0..1)*
+* `unique_active_addresses` *(int/float; may be null)*
+* `median_tx_value_native` *(float; may be null)*
+* `value_transferred_native` *(float; may be null)*
+
+### 3.4 Verified derived fields (minimum expected)
+
+From your derived daily samples:
+
+* `derived.meta_confidence.confidence_score` *(float 0..1)*
+* `derived.metrics.<metric>__ma7`
+* `derived.metrics.<metric>__ma30`
+
+### 3.5 Meta fields (required behavior even if missing)
+
+If meta contains:
+
+* z-score / percentile / long-run distribution stats per metric,
+  web will show them.
+  If meta does **not** contain them, web must:
+* show “Not available” in Advanced
+* never crash, never show NaN as UI text (use “—”)
+
+---
+
+## 4) UX / Visual System (Premium, “design-luxury”)
+
+### 4.1 Global styling rules
+
+**Background**
+
+* Dark, depth gradient: `zinc-950` with subtle radial highlights
+
+**Cards**
+
+* Glass effect: `bg-white/5`, `border-white/10`, `backdrop-blur`
+* Soft shadow + chain-colored rim glow
+
+**Typography**
+
+* H1: 48–56 px, tight
+* H2: 28–34 px
+* Body: 14–16 px
+* Labels: 11–12 px, uppercase tracking
+
+**Color identity per chain (required)**
+
+* Bitcoin: amber/orange glow
+* Ethereum: violet/magenta glow
+* Arbitrum: cyan/blue glow
+* Base: emerald/green glow
+
+**Interactivity**
+
+* Charts: hover tooltips mandatory
+* Panels: expand/collapse with smooth animation
+* Date controls: immediate response with loading skeletons (no layout jump)
+
+### 4.2 Information density rules (anti-textwall)
+
+* Landing: max 2 short sentences per chain (Basic) + optional expand reveals more.
+* Chain pages: each MetricPanel includes Basic and Advanced, but Advanced is collapsed by default.
+* Methodology/Wiki are the only pages allowed to be text-heavy; still structured.
+
+---
+
+## 5) Landing Page (30 seconds, no scrolling on desktop)
+
+### 5.1 Layout
+
+Desktop:
+
+* 2x2 grid with 4 chain cards above fold.
+  Mobile:
+* stack vertically, but each card remains concise.
+
+Each chain card includes:
+
+1. Chain header + trust strip
+2. One signature chart (large)
+3. 3 insight chips
+4. Basic interpretation (2 sentences)
+5. Expand toggle → reveals mini “Notables”
+6. “Open chain dashboard” link
+
+### 5.2 Trust strip content (mandatory)
+
+For each chain:
+
+* `asof` date (from manifest gold/derived/meta)
+* freshness lag estimate label:
+
+  * BTC/ETH: “Near-real-time (daily)” (if manifest asof within 1–2 days of today)
+  * ARB/BASE: “Delayed feed (≈ 1 week)” (consistent with your known lag)
+* `confidence_score` (latest derived) as a badge
+* dataset_id + revision (for audit)
+
+### 5.3 Signature metric per chain (FINAL)
+
+This is fixed and must be implemented:
+
+* **Bitcoin:** `tx_count_daily`
+* **Ethereum:** `gas_utilization_pct` (fallback to `tx_count_daily` if missing/mostly null)
+* **Arbitrum:** `tx_count_daily`
+* **Base:** `tx_count_daily`
+
+### 5.4 Insight chips (FINAL, chain-specific)
+
+Chips are deterministic from `/api/summary` for the signature metric:
+
+* Chip 1: **Level** (Low / Typical / Elevated / Extreme)
+* Chip 2: **Trend** (Rising / Falling / Flat; + strength: Weak/Moderate/Strong)
+* Chip 3: **Stability** (Stable / Variable / Highly variable)
+
+---
+
+## 6) Chain Pages (each chain is its own ecosystem)
+
+### 6.1 Common layout skeleton (all chains)
+
+1. **Hero section**
+
+   * Chain-specific “what matters here” (3 bullets)
+   * Date range selector (start date; end always = latest)
+   * “Data diagnostics” mini strip (coverage, lag, confidence)
+
+2. **Primary KPIs strip** (4–6 KPI cards)
+
+   * latest daily, MA7, MA30, confidence, (and z/percentile if available)
+
+3. **Metric grid** (MetricPanels)
+
+   * grouped into: Core Activity, Execution & Cost, Reliability, Value/Participation
+
+4. **Notables (descriptive change detection)**
+
+   * top 3 notable metrics for the selected range (from deterministic rules)
+
+5. **Diagnostics**
+
+   * missing days table
+   * null coverage per metric
+   * per-genre asof and lag statement
+
+6. **Links**
+
+   * “Methodology for this chain”
+   * “Wiki terms referenced here”
+
+### 6.2 MetricPanel component contract (must be consistent everywhere)
+
+Each MetricPanel must include:
+
+* Title + short subtitle
+* Chart with 3 series:
+
+  * Daily
+  * MA7
+  * MA30
+* Tooltip with:
+
+  * date
+  * daily
+  * MA7
+  * MA30
+  * confidence score for that date (if available)
+  * z-score/percentile for that date (if meta provides)
+* Basic interpretation (2 sentences)
+* Advanced interpretation (structured bullets)
+* Links:
+
+  * Methodology anchor for this metric
+  * Wiki anchor(s)
+  * Raw JSON viewer for that date (gold + derived + meta)
+
+---
+
+## 7) Final Metric Sets (per chain) — COMPLETE & SPECIFIC
+
+These are the **primary metrics** per chain. Web must implement exactly these groups.
+
+### 7.1 Bitcoin (BTC) — “Settlement cadence & fee pressure”
+
+**Core Activity**
+
+1. `tx_count_daily` — Daily transactions
+2. `unique_active_addresses` — Active addresses *(if coverage sufficient; else hidden with diagnostics note)*
+
+**Execution & Cost**
+3) `median_tx_fee_native` — Median transaction fee (native)
+
+**Reliability**
+4) `avg_block_time_sec` — Average block time
+5) `block_count_daily` — Blocks per day
+
+**Value / Throughput**
+6) `value_transferred_native` — Value transferred (native) *(optional panel: show only if ≥70% non-null in selected range)*
+7) `median_tx_value_native` — Median tx value (native) *(optional panel with same rule)*
+
+**Hard exclusions (BTC)**
+
+* `gas_utilization_pct` must not be shown
+* `failed_tx_rate` must not be shown
+
+### 7.2 Ethereum (ETH) — “Execution conditions & demand”
+
+**Core Activity**
+
+1. `tx_count_daily`
+2. `unique_active_addresses` *(hide if insufficient coverage)*
+
+**Execution & Cost**
+3) `gas_utilization_pct`
+4) `median_tx_fee_native`
+
+**Reliability**
+5) `failed_tx_rate` *(hide if insufficient coverage)*
+6) `avg_block_time_sec`
+7) `block_count_daily`
+
+**Value**
+8) `value_transferred_native` *(optional if coverage sufficient)*
+9) `median_tx_value_native` *(optional if coverage sufficient)*
+
+### 7.3 Arbitrum (ARB) — “L2 throughput, reliability, cost”
+
+**Core Activity**
+
+1. `tx_count_daily`
+2. `unique_active_addresses` *(optional coverage rule)*
+
+**Execution & Cost**
+3) `median_tx_fee_native`
+4) `gas_utilization_pct` *(optional coverage rule)*
+
+**Reliability**
+5) `failed_tx_rate` *(optional coverage rule)*
+6) `avg_block_time_sec` *(optional coverage rule if meaningful)*
+
+**Value**
+7) `value_transferred_native` *(optional coverage rule)*
+
+### 7.4 Base — “L2 throughput, reliability, cost”
+
+Same structure as Arbitrum, but chain identity and copy differ.
+
+### 7.5 Coverage rule (mandatory, deterministic)
+
+For any metric marked optional:
+
+* Compute `%nonNull` within selected range.
+* If `< 70%`, hide panel and show in Diagnostics: “Metric hidden due to insufficient coverage (x%).”
+
+---
+
+## 8) Live Web Computation (from daily JSON, cloud-safe)
+
+### 8.1 Goal
+
+User can select any start date; end = latest.
+All displayed values must update:
+
+* chart points (daily)
+* MA7/MA30 (from derived daily)
+* confidence score
+* z/percentile if meta supports
+* interpretation text
+
+### 8.2 Why not fetch hundreds of daily files directly in browser
+
+* Too many requests (performance, cost, failure rate)
+* Hard to cache efficiently client-side
+
+### 8.3 Required solution: Next API aggregation layer
+
+Implement server routes that read static published files and return aggregated outputs.
+
+#### 8.3.1 `/api/series` (required)
+
+**Input (query params):**
+
+* `chain` = bitcoin|ethereum|arbitrum|base
+* `metric` = one of the gold metric keys
+* `start` = YYYY-MM-DD
+* `end` = omitted → server uses gold manifest `asof`
+
+**Output (JSON):**
+
+* `dataset_id`, `revision_id`
+* `chain`, `metric`
+* `start`, `end`
+* `rows[]` each:
+
+  * `date`
+  * `daily` (from gold daily file)
+  * `ma7` (from derived daily file metric__ma7)
+  * `ma30` (from derived daily file metric__ma30)
+  * `confidence` (from derived meta_confidence.confidence_score)
+  * `z` (meta if available else null)
+  * `percentile` (meta if available else null)
+* `coverage`:
+
+  * `expected_days`, `present_days`, `missing_days[]`, `nonNull_ratio`
+* `freshness`:
+
+  * `asof`, `lag_days` (computed from today)
+
+**Mandatory rule:** MA7 and MA30 must come from **derived daily** if present.
+Fallback compute rolling mean server-side only if derived missing for that date, with:
+
+* `ma_source="fallback_computed"` included in row for those dates.
+
+#### 8.3.2 `/api/summary` (required)
+
+**Input:**
+
+* `chain`, `metric`, `start`, `end`
+
+**Output:**
+
+* `current`:
+
+  * latest daily, latest ma7, latest ma30
+* `period`:
+
+  * mean daily, median daily, stdev daily
+* `trend`:
+
+  * slope of ma30 over period (linear regression)
+  * label: Rising/Falling/Flat
+  * strength: Weak/Moderate/Strong by |slope| normalized by period stdev
+* `volatility`:
+
+  * coefficient of variation of daily (stdev/mean absolute)
+  * label: Stable/Variable/Highly variable
+* `level`:
+
+  * classification based on historical reference (meta percentile if exists else period-only bands)
+* `confidence`:
+
+  * mean confidence over period + latest
+* `caveats[]`:
+
+  * missing days, low coverage, lag statement
+* `interpretation`:
+
+  * `basic`: exactly 2 sentences
+  * `advanced`: bullet list strings
+
+### 8.4 Caching (mandatory)
+
+Server routes must cache by:
+
+* `dataset_id + chain + metric + start + end`
+  When dataset changes, cache invalidates automatically.
+
+---
+
+## 9) Interpretation System (Basic + Advanced for every metric)
+
+### 9.1 Deterministic interpretation (no generative variability)
+
+Interpretation must be produced from `/api/summary` outputs using fixed templates.
+
+### 9.2 Basic template (exact format)
+
+Sentence 1:
+
+> “Over the selected period, **{metric_name}** has been **{level_label}**, with a **{trend_strength} {trend_label}** trend and **{vol_label}** variability.”
+
+Sentence 2:
+
+> “This means **{plain_meaning_translation}**, and the changes are **{stability_translation}** rather than isolated outliers.”
+
+If caveats exist, append short note below (not extra sentence):
+
+> “Data notes: {top_caveat}.”
+
+### 9.3 Advanced template (fixed bullets)
+
+* Window: `{start} → {end}` (`{present_days}/{expected_days}` days)
+* Freshness: `as-of {asof}`, lag `{lag_days}` day(s)
+* Current: `daily={x}`, `ma7={y}`, `ma30={z}`
+* Trend method: “Linear slope of MA30 over window; strength normalized by daily dispersion”
+* Vol method: “Daily coefficient of variation over window”
+* Confidence: “Mean confidence over window + latest”
+* Missingness: “Missing days: N; non-null ratio: R”
+* Meta context: “z-score/percentile available: yes/no”
+* Caveats: list
+
+### 9.4 Plain-language translations (deterministic mapping)
+
+* `level_label` mapping:
+
+  * Extreme: percentile ≥ 95
+  * Elevated: 80–95
+  * Typical: 20–80
+  * Low: ≤ 20
+  * If percentile missing: compute relative to chain’s last365d distribution using rank.
+
+* `trend_label`:
+
+  * Rising if slope > +T
+  * Falling if slope < −T
+  * Flat otherwise
+  * Threshold T = 0.05 * (stdev_daily / max(1, window_days)) normalized
+
+* `vol_label`:
+
+  * Stable if CV < 0.25
+  * Variable if 0.25–0.60
+  * Highly variable if > 0.60
+
+* `plain_meaning_translation` (examples per metric):
+
+  * tx_count_daily: “the network’s day-to-day activity level has been {higher/lower/about typical} compared to its usual range.”
+  * gas_utilization_pct: “blocks have been {more/less} full than usual, indicating {higher/lower} execution demand relative to capacity.”
+  * median_tx_fee_native: “typical transaction cost has been {higher/lower/about typical} compared to recent history.”
+  * failed_tx_rate: “a {higher/lower} share of transactions failed than usual, reflecting {more/less} execution friction.”
+  * avg_block_time_sec: “block production cadence has been {slower/faster/about typical}.”
+  * block_count_daily: “block output has been {lower/higher/about typical}.”
+  * unique_active_addresses: “participation breadth has been {narrower/broader/about typical}.”
+  * value_transferred_native: “settlement volume has been {higher/lower/about typical} in native units.”
+
+* `stability_translation`:
+
+  * Stable: “relatively smooth and persistent”
+  * Variable: “changing meaningfully week-to-week”
+  * Highly variable: “dominated by sharp swings”
+
+---
+
+## 10) Methodology Page (must answer everything)
+
+### 10.1 Structure
+
+* Tabs: Basic / Advanced
+* Sections:
+
+  1. Data sources & freshness
+  2. Gold calculations
+  3. Derived calculations
+  4. Confidence score
+  5. Trend/volatility/level classification
+  6. Versioning & change log
+
+### 10.2 For every metric (mandatory)
+
+Provide:
+
+* What it is
+* How computed (exact)
+* Why included
+* Value to user
+* Caveats (nulls, lag, chain differences)
+* Links to Wiki terms
+
+### 10.3 For every derived concept (mandatory)
+
+* MA7 / MA30:
+
+  * definition, alignment, missing handling
+* z-score / percentile (if meta supports):
+
+  * distribution basis and update cadence
+* confidence score:
+
+  * meaning, range, how to interpret
+* trend:
+
+  * slope method and thresholds
+* volatility:
+
+  * CV method and thresholds
+
+---
+
+## 11) Wiki Page (glossary + pedagogy)
+
+### 11.1 Must contain
+
+* Definitions for every metric name and every concept referenced
+* “How to read” sections:
+
+  * moving averages
+  * z-score
+  * percentiles
+  * confidence
+  * missing data / lag
+
+### 11.2 Linking rules (mandatory)
+
+Every MetricPanel must link:
+
+* to its Methodology anchor
+* to one or more Wiki anchors
+  and wiki/methodology must link back to:
+* chain pages and metric panels
+
+---
+
+## 12) Customer API (export + computed endpoints)
+
+### 12.1 Export endpoints
+
+* `GET /api/export/daily?chain=&genre=&date=`
+* `GET /api/export/window?chain=&genre=&window=`
+* `GET /api/export/manifest?chain=&genre=`
+
+### 12.2 Computed endpoints (same as UI)
+
+* `GET /api/series?...`
+* `GET /api/summary?...`
+
+**Requirement:** API returns `dataset_id`, `revision_id` always.
+
+---
+
+## 13) Operational Requirements
+
+### 13.1 Pipeline automation (production)
+
+* Daily schedule in cloud (cron) triggers pipeline run.
+* Pipeline writes new dataset to storage.
+* Web reads latest dataset (either via symlink “current” or by copying to fixed path `/data/published/v1`).
+* Must support rollback by selecting previous dataset root.
+
+### 13.2 Observability
+
+* Pipeline logs must capture:
+
+  * per step start/end
+  * per chain asof
+  * count of files written
+  * landing export success
+* Web API logs:
+
+  * request timings
+  * cache hit/miss
+  * missing day counts
+
+---
+
+## 14) Testing & Acceptance Criteria (COMPLETE)
+
+### 14.1 Pipeline & published artifacts
+
+**P1** GIVEN pipeline run completes
+THEN `data/published/v1/dataset.json` exists and is valid JSON.
+
+**P2** GIVEN dataset.json exists
+THEN for each chain and each genre, `manifest.json` exists and lists all `available_days`.
+
+**P3** GIVEN landing export exists
+THEN `landing/index.json` and `landing/<chain>/hero.json` exist for all chains.
+
+**P4** GIVEN web sync runs
+THEN `web-v1/public/data/published/v1/**` contains identical dataset structure.
+
+### 14.2 Landing UX
+
+**L1** Landing shows 4 chain cards in 2x2 grid on desktop, no scrolling required to see all.
+**L2** Each chain card displays: name, asof, lag, confidence, dataset_id/revision.
+**L3** Signature chart includes daily + MA7 + MA30 series and tooltip shows all three.
+**L4** Expand reveals notables without navigation.
+**L5** Chain CTA opens correct chain page route.
+
+### 14.3 Chain pages
+
+**C1** Each chain page shows exactly the metric set defined in Section 7 with optional metrics hidden by coverage rule.
+**C2** Date selector changes the entire page state consistently (charts + KPIs + interpretations).
+**C3** No page renders “NaN” strings; missing values render “—”.
+**C4** Every MetricPanel has Basic and Advanced; Advanced collapsed by default.
+**C5** Every MetricPanel links to Methodology + Wiki + Raw JSON.
+
+### 14.4 Live computation correctness
+
+**S1** `/api/series` returns rows for every day in range that exists in manifest; missing days are listed explicitly.
+**S2** MA7/MA30 values match derived daily files when present (no “starts after 7/30 days” artifact).
+**S3** Confidence score is included per row when available.
+**S4** `/api/summary` outputs deterministic classification per thresholds defined.
+
+### 14.5 Premium UI requirements
+
+**U1** Cards use glass + subtle glow; chain identity colors are applied consistently.
+**U2** Charts are interactive with hover tooltip and legible axis labels.
+**U3** Mobile layout is readable and stable.
+
+### 14.6 Non-advisory compliance
+
+**N1** No UI text contains: “buy/sell/should/expect/likely/bullish/bearish”.
+**N2** No chart displays price or price-derived metrics.
+**N3** Interpretations remain descriptive and reference only observed data.
+
+---
+
+## 15) Definitive Implementation Checklist (no ambiguity)
+
+The development team must implement, in this order:
+
+1. Ensure published dataset contract (already exists) remains stable in cloud path.
+2. Implement `/api/series` and `/api/summary` exactly as specified (inputs/outputs).
+3. Refactor UI to use MetricPanel contract everywhere.
+4. Landing: 2x2 cards, signature charts, chips, expand.
+5. Chain pages: fixed metric sets per chain (Section 7), coverage rule, group layout.
+6. Methodology: anchors per metric + per algorithm + Basic/Advanced tabs.
+7. Wiki: glossary + anchors + back-links.
+8. Link everything bidirectionally.
+9. Add caching and dataset_id-based cache busting.
+10. Add compliance checks (text lint for banned words, optional automated test).
+
+---
+
+# END OF DOCUMENT
+
+

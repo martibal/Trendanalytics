@@ -1,310 +1,272 @@
-// src/app/chains/[chain]/ChainClient.tsx
 "use client";
 
-import React, { useMemo, useState } from "react";
-import useSWR from "swr";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
-import { fetchJsonLenient } from "@/lib/fetchJson";
+import React, { useEffect, useMemo, useState } from "react";
+import { MetricPanel } from "@/components/charts/MetricPanel";
 
-const PUBLISHED_BASE = "/data/published/v1";
+type Chain = "bitcoin" | "ethereum" | "arbitrum" | "base";
 
-type HeroChartSpec = {
-  id: string;
-  title: string;
+type ExportManifestResponse = {
+  dataset_id: string | null;
+  revision_id: number | null;
+  chain: Chain;
   genre: "gold" | "meta" | "derived";
-  window_days: number;
-  x: string;
-  y: string;
-  format?: "int" | "float" | "pct";
-  hint_basic?: string;
-  hint_advanced?: string;
-  source_file: string | null;
-};
-
-type LandingHeroFile = {
-  dataset_id: string;
-  revision_id: number;
-  computed_at_utc: string;
-  chain: string;
-  windows_supported: number[];
-  asof: Record<string, string>;
-  hero: {
-    headline: string;
-    charts: HeroChartSpec[];
-    notes: string[];
+  data: {
+    asof?: string;
+    available_days?: string[];
+    [k: string]: any;
   };
 };
 
-type Row = Record<string, any> & { date: string };
-
-function toNumberOrNull(x: any): number | null {
-  if (typeof x === "number" && Number.isFinite(x)) return x;
-  if (typeof x === "string") {
-    const n = Number(x);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
-function rollingMean(values: Array<number | null>, window: number): Array<number | null> {
-  const out: Array<number | null> = new Array(values.length).fill(null);
-  const q: Array<number | null> = [];
-  let sum = 0;
-  let cnt = 0;
-
-  for (let i = 0; i < values.length; i++) {
-    const v = values[i];
-    q.push(v);
-    if (v !== null) {
-      sum += v;
-      cnt += 1;
-    }
-    if (q.length > window) {
-      const removed = q.shift()!;
-      if (removed !== null) {
-        sum -= removed;
-        cnt -= 1;
-      }
-    }
-    if (q.length === window) out[i] = cnt > 0 ? sum / cnt : null;
-  }
-  return out;
-}
-
-function formatCompact(n: number | null, mode: "int" | "float" | "pct" | undefined): string {
-  if (n === null || !Number.isFinite(n)) return "—";
-  if (mode === "pct") return `${(n * 100).toFixed(2)}%`;
-  if (mode === "int") return Math.round(n).toLocaleString();
-  const abs = Math.abs(n);
-  if (abs >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  if (abs >= 1) return n.toLocaleString(undefined, { maximumFractionDigits: 6 });
-  return n.toPrecision(6);
-}
-
-const fetcher = async (url: string) => {
-  const r: any = await fetchJsonLenient(url);
-  if (r && typeof r === "object") {
-    if (r.error) throw new Error(typeof r.error === "string" ? r.error : JSON.stringify(r.error));
-    if (r.data !== undefined) return r.data;
-  }
-  return r;
+type LandingHeroFileMaybe = {
+  dataset_id?: string;
+  revision_id?: number;
+  windows_supported?: number[];
+  asof?: Record<string, string>;
 };
+
+function isValidISODate(s: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+function toISODateUTC(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map((x) => parseInt(x, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return toISODateUTC(dt);
+}
+
+function parseChain(s: string): Chain {
+  const v = (s || "").toLowerCase();
+  if (v === "bitcoin" || v === "ethereum" || v === "arbitrum" || v === "base") return v;
+  return "bitcoin";
+}
 
 function capitalize(s: string) {
   return s ? s.slice(0, 1).toUpperCase() + s.slice(1) : s;
 }
 
-export default function ChainClient({ chain, hero }: { chain: string; hero: LandingHeroFile }) {
-  // Pick a small, high-signal set for the chain page (still fast to parse visually)
-  // You can tune this list later.
-  const preferred = ["tx_count_daily", "median_tx_fee_native", "avg_block_time_sec"];
-  const charts = (hero.hero?.charts || [])
-    .filter((c) => preferred.includes(c.id))
-    .slice(0, 3);
+function clampWindowDays(n: number, supported: number[]) {
+  if (!Number.isFinite(n)) return supported[0] ?? 30;
+  if (!supported.length) return n;
+  if (supported.includes(n)) return n;
 
-  const [activeChartId, setActiveChartId] = useState(charts[0]?.id || "");
+  let best = supported[0];
+  let bestDist = Math.abs(best - n);
+  for (const w of supported) {
+    const d = Math.abs(w - n);
+    if (d < bestDist) {
+      best = w;
+      bestDist = d;
+    }
+  }
+  return best;
+}
 
-  const active = charts.find((c) => c.id === activeChartId) || charts[0];
+type MetricDef = {
+  metric: string;
+  title: string;
+  optional?: boolean;
+};
 
-  const sourceRel = active?.source_file || null;
+type ChainMetricLayout = {
+  bullets: string[];
+  groups: Array<{ title: string; items: MetricDef[] }>;
+};
 
-  const { data: raw, error } = useSWR<Row[]>(
-    sourceRel ? `${PUBLISHED_BASE}/${sourceRel}` : null,
-    fetcher,
-    { revalidateOnFocus: false }
-  );
+const METRICS_BY_CHAIN: Record<Chain, ChainMetricLayout> = {
+  bitcoin: {
+    bullets: [
+      "Settlement cadence and throughput, observed via activity and block production.",
+      "Fee pressure as a descriptive execution-cost signal (no price proxies).",
+      "Reliability diagnostics from block timing and output.",
+    ],
+    groups: [
+      { title: "Core Activity", items: [{ metric: "tx_count_daily", title: "Daily transactions" }, { metric: "unique_active_addresses", title: "Active addresses", optional: true }] },
+      { title: "Execution & Cost", items: [{ metric: "median_tx_fee_native", title: "Median transaction fee (native)" }] },
+      { title: "Reliability", items: [{ metric: "avg_block_time_sec", title: "Average block time (seconds)" }, { metric: "block_count_daily", title: "Blocks per day" }] },
+      { title: "Value / Throughput", items: [{ metric: "value_transferred_native", title: "Value transferred (native)", optional: true }, { metric: "median_tx_value_native", title: "Median transaction value (native)", optional: true }] },
+    ],
+  },
+  ethereum: {
+    bullets: [
+      "Execution conditions and demand, with utilization as a capacity-pressure signal.",
+      "Cost and reliability diagnostics (descriptive; no forecasts or advice).",
+      "Participation breadth and throughput where coverage supports it.",
+    ],
+    groups: [
+      { title: "Core Activity", items: [{ metric: "tx_count_daily", title: "Daily transactions" }, { metric: "unique_active_addresses", title: "Active addresses", optional: true }] },
+      { title: "Execution & Cost", items: [{ metric: "gas_utilization_pct", title: "Gas utilization" }, { metric: "median_tx_fee_native", title: "Median transaction fee (native)" }, { metric: "failed_tx_rate", title: "Failed transaction rate", optional: true }] },
+      { title: "Reliability", items: [{ metric: "avg_block_time_sec", title: "Average block time (seconds)" }, { metric: "block_count_daily", title: "Blocks per day", optional: true }] },
+      { title: "Value / Throughput", items: [{ metric: "value_transferred_native", title: "Value transferred (native)", optional: true }, { metric: "median_tx_value_native", title: "Median transaction value (native)", optional: true }] },
+    ],
+  },
+  arbitrum: {
+    bullets: [
+      "Rollup usage and demand, interpreted with explicit indexing lag/coverage.",
+      "User-facing cost and capacity pressure in native units (no price proxies).",
+      "Operational regularity signals to detect persistent changes, not spikes.",
+    ],
+    groups: [
+      { title: "Core Activity", items: [{ metric: "tx_count_daily", title: "Daily transactions" }, { metric: "unique_active_addresses", title: "Active addresses", optional: true }] },
+      { title: "Execution & Cost", items: [{ metric: "gas_utilization_pct", title: "Gas utilization", optional: true }, { metric: "median_tx_fee_native", title: "Median transaction fee (native)" }, { metric: "failed_tx_rate", title: "Failed transaction rate", optional: true }] },
+      { title: "Reliability", items: [{ metric: "avg_block_time_sec", title: "Average block time (seconds)", optional: true }, { metric: "block_count_daily", title: "Blocks per day", optional: true }] },
+      { title: "Value / Throughput", items: [{ metric: "value_transferred_native", title: "Value transferred (native)", optional: true }, { metric: "median_tx_value_native", title: "Median transaction value (native)", optional: true }] },
+    ],
+  },
+  base: {
+    bullets: [
+      "Consumer-style usage signals and capacity context, without any price data.",
+      "Cost and reliability metrics used as descriptive friction/health proxies.",
+      "Throughput context (value transferred) where coverage supports it.",
+    ],
+    groups: [
+      { title: "Core Activity", items: [{ metric: "tx_count_daily", title: "Daily transactions" }, { metric: "unique_active_addresses", title: "Active addresses", optional: true }] },
+      { title: "Execution & Cost", items: [{ metric: "gas_utilization_pct", title: "Gas utilization", optional: true }, { metric: "median_tx_fee_native", title: "Median transaction fee (native)" }, { metric: "failed_tx_rate", title: "Failed transaction rate", optional: true }] },
+      { title: "Reliability", items: [{ metric: "avg_block_time_sec", title: "Average block time (seconds)", optional: true }, { metric: "block_count_daily", title: "Blocks per day", optional: true }] },
+      { title: "Value / Throughput", items: [{ metric: "value_transferred_native", title: "Value transferred (native)", optional: true }, { metric: "median_tx_value_native", title: "Median transaction value (native)", optional: true }] },
+    ],
+  },
+};
 
-  const series = useMemo(() => {
-    const rows = Array.isArray(raw) ? raw : [];
-    const yKey = active?.y;
-    if (!yKey || rows.length === 0) return [];
+async function fetchGoldManifest(chain: Chain, signal?: AbortSignal): Promise<ExportManifestResponse> {
+  const res = await fetch(`/api/export/manifest?chain=${chain}&genre=gold`, { signal, cache: "no-store" });
+  if (!res.ok) throw new Error(`manifest ${res.status}`);
+  return (await res.json()) as ExportManifestResponse;
+}
 
-    const ys = rows.map((r) => toNumberOrNull(r[yKey]));
-    const sma7 = rollingMean(ys, 7);
-    const sma30 = rollingMean(ys, 30);
+export default function ChainClient(props: { chain: string; hero?: LandingHeroFileMaybe }) {
+  const chain = parseChain(props.chain);
 
-    return rows.map((r, i) => ({
-      ...r,
-      __y: ys[i],
-      __sma7: sma7[i],
-      __sma30: sma30[i],
-    }));
-  }, [raw, active?.y]);
+  // Window options (fallback), can be refined later if you publish supported windows.
+  const fallbackWindows = useMemo(() => [7, 30, 90, 180, 365], []);
+
+  // Default per spec: 180d; clamp to available options.
+  const [windowDays, setWindowDays] = useState<number>(() => clampWindowDays(180, fallbackWindows));
+
+  // As-of / audit (prefer passed hero if present; otherwise fetch manifest)
+  const [asofGold, setAsofGold] = useState<string | null>(() => {
+    const fromHero = props.hero?.asof?.gold;
+    return fromHero && isValidISODate(fromHero) ? fromHero : null;
+  });
+  const [datasetId, setDatasetId] = useState<string | null>(props.hero?.dataset_id ?? null);
+  const [revisionId, setRevisionId] = useState<number | null>(typeof props.hero?.revision_id === "number" ? props.hero!.revision_id : null);
+
+  // IMPORTANT: No landing_hero.json fetch anymore. Only manifest.
+  useEffect(() => {
+    let cancelled = false;
+    const ac = new AbortController();
+
+    async function run() {
+      try {
+        const m = await fetchGoldManifest(chain, ac.signal);
+        if (cancelled) return;
+
+        const a = m?.data?.asof;
+        setAsofGold(a && isValidISODate(a) ? a : null);
+        setDatasetId(m.dataset_id ?? null);
+        setRevisionId(typeof m.revision_id === "number" ? m.revision_id : null);
+      } catch {
+        // non-fatal: page can still render; panels can use end fallback.
+        if (cancelled) return;
+        setAsofGold((prev) => prev); // keep prior if any
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [chain]);
+
+  const endISO = useMemo(() => (asofGold && isValidISODate(asofGold) ? asofGold : toISODateUTC(new Date())), [asofGold]);
+
+  // Derived window start, inclusive.
+  const startISO = useMemo(() => addDaysISO(endISO, -(windowDays - 1)), [endISO, windowDays]);
+
+  const layout = METRICS_BY_CHAIN[chain];
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <div className="mx-auto max-w-6xl px-4 py-10">
+      <div className="mb-8 rounded-2xl border border-white/10 bg-black/20 p-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold">{capitalize(chain)}</h1>
-            <p className="mt-2 text-white/70">
-              Full diagnostics and methodology, built from published gold/meta/derived artifacts.
+            <h1 className="text-3xl font-semibold tracking-tight text-white">{capitalize(chain)}</h1>
+            <p className="mt-2 text-sm text-white/70">
+              {capitalize(chain)} — Trends & context (price-agnostic)
             </p>
+
+            <ul className="mt-4 space-y-1 text-sm text-white/70">
+              {layout.bullets.map((b, i) => (
+                <li key={i}>• {b}</li>
+              ))}
+            </ul>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/80">
-            <div className="text-white/60">Dataset</div>
-            <div className="font-mono text-xs">{hero.dataset_id} · rev {hero.revision_id}</div>
-            <div className="mt-2 text-white/60">Computed (UTC)</div>
-            <div className="font-mono text-xs">{hero.computed_at_utc}</div>
-            <div className="mt-2 text-white/60">As-of (gold)</div>
-            <div className="font-mono text-xs">{hero.asof?.gold || "—"}</div>
+          <div className="mt-4 flex items-center gap-3 md:mt-0">
+            <div className="text-xs text-white/60">Window</div>
+            <select
+              className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+              value={windowDays}
+              onChange={(e) => setWindowDays(clampWindowDays(Number(e.target.value), fallbackWindows))}
+            >
+              {fallbackWindows.map((w) => (
+                <option key={w} value={w}>
+                  {w}d
+                </option>
+              ))}
+            </select>
+            {asofGold && <div className="text-xs text-white/60">as-of {asofGold}</div>}
           </div>
         </div>
+
+        <div className="mt-5 flex flex-wrap gap-2 text-xs text-white/70">
+          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">
+            Window: <span className="font-mono text-white/85">{startISO}</span> →{" "}
+            <span className="font-mono text-white/85">{endISO}</span>
+          </span>
+          {datasetId ? (
+            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">
+              dataset_id: <span className="font-mono text-white/85">{datasetId}</span>
+            </span>
+          ) : null}
+          {typeof revisionId === "number" ? (
+            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">
+              revision: <span className="font-mono text-white/85">{revisionId}</span>
+            </span>
+          ) : null}
+        </div>
+
+        <div className="mt-3 text-xs text-white/50">Descriptive only · No prices · No forecasts · No advice</div>
       </div>
 
-      {/* Chart picker */}
-      <div className="flex flex-wrap gap-2">
-        {charts.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setActiveChartId(c.id)}
-            className={[
-              "rounded-full border px-3 py-1 text-xs",
-              c.id === (active?.id || "")
-                ? "border-white/25 bg-white/10 text-white"
-                : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10",
-            ].join(" ")}
-          >
-            {c.title}
-          </button>
+      <div className="space-y-10">
+        {layout.groups.map((g) => (
+          <section key={g.title} className="space-y-4">
+            <h2 className="text-xl font-semibold text-white">{g.title}</h2>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {g.items.map((it) => (
+                <MetricPanel
+                  key={it.metric}
+                  chain={chain}
+                  metric={it.metric}
+                  start={startISO}
+                  end={endISO}
+                  title={it.title}
+                  hideIfLowCoverage={Boolean(it.optional)}
+                />
+              ))}
+            </div>
+          </section>
         ))}
-      </div>
-
-      {/* Main signature chart */}
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-white/60">
-              {capitalize(chain)} · last {active?.window_days ?? 90}d · {active?.genre ?? "gold"}
-            </div>
-            <div className="mt-1 text-xl font-semibold">{active?.title || "Chart"}</div>
-            <div className="mt-1 text-sm text-white/65">{active?.hint_basic || ""}</div>
-
-            <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-white/70">
-              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">Daily</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">SMA 7</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">SMA 30</span>
-            </div>
-          </div>
-
-          <div className="text-xs text-white/55">window</div>
-        </div>
-
-        <div className="mt-4 h-[320px] w-full">
-          {error ? (
-            <div className="grid h-full place-items-center text-sm text-red-200">
-              Failed to load chart data: {(error as any)?.message || String(error)}
-            </div>
-          ) : series.length === 0 ? (
-            <div className="grid h-full place-items-center text-sm text-white/60">
-              No data yet.
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
-                <defs>
-                  <linearGradient id={`fill_${chain}_${active?.id}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="rgba(217,70,239,0.55)" />
-                    <stop offset="100%" stopColor="rgba(217,70,239,0.02)" />
-                  </linearGradient>
-                </defs>
-
-                <CartesianGrid strokeDasharray="4 6" opacity={0.12} />
-                <XAxis
-                  dataKey={active?.x || "date"}
-                  stroke="rgba(255,255,255,0.35)"
-                  tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 11 }}
-                  axisLine={{ stroke: "rgba(255,255,255,0.18)" }}
-                  tickLine={{ stroke: "rgba(255,255,255,0.18)" }}
-                  minTickGap={18}
-                />
-                <YAxis
-                  stroke="rgba(255,255,255,0.35)"
-                  tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 11 }}
-                  axisLine={{ stroke: "rgba(255,255,255,0.18)" }}
-                  tickLine={{ stroke: "rgba(255,255,255,0.18)" }}
-                  tickFormatter={(v) => formatCompact(Number(v), active?.format)}
-                />
-                <Tooltip
-                  content={({ active: a, payload, label }) => {
-                    if (!a || !payload || payload.length === 0) return null;
-                    const p = payload[0]?.payload as any;
-                    const daily = toNumberOrNull(p.__y);
-                    const sma7 = toNumberOrNull(p.__sma7);
-                    const sma30 = toNumberOrNull(p.__sma30);
-
-                    return (
-                      <div className="rounded-xl border border-white/10 bg-black/80 p-3 text-xs text-white/90 backdrop-blur">
-                        <div className="text-white/70">{String(label)}</div>
-                        <div className="mt-2 space-y-1">
-                          <div className="flex justify-between gap-6">
-                            <span className="text-white/70">Daily</span>
-                            <span>{formatCompact(daily, active?.format)}</span>
-                          </div>
-                          <div className="flex justify-between gap-6">
-                            <span className="text-white/70">SMA 7</span>
-                            <span>{formatCompact(sma7, active?.format)}</span>
-                          </div>
-                          <div className="flex justify-between gap-6">
-                            <span className="text-white/70">SMA 30</span>
-                            <span>{formatCompact(sma30, active?.format)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }}
-                />
-
-                {/* Daily (filled) */}
-                <Area
-                  type="monotone"
-                  dataKey="__y"
-                  stroke="rgba(217,70,239,0.95)"
-                  strokeWidth={2}
-                  fill={`url(#fill_${chain}_${active?.id})`}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-
-                {/* SMA 7 */}
-                <Area
-                  type="monotone"
-                  dataKey="__sma7"
-                  stroke="rgba(168,85,247,0.95)"
-                  strokeWidth={2}
-                  fill="rgba(0,0,0,0)"
-                  dot={false}
-                  isAnimationActive={false}
-                />
-
-                {/* SMA 30 */}
-                <Area
-                  type="monotone"
-                  dataKey="__sma30"
-                  stroke="rgba(59,130,246,0.85)"
-                  strokeWidth={2}
-                  fill="rgba(0,0,0,0)"
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        <div className="mt-3 text-xs text-white/55">
-          {hero.hero?.headline || "Network activity & execution conditions"}
-        </div>
       </div>
     </div>
   );

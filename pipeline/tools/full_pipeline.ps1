@@ -122,6 +122,7 @@ try {
   $PY_SYNC_GOLD = Join-Path $PIPELINE_ROOT 'tools\sync_gold_json_history.py'
   $PY_PUBLISH = Join-Path $PIPELINE_ROOT 'tools\publish_artifacts.py'
   $PY_VALIDATE_PUBLISHED = Join-Path $PIPELINE_ROOT 'tools\validate_published_dataset.py'
+  $PY_DOWNLOAD_RAW = Join-Path $PIPELINE_ROOT 'tools\download_up_to_date_minimal.py'
 
   Ensure-Dir $WORK_ROOT
   Ensure-Dir $PROD_ROOT
@@ -136,6 +137,7 @@ try {
   Ensure-Dir $META_JSON_ROOT
   Ensure-Dir $DERIVED_OUT_ROOT
   Ensure-Dir $PUBLISHED_ROOT
+  Ensure-Dir $RAW_ROOT
 
   $syncModeGold = 'incremental'
   if ($Mode -eq 'rebuild') { $syncModeGold = 'full' }
@@ -149,6 +151,26 @@ try {
 
   Push-Location $MAIN_ROOT
   try {
+    # ---------------------------
+    # STEP -1: Sync RAW from AWS
+    # ---------------------------
+    if (Test-Path $PY_DOWNLOAD_RAW) {
+      Write-Log 'STEP -1: Download/sync RAW from AWS (minimal catch-up)'
+      # Small-but-safe lookback so we can catch missing days without full rebuild.
+      # If you want even tighter: set to (latestRaw - 14).
+      $rawLookbackDays = 60
+      $startRaw = (Get-Date).ToUniversalTime().AddDays(-1 * $rawLookbackDays)
+      $startRawIso = Format-IsoDate $startRaw
+
+      Write-Log ("  raw sync start: " + $startRawIso + " (lookback " + $rawLookbackDays + "d)")
+      & $PY -u $PY_DOWNLOAD_RAW --root $MAIN_ROOT --raw-root $RAW_ROOT --start $startRawIso --chains $chainsCsv --lag-l1-days 1 --lag-l2-days 7
+      if ($LASTEXITCODE -ne 0) {
+        throw "download_up_to_date_minimal.py failed rc=$LASTEXITCODE"
+      }
+    } else {
+      Write-Log "STEP -1: Skipping RAW download (missing tool): $PY_DOWNLOAD_RAW"
+    }
+
     Write-Log 'STEP 0: Probe latest raw day'
     $latestRaw = Get-LatestRawDay $RAW_ROOT
     if (-not $latestRaw) { throw "No raw day folders found under $RAW_ROOT" }
@@ -209,7 +231,6 @@ try {
     & $PY -u $PY_EXPORT_DERIVED --root $MAIN_ROOT --gold-json-root $GOLD_JSON_ROOT --meta-json-root $META_JSON_ROOT --out-root $DERIVED_OUT_ROOT --chains $chainsCsv --mode $modeIncRebuild --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) { throw "export_derived_json_history.py failed rc=$LASTEXITCODE" }
 
-    # ✅ FIXED: export_meta_json_history.py requires --start
     Write-Log 'STEP 6: Export META json history + windows'
     & $PY -u $PY_EXPORT_META --root $MAIN_ROOT --out-root $META_JSON_ROOT --start $startIso --mode $modeIncRebuild --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) { throw "export_meta_json_history.py failed rc=$LASTEXITCODE" }
