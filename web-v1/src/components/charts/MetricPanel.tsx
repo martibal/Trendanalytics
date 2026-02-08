@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { MetricTriLineChart } from "@/components/charts/MetricTriLineChart";
+import { getMetric, metricLinks } from "@/lib/metrics/catalog";
 
 type Chain = "bitcoin" | "ethereum" | "arbitrum" | "base";
 
@@ -122,6 +123,9 @@ export function MetricPanel(props: {
   methodologyHref?: string;
   wikiHref?: string;
 }) {
+  const metricEntry = useMemo(() => getMetric(props.metric), [props.metric]);
+  const isKnownMetric = Boolean(metricEntry);
+
   const [series, setSeries] = useState<SeriesResponse | null>(null);
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -149,6 +153,15 @@ export function MetricPanel(props: {
     let cancelled = false;
 
     async function run() {
+      // Guardrail: unknown metric -> do not fetch
+      if (!isKnownMetric) {
+        setLoading(false);
+        setSeries(null);
+        setSummary(null);
+        setErr(`Unknown/undocumented metric key: ${props.metric}`);
+        return;
+      }
+
       setLoading(true);
       setErr(null);
 
@@ -179,7 +192,7 @@ export function MetricPanel(props: {
     return () => {
       cancelled = true;
     };
-  }, [seriesUrl, summaryUrl]);
+  }, [seriesUrl, summaryUrl, isKnownMetric, props.metric]);
 
   const triData: TriSeriesPoint[] = useMemo(() => {
     const rows = series?.rows ?? [];
@@ -194,19 +207,19 @@ export function MetricPanel(props: {
     }));
   }, [series]);
 
-  const title = props.title ?? toTitle(props.metric);
-  const subtitle = props.subtitle ?? "Daily, MA7, MA30 with deterministic context (no prices).";
+  const title = props.title ?? (metricEntry ? metricEntry.label : toTitle(props.metric));
+  const subtitle = props.subtitle ?? (metricEntry ? metricEntry.doc.why.basic : "Undocumented metric (no catalog entry).");
 
   const nonNull = series?.coverage?.nonNull_ratio ?? null;
   const isLowCoverage = nonNull !== null && nonNull < 0.7;
   const missingCount = series?.coverage?.missing_days?.length ?? 0;
 
-  const methodologyHref = props.methodologyHref ?? `/methodology#${props.chain}-${props.metric}`;
-  const wikiHref = props.wikiHref ?? `/wiki#${props.metric}`;
+  const catalogLinks = metricEntry ? metricLinks(metricEntry.key) : { methodologyHref: `/methodology#${props.metric}`, wikiHref: `/wiki#${props.metric}` };
+  const methodologyHref = props.methodologyHref ?? catalogLinks.methodologyHref;
+  const wikiHref = props.wikiHref ?? catalogLinks.wikiHref;
 
   const latestDate = series?.rows?.length ? series.rows[series.rows.length - 1]?.date : null;
 
-  // Raw exports (daily + window + manifest)
   const rawGoldDailyHref =
     latestDate ? buildUrl("/api/export/daily", { chain: props.chain, genre: "gold", date: latestDate }) : null;
   const rawDerivedDailyHref =
@@ -230,16 +243,12 @@ export function MetricPanel(props: {
           <div className="mt-0.5 text-xs text-white/60">{subtitle}</div>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            {missingCount > 0 ? (
-              <Chip label="missing days" value={`${missingCount}`} tone="warn" />
-            ) : (
-              <Chip label="missing days" value="0" />
-            )}
+            {missingCount > 0 ? <Chip label="missing days" value={`${missingCount}`} tone="warn" /> : <Chip label="missing days" value="0" />}
 
             {nonNull !== null ? (
               <Chip label="non-null" value={`${(nonNull * 100).toFixed(1)}%`} tone={isLowCoverage ? "warn" : "neutral"} />
             ) : (
-              <Chip label="non-null" value="—" />
+              <Chip label="non-null" value="—" tone={err ? "warn" : "neutral"} />
             )}
           </div>
         </div>
@@ -247,7 +256,7 @@ export function MetricPanel(props: {
         <div className="flex flex-col items-end gap-1 text-[11px] text-white/60">
           <div>
             Window: <span className="text-white/80 tabular-nums">{props.start}</span> →{" "}
-            <span className="text-white/80 tabular-nums">{series?.end ?? "—"}</span>
+            <span className="text-white/80 tabular-nums">{series?.end ?? props.end ?? "—"}</span>
           </div>
           <div>
             As-of: <span className="text-white/80 tabular-nums">{series?.freshness?.asof ?? "—"}</span>{" "}
@@ -263,12 +272,13 @@ export function MetricPanel(props: {
       </div>
 
       {loading ? (
-        <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
-          Loading metric…
-        </div>
+        <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">Loading metric…</div>
       ) : err ? (
         <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          Failed to load: {err}
+          {err}
+          <div className="mt-2 text-xs text-red-200/80">
+            This metric is blocked by the documentation guardrail. Add it to <span className="font-mono">METRIC_CATALOG</span> before exposing it.
+          </div>
         </div>
       ) : props.hideIfLowCoverage && isLowCoverage ? (
         <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">

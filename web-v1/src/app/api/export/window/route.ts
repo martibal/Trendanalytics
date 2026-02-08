@@ -59,7 +59,56 @@ function parseRevisionId(v: any): number | null {
   return null;
 }
 
+function authEnabled(): boolean {
+  return typeof process.env.EXPORT_TOKEN === "string" && process.env.EXPORT_TOKEN.trim().length > 0;
+}
+
+function extractBearerToken(authHeader: string | null): string | null {
+  if (!authHeader) return null;
+  const m = authHeader.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : null;
+}
+
+function requireExportAuth(req: NextRequest): NextResponse | null {
+  if (!authEnabled()) return null;
+
+  const expected = (process.env.EXPORT_TOKEN ?? "").trim();
+  const tokenFromHeader = extractBearerToken(req.headers.get("authorization"));
+  const tokenFromQuery = new URL(req.url).searchParams.get("token")?.trim() || null;
+
+  const token = tokenFromHeader ?? tokenFromQuery;
+  if (!token || token !== expected) {
+    return jsonError(
+      "UNAUTHORIZED",
+      "Missing or invalid export token.",
+      401,
+      { hint: "Provide Authorization: Bearer <token> (or ?token=... for testing)." }
+    );
+  }
+  return null;
+}
+
+function headersFor(req: NextRequest, etag?: string) {
+  if (authEnabled()) {
+    const h: Record<string, string> = {
+      "Cache-Control": "private, no-store",
+      Vary: "Authorization",
+    };
+    if (etag) h.ETag = etag;
+    return h;
+  }
+
+  const h: Record<string, string> = {
+    "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
+  };
+  if (etag) h.ETag = etag;
+  return h;
+}
+
 export async function GET(req: NextRequest) {
+  const authResp = requireExportAuth(req);
+  if (authResp) return authResp;
+
   const url = new URL(req.url);
 
   const chain = parseChain(url.searchParams.get("chain"));
@@ -76,19 +125,6 @@ export async function GET(req: NextRequest) {
   const dataset_id: string | null = typeof datasetJson?.dataset_id === "string" ? datasetJson.dataset_id : null;
   const revision_id: number | null = parseRevisionId(datasetJson?.revision_id);
 
-  const cacheKey = `${dataset_id ?? "no_dataset"}|${revision_id ?? "no_revision"}|export_window|${genre}|${chain}|${window}`;
-  const etag = `W/"${crypto.createHash("sha256").update(cacheKey).digest("hex")}"`;
-  const ifNoneMatch = req.headers.get("if-none-match");
-  if (ifNoneMatch && ifNoneMatch === etag) {
-    return new NextResponse(null, {
-      status: 304,
-      headers: {
-        ETag: etag,
-        "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
-      },
-    });
-  }
-
   const filePath = path.join(root, genre, chain, `last${window}d.json`);
   const data = await readJsonSafe(filePath);
 
@@ -103,21 +139,18 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  return NextResponse.json(
-    {
-      dataset_id,
-      revision_id,
-      chain,
-      genre,
-      window,
-      data,
-    },
-    {
-      status: 200,
-      headers: {
-        ETag: etag,
-        "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
-      },
+  const cacheKey = `${dataset_id ?? "no_dataset"}|${revision_id ?? "no_revision"}|export_window|${genre}|${chain}|${window}`;
+  const etag = `W/"${crypto.createHash("sha256").update(cacheKey).digest("hex")}"`;
+
+  if (!authEnabled()) {
+    const ifNoneMatch = req.headers.get("if-none-match");
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      return new NextResponse(null, { status: 304, headers: headersFor(req, etag) });
     }
+  }
+
+  return NextResponse.json(
+    { dataset_id, revision_id, chain, genre, window, data },
+    { status: 200, headers: headersFor(req, etag) }
   );
 }

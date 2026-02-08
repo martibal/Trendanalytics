@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { promises as fs } from "fs";
 import crypto from "crypto";
+import { getMetric } from "@/lib/metrics/catalog";
 
 type Chain = "bitcoin" | "ethereum" | "arbitrum" | "base";
 
@@ -40,8 +41,6 @@ type ApiResponse = {
   freshness: Freshness;
 };
 
-const CACHE = new Map<string, { createdAt: number; payload: ApiResponse }>();
-
 type ApiError = {
   error: {
     code: string;
@@ -49,6 +48,9 @@ type ApiError = {
     details?: any;
   };
 };
+
+const CACHE = new Map<string, { createdAt: number; payload: ApiResponse }>();
+const CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=600";
 
 function jsonError(code: string, message: string, status: number, details?: any) {
   const body: ApiError = { error: { code, message, details } };
@@ -81,7 +83,6 @@ function addDaysISO(iso: string, days: number): string {
 }
 
 function diffDaysUTC(aISO: string, bISO: string): number {
-  // returns (a - b) in whole days
   const [ay, am, ad] = aISO.split("-").map((x) => parseInt(x, 10));
   const [by, bm, bd] = bISO.split("-").map((x) => parseInt(x, 10));
   const a = Date.UTC(ay, am - 1, ad);
@@ -119,7 +120,6 @@ function parseRevisionId(v: any): number | null {
 }
 
 function pickZPercentile(meta: any, metric: string): { z: number | null; percentile: number | null } {
-  // Meta schema may evolve; be defensive and return nulls if not present.
   const candidates = [
     meta?.metrics?.[metric]?.z,
     meta?.metrics?.[metric]?.z_score,
@@ -140,22 +140,12 @@ function pickZPercentile(meta: any, metric: string): { z: number | null; percent
   return { z, percentile };
 }
 
-function assertSeriesContract(p: ApiResponse) {
-  if (!p.chain) throw new Error("Series contract violated: chain missing");
-  if (!p.metric) throw new Error("Series contract violated: metric missing");
-  if (!p.start || !p.end) throw new Error("Series contract violated: start/end missing");
-  if (!p.coverage) throw new Error("Series contract violated: coverage missing");
-  if (!p.freshness) throw new Error("Series contract violated: freshness missing");
-  if (!Array.isArray(p.rows)) throw new Error("Series contract violated: rows missing");
-}
-
 function parseWindowDays(v: string | null): number | null {
   if (!v) return null;
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
   const i = Math.floor(n);
   if (i <= 0) return null;
-  // guardrail to prevent pathological ranges
   if (i > 3650) return null;
   return i;
 }
@@ -165,17 +155,10 @@ function makeEtag(input: string): string {
   return `W/"${hash}"`;
 }
 
-const CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=600";
-
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
 
-    // Query params (back-compat):
-    // - chain (required): bitcoin|ethereum|arbitrum|base
-    // - metric (required): gold metric key
-    // - start/end (preferred): YYYY-MM-DD
-    // - window (optional alternative): integer day count (e.g., 7/30/90/180/365)
     const chain = parseChain(url.searchParams.get("chain"));
     const metric = url.searchParams.get("metric");
     const startParam = url.searchParams.get("start");
@@ -184,17 +167,21 @@ export async function GET(req: NextRequest) {
 
     if (!chain) return jsonError("INVALID_CHAIN", "Invalid chain. Use bitcoin|ethereum|arbitrum|base.", 400);
     if (!metric) return jsonError("MISSING_METRIC", "Missing metric.", 400);
+
+    // Guardrail: metric must exist in catalog
+    if (!getMetric(metric)) {
+      return jsonError("INVALID_METRIC", "Unknown metric key. This metric is not documented in METRIC_CATALOG.", 400, { metric });
+    }
+
     if (endParam && !isValidISODate(endParam)) return jsonError("INVALID_END", "Invalid end. Use YYYY-MM-DD.", 400);
     if (startParam && !isValidISODate(startParam)) return jsonError("INVALID_START", "Invalid start. Use YYYY-MM-DD.", 400);
 
     const root = path.join(process.cwd(), "public", "data", "published", "v1");
 
-    // dataset metadata (audit)
     const datasetJson = await readJsonSafe(path.join(root, "dataset.json"));
     const dataset_id: string | null = typeof datasetJson?.dataset_id === "string" ? datasetJson.dataset_id : null;
     const revision_id: number | null = parseRevisionId(datasetJson?.revision_id);
 
-    // manifests (source of truth)
     const goldManifestPath = path.join(root, "gold", chain, "manifest.json");
     const goldManifest = await readJsonSafe(goldManifestPath);
     const asof: string | null = typeof goldManifest?.asof === "string" ? goldManifest.asof : null;
@@ -204,13 +191,13 @@ export async function GET(req: NextRequest) {
     }
 
     const end = endParam ?? asof;
-    const windowDays = windowParam ? Number(windowParam) : null;
-    if (windowParam && (!Number.isFinite(windowDays) || windowDays === null || windowDays <= 0 || !Number.isInteger(windowDays))) {
-      return jsonError("INVALID_WINDOW", "Invalid window. Use a positive integer number of days.", 400);
+
+    const windowDays = parseWindowDays(windowParam);
+    if (windowParam && windowDays === null) {
+      return jsonError("INVALID_WINDOW", "Invalid window. Use a positive integer number of days (<= 3650).", 400);
     }
 
     const start = startParam ? startParam : windowDays ? addDaysISO(end, -(windowDays - 1)) : null;
-
     if (!start) {
       return jsonError("MISSING_START_OR_WINDOW", "Provide either start (YYYY-MM-DD) or window (days).", 400);
     }
@@ -220,26 +207,17 @@ export async function GET(req: NextRequest) {
     }
 
     const cacheKey = `${dataset_id ?? "no_dataset"}|${revision_id ?? "no_revision"}|${chain}|${metric}|${start}|${end}`;
-    const etag = `W/"${crypto.createHash("sha256").update(cacheKey).digest("hex")}"`;
+    const etag = makeEtag(cacheKey);
+
     const ifNoneMatch = req.headers.get("if-none-match");
     if (ifNoneMatch && ifNoneMatch === etag) {
-      return new NextResponse(null, {
-        status: 304,
-        headers: {
-          ETag: etag,
-          "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600",
-        },
-      });
+      return new NextResponse(null, { status: 304, headers: { ETag: etag, "Cache-Control": CACHE_CONTROL } });
     }
+
     const cached = CACHE.get(cacheKey);
-    if (cached)
-      return NextResponse.json(cached.payload, {
-        status: 200,
-        headers: {
-          ETag: etag,
-          "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600",
-        },
-      });
+    if (cached) {
+      return NextResponse.json(cached.payload, { status: 200, headers: { ETag: etag, "Cache-Control": CACHE_CONTROL } });
+    }
 
     const availableDays: string[] = Array.isArray(goldManifest?.available_days) ? goldManifest.available_days : [];
     const availableSet = new Set<string>(availableDays);
@@ -264,7 +242,11 @@ export async function GET(req: NextRequest) {
       const derivedDailyPath = path.join(root, "derived", chain, `${d}.json`);
       const metaDailyPath = path.join(root, "meta", chain, `${d}.json`);
 
-      const [goldDaily, derivedDaily, metaDaily] = await Promise.all([readJsonSafe(goldDailyPath), readJsonSafe(derivedDailyPath), readJsonSafe(metaDailyPath)]);
+      const [goldDaily, derivedDaily, metaDaily] = await Promise.all([
+        readJsonSafe(goldDailyPath),
+        readJsonSafe(derivedDailyPath),
+        readJsonSafe(metaDailyPath),
+      ]);
 
       const daily: number | null = isNumber(goldDaily?.[metric]) ? goldDaily[metric] : null;
 
@@ -274,15 +256,16 @@ export async function GET(req: NextRequest) {
       const ma7FromDerived: number | null = isNumber(derivedDaily?.derived?.metrics?.[ma7Key]) ? derivedDaily.derived.metrics[ma7Key] : null;
       const ma30FromDerived: number | null = isNumber(derivedDaily?.derived?.metrics?.[ma30Key]) ? derivedDaily.derived.metrics[ma30Key] : null;
 
-      const confidence: number | null = isNumber(derivedDaily?.derived?.meta_confidence?.confidence_score) ? derivedDaily.derived.meta_confidence.confidence_score : null;
+      const confidence: number | null = isNumber(derivedDaily?.derived?.meta_confidence?.confidence_score)
+        ? derivedDaily.derived.meta_confidence.confidence_score
+        : null;
 
       const { z, percentile } = pickZPercentile(metaDaily, metric);
 
       rows.push({ date: d, daily, ma7: ma7FromDerived, ma30: ma30FromDerived, confidence, z, percentile, ma_source: "derived" });
     }
 
-    // Fallback compute MA7/MA30 only where derived is missing.
-    // Uses trailing window over present days (not calendar-missing days).
+    // Fallback MA (only if derived missing): trailing over present days.
     const sortedRows = rows.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
     for (let i = 0; i < sortedRows.length; i++) {
@@ -334,16 +317,9 @@ export async function GET(req: NextRequest) {
       freshness: { asof, lag_days },
     };
 
-    assertSeriesContract(payload);
-
     CACHE.set(cacheKey, { createdAt: Date.now(), payload });
-    return NextResponse.json(payload, {
-      status: 200,
-      headers: {
-        ETag: etag,
-        "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600",
-      },
-    });
+
+    return NextResponse.json(payload, { status: 200, headers: { ETag: etag, "Cache-Control": CACHE_CONTROL } });
   } catch (e: any) {
     return jsonError("SERIES_FAILED", e?.message || "Series route failed", 500);
   }

@@ -243,9 +243,7 @@ function buildWhatToWatch(args: {
     const pct = (t.daily / t.ma30 - 1) * 100;
     const dir = pct >= 0 ? "above" : "below";
     bullets.push(
-      `${t.label}: latest daily is ${Math.abs(pct).toFixed(1)}% ${dir} MA30 (daily=${fmtNum(t.daily)}, MA30=${fmtNum(
-        t.ma30
-      )}).`
+      `${t.label}: latest daily is ${Math.abs(pct).toFixed(1)}% ${dir} MA30 (daily=${fmtNum(t.daily)}, MA30=${fmtNum(t.ma30)}).`
     );
   }
 
@@ -286,7 +284,12 @@ export function ChainDetail({ chain }: { chain: string }) {
   const meta = bundle?.meta ?? null;
   const gold = bundle?.gold ?? null;
 
+  // This page's chart window is currently fixed at 180 days (driven off derived as-of)
   const chartDates = useMemo(() => (derivedAsof ? buildDateRangeISO(derivedAsof, 180) : []), [derivedAsof]);
+
+  // Deterministic ISO window boundaries for MetricPanel (API-backed)
+  const startISO = useMemo(() => (chartDates.length ? chartDates[0] : derivedAsof ?? null), [chartDates, derivedAsof]);
+  const endISO = useMemo(() => (chartDates.length ? chartDates[chartDates.length - 1] : derivedAsof ?? null), [chartDates, derivedAsof]);
 
   const [rows, setRows] = useState<DerivedSeriesRow[]>([]);
   const [rowsLoading, setRowsLoading] = useState(false);
@@ -549,9 +552,7 @@ export function ChainDetail({ chain }: { chain: string }) {
             <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-3 py-2">
               <div className="text-[11px] text-ui-faint">derived (snapshot)</div>
               <div className="mt-1 text-sm text-ui-text">{layerDerivedOk ? "loaded" : "missing"}</div>
-              <div className="mt-1 text-[11px] text-ui-faint">
-                top-level keys: {safeObjectKeysCount(bundle.derived)}
-              </div>
+              <div className="mt-1 text-[11px] text-ui-faint">top-level keys: {safeObjectKeysCount(bundle.derived)}</div>
             </div>
             <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-3 py-2">
               <div className="text-[11px] text-ui-faint">gold</div>
@@ -645,14 +646,17 @@ export function ChainDetail({ chain }: { chain: string }) {
             <div className="text-sm text-ui-muted">Loading series…</div>
           ) : triSeries.length === 0 ? (
             <div className="text-sm text-ui-muted">No series available for this window.</div>
+          ) : !startISO || !endISO ? (
+            <div className="text-sm text-ui-muted">Window boundaries unavailable (missing as-of).</div>
           ) : (
             <MetricPanel
+              chain={chainId}
+              metric={metricKey}
+              start={startISO}
+              end={endISO}
               title={getMetricLabel(metricKey)}
-              subtitle="Daily + MA7 + MA30"
-              data={triSeries}
-              basicExplain={getMetricDescription(metricKey, "basic")}
-              advancedExplain={getMetricDescription(metricKey, "advanced")}
-              explainMode={explainMode}
+              // keep current behavior: let MetricPanel itself hide if low coverage when you opt in later
+              hideIfLowCoverage={false}
             />
           )}
         </div>
@@ -769,12 +773,8 @@ export function ChainDetail({ chain }: { chain: string }) {
         </div>
 
         <details className="mt-4 rounded-xl border border-ui-border bg-ui-bg/20 p-3">
-          <summary className="cursor-pointer text-xs font-semibold text-ui-text">
-            Read the interpretation summary
-          </summary>
-          <div className="mt-2 text-sm text-ui-muted">
-            {explainMode === "advanced" ? summary.advanced : summary.basic}
-          </div>
+          <summary className="cursor-pointer text-xs font-semibold text-ui-text">Read the interpretation summary</summary>
+          <div className="mt-2 text-sm text-ui-muted">{explainMode === "advanced" ? summary.advanced : summary.basic}</div>
 
           <div className="mt-4">
             <InfoBox
@@ -801,17 +801,19 @@ export function ChainDetail({ chain }: { chain: string }) {
           <div className="text-sm text-ui-muted">Loading series…</div>
         ) : primaryPanels.length === 0 ? (
           <div className="text-sm text-ui-muted">No primary metric series available for this window.</div>
+        ) : !startISO || !endISO ? (
+          <div className="text-sm text-ui-muted">Window boundaries unavailable (missing as-of).</div>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {primaryPanels.map((p) => (
               <MetricPanel
                 key={p.baseKey}
+                chain={chainId}
+                metric={p.baseKey}
+                start={startISO}
+                end={endISO}
                 title={p.label}
-                subtitle="Daily + MA7 + MA30"
-                data={p.series}
-                basicExplain={getMetricDescription(p.baseKey, "basic")}
-                advancedExplain={getMetricDescription(p.baseKey, "advanced")}
-                explainMode={explainMode}
+                // subtitle will default from catalog; keep explicit if you want, but not needed
               />
             ))}
           </div>
@@ -851,19 +853,22 @@ export function ChainDetail({ chain }: { chain: string }) {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {advancedPanels.slice(0, advancedLimit).map((p) => (
-              <MetricPanel
-                key={`all-${p.baseKey}`}
-                title={p.label}
-                subtitle="Daily + MA7 + MA30"
-                data={p.series}
-                basicExplain={getMetricDescription(p.baseKey, "basic")}
-                advancedExplain={getMetricDescription(p.baseKey, "advanced")}
-                explainMode={explainMode}
-              />
-            ))}
-          </div>
+          {!startISO || !endISO ? (
+            <div className="text-sm text-ui-muted">Window boundaries unavailable (missing as-of).</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {advancedPanels.slice(0, advancedLimit).map((p) => (
+                <MetricPanel
+                  key={`all-${p.baseKey}`}
+                  chain={chainId}
+                  metric={p.baseKey}
+                  start={startISO}
+                  end={endISO}
+                  title={p.label}
+                />
+              ))}
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -872,9 +877,7 @@ export function ChainDetail({ chain }: { chain: string }) {
         <Diagnostics />
       ) : (
         <details className="rounded-2xl border border-ui-border bg-ui-surface p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-ui-text">
-            Open diagnostics (advanced details)
-          </summary>
+          <summary className="cursor-pointer text-sm font-semibold text-ui-text">Open diagnostics (advanced details)</summary>
           <div className="mt-4">
             <Diagnostics />
           </div>

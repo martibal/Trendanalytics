@@ -89,7 +89,8 @@ function paletteFor(chain: ChainId): Palette {
 function normalize(vals: (number | null)[]) {
   const xs = vals.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   if (!xs.length) return { min: 0, max: 1 };
-  let min = xs[0], max = xs[0];
+  let min = xs[0],
+    max = xs[0];
   for (const v of xs) {
     if (v < min) min = v;
     if (v > max) max = v;
@@ -158,11 +159,7 @@ function confColor(conf: number | null) {
   return "rgba(244,63,94,0.70)";
 }
 
-function WindowToggle(props: {
-  windows: number[];
-  active: number | null;
-  onChange: (w: number) => void;
-}) {
+function WindowToggle(props: { windows: number[]; active: number | null; onChange: (w: number) => void }) {
   const { windows, active, onChange } = props;
   const preferredOrder = [30, 90, 180, 365, 7];
 
@@ -200,7 +197,12 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
 
   const { data: hero, isLoading: heroLoading } = useLandingHero(chain);
 
-  const windows = hero?.windows_available ?? [];
+  // ✅ Memoize windows to avoid new [] each render (fixes react-hooks/exhaustive-deps warning)
+  const windows = useMemo<number[]>(() => {
+    const w = hero?.windows_available;
+    return Array.isArray(w) ? w : [];
+  }, [hero?.windows_available]);
+
   const defaultWindow = hero?.default_window_days ?? null;
 
   const [activeWindow, setActiveWindow] = useState<number | null>(defaultWindow);
@@ -287,37 +289,27 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
                 {heroLoading ? (
                   <div className="text-xs text-ui-muted">Loading windows…</div>
                 ) : windows.length === 0 ? (
-                  <div className="text-xs text-ui-bad">
-                    Missing landing files. Run publish + landing export + sync.
-                  </div>
+                  <div className="text-xs text-ui-bad">Missing landing files. Run publish + landing export + sync.</div>
                 ) : (
                   <WindowToggle windows={windows} active={active} onChange={(w) => setActiveWindow(w)} />
                 )}
               </div>
             </div>
 
-            <div className="mt-4 text-xs text-ui-faint">
-              Hover chart for exact values. Click to open full diagnostics →
-            </div>
+            <div className="mt-4 text-xs text-ui-faint">Hover chart for exact values. Click to open full diagnostics →</div>
           </div>
 
           <div className="flex-1">
             <div className="rounded-2xl border border-ui-border bg-ui-bg/20 p-4">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-xs font-medium text-ui-muted">Signature trend</div>
-                <div className="text-xs text-ui-faint">
-                  tx_count_daily • {active ? `${active}d` : "—"}
-                </div>
+                <div className="text-xs text-ui-faint">tx_count_daily • {active ? `${active}d` : "—"}</div>
               </div>
 
               {heroLoading || winLoading ? (
-                <div className="flex h-[240px] items-center justify-center text-sm text-ui-faint">
-                  Loading series…
-                </div>
+                <div className="flex h-[240px] items-center justify-center text-sm text-ui-faint">Loading series…</div>
               ) : !hasAny ? (
-                <div className="rounded-xl border border-ui-border bg-ui-bg/20 p-4 text-sm text-ui-faint">
-                  No usable series.
-                </div>
+                <div className="rounded-xl border border-ui-border bg-ui-bg/20 p-4 text-sm text-ui-faint">No usable series.</div>
               ) : (
                 <div
                   ref={wrapRef}
@@ -433,13 +425,7 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
 
                     {xHover !== null && hover ? (
                       <g>
-                        <line
-                          x1={xHover}
-                          y1={pad}
-                          x2={xHover}
-                          y2={h - pad}
-                          stroke="rgba(255,255,255,0.18)"
-                        />
+                        <line x1={xHover} y1={pad} x2={xHover} y2={h - pad} stroke="rgba(255,255,255,0.18)" />
                         {(() => {
                           const v = safeNum(hover.daily) ?? safeNum(hover.ma7) ?? safeNum(hover.ma30);
                           if (typeof v !== "number" || !Number.isFinite(v)) return null;
@@ -463,15 +449,7 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
                         const x = (w / Math.max(1, conf.length)) * i;
                         const rw = w / Math.max(1, conf.length);
                         return (
-                          <rect
-                            key={i}
-                            x={x}
-                            y={0}
-                            width={rw}
-                            height={8}
-                            fill={confColor(c)}
-                            opacity="0.95"
-                          />
+                          <rect key={i} x={x} y={0} width={rw} height={8} fill={confColor(c)} opacity="0.95" />
                         );
                       })}
                     </g>

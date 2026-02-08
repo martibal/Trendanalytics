@@ -1,70 +1,59 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { useUIStore } from '@/store/uiStore';
-import { MetricLineChart } from '@/components/MetricLineChart';
-import { InfoBox } from '@/components/InfoBox';
-import { getMetricOptionsForChain, getMetricDescription } from '@/lib/registry/metricRegistry';
+import { useMemo, useState } from "react";
+import { useUiStore } from "@/store/uiStore";
 
-type TrendSeriesProps = {
+import { MetricPanel } from "@/components/charts/MetricPanel";
+import type { ChainId } from "@/lib/types";
+import { getMetricOptionsForChain, getMetricDescription, getMetricLabel } from "@/lib/registry/metricRegistry";
+
+type ExplainMode = "basic" | "advanced";
+
+function normalizeChain(input: string): ChainId | null {
+  const v = input.toLowerCase();
+  if (v === "bitcoin" || v === "ethereum" || v === "arbitrum" || v === "base") return v;
+  return null;
+}
+
+export function TrendSeries(props: {
   chain: string;
-  dates: string[];
-};
+  start: string;
+  end?: string;
+  title?: string;
+  subtitle?: string;
+}) {
+  const chainId = normalizeChain(props.chain);
+  const explainMode = useUiStore((s) => s.explainMode) as ExplainMode;
 
-export default function TrendSeries({ chain, dates }: TrendSeriesProps) {
-  const explainMode = useUIStore((s) => s.explainMode);
+  const [metricKey, setMetricKey] = useState<string>("tx_count_daily");
 
-  /**
-   * Registry-styrte metrics for denne kjeden
-   */
   const metricOptions = useMemo(() => {
-    return getMetricOptionsForChain(chain);
-  }, [chain]);
+    return getMetricOptionsForChain(chainId ?? "bitcoin");
+  }, [chainId]);
 
-  /**
-   * Valgt metric (default: første gyldige i registry)
-   */
-  const [metricKey, setMetricKey] = useState<string | null>(
-    metricOptions.length > 0 ? metricOptions[0].key : null
-  );
+  const metricLabel = useMemo(() => getMetricLabel(metricKey), [metricKey]);
 
-  /**
-   * Hvis registry endres (eller chain byttes) og valgt metric
-   * ikke lenger finnes → fall tilbake trygt
-   */
-  if (
-    metricKey &&
-    metricOptions.length > 0 &&
-    !metricOptions.find((m) => m.key === metricKey)
-  ) {
-    setMetricKey(metricOptions[0].key);
+  const basicExplain = useMemo(() => getMetricDescription(metricKey, "basic"), [metricKey]);
+  const advancedExplain = useMemo(() => getMetricDescription(metricKey, "advanced"), [metricKey]);
+
+  if (!chainId) {
+    return (
+      <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
+        <div className="text-sm text-ui-text">Unknown chain: {props.chain}</div>
+      </div>
+    );
   }
-
-  if (!metricKey) {
-    return null;
-  }
-
-  const selectedMetric = metricOptions.find((m) => m.key === metricKey);
-
-  /**
-   * Registry-forklaring (Basic / Advanced)
-   * Fallback brukes hvis registry mangler tekst
-   */
-  const explanation =
-    getMetricDescription(metricKey, explainMode) ??
-    (explainMode === 'advanced'
-      ? 'Derived on-chain metric shown as a smoothed daily time series. Values are descriptive and relative to the chain’s own history.'
-      : 'Smoothed daily on-chain activity shown over time.');
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold tracking-wide text-muted-foreground">
-          Trend series
-        </h3>
+    <div className="rounded-2xl border border-ui-border bg-ui-surface p-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-ui-text">{props.title ?? "Trend series"}</div>
+          <div className="mt-1 text-xs text-ui-faint">{props.subtitle ?? "Daily + MA7 + MA30 (price-agnostic)"}</div>
+        </div>
 
         <select
-          className="rounded-md bg-background px-3 py-1.5 text-sm ring-1 ring-border focus:outline-none"
+          className="rounded-xl border border-ui-border bg-ui-bg/30 px-3 py-2 text-xs text-ui-text focus:outline-none focus:ring-2 focus:ring-ui-accent/30"
           value={metricKey}
           onChange={(e) => setMetricKey(e.target.value)}
         >
@@ -76,15 +65,23 @@ export default function TrendSeries({ chain, dates }: TrendSeriesProps) {
         </select>
       </div>
 
-      <MetricLineChart
-        chain={chain}
-        metricKey={metricKey}
-        dates={dates}
-      />
+      <div className="mt-3">
+        <MetricPanel
+          chain={chainId}
+          metric={metricKey}
+          start={props.start}
+          end={props.end}
+          title={metricLabel}
+          subtitle="Daily + MA7 + MA30"
+        />
+      </div>
 
-      <InfoBox title="What this chart is">
-        {explanation}
-      </InfoBox>
-    </section>
+      <div className="mt-4 rounded-xl border border-ui-border bg-ui-bg/20 p-3">
+        <div className="text-[11px] text-ui-faint">{explainMode === "advanced" ? "Advanced" : "Basic"} context</div>
+        <div className="mt-1 text-sm text-ui-muted">
+          {explainMode === "advanced" ? (advancedExplain ?? "—") : (basicExplain ?? "—")}
+        </div>
+      </div>
+    </div>
   );
 }

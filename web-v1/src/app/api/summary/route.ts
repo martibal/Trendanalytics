@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { promises as fs } from "fs";
 import crypto from "crypto";
+import { getMetric } from "@/lib/metrics/catalog";
 
 type Chain = "bitcoin" | "ethereum" | "arbitrum" | "base";
 
@@ -83,7 +84,7 @@ type SummaryResponse = {
 
   interpretation: {
     basic: string; // exactly 2 sentences
-    advanced: string[]; // may be empty, but never undefined
+    advanced: string[]; // always array
   };
 };
 
@@ -121,7 +122,6 @@ function toISODateUTC(d: Date): string {
 }
 
 function diffDaysUTC(aISO: string, bISO: string): number {
-  // returns (a - b) in whole days
   const [ay, am, ad] = aISO.split("-").map((x) => parseInt(x, 10));
   const [by, bm, bd] = bISO.split("-").map((x) => parseInt(x, 10));
   const a = Date.UTC(ay, am - 1, ad);
@@ -164,7 +164,7 @@ function parseWindowDays(v: string | null): number | null {
   if (!Number.isFinite(n)) return null;
   const i = Math.floor(n);
   if (i <= 0) return null;
-  if (i > 3650) return null; // guardrail
+  if (i > 3650) return null;
   return i;
 }
 
@@ -412,6 +412,11 @@ export async function GET(req: NextRequest) {
     if (!chain) return jsonError("INVALID_CHAIN", "Invalid chain. Use bitcoin|ethereum|arbitrum|base.", 400);
     if (!metric) return jsonError("MISSING_METRIC", "Missing metric.", 400);
 
+    // Guardrail: metric must exist in catalog
+    if (!getMetric(metric)) {
+      return jsonError("INVALID_METRIC", "Unknown metric key. This metric is not documented in METRIC_CATALOG.", 400, { metric });
+    }
+
     if (startParam && !isValidISODate(startParam)) return jsonError("INVALID_START", "Invalid start. Use YYYY-MM-DD.", 400);
     if (endParam && !isValidISODate(endParam)) return jsonError("INVALID_END", "Invalid end. Use YYYY-MM-DD.", 400);
 
@@ -420,7 +425,6 @@ export async function GET(req: NextRequest) {
       return jsonError("INVALID_WINDOW", "Invalid window. Use a positive integer number of days (<= 3650).", 400);
     }
 
-    // end defaults to manifest asof
     const root = path.join(process.cwd(), "public", "data", "published", "v1");
     const goldManifestPath = path.join(root, "gold", chain, "manifest.json");
     const goldManifest = await readJsonSafe(goldManifestPath);
@@ -430,18 +434,14 @@ export async function GET(req: NextRequest) {
     }
     const end = endParam ?? asof;
 
-    const start =
-      startParam ?? (windowDays ? addDaysISO(end, -(windowDays - 1)) : null);
-
+    const start = startParam ?? (windowDays ? addDaysISO(end, -(windowDays - 1)) : null);
     if (!start) {
       return jsonError("MISSING_START_OR_WINDOW", "Provide either start (YYYY-MM-DD) or window (days).", 400);
     }
-
     if (diffDaysUTC(start, end) > 0) {
       return jsonError("INVALID_RANGE", "start must be <= end.", 400, { start, end });
     }
 
-    // dataset metadata for etag/audit
     const datasetJson = await readJsonSafe(path.join(root, "dataset.json"));
     const dataset_id: string | null = typeof datasetJson?.dataset_id === "string" ? datasetJson.dataset_id : null;
     const revision_id: number | null = parseRevisionId(datasetJson?.revision_id);
@@ -449,10 +449,7 @@ export async function GET(req: NextRequest) {
     const etag = makeEtag(`${dataset_id ?? "no_dataset"}|${revision_id ?? "no_revision"}|summary|${chain}|${metric}|${start}|${end}`);
     const ifNoneMatch = req.headers.get("if-none-match");
     if (ifNoneMatch && ifNoneMatch === etag) {
-      return new NextResponse(null, {
-        status: 304,
-        headers: { ETag: etag, "Cache-Control": CACHE_CONTROL },
-      });
+      return new NextResponse(null, { status: 304, headers: { ETag: etag, "Cache-Control": CACHE_CONTROL } });
     }
 
     const series = await fetchSeriesLocal(chain, metric, start, end);
@@ -468,10 +465,8 @@ export async function GET(req: NextRequest) {
     const medianDaily = median(dailyVals);
     const stdevDaily = stdev(dailyVals);
 
-    // Trend: slope of MA30 over period (linear regression)
     const slope = linearSlope(ma30Vals);
 
-    // Threshold T
     const windowLen = Math.max(1, series.coverage.expected_days);
     const stdevForT = stdevDaily ?? 0;
     const T = 0.05 * (stdevForT / Math.max(1, windowLen));
@@ -482,12 +477,10 @@ export async function GET(req: NextRequest) {
     const normAbsSlope = slope === null ? 0 : Math.abs(slope) / Math.max(1e-9, stdevForT || 1e-9);
     const trendStrength = strengthFromNormalizedSlope(normAbsSlope);
 
-    // Volatility: coefficient of variation of daily (stdev/mean absolute)
     const absM = absMean(dailyVals);
     const cv = stdevDaily === null || absM === null || absM === 0 ? null : stdevDaily / absM;
     const volLabel = volLabelFromCV(cv);
 
-    // Level: prefer meta percentile if available, else rank in last365 window (gold)
     const metaPercentile = latest?.percentile ?? null;
     let levelLabel: "Low" | "Typical" | "Elevated" | "Extreme" = "Typical";
     let levelMethod: "meta_percentile" | "last365_rank" = "last365_rank";
@@ -518,12 +511,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Confidence: mean over window + latest
     const confVals = rows.map((r) => r.confidence).filter(isNumber);
     const confMean = mean(confVals);
     const confLatest = latest?.confidence ?? null;
 
-    // Caveats: ALWAYS return array
     const caveats: string[] = [];
     if (series.coverage.missing_days.length > 0) caveats.push(`Missing days in window: ${series.coverage.missing_days.length}.`);
     if (series.coverage.nonNull_ratio < 0.7) {
@@ -535,13 +526,11 @@ export async function GET(req: NextRequest) {
         : `Data is near-real-time: as-of ${series.freshness.asof} (lag ${series.freshness.lag_days} day(s)).`
     );
 
-    // Interpretation: ALWAYS 2 sentences (basic)
     const metricName = metricDisplayName(metric);
     const s1 = `Over the selected period, ${metricName} has been ${levelLabel}, with a ${trendStrength} ${trendLabel} trend and ${volLabel} variability.`;
     const s2 = `This means ${plainMeaning(metric, levelLabel)} and the changes are ${stabilityTranslation(volLabel)} rather than isolated outliers.`;
     const basic = `${s1} ${s2}`;
 
-    // Advanced: ALWAYS array (may be empty, but we fill deterministic bullets)
     const expected = series.coverage.expected_days;
     const present = series.coverage.present_days;
 
@@ -610,13 +599,7 @@ export async function GET(req: NextRequest) {
 
     assertSummaryContract(payload);
 
-    return NextResponse.json(payload, {
-      status: 200,
-      headers: {
-        ETag: etag,
-        "Cache-Control": CACHE_CONTROL,
-      },
-    });
+    return NextResponse.json(payload, { status: 200, headers: { ETag: etag, "Cache-Control": CACHE_CONTROL } });
   } catch (e: any) {
     return jsonError("SUMMARY_FAILED", e?.message || "Summary route failed", 500);
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type TriSeriesPoint = {
   date: string; // YYYY-MM-DD
@@ -212,8 +212,16 @@ export function MetricTriLineChart({
   const innerW = Math.max(1, size.w - padL - padR);
   const innerH = Math.max(1, size.h - padT - padB);
 
-  const x = (t: number) => padL + ((t - xMin) / (xMax - xMin)) * innerW;
-  const y = (v: number) => padT + (1 - (v - yMin) / (yMax - yMin)) * innerH;
+  // ✅ Make x/y stable across renders (fixes react-hooks/exhaustive-deps warning)
+  const x = useCallback(
+    (t: number) => padL + ((t - xMin) / (xMax - xMin)) * innerW,
+    [padL, xMin, xMax, innerW]
+  );
+
+  const y = useCallback(
+    (v: number) => padT + (1 - (v - yMin) / (yMax - yMin)) * innerH,
+    [padT, yMin, yMax, innerH]
+  );
 
   const pathDaily = ready ? buildPath(clean, "daily", x, y) : "";
   const pathMA7 = ready ? buildPath(clean, "ma7", x, y) : "";
