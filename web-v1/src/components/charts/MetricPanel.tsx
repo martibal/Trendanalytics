@@ -109,6 +109,33 @@ function Chip(props: { label: string; value: string; tone?: "neutral" | "warn" }
   );
 }
 
+function PercentileCopy({ p }: { p: number | null | undefined }) {
+  if (p == null || !Number.isFinite(p)) return <span>—</span>;
+  const pct = Math.max(0, Math.min(100, Math.round(p)));
+  const below = 100 - pct;
+  return (
+    <span className="text-white/70">
+      Today ranks in the <span className="font-semibold text-white">{pct}th</span> percentile{" "}
+      <span className="text-white/60">(lower than ~{below}% of days in this window)</span>.
+    </span>
+  );
+}
+
+function zLabel(z: number | null) {
+  if (z == null || !Number.isFinite(z)) return null;
+  const a = Math.abs(z);
+  if (a >= 3) return "Extremely unusual";
+  if (a >= 2) return "Very unusual";
+  if (a >= 1) return "Somewhat unusual";
+  return "Within typical range";
+}
+
+function fmtZ(z: number | null) {
+  if (z == null || !Number.isFinite(z)) return "—";
+  const s = z.toFixed(2);
+  return z >= 0 ? `+${s}` : s;
+}
+
 export function MetricPanel(props: {
   chain: Chain;
   metric: string;
@@ -153,7 +180,6 @@ export function MetricPanel(props: {
     let cancelled = false;
 
     async function run() {
-      // Guardrail: unknown metric -> do not fetch
       if (!isKnownMetric) {
         setLoading(false);
         setSeries(null);
@@ -214,18 +240,17 @@ export function MetricPanel(props: {
   const isLowCoverage = nonNull !== null && nonNull < 0.7;
   const missingCount = series?.coverage?.missing_days?.length ?? 0;
 
-  const catalogLinks = metricEntry ? metricLinks(metricEntry.key) : { methodologyHref: `/methodology#${props.metric}`, wikiHref: `/wiki#${props.metric}` };
+  const catalogLinks = metricEntry
+    ? metricLinks(metricEntry.key)
+    : { methodologyHref: `/methodology#${props.metric}`, wikiHref: `/wiki#${props.metric}` };
   const methodologyHref = props.methodologyHref ?? catalogLinks.methodologyHref;
   const wikiHref = props.wikiHref ?? catalogLinks.wikiHref;
 
   const latestDate = series?.rows?.length ? series.rows[series.rows.length - 1]?.date : null;
 
-  const rawGoldDailyHref =
-    latestDate ? buildUrl("/api/export/daily", { chain: props.chain, genre: "gold", date: latestDate }) : null;
-  const rawDerivedDailyHref =
-    latestDate ? buildUrl("/api/export/daily", { chain: props.chain, genre: "derived", date: latestDate }) : null;
-  const rawMetaDailyHref =
-    latestDate ? buildUrl("/api/export/daily", { chain: props.chain, genre: "meta", date: latestDate }) : null;
+  const rawGoldDailyHref = latestDate ? buildUrl("/api/export/daily", { chain: props.chain, genre: "gold", date: latestDate }) : null;
+  const rawDerivedDailyHref = latestDate ? buildUrl("/api/export/daily", { chain: props.chain, genre: "derived", date: latestDate }) : null;
+  const rawMetaDailyHref = latestDate ? buildUrl("/api/export/daily", { chain: props.chain, genre: "meta", date: latestDate }) : null;
 
   const rawGoldWindowHref = buildUrl("/api/export/window", { chain: props.chain, genre: "gold", window: "365" });
   const rawDerivedWindowHref = buildUrl("/api/export/window", { chain: props.chain, genre: "derived", window: "365" });
@@ -234,6 +259,26 @@ export function MetricPanel(props: {
   const rawGoldManifestHref = buildUrl("/api/export/manifest", { chain: props.chain, genre: "gold" });
   const rawDerivedManifestHref = buildUrl("/api/export/manifest", { chain: props.chain, genre: "derived" });
   const rawMetaManifestHref = buildUrl("/api/export/manifest", { chain: props.chain, genre: "meta" });
+
+  const pct = summary?.level?.percentile;
+  const pctInt = pct == null || !Number.isFinite(Number(pct)) ? null : Math.round(Number(pct));
+
+  // Z-score: prefer last row z from series, else compute from summary period stats (display-only)
+  const latestRow = series?.rows?.length ? series.rows[series.rows.length - 1] : null;
+  const zFromSeries = latestRow?.z ?? null;
+
+  const zFallback = useMemo(() => {
+    const x = summary?.current?.daily;
+    const mu = summary?.period?.mean_daily;
+    const sd = summary?.period?.stdev_daily;
+    if (x == null || mu == null || sd == null) return null;
+    if (!Number.isFinite(x) || !Number.isFinite(mu) || !Number.isFinite(sd)) return null;
+    if (sd === 0) return null;
+    return (x - mu) / sd;
+  }, [summary]);
+
+  const zLatest = (zFromSeries != null && Number.isFinite(zFromSeries)) ? zFromSeries : zFallback;
+  const zText = zLabel(zLatest);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur">
@@ -297,34 +342,83 @@ export function MetricPanel(props: {
         </div>
       ) : (
         <>
-          <div className="mt-4 h-[240px] w-full">
-            <MetricTriLineChart data={triData} />
+          {/* Taller chart (was 240px) */}
+          <div className="mt-4 h-[320px] w-full">
+            <MetricTriLineChart data={triData} height={320} />
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {/* Context tiles (now 5, responsive) */}
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
             <div className="rounded-xl border border-white/10 bg-black/20 p-3">
               <div className="text-[11px] uppercase tracking-wide text-white/50">Latest</div>
               <div className="mt-1 text-sm font-semibold text-white tabular-nums">{fmtCompact(summary?.current?.daily)}</div>
+              <div className="mt-1 text-[11px] text-white/55">Observed latest day (can be noisy).</div>
             </div>
 
             <div className="rounded-xl border border-white/10 bg-black/20 p-3">
               <div className="text-[11px] uppercase tracking-wide text-white/50">MA7</div>
               <div className="mt-1 text-sm font-semibold text-white tabular-nums">{fmtCompact(summary?.current?.ma7)}</div>
+              <div className="mt-1 text-[11px] text-white/55">Short-term baseline (last week).</div>
             </div>
 
             <div className="rounded-xl border border-white/10 bg-black/20 p-3">
               <div className="text-[11px] uppercase tracking-wide text-white/50">MA30</div>
               <div className="mt-1 text-sm font-semibold text-white tabular-nums">{fmtCompact(summary?.current?.ma30)}</div>
+              <div className="mt-1 text-[11px] text-white/55">Structural baseline (last month).</div>
             </div>
 
             <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-white/50">Context</div>
-              <div className="mt-1 text-sm font-semibold text-white">
-                {summary ? `${summary.level.label} · ${summary.trend.strength} ${summary.trend.label}` : "—"}
-              </div>
+              <div className="text-[11px] uppercase tracking-wide text-white/50">Percentile (historical)</div>
+              <div className="mt-1 text-sm font-semibold text-white tabular-nums">{pctInt == null ? "—" : `${pctInt}%`}</div>
+              <div className="mt-1 text-[11px] text-white/55">Where today ranks in this window.</div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-white/50">Z-score (context)</div>
+              <div className="mt-1 text-sm font-semibold text-white tabular-nums">{fmtZ(zLatest)}</div>
+              <div className="mt-1 text-[11px] text-white/55">{zText ?? "Standardized distance from mean."}</div>
             </div>
           </div>
 
+          {/* Percentile explanation */}
+          <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-white/50">What “percentile” means</div>
+            <div className="mt-1 text-sm">
+              <PercentileCopy p={pctInt} />
+            </div>
+
+            <details className="mt-3">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-white/80">
+                Advanced definition
+              </summary>
+              <div className="mt-2 text-xs text-white/70 leading-relaxed">
+                Percentile ranks today’s <span className="text-white/85">daily</span> value among{" "}
+                <span className="text-white/85">non-null daily</span> values in the selected window. It is distribution context —{" "}
+                <span className="text-white/85">not a forecast</span>.
+              </div>
+            </details>
+          </div>
+
+          {/* Z-score explanation */}
+          <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-white/50">What “z-score” means</div>
+            <div className="mt-1 text-sm text-white/70">
+              Z-score tells you how far today is from the window’s average in <span className="text-white/85">standard deviation units</span>.
+              <span className="ml-2 text-white/60">Rule of thumb: |z|≈1 typical, |z|≈2 unusual, |z|≥3 rare.</span>
+            </div>
+
+            <details className="mt-3">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-white/80">
+                Advanced definition
+              </summary>
+              <div className="mt-2 text-xs text-white/70 leading-relaxed">
+                z = (x − μ) / σ, where x is today’s daily value, μ is the mean of non-null daily values in the selected window,
+                and σ is the standard deviation. If σ is ~0 or sample is too small, z is null. This is context, not causality or prediction.
+              </div>
+            </details>
+          </div>
+
+          {/* Interpretation */}
           <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
             <div className="text-[11px] uppercase tracking-wide text-white/50">Basic</div>
             <div className="mt-1 text-sm text-white/85">{summary?.interpretation?.basic ?? "—"}</div>
@@ -352,6 +446,7 @@ export function MetricPanel(props: {
             </details>
           </div>
 
+          {/* Links */}
           <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-white/70">
             <a className="underline underline-offset-2 hover:text-white" href={methodologyHref}>
               Methodology

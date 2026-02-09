@@ -144,21 +144,18 @@ async function fetchGoldManifest(chain: Chain, signal?: AbortSignal): Promise<Ex
 export default function ChainClient(props: { chain: string; hero?: LandingHeroFileMaybe }) {
   const chain = parseChain(props.chain);
 
-  // Window options (fallback), can be refined later if you publish supported windows.
   const fallbackWindows = useMemo(() => [7, 30, 90, 180, 365], []);
-
-  // Default per spec: 180d; clamp to available options.
   const [windowDays, setWindowDays] = useState<number>(() => clampWindowDays(180, fallbackWindows));
 
-  // As-of / audit (prefer passed hero if present; otherwise fetch manifest)
   const [asofGold, setAsofGold] = useState<string | null>(() => {
     const fromHero = props.hero?.asof?.gold;
     return fromHero && isValidISODate(fromHero) ? fromHero : null;
   });
   const [datasetId, setDatasetId] = useState<string | null>(props.hero?.dataset_id ?? null);
-  const [revisionId, setRevisionId] = useState<number | null>(typeof props.hero?.revision_id === "number" ? props.hero!.revision_id : null);
+  const [revisionId, setRevisionId] = useState<number | null>(
+    typeof props.hero?.revision_id === "number" ? props.hero!.revision_id : null
+  );
 
-  // IMPORTANT: No landing_hero.json fetch anymore. Only manifest.
   useEffect(() => {
     let cancelled = false;
     const ac = new AbortController();
@@ -173,9 +170,8 @@ export default function ChainClient(props: { chain: string; hero?: LandingHeroFi
         setDatasetId(m.dataset_id ?? null);
         setRevisionId(typeof m.revision_id === "number" ? m.revision_id : null);
       } catch {
-        // non-fatal: page can still render; panels can use end fallback.
         if (cancelled) return;
-        setAsofGold((prev) => prev); // keep prior if any
+        setAsofGold((prev) => prev);
       }
     }
 
@@ -187,27 +183,42 @@ export default function ChainClient(props: { chain: string; hero?: LandingHeroFi
   }, [chain]);
 
   const endISO = useMemo(() => (asofGold && isValidISODate(asofGold) ? asofGold : toISODateUTC(new Date())), [asofGold]);
-
-  // Derived window start, inclusive.
   const startISO = useMemo(() => addDaysISO(endISO, -(windowDays - 1)), [endISO, windowDays]);
-
   const layout = METRICS_BY_CHAIN[chain];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <div className="mb-8 rounded-2xl border border-white/10 bg-black/20 p-6">
+      {/* Header shell in “landing” style */}
+      <div className="mb-8 rounded-3xl border border-white/10 bg-black/20 p-6 shadow-sm backdrop-blur">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-white">{capitalize(chain)}</h1>
-            <p className="mt-2 text-sm text-white/70">
-              {capitalize(chain)} — Trends & context (price-agnostic)
-            </p>
+            <p className="mt-2 text-sm text-white/70">{capitalize(chain)} — Trends & context (price-agnostic)</p>
 
             <ul className="mt-4 space-y-1 text-sm text-white/70">
               {layout.bullets.map((b, i) => (
                 <li key={i}>• {b}</li>
               ))}
             </ul>
+
+            {/* Global mental model (same copy everywhere) */}
+            <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-white/75">
+              <div className="text-xs font-semibold text-white/85">How to read every chart</div>
+              <div className="mt-2 grid gap-2 md:grid-cols-4">
+                <div>
+                  <span className="font-semibold text-white">Daily</span> = raw day-to-day activity (noise)
+                </div>
+                <div>
+                  <span className="font-semibold text-white">MA7</span> = short-term regime (last week)
+                </div>
+                <div>
+                  <span className="font-semibold text-white">MA30</span> = structural baseline (last month)
+                </div>
+                <div>
+                  <span className="font-semibold text-white">Percentile</span> = historical placement (context)
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mt-4 flex items-center gap-3 md:mt-0">
@@ -247,12 +258,14 @@ export default function ChainClient(props: { chain: string; hero?: LandingHeroFi
         <div className="mt-3 text-xs text-white/50">Descriptive only · No prices · No forecasts · No advice</div>
       </div>
 
-      <div className="space-y-10">
+      {/* ✅ full-width vertical stacking for metric panels */}
+      <div className="space-y-12">
         {layout.groups.map((g) => (
           <section key={g.title} className="space-y-4">
             <h2 className="text-xl font-semibold text-white">{g.title}</h2>
 
-            <div className="grid gap-6 md:grid-cols-2">
+            {/* one panel per row */}
+            <div className="grid grid-cols-1 gap-6">
               {g.items.map((it) => (
                 <MetricPanel
                   key={it.metric}

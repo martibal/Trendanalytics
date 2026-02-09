@@ -123,8 +123,30 @@ export type LandingWindowFile = {
 
 export type LandingHeroFile = {
   chain: ChainId;
-  default_window_days: number | null;
-  windows_available: number[];
-  hero_metric: string;
-  default: LandingWindowFile | null;
+  dataset_id: string;
+  revision_id: number;
+  computed_at_utc: string;
+
+  // as-of dates per genre (as in your JSON)
+  asof: {
+    gold: string;
+    meta: string;
+    derived: string;
+  };
+
+  // NEW: matches hero.json
+  windows_supported: number[];
+
+  // optional backward compat if you had this earlier
+  windows_available?: number[];
+
+  // keep whatever you already have here:
+  files: any;
+  hero: any;
+
+  // optional if you use this in UI
+  default_window_days?: number;
+  default?: {
+    series?: LandingHeroPoint[];
+  };
 };

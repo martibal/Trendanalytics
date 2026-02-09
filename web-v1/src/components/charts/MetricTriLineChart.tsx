@@ -103,7 +103,6 @@ function buildPath(
 }
 
 function findNearestIndexByT(pts: CleanPoint[], t: number) {
-  // pts sorted by t
   let lo = 0;
   let hi = pts.length - 1;
 
@@ -122,17 +121,10 @@ function findNearestIndexByT(pts: CleanPoint[], t: number) {
   return Math.abs(a.t - t) <= Math.abs(b.t - t) ? i - 1 : i;
 }
 
-export function MetricTriLineChart({
-  data,
-  height = 160,
-}: {
-  data: TriSeriesPoint[];
-  height?: number;
-}) {
+export function MetricTriLineChart({ data, height = 160 }: { data: TriSeriesPoint[]; height?: number }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState<Size>({ w: 0, h: height });
 
-  // hover state
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [hoverXY, setHoverXY] = useState<{ x: number; y: number } | null>(null);
 
@@ -203,25 +195,17 @@ export function MetricTriLineChart({
     return { xMin: xmin, xMax: xmax, yMin: yd.min, yMax: yd.max };
   }, [ready, clean]);
 
-  // Layout
-  const padL = 46;
-  const padR = 10;
+  // Layout (reduced dead space, clearer axes)
+  const padL = 54;
+  const padR = 12;
   const padT = 10;
-  const padB = 22;
+  const padB = 26;
 
   const innerW = Math.max(1, size.w - padL - padR);
   const innerH = Math.max(1, size.h - padT - padB);
 
-  // ✅ Make x/y stable across renders (fixes react-hooks/exhaustive-deps warning)
-  const x = useCallback(
-    (t: number) => padL + ((t - xMin) / (xMax - xMin)) * innerW,
-    [padL, xMin, xMax, innerW]
-  );
-
-  const y = useCallback(
-    (v: number) => padT + (1 - (v - yMin) / (yMax - yMin)) * innerH,
-    [padT, yMin, yMax, innerH]
-  );
+  const x = useCallback((t: number) => padL + ((t - xMin) / (xMax - xMin)) * innerW, [padL, xMin, xMax, innerW]);
+  const y = useCallback((v: number) => padT + (1 - (v - yMin) / (yMax - yMin)) * innerH, [padT, yMin, yMax, innerH]);
 
   const pathDaily = ready ? buildPath(clean, "daily", x, y) : "";
   const pathMA7 = ready ? buildPath(clean, "ma7", x, y) : "";
@@ -229,21 +213,17 @@ export function MetricTriLineChart({
 
   const xTicks = useMemo(() => {
     if (!ready) return [];
-    const n = 4;
+    const n = 5;
     const out: number[] = [];
-    for (let i = 0; i < n; i++) {
-      out.push(xMin + ((xMax - xMin) * i) / (n - 1));
-    }
+    for (let i = 0; i < n; i++) out.push(xMin + ((xMax - xMin) * i) / (n - 1));
     return out;
   }, [ready, xMin, xMax]);
 
   const yTicks = useMemo(() => {
     if (!ready) return [];
-    const n = 3;
+    const n = 4;
     const out: number[] = [];
-    for (let i = 0; i < n; i++) {
-      out.push(yMin + ((yMax - yMin) * i) / (n - 1));
-    }
+    for (let i = 0; i < n; i++) out.push(yMin + ((yMax - yMin) * i) / (n - 1));
     return out;
   }, [ready, yMin, yMax]);
 
@@ -261,7 +241,6 @@ export function MetricTriLineChart({
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
 
-    // clamp to plot area horizontally (still allow tooltip within svg)
     const clampedX = Math.min(padL + innerW, Math.max(padL, px));
     const t = xMin + ((clampedX - padL) / innerW) * (xMax - xMin);
 
@@ -275,22 +254,20 @@ export function MetricTriLineChart({
     setHoverXY(null);
   }
 
-  // Tooltip layout
   const tip = useMemo(() => {
     if (!hoveredPoint || !hoverXY) return null;
 
     const { p } = hoveredPoint;
 
     const lines = [
-      { label: "Daily", v: p.daily, color: "rgba(255,255,255,0.85)" },
-      { label: "MA7", v: p.ma7, color: "rgba(99, 179, 237, 0.85)" },
-      { label: "MA30", v: p.ma30, color: "rgba(245, 158, 11, 0.85)" },
+      { label: "Daily", v: p.daily, color: "rgba(255,255,255,0.92)" },
+      { label: "MA7", v: p.ma7, color: "rgba(147, 197, 253, 0.92)" },
+      { label: "MA30", v: p.ma30, color: "rgba(253, 230, 138, 0.92)" },
     ].filter((x) => x.v !== null && Number.isFinite(x.v as number));
 
     const title = p.date;
 
-    // position: keep inside box
-    const boxW = 170;
+    const boxW = 190;
     const boxH = 22 + lines.length * 18;
     const margin = 8;
 
@@ -305,11 +282,7 @@ export function MetricTriLineChart({
   }, [hoveredPoint, hoverXY, size.w, size.h]);
 
   return (
-    <div
-      ref={wrapRef}
-      className="w-full rounded-xl border border-white/10 bg-black/20"
-      style={{ height }}
-    >
+    <div ref={wrapRef} className="w-full" style={{ height }}>
       {!ready ? null : (
         <svg
           width={size.w}
@@ -318,119 +291,24 @@ export function MetricTriLineChart({
           onPointerMove={onPointerMove}
           onPointerLeave={onPointerLeave}
         >
+          {/* plot background */}
+          <rect x={0} y={0} width={size.w} height={size.h} rx={14} fill="rgba(0,0,0,0.18)" stroke="rgba(255,255,255,0.08)" />
+
           {/* grid */}
           {xTicks.map((t, i) => {
             const X = x(t);
-            return (
-              <line
-                key={`xg-${i}`}
-                x1={X}
-                y1={padT}
-                x2={X}
-                y2={padT + innerH}
-                stroke="rgba(255,255,255,0.10)"
-                strokeDasharray="3 3"
-              />
-            );
+            return <line key={`xg-${i}`} x1={X} y1={padT} x2={X} y2={padT + innerH} stroke="rgba(255,255,255,0.10)" strokeDasharray="3 3" />;
           })}
           {yTicks.map((v, i) => {
             const Y = y(v);
-            return (
-              <line
-                key={`yg-${i}`}
-                x1={padL}
-                y1={Y}
-                x2={padL + innerW}
-                y2={Y}
-                stroke="rgba(255,255,255,0.10)"
-                strokeDasharray="3 3"
-              />
-            );
+            return <line key={`yg-${i}`} x1={padL} y1={Y} x2={padL + innerW} y2={Y} stroke="rgba(255,255,255,0.10)" strokeDasharray="3 3" />;
           })}
-
-          {/* lines */}
-          {pathDaily ? (
-            <path
-              d={pathDaily}
-              fill="none"
-              stroke="rgba(255,255,255,0.85)"
-              strokeWidth={1.5}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          ) : null}
-          {pathMA7 ? (
-            <path
-              d={pathMA7}
-              fill="none"
-              stroke="rgba(99, 179, 237, 0.85)"
-              strokeWidth={2}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          ) : null}
-          {pathMA30 ? (
-            <path
-              d={pathMA30}
-              fill="none"
-              stroke="rgba(245, 158, 11, 0.85)"
-              strokeWidth={2}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          ) : null}
-
-          {/* hover crosshair + dots */}
-          {hoveredPoint ? (
-            <>
-              <line
-                x1={hoveredPoint.X}
-                y1={padT}
-                x2={hoveredPoint.X}
-                y2={padT + innerH}
-                stroke="rgba(255,255,255,0.18)"
-              />
-
-              {/* dots at series values (if present) */}
-              {hoveredPoint.p.daily !== null && Number.isFinite(hoveredPoint.p.daily) ? (
-                <circle
-                  cx={hoveredPoint.X}
-                  cy={y(hoveredPoint.p.daily)}
-                  r={3}
-                  fill="rgba(255,255,255,0.95)"
-                />
-              ) : null}
-              {hoveredPoint.p.ma7 !== null && Number.isFinite(hoveredPoint.p.ma7) ? (
-                <circle
-                  cx={hoveredPoint.X}
-                  cy={y(hoveredPoint.p.ma7)}
-                  r={3}
-                  fill="rgba(99, 179, 237, 0.95)"
-                />
-              ) : null}
-              {hoveredPoint.p.ma30 !== null && Number.isFinite(hoveredPoint.p.ma30) ? (
-                <circle
-                  cx={hoveredPoint.X}
-                  cy={y(hoveredPoint.p.ma30)}
-                  r={3}
-                  fill="rgba(245, 158, 11, 0.95)"
-                />
-              ) : null}
-            </>
-          ) : null}
 
           {/* axes labels */}
           {yTicks.map((v, i) => {
             const Y = y(v);
             return (
-              <text
-                key={`yl-${i}`}
-                x={padL - 8}
-                y={Y + 4}
-                textAnchor="end"
-                fontSize={11}
-                fill="rgba(255,255,255,0.55)"
-              >
+              <text key={`yl-${i}`} x={padL - 10} y={Y + 4} textAnchor="end" fontSize={11} fill="rgba(255,255,255,0.58)">
                 {fmtCompact(v)}
               </text>
             );
@@ -438,66 +316,82 @@ export function MetricTriLineChart({
           {xTicks.map((t, i) => {
             const X = x(t);
             return (
-              <text
-                key={`xl-${i}`}
-                x={X}
-                y={padT + innerH + 16}
-                textAnchor="middle"
-                fontSize={11}
-                fill="rgba(255,255,255,0.55)"
-              >
+              <text key={`xl-${i}`} x={X} y={padT + innerH + 18} textAnchor="middle" fontSize={11} fill="rgba(255,255,255,0.58)">
                 {fmtTickFromMs(t)}
               </text>
             );
           })}
 
+          {/* lines - visual hierarchy */}
+          {/* Daily: thinner, slightly transparent */}
+          {pathDaily ? (
+            <path d={pathDaily} fill="none" stroke="rgba(255,255,255,0.80)" strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+          ) : null}
+
+          {/* MA7: thick + high contrast */}
+          {pathMA7 ? (
+            <>
+              <path d={pathMA7} fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={6.5} strokeLinecap="round" opacity="0.55" />
+              <path d={pathMA7} fill="none" stroke="rgba(147, 197, 253, 0.95)" strokeWidth={3.2} strokeLinejoin="round" strokeLinecap="round" />
+            </>
+          ) : null}
+
+          {/* MA30: thick + dashed (ALWAYS) */}
+          {pathMA30 ? (
+            <>
+              <path d={pathMA30} fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={6.0} strokeLinecap="round" opacity="0.50" strokeDasharray="10 8" />
+              <path
+                d={pathMA30}
+                fill="none"
+                stroke="rgba(253, 230, 138, 0.92)"
+                strokeWidth={3.0}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                strokeDasharray="10 8"
+              />
+            </>
+          ) : null}
+
+          {/* hover crosshair + dots */}
+          {hoveredPoint ? (
+            <>
+              <line x1={hoveredPoint.X} y1={padT} x2={hoveredPoint.X} y2={padT + innerH} stroke="rgba(255,255,255,0.18)" />
+
+              {hoveredPoint.p.daily !== null && Number.isFinite(hoveredPoint.p.daily) ? (
+                <circle cx={hoveredPoint.X} cy={y(hoveredPoint.p.daily)} r={3.2} fill="rgba(255,255,255,0.95)" />
+              ) : null}
+              {hoveredPoint.p.ma7 !== null && Number.isFinite(hoveredPoint.p.ma7) ? (
+                <circle cx={hoveredPoint.X} cy={y(hoveredPoint.p.ma7)} r={3.2} fill="rgba(147, 197, 253, 0.95)" />
+              ) : null}
+              {hoveredPoint.p.ma30 !== null && Number.isFinite(hoveredPoint.p.ma30) ? (
+                <circle cx={hoveredPoint.X} cy={y(hoveredPoint.p.ma30)} r={3.2} fill="rgba(253, 230, 138, 0.95)" />
+              ) : null}
+            </>
+          ) : null}
+
           {/* tooltip */}
           {tip ? (
-            <>
-              <g>
-                <rect
-                  x={tip.left}
-                  y={tip.top}
-                  width={tip.boxW}
-                  height={tip.boxH}
-                  rx={10}
-                  ry={10}
-                  fill="rgba(10,10,10,0.96)"
-                  stroke="rgba(255,255,255,0.14)"
-                />
-                <text
-                  x={tip.left + 10}
-                  y={tip.top + 15}
-                  fontSize={12}
-                  fill="rgba(255,255,255,0.80)"
-                  fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-                >
-                  {tip.title}
-                </text>
+            <g>
+              <rect x={tip.left} y={tip.top} width={tip.boxW} height={tip.boxH} rx={12} ry={12} fill="rgba(10,10,10,0.96)" stroke="rgba(255,255,255,0.14)" />
+              <text
+                x={tip.left + 10}
+                y={tip.top + 15}
+                fontSize={12}
+                fill="rgba(255,255,255,0.85)"
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+              >
+                {tip.title}
+              </text>
 
-                {tip.lines.map((ln, i) => (
-                  <g key={ln.label}>
-                    <rect
-                      x={tip.left + 10}
-                      y={tip.top + 22 + i * 18 - 8}
-                      width={8}
-                      height={8}
-                      rx={2}
-                      fill={ln.color}
-                    />
-                    <text
-                      x={tip.left + 24}
-                      y={tip.top + 22 + i * 18}
-                      fontSize={12}
-                      fill="rgba(255,255,255,0.80)"
-                    >
-                      {ln.label}:{" "}
-                      <tspan fill="rgba(255,255,255,0.92)">{fmtCompact(ln.v)}</tspan>
-                    </text>
-                  </g>
-                ))}
-              </g>
-            </>
+              {tip.lines.map((ln, i) => (
+                <g key={ln.label}>
+                  <rect x={tip.left + 10} y={tip.top + 22 + i * 18 - 8} width={8} height={8} rx={2} fill={ln.color} />
+                  <text x={tip.left + 24} y={tip.top + 22 + i * 18} fontSize={12} fill="rgba(255,255,255,0.82)">
+                    {ln.label}: <tspan fill="rgba(255,255,255,0.95)">{fmtCompact(ln.v)}</tspan>
+                  </text>
+                </g>
+              ))}
+            </g>
           ) : null}
         </svg>
       )}
