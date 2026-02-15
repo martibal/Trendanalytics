@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
+import InlineDisclaimer from "@/components/legal/InlineDisclaimer";
 
 type ChainSlug = "bitcoin" | "ethereum" | "arbitrum" | "base";
 
@@ -53,11 +54,7 @@ type ManifestExport = {
 };
 
 function Card(props: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm backdrop-blur">
-      {props.children}
-    </div>
-  );
+  return <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm backdrop-blur">{props.children}</div>;
 }
 
 function buildUrl(path: string, params: Record<string, string>) {
@@ -206,6 +203,11 @@ export default function ChainsIndexPage() {
           Optional metrics are hidden deterministically when coverage is insufficient.
         </p>
       </header>
+
+      {/* Web2-intent: make descriptive-only / no-price / no-advice constraints explicit on index pages too */}
+      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <InlineDisclaimer variant="legal" />
+      </div>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {chainCards.map((c) => (

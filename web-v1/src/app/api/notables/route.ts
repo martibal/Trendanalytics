@@ -1,8 +1,10 @@
+// src/app/api/notables/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { promises as fs } from "fs";
 import crypto from "crypto";
 import { METRIC_KEYS, requireMetric, metricAvailability, metricLinks } from "@/lib/metrics/catalog";
+import { validateNoForbiddenLanguage } from "@/lib/legal/forbiddenLanguage";
 import type { ChainId } from "@/lib/types";
 
 type Chain = "bitcoin" | "ethereum" | "arbitrum" | "base";
@@ -79,6 +81,40 @@ type ApiResponse = {
 };
 
 const CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=600";
+
+/**
+ * In-memory cache (per server instance).
+ * Keyed by ETag because ETag hashes the response identity (inputs + manifest content).
+ * TTL aligned with s-maxage=300 to avoid long-lived staleness.
+ */
+type MemCacheEntry = {
+  createdAtMs: number;
+  payload: ApiResponse;
+};
+
+const MEM_CACHE_TTL_MS = 300_000; // 5 min
+const MEM_CACHE_MAX_ENTRIES = 64;
+const MEM_CACHE: Map<string, MemCacheEntry> = new Map();
+
+function memCacheGet(etag: string): ApiResponse | null {
+  const hit = MEM_CACHE.get(etag);
+  if (!hit) return null;
+  const age = Date.now() - hit.createdAtMs;
+  if (age > MEM_CACHE_TTL_MS) {
+    MEM_CACHE.delete(etag);
+    return null;
+  }
+  return hit.payload;
+}
+
+function memCacheSet(etag: string, payload: ApiResponse) {
+  if (MEM_CACHE.size >= MEM_CACHE_MAX_ENTRIES) {
+    const entries = Array.from(MEM_CACHE.entries()).sort((a, b) => a[1].createdAtMs - b[1].createdAtMs);
+    const toDrop = Math.max(1, Math.floor(MEM_CACHE_MAX_ENTRIES * 0.25));
+    for (let i = 0; i < toDrop && i < entries.length; i++) MEM_CACHE.delete(entries[i][0]);
+  }
+  MEM_CACHE.set(etag, { createdAtMs: Date.now(), payload });
+}
 
 function jsonError(code: string, message: string, status: number, details?: any) {
   const body: ApiError = { error: { code, message, details } };
@@ -238,6 +274,16 @@ function makeEtag(input: string): string {
   return `W/"${hash}"`;
 }
 
+function hashStringList(xs: string[]): string {
+  // Stable content hash: order is assumed normalized by caller (sorted, de-duped).
+  const h = crypto.createHash("sha256");
+  for (const s of xs) {
+    h.update(s);
+    h.update("|");
+  }
+  return h.digest("hex").slice(0, 16);
+}
+
 type Row = {
   date: string;
   daily: number | null;
@@ -300,7 +346,7 @@ async function loadWindowSeries(root: string, chain: Chain, metric: string, star
       const v = sorted[j].daily;
       if (isNumber(v)) vals.push(v);
     }
-    return vals.length ? (vals.reduce((s, x) => s + x, 0) / vals.length) : null;
+    return vals.length ? vals.reduce((s, x) => s + x, 0) / vals.length : null;
   }
 
   for (let i = 0; i < sorted.length; i++) {
@@ -387,7 +433,11 @@ function persistenceHint(rows: Row[]) {
 
   const delta = m2 - m1;
   // We do not interpret sign as "good/bad", only directionality.
-  return { ok: true, delta, label: delta > 0 ? "higher than early-window baseline" : delta < 0 ? "lower than early-window baseline" : "similar to early-window baseline" };
+  return {
+    ok: true,
+    delta,
+    label: delta > 0 ? "higher than early-window baseline" : delta < 0 ? "lower than early-window baseline" : "similar to early-window baseline",
+  };
 }
 
 function buildNotable(
@@ -411,7 +461,11 @@ function buildNotable(
   let score = 0;
 
   // Data quality first (can be notable on its own)
-  if (freshness.lag_days >= 7 || coverage.nonNull_ratio < 0.7 || coverage.missing_days.length >= Math.max(3, Math.floor(coverage.expected_days * 0.1))) {
+  if (
+    freshness.lag_days >= 7 ||
+    coverage.nonNull_ratio < 0.7 ||
+    coverage.missing_days.length >= Math.max(3, Math.floor(coverage.expected_days * 0.1))
+  ) {
     kind.push("DataQuality");
     score += 1;
   }
@@ -480,7 +534,9 @@ function buildNotable(
     levelText,
     trendText,
     volText,
-    pers.ok ? `Persistence (median last7 vs first7): ${pers.label} (Δ=${pers.delta === null ? "—" : pers.delta.toFixed(6)}).` : `Persistence: ${pers.label}.`,
+    pers.ok
+      ? `Persistence (median last7 vs first7): ${pers.label} (Δ=${pers.delta === null ? "—" : pers.delta.toFixed(6)}).`
+      : `Persistence: ${pers.label}.`,
     `Why this metric exists (basic): ${m.doc.why.basic}`,
     `Value to the user (basic): ${m.doc.value.basic}`,
   ];
@@ -536,15 +592,40 @@ export async function GET(req: NextRequest) {
     const end = asof;
     const start = addDaysISO(end, -(window_days - 1));
 
-    const availableDays: string[] = Array.isArray(goldManifest?.available_days) ? goldManifest.available_days : [];
+    // Normalize available_days to avoid order/dup/invalid-date cache issues.
+    const availableDaysRaw: string[] = Array.isArray(goldManifest?.available_days) ? goldManifest.available_days : [];
+    const availableDays = Array.from(new Set(availableDaysRaw.filter((d) => typeof d === "string" && isValidISODate(d)))).sort();
     const availableSet = new Set<string>(availableDays);
 
     const freshness: Freshness = { asof, lag_days };
 
-    const etag = makeEtag(`${dataset_id ?? "no_dataset"}|${revision_id ?? "no_revision"}|notables|${chain}|${window_days}|${start}|${end}|${availableDays.length}`);
+    // Robust response identity:
+    // - include limit (payload slices notables)
+    // - include stable hash of available_days CONTENT (not just length)
+    const availableDaysHash = hashStringList(availableDays);
+
+    const etag = makeEtag(
+      [
+        dataset_id ?? "no_dataset",
+        revision_id ?? "no_revision",
+        "notables",
+        chain,
+        String(window_days),
+        start,
+        end,
+        `limit=${limit}`,
+        `available_days_hash=${availableDaysHash}`,
+      ].join("|")
+    );
+
     const ifNoneMatch = req.headers.get("if-none-match");
     if (ifNoneMatch && ifNoneMatch === etag) {
       return new NextResponse(null, { status: 304, headers: { ETag: etag, "Cache-Control": CACHE_CONTROL } });
+    }
+
+    const cached = memCacheGet(etag);
+    if (cached) {
+      return NextResponse.json(cached, { status: 200, headers: { ETag: etag, "Cache-Control": CACHE_CONTROL } });
     }
 
     // Candidate metrics = catalog keys, filtered by chain availability
@@ -587,6 +668,23 @@ export async function GET(req: NextRequest) {
       notables: notables.slice(0, limit),
       notes,
     };
+
+    // Web2 [LEGAL]: hard-stop if any generated narrative violates the no-advice / no-prediction policy.
+    for (let i = 0; i < payload.notes.length; i++) {
+      validateNoForbiddenLanguage(payload.notes[i], `notables.notes[${i}]`);
+    }
+    for (let i = 0; i < payload.notables.length; i++) {
+      const n = payload.notables[i];
+      validateNoForbiddenLanguage(n.interpretation.basic, `notables[${i}].interpretation.basic`);
+      for (let j = 0; j < n.interpretation.advanced.length; j++) {
+        validateNoForbiddenLanguage(n.interpretation.advanced[j], `notables[${i}].interpretation.advanced[${j}]`);
+      }
+      for (let j = 0; j < n.caveats.length; j++) {
+        validateNoForbiddenLanguage(n.caveats[j], `notables[${i}].caveats[${j}]`);
+      }
+    }
+
+    memCacheSet(etag, payload);
 
     return NextResponse.json(payload, { status: 200, headers: { ETag: etag, "Cache-Control": CACHE_CONTROL } });
   } catch (e: any) {

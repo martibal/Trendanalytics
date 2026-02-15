@@ -4,6 +4,7 @@
 // and fast navigation for both amateurs and professionals.
 
 import Link from "next/link";
+import InlineDisclaimer from "@/components/legal/InlineDisclaimer";
 import { METRIC_KEYS, requireMetric } from "@/lib/metrics/catalog";
 
 type Entry = {
@@ -284,6 +285,11 @@ export default function WikiPage() {
             Dashboards →
           </Link>
         </div>
+      </div>
+
+      {/* Web2 [LEGAL]: Inline descriptive-only disclaimer for wiki content. */}
+      <div className="mb-10">
+        <InlineDisclaimer variant="legal" />
       </div>
 
       {/* Quick navigation */}

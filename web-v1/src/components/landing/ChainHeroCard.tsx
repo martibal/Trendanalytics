@@ -31,46 +31,19 @@ type Palette = {
   ma30: string; // MA30 color
 };
 
-function paletteFor(chain: ChainId): Palette {
-  // Daily keeps chain identity. MA7/MA30 are high-contrast and consistent.
-  if (chain === "ethereum") {
-    return {
-      a: "rgba(168,85,247,0.80)",
-      b: "rgba(59,130,246,0.10)",
-      stroke: "rgba(196,181,253,0.98)",
-      glow: "rgba(168,85,247,0.95)",
-      ma7: "rgba(255,255,255,0.92)",
-      ma30: "rgba(34,211,238,0.95)",
-    };
-  }
-  if (chain === "bitcoin") {
-    return {
-      a: "rgba(245,158,11,0.82)",
-      b: "rgba(236,72,153,0.10)",
-      stroke: "rgba(253,230,138,0.98)",
-      glow: "rgba(245,158,11,0.95)",
-      ma7: "rgba(255,255,255,0.92)",
-      ma30: "rgba(34,211,238,0.95)",
-    };
-  }
-  if (chain === "arbitrum") {
-    return {
-      a: "rgba(34,211,238,0.80)",
-      b: "rgba(59,130,246,0.10)",
-      stroke: "rgba(165,243,252,0.98)",
-      glow: "rgba(34,211,238,0.95)",
-      ma7: "rgba(255,255,255,0.92)",
-      ma30: "rgba(250,204,21,0.95)",
-    };
-  }
-  // base
+function paletteFor(_chain: ChainId): Palette {
+  // Web2: controlled, semantically stable palette across chains.
+  // - Daily: subtle (noise)
+  // - MA7: secondary accent (short-term regime)
+  // - MA30: primary accent (structural baseline)
+  // Chain identity should come from labels and badges, not chart colors.
   return {
-    a: "rgba(34,197,94,0.80)",
-    b: "rgba(16,185,129,0.10)",
-    stroke: "rgba(187,247,208,0.98)",
-    glow: "rgba(34,197,94,0.95)",
-    ma7: "rgba(255,255,255,0.92)",
-    ma30: "rgba(250,204,21,0.95)",
+    a: "rgb(var(--chart-ma30) / 0.18)",
+    b: "rgb(var(--chart-ma7) / 0.08)",
+    stroke: "rgb(var(--chart-daily) / 0.70)",
+    glow: "rgb(var(--chart-ma30) / 0.85)",
+    ma7: "rgb(var(--chart-ma7) / 0.92)",
+    ma30: "rgb(var(--chart-ma30) / 0.95)",
   };
 }
 
@@ -96,6 +69,20 @@ type SeriesPoint = {
   ma7: number | null;
   ma30: number | null;
 };
+
+type SummaryResponse = {
+  chain: ChainId;
+  metric: string;
+  start: string;
+  end: string;
+  current: { daily: number | null; ma7: number | null; ma30: number | null };
+  period: { mean_daily: number | null; median_daily: number | null; stdev_daily: number | null };
+  level: { percentile: number | null };
+};
+
+function isValidISODate(s: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
 
 function normalize(vals: (number | null)[]) {
   const xs = vals.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
@@ -218,6 +205,21 @@ function formatSignedPct(p: number | null) {
   return `${p >= 0 ? "+" : ""}${s}%`;
 }
 
+function fmtZ(z: number | null) {
+  if (z === null || !Number.isFinite(z)) return "—";
+  const s = z.toFixed(2);
+  return z >= 0 ? `+${s}` : s;
+}
+
+function zLabel(z: number | null) {
+  if (z === null || !Number.isFinite(z)) return null;
+  const a = Math.abs(z);
+  if (a >= 3) return "rare";
+  if (a >= 2) return "unusual";
+  if (a >= 1) return "somewhat unusual";
+  return "typical";
+}
+
 function percentileRank(values: number[], x: number) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -286,8 +288,8 @@ function WindowToggle(props: { windows: number[]; active: number; onChange: (w: 
             className={[
               "rounded-full border px-3 py-1 text-[11px] font-semibold transition",
               isActive
-                ? "border-white/30 bg-white/10 text-white"
-                : "border-white/15 bg-black/20 text-white/70 hover:border-white/25 hover:text-white",
+                ? "border-ui-border/30 bg-ui-bg/20 text-ui-text"
+                : "border-ui-border/15 bg-ui-bg/10 text-ui-muted hover:border-ui-border/25 hover:text-ui-text",
             ].join(" ")}
           >
             {w}d
@@ -313,6 +315,141 @@ function pctWord(p: number) {
   if (abs < 0.06) return p > 0 ? "slightly above" : "slightly below";
   if (abs < 0.14) return p > 0 ? "above" : "below";
   return p > 0 ? "well above" : "well below";
+}
+
+type RegimeBadge = {
+  kind: "near" | "persistent_above" | "persistent_below" | "transient_above" | "transient_below" | "insufficient";
+  relDiff: number | null;
+  streakDays: number | null;
+  label: string;
+  detail: string;
+  tone: "neutral" | "warn";
+};
+
+function computeRegimeBadge(points: SeriesPoint[]): RegimeBadge {
+  const threshold = 0.08;
+  const minStreak = 5;
+  const lookbackMax = 21;
+
+  if (!Array.isArray(points) || points.length < 2) {
+    return {
+      kind: "insufficient",
+      relDiff: null,
+      streakDays: null,
+      label: "Regime: —",
+      detail: "Not enough usable MA7/MA30 points.",
+      tone: "neutral",
+    };
+  }
+
+  let latestIdx = -1;
+  for (let i = points.length - 1; i >= 0; i--) {
+    const p = points[i];
+    if (typeof p?.ma7 === "number" && Number.isFinite(p.ma7) && typeof p?.ma30 === "number" && Number.isFinite(p.ma30)) {
+      latestIdx = i;
+      break;
+    }
+  }
+  if (latestIdx < 0) {
+    return {
+      kind: "insufficient",
+      relDiff: null,
+      streakDays: null,
+      label: "Regime: —",
+      detail: "MA7/MA30 missing at end of window.",
+      tone: "neutral",
+    };
+  }
+
+  const latest = points[latestIdx];
+  const ma7 = latest.ma7 as number;
+  const ma30 = latest.ma30 as number;
+  if (ma30 === 0 || !Number.isFinite(ma7) || !Number.isFinite(ma30)) {
+    return {
+      kind: "insufficient",
+      relDiff: null,
+      streakDays: null,
+      label: "Regime: —",
+      detail: "Could not compute stable MA7/MA30 divergence.",
+      tone: "neutral",
+    };
+  }
+
+  const relDiff = (ma7 - ma30) / Math.abs(ma30);
+  if (!Number.isFinite(relDiff)) {
+    return {
+      kind: "insufficient",
+      relDiff: null,
+      streakDays: null,
+      label: "Regime: —",
+      detail: "Could not compute stable MA7/MA30 divergence.",
+      tone: "neutral",
+    };
+  }
+
+  const absRel = Math.abs(relDiff);
+  const sign = relDiff === 0 ? 0 : relDiff > 0 ? 1 : -1;
+
+  if (absRel < threshold) {
+    return {
+      kind: "near",
+      relDiff,
+      streakDays: 0,
+      label: "Regime: near baseline",
+      detail: "MA7 is close to MA30 (short-term aligned with structural baseline).",
+      tone: "neutral",
+    };
+  }
+
+  let streak = 0;
+  const startIdx = Math.max(0, latestIdx - lookbackMax);
+  for (let i = latestIdx; i >= startIdx; i--) {
+    const p = points[i];
+    const m7 = p?.ma7;
+    const m30 = p?.ma30;
+    if (typeof m7 !== "number" || !Number.isFinite(m7) || typeof m30 !== "number" || !Number.isFinite(m30) || m30 === 0) break;
+    const rd = (m7 - m30) / Math.abs(m30);
+    if (!Number.isFinite(rd)) break;
+    const s = rd === 0 ? 0 : rd > 0 ? 1 : -1;
+    if (s !== sign) break;
+    if (Math.abs(rd) < threshold) break;
+    streak += 1;
+  }
+
+  const pct = Math.round(absRel * 1000) / 10;
+  const dir = sign >= 0 ? "above" : "below";
+
+  if (streak >= minStreak) {
+    return {
+      kind: sign >= 0 ? "persistent_above" : "persistent_below",
+      relDiff,
+      streakDays: streak,
+      label: `Regime: persistently ${dir}`,
+      detail: `MA7 is ~${pct}% ${dir} MA30 for ${streak} consecutive days.`,
+      tone: "warn",
+    };
+  }
+
+  return {
+    kind: sign >= 0 ? "transient_above" : "transient_below",
+    relDiff,
+    streakDays: streak,
+    label: `Regime: ${dir} (not persistent)`,
+    detail: `MA7 is ~${pct}% ${dir} MA30, but not sustained (streak: ${streak}d).`,
+    tone: "neutral",
+  };
+}
+
+function HeroPill(props: { children: React.ReactNode; tone?: "neutral" | "warn" }) {
+  const tone = props.tone ?? "neutral";
+  const cls =
+    tone === "warn"
+      ? "border-ui-border bg-[rgb(var(--bad)/0.10)] text-ui-text"
+      : "border-ui-border/15 bg-ui-bg/10 text-ui-muted";
+
+  return (
+    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold ${cls}`}>{props.children}</span>
+  );
 }
 
 export function ChainHeroCard({ chain }: { chain: ChainId }) {
@@ -385,7 +522,20 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
     });
   }, [baseGoldRows, signature.y, active]);
 
+  const startISO = useMemo(() => (series.length ? series[0].date : null), [series]);
+  const endISO = useMemo(() => (series.length ? series[series.length - 1].date : null), [series]);
+
+  const summaryUrl = useMemo(() => {
+    if (!startISO || !endISO || !isValidISODate(startISO) || !isValidISODate(endISO)) return null;
+    return `/api/summary?chain=${chain}&metric=${encodeURIComponent(signature.y)}&start=${startISO}&end=${endISO}`;
+  }, [chain, signature.y, startISO, endISO]);
+
+  const { data: summary, isLoading: summaryLoading } = useSWR<SummaryResponse | null>(summaryUrl, fetcherOrNull, {
+    revalidateOnFocus: false,
+  });
+
   const snapshot = useMemo(() => computeSnapshot(series), [series]);
+  const regimeBadge = useMemo(() => computeRegimeBadge(series), [series]);
 
   const lastRead = useMemo(() => {
     const lastIdx = series.length - 1;
@@ -400,12 +550,27 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
     const dailyVs7 = d !== null && m7 !== null && m7 !== 0 ? (d - m7) / Math.abs(m7) : null;
     const ma7Vs30 = m7 !== null && m30 !== null && m30 !== 0 ? (m7 - m30) / Math.abs(m30) : null;
 
+    // Percentile: prefer summary.level.percentile, fallback to local rank.
+    const summaryPct = summary?.level?.percentile;
+    const pctFromSummary =
+      typeof summaryPct === "number" && Number.isFinite(summaryPct) ? Math.round(Math.max(0, Math.min(1, summaryPct)) * 100) : null;
+
     const dailyVals = series
       .map((p) => p.daily)
       .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
 
-    const pct = d !== null ? percentileRank(dailyVals, d) : null;
-    const pctInt = pct === null ? null : Math.round(pct * 100);
+    const pctLocal = d !== null ? percentileRank(dailyVals, d) : null;
+    const pctFromLocal = pctLocal === null ? null : Math.round(pctLocal * 100);
+
+    const pct = pctFromSummary ?? pctFromLocal;
+
+    // Z-score: from summary period stats (descriptive abnormality context).
+    const mu = summary?.period?.mean_daily ?? null;
+    const sd = summary?.period?.stdev_daily ?? null;
+    const z =
+      d !== null && mu !== null && sd !== null && Number.isFinite(d) && Number.isFinite(mu) && Number.isFinite(sd) && sd !== 0
+        ? (d - mu) / sd
+        : null;
 
     // Landing-friendly “meaning” in plain language (A1/B2).
     const dailyMeaning =
@@ -419,9 +584,12 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
         : `MA7 is ${pctWord(ma7Vs30)} the 30-day baseline (MA30).`;
 
     const pctMeaning =
-      pctInt === null
+      pct === null
         ? "Percentile shows where today sits vs other days in the selected window."
-        : `Percentile: today is higher than about ${pctInt}% of days in this window.`;
+        : `Percentile: today is higher than about ${pct}% of days in this window.`;
+
+    const zMeaning =
+      z === null ? "Z-score expresses how far today is from the window mean (in standard deviation units)." : `Z-score is ${zLabel(z)} for this window.`;
 
     return {
       date: last.date,
@@ -430,12 +598,14 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
       ma30: m30,
       dailyVs7,
       ma7Vs30,
-      pct: pctInt,
+      pct,
+      z,
       dailyMeaning,
       regimeMeaning,
       pctMeaning,
+      zMeaning,
     };
-  }, [series]);
+  }, [series, summary]);
 
   // Chart layout
   const W = 1700;
@@ -449,7 +619,7 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
   const unifiedVals = [...dailyVals, ...ma7Vals, ...ma30Vals];
   const { min, max } = normalize(unifiedVals);
 
-  const area = areaUnderSeries(dailyVals, W, H, INNER_PAD, min, max);
+  const area = areaUnderSeries(ma30Vals, W, H, INNER_PAD, min, max);
   const dailyLine = pathForSeries(dailyVals, W, H, INNER_PAD, min, max);
   const ma7Line = pathForSeries(ma7Vals, W, H, INNER_PAD, min, max);
   const ma30Line = pathForSeries(ma30Vals, W, H, INNER_PAD, min, max);
@@ -499,6 +669,18 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
             <div className="mt-1 text-xs text-ui-faint">
               Window: <span className="text-ui-muted">{active}d</span> · Click for full dashboard →
             </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <HeroPill tone={regimeBadge.tone === "warn" ? "warn" : "neutral"}>{regimeBadge.label}</HeroPill>
+              {regimeBadge.relDiff != null && Number.isFinite(regimeBadge.relDiff) ? (
+                <HeroPill tone={regimeBadge.tone === "warn" ? "warn" : "neutral"}>
+                  MA7 vs MA30: {formatSignedPct(regimeBadge.relDiff)}
+                </HeroPill>
+              ) : null}
+              {regimeBadge.kind !== "near" && regimeBadge.streakDays != null ? (
+                <HeroPill tone={regimeBadge.tone === "warn" ? "warn" : "neutral"}>streak: {regimeBadge.streakDays}d</HeroPill>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -511,7 +693,7 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
         </div>
 
         {/* GRAPH BOX (centerpiece) */}
-        <div className="mt-5 rounded-[28px] border border-white/15 bg-ui-bg/10 p-4">
+        <div className="mt-5 rounded-[28px] border border-ui-border/15 bg-ui-bg/10 p-4">
           {heroLoading || goldLoading ? (
             <div className="flex h-[460px] items-center justify-center text-sm text-ui-faint">Loading chart…</div>
           ) : !hasAny ? (
@@ -522,7 +704,7 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
             <div ref={wrapRef} className="relative" onMouseMove={onMove} onMouseEnter={onMove} onMouseLeave={onLeave}>
               {hover ? (
                 <div
-                  className="pointer-events-none absolute top-3 z-10 rounded-2xl border border-white/10 bg-black/70 px-4 py-3 text-[12px] text-white backdrop-blur"
+                  className="pointer-events-none absolute top-3 z-10 rounded-2xl border border-ui-border/10 bg-ui-bg/80 px-4 py-3 text-[12px] text-ui-text backdrop-blur"
                   style={{
                     left: `clamp(12px, ${tooltipLeftPct}%, calc(100% - 300px))`,
                     width: 290,
@@ -530,20 +712,20 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-semibold">{hover.date}</div>
-                    <div className="text-white/70">{signature.title}</div>
+                    <div className="text-ui-muted">{signature.title}</div>
                   </div>
 
                   <div className="mt-2 grid grid-cols-3 gap-2">
                     <div>
-                      <div className="text-[11px] text-white/60">Daily</div>
+                      <div className="text-[11px] text-ui-faint">Daily</div>
                       <div className="text-base font-semibold">{formatCompactInt(hover.daily)}</div>
                     </div>
                     <div>
-                      <div className="text-[11px] text-white/60">MA7</div>
+                      <div className="text-[11px] text-ui-faint">MA7</div>
                       <div className="text-base font-semibold">{formatCompactInt(hover.ma7)}</div>
                     </div>
                     <div>
-                      <div className="text-[11px] text-white/60">MA30</div>
+                      <div className="text-[11px] text-ui-faint">MA30</div>
                       <div className="text-base font-semibold">{formatCompactInt(hover.ma30)}</div>
                     </div>
                   </div>
@@ -571,8 +753,8 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
                   y={INNER_PAD}
                   width={W - INNER_PAD * 2}
                   height={H - INNER_PAD * 2}
-                  fill="rgba(0,0,0,0.10)"
-                  stroke="rgba(255,255,255,0.10)"
+                  fill="rgb(var(--surface) / 0.35)"
+                  stroke="rgb(var(--border) / 0.10)"
                   rx="22"
                 />
 
@@ -582,19 +764,13 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
                     const y = mapY(tv, min, max, H, INNER_PAD);
                     return (
                       <g key={`${tv}-${i}`}>
-                        <line
-                          x1={INNER_PAD}
-                          y1={y}
-                          x2={W - INNER_PAD}
-                          y2={y}
-                          stroke="rgba(255,255,255,0.10)"
-                        />
+                        <line x1={INNER_PAD} y1={y} x2={W - INNER_PAD} y2={y} stroke="rgb(var(--border) / 0.10)" />
                         <text
                           x={INNER_PAD - 12}
                           y={y + 4}
                           textAnchor="end"
                           fontSize="12"
-                          fill="rgba(255,255,255,0.45)"
+                          fill="rgb(var(--text-faint) / 0.95)"
                         >
                           {formatCompactInt(tv)}
                         </text>
@@ -603,7 +779,7 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
                   })}
                 </g>
 
-                {/* Daily area */}
+                {/* MA30 area (baseline fill) */}
                 {area.d ? <path d={area.d} fill={`url(#${gradId})`} opacity="0.92" /> : null}
 
                 {/* Daily line */}
@@ -625,7 +801,7 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
                     <path
                       d={ma7Line.d}
                       fill="none"
-                      stroke="rgba(0,0,0,0.70)"
+                      stroke="rgb(0 0 0 / 0.45)"
                       strokeWidth="7.2"
                       strokeLinecap="round"
                       opacity="0.55"
@@ -634,38 +810,30 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
                   </>
                 ) : null}
 
-                {/* MA30 (dashed) */}
+                {/* MA30 (baseline) */}
                 {ma30Line.d ? (
                   <>
                     <path
                       d={ma30Line.d}
                       fill="none"
-                      stroke="rgba(0,0,0,0.75)"
+                      stroke="rgb(0 0 0 / 0.45)"
                       strokeWidth="6.8"
                       strokeLinecap="round"
                       opacity="0.50"
                     />
-                    <path
-                      d={ma30Line.d}
-                      fill="none"
-                      stroke={pal.ma30}
-                      strokeWidth="3.4"
-                      strokeLinecap="round"
-                      strokeDasharray="10 8"
-                      opacity="1"
-                    />
+                    <path d={ma30Line.d} fill="none" stroke={pal.ma30} strokeWidth="3.4" strokeLinecap="round" opacity="1" />
                   </>
                 ) : null}
 
                 {/* X labels */}
                 <g>
-                  <text x={INNER_PAD} y={H - 10} fontSize="12" fill="rgba(255,255,255,0.55)">
+                  <text x={INNER_PAD} y={H - 10} fontSize="12" fill="rgb(var(--text-faint) / 0.95)">
                     {xLeft}
                   </text>
-                  <text x={W / 2} y={H - 10} textAnchor="middle" fontSize="12" fill="rgba(255,255,255,0.55)">
+                  <text x={W / 2} y={H - 10} textAnchor="middle" fontSize="12" fill="rgb(var(--text-faint) / 0.95)">
                     {xMid}
                   </text>
-                  <text x={W - INNER_PAD} y={H - 10} textAnchor="end" fontSize="12" fill="rgba(255,255,255,0.55)">
+                  <text x={W - INNER_PAD} y={H - 10} textAnchor="end" fontSize="12" fill="rgb(var(--text-faint) / 0.95)">
                     {xRight}
                   </text>
                 </g>
@@ -673,21 +841,12 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
                 {/* Hover crosshair + dot */}
                 {xHover !== null && hover ? (
                   <g>
-                    <line x1={xHover} y1={INNER_PAD} x2={xHover} y2={H - INNER_PAD} stroke="rgba(255,255,255,0.20)" />
+                    <line x1={xHover} y1={INNER_PAD} x2={xHover} y2={H - INNER_PAD} stroke="rgb(var(--border) / 0.22)" />
                     {(() => {
                       const v = hover.daily ?? hover.ma7 ?? hover.ma30;
                       if (typeof v !== "number" || !Number.isFinite(v)) return null;
                       const y = mapY(v, min, max, H, INNER_PAD);
-                      return (
-                        <circle
-                          cx={xHover}
-                          cy={y}
-                          r={8}
-                          fill="rgba(255,255,255,0.96)"
-                          stroke={pal.glow}
-                          strokeWidth={2.6}
-                        />
-                      );
+                      return <circle cx={xHover} cy={y} r={8} fill="rgb(var(--bg) / 0.90)" stroke={pal.glow} strokeWidth={2.6} />;
                     })()}
                   </g>
                 ) : null}
@@ -706,12 +865,7 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
                     <span className="text-ui-muted">MA7 (short-term)</span>
                   </div>
                   <div className="inline-flex items-center gap-2">
-                    <span
-                      className="inline-block h-[3px] w-6 rounded-full"
-                      style={{
-                        background: `linear-gradient(90deg, ${pal.ma30} 0 60%, transparent 60% 100%)`,
-                      }}
-                    />
+                    <span className="inline-block h-[3px] w-6 rounded-full" style={{ background: pal.ma30 }} />
                     <span className="text-ui-muted">MA30 (baseline)</span>
                   </div>
                 </div>
@@ -720,70 +874,85 @@ export function ChainHeroCard({ chain }: { chain: ChainId }) {
           )}
         </div>
 
-        {/* METRICS BOX (supports the graph; no raw refs) */}
-        <div className="mt-4 rounded-[28px] border border-white/12 bg-ui-bg/10 p-5">
+        {/* METRICS BOX (supports the graph; explicit percentile + mini z-score) */}
+        <div className="mt-4 rounded-[28px] border border-ui-border/12 bg-ui-bg/10 p-5">
           {lastRead ? (
             <>
-              <div className="text-[11px] text-ui-faint">
-                Latest: <span className="text-ui-muted">{lastRead.date}</span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[11px] text-ui-faint">
+                  Latest: <span className="text-ui-muted">{lastRead.date}</span>
+                </div>
+                <div className="text-[11px] text-ui-faint">
+                  Context source:{" "}
+                  <span className="text-ui-muted">{summaryLoading ? "loading…" : summary ? "summary API" : "local fallback"}</span>
+                </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-2xl border border-white/10 bg-ui-bg/15 px-4 py-3">
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div className="rounded-2xl border border-ui-border/10 bg-ui-bg/15 px-4 py-3">
                   <div className="text-[11px] text-ui-faint">Daily</div>
                   <div className="mt-1 text-base font-semibold text-ui-text">{formatCompactInt(lastRead.daily)}</div>
                   <div className="mt-1 text-[11px] text-ui-faint">
                     {lastRead.dailyVs7 === null ? (
                       <>Compared to MA7: —</>
                     ) : (
-                      <>
-                        {formatSignedPct(lastRead.dailyVs7)} vs MA7 (last-week normal)
-                      </>
+                      <>{formatSignedPct(lastRead.dailyVs7)} vs MA7 (last-week normal)</>
                     )}
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-ui-bg/15 px-4 py-3">
+                <div className="rounded-2xl border border-ui-border/10 bg-ui-bg/15 px-4 py-3">
                   <div className="text-[11px] text-ui-faint">MA7</div>
                   <div className="mt-1 text-base font-semibold text-ui-text">{formatCompactInt(lastRead.ma7)}</div>
                   <div className="mt-1 text-[11px] text-ui-faint">Short-term regime</div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-ui-bg/15 px-4 py-3">
+                <div className="rounded-2xl border border-ui-border/10 bg-ui-bg/15 px-4 py-3">
                   <div className="text-[11px] text-ui-faint">MA30</div>
                   <div className="mt-1 text-base font-semibold text-ui-text">{formatCompactInt(lastRead.ma30)}</div>
                   <div className="mt-1 text-[11px] text-ui-faint">Structural baseline</div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-ui-bg/15 px-4 py-3">
+                <div className="rounded-2xl border border-ui-border/10 bg-ui-bg/15 px-4 py-3">
                   <div className="text-[11px] text-ui-faint">Percentile</div>
-                  <div className="mt-1 text-base font-semibold text-ui-text">
-                    {lastRead.pct === null ? "—" : `${lastRead.pct}th`}
-                  </div>
-                  <div className="mt-1 text-[11px] text-ui-faint">Historical placement (this window)</div>
+                  <div className="mt-1 text-base font-semibold text-ui-text">{lastRead.pct === null ? "—" : `${lastRead.pct}th`}</div>
+                  <div className="mt-1 text-[11px] text-ui-faint">Historical placement (window)</div>
+                </div>
+
+                <div className="rounded-2xl border border-ui-border/10 bg-ui-bg/15 px-4 py-3">
+                  <div className="text-[11px] text-ui-faint">Z-score</div>
+                  <div className="mt-1 text-base font-semibold text-ui-text">{fmtZ(lastRead.z)}</div>
+                  <div className="mt-1 text-[11px] text-ui-faint">{lastRead.zMeaning}</div>
                 </div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-white/10 bg-ui-bg/12 px-4 py-3">
+              <div className="mt-4 rounded-2xl border border-ui-border/10 bg-ui-bg/12 px-4 py-3">
                 <div className="text-xs font-semibold text-ui-text">Plain-English interpretation</div>
                 <ul className="mt-2 space-y-1 text-[12px] text-ui-muted">
                   <li>
-                    <span className="font-semibold text-ui-text">Daily</span>: actual day’s activity (can be noisy).
-                    {" "}
+                    <span className="font-semibold text-ui-text">Regime</span>: short-term (MA7) vs structural baseline (MA30).{" "}
+                    <span className="text-ui-text">{regimeBadge.detail}</span>
+                  </li>
+                  <li>
+                    <span className="font-semibold text-ui-text">Daily</span>: actual day’s activity (can be noisy).{" "}
                     <span className="text-ui-text">{lastRead.dailyMeaning}</span>
                   </li>
                   <li>
-                    <span className="font-semibold text-ui-text">MA7</span>: short-term regime (last 7 days).
-                    {" "}
+                    <span className="font-semibold text-ui-text">MA7</span>: short-term regime (last 7 days).{" "}
                     <span className="text-ui-text">{lastRead.regimeMeaning}</span>
                   </li>
                   <li>
                     <span className="font-semibold text-ui-text">MA30</span>: structural baseline (last 30 days).
                   </li>
                   <li>
-                    <span className="font-semibold text-ui-text">Percentile</span>: distribution context (not a forecast).
-                    {" "}
+                    <span className="font-semibold text-ui-text">Percentile</span>: distribution context (not a forecast).{" "}
                     <span className="text-ui-text">{lastRead.pctMeaning}</span>
+                  </li>
+                  <li>
+                    <span className="font-semibold text-ui-text">Z-score</span>: standardized abnormality context (not a forecast).{" "}
+                    <span className="text-ui-text">
+                      {lastRead.z === null ? "Z is unavailable (insufficient variance/sample)." : `|z| suggests ${zLabel(lastRead.z)} deviation.`}
+                    </span>
                   </li>
                 </ul>
                 <div className="mt-2 text-[11px] text-ui-faint">Descriptive only · No prices · No advice</div>

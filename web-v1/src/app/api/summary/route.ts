@@ -1,8 +1,10 @@
+// src/app/api/summary/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { promises as fs } from "fs";
 import crypto from "crypto";
 import { getMetric } from "@/lib/metrics/catalog";
+import { validateNoForbiddenLanguage } from "@/lib/legal/forbiddenLanguage";
 
 type Chain = "bitcoin" | "ethereum" | "arbitrum" | "base";
 
@@ -598,6 +600,15 @@ export async function GET(req: NextRequest) {
     };
 
     assertSummaryContract(payload);
+
+    // Web2 [LEGAL]: hard-stop if any generated narrative violates the no-advice / no-prediction policy.
+    validateNoForbiddenLanguage(payload.interpretation.basic, "summary.interpretation.basic");
+    for (let i = 0; i < payload.interpretation.advanced.length; i++) {
+      validateNoForbiddenLanguage(payload.interpretation.advanced[i], `summary.interpretation.advanced[${i}]`);
+    }
+    for (let i = 0; i < payload.caveats.length; i++) {
+      validateNoForbiddenLanguage(payload.caveats[i], `summary.caveats[${i}]`);
+    }
 
     return NextResponse.json(payload, { status: 200, headers: { ETag: etag, "Cache-Control": CACHE_CONTROL } });
   } catch (e: any) {

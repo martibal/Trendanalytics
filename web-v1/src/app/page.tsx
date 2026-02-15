@@ -56,14 +56,19 @@ export default function HomePage() {
             <SectionCard title="How to read the charts">
               <ul className="list-disc space-y-2 pl-5">
                 <li>
-                  <span className="text-ui-text">Daily</span> is the raw value for the date.
+                  <span className="text-ui-text">Daily</span> is the raw value for the date (noisy).
                 </li>
                 <li>
                   <span className="text-ui-text">MA7</span> and <span className="text-ui-text">MA30</span> smooth noise to
-                  show sustained movement.
+                  show sustained movement (short-term regime vs structural baseline).
                 </li>
                 <li>
-                  Hover to inspect exact values and (when available) confidence and deviation context.
+                  <span className="text-ui-text">Percentile</span> places today within the window’s historical distribution
+                  (context, not a forecast).
+                </li>
+                <li>
+                  <span className="text-ui-text">Z-score</span> shows how unusual today is vs the window mean in standard
+                  deviation units (context, not causality).
                 </li>
                 <li>
                   Missing values render as <span className="text-ui-text">gaps</span> (null) — never interpolated, never
@@ -78,7 +83,7 @@ export default function HomePage() {
                   <span className="text-ui-text">Level</span>: low / typical / elevated / extreme vs historical reference.
                 </li>
                 <li>
-                  <span className="text-ui-text">Trend</span>: rising / falling / flat based on windowed momentum.
+                  <span className="text-ui-text">Trend</span>: rising / falling / flat based on windowed momentum (descriptive).
                 </li>
                 <li>
                   <span className="text-ui-text">Stability</span>: how variable daily values are within the window.
@@ -89,6 +94,10 @@ export default function HomePage() {
                 </li>
               </ul>
             </SectionCard>
+          </div>
+
+          <div className="mt-5 text-[11px] text-ui-faint">
+            Guardrails: no prices · no advice · no forecasts · nulls render as gaps, never zeros.
           </div>
         </section>
       </FullBleedSection>
@@ -114,6 +123,7 @@ export default function HomePage() {
               <PillLink href="/chains/ethereum" label="Ethereum dashboard" />
               <PillLink href="/chains/arbitrum" label="Arbitrum dashboard" />
               <PillLink href="/chains/base" label="Base dashboard" />
+              <PillLink href="/notables" label="Notables policy" />
               <PillLink href="/methodology" label="Methodology" />
               <PillLink href="/wiki" label="Wiki" />
               <PillLink href="/about" label="About / contract" />
@@ -122,8 +132,8 @@ export default function HomePage() {
 
           <div className="relative mt-4 text-[11px] text-ui-faint">
             Data is served from published artifacts under{" "}
-            <span className="font-mono text-ui-muted">public/data/published/v1</span> and is auditable via dataset
-            metadata and manifest files.
+            <span className="font-mono text-ui-muted">public/data/published/v1</span> and is auditable via dataset metadata
+            and manifest files.
           </div>
         </section>
       </FullBleedSection>

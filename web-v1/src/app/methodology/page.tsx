@@ -4,6 +4,8 @@
 
 import Link from "next/link";
 
+import InlineDisclaimer from "@/components/legal/InlineDisclaimer";
+
 function Pill(props: { children: React.ReactNode }) {
   return (
     <span className="inline-flex items-center rounded-full border border-ui-border bg-ui-bg/30 px-3 py-1 text-[11px] font-semibold text-ui-muted">
@@ -85,7 +87,7 @@ export default function MethodologyPage() {
         </h1>
 
         <p className="mt-4 max-w-3xl text-pretty text-base text-ui-muted md:text-lg">
-          This product reports <span className="text-ui-text">what the data shows</span> — not what anyone should do.
+          This product reports <span className="text-ui-text">what the data shows</span> — not instructions or recommendations.
           Every chart, label, and summary is produced by explicit, auditable rules. Missing values remain{" "}
           <span className="text-ui-text">null</span> and render as gaps (never zeros).
         </p>
@@ -101,6 +103,11 @@ export default function MethodologyPage() {
             Dashboards →
           </Link>
         </div>
+      </div>
+
+      {/* Web2 [LEGAL]: Inline descriptive-only disclaimer for methodology content. */}
+      <div className="mb-10">
+        <InlineDisclaimer variant="legal" />
       </div>
 
       {/* TOC */}
@@ -140,7 +147,7 @@ export default function MethodologyPage() {
         <Card title="Core principles">
           <ul className="list-disc space-y-1 pl-5 text-sm">
             <li>
-              <span className="text-ui-text">No price series</span> anywhere (no charts, no “should”, no advice).
+              <span className="text-ui-text">No price series</span> anywhere (no charts, no recommendations, no advice).
             </li>
             <li>
               <span className="text-ui-text">Nulls stay null</span>. We do not interpolate missing days.
@@ -212,28 +219,24 @@ export default function MethodologyPage() {
               <BasicAdvanced
                 basic={
                   <>
-                    Fast scan:
-                    <ol className="mt-2 list-decimal space-y-1 pl-5">
-                      <li>
-                        Check <span className="text-ui-text font-semibold">MA7 vs MA30</span>: is the short-term baseline above or below the structural baseline?
-                      </li>
-                      <li>
-                        Check <span className="text-ui-text font-semibold">Daily vs MA7</span>: is today unusually high/low versus the last-week norm?
-                      </li>
-                      <li>
-                        Use <span className="text-ui-text font-semibold">Percentile</span>: is today extreme or typical in the selected window?
-                      </li>
-                      <li>
-                        If something looks odd, click through to the chain dashboard for coverage/lag details and deeper context.
-                      </li>
-                    </ol>
+                    Scan for:
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      <li>Is the percentile extreme (very high or very low)?</li>
+                      <li>Is MA7 above or below MA30 (regime vs baseline)?</li>
+                      <li>Is today far from MA7 (one-day anomaly)?</li>
+                      <li>Is coverage solid and lag acceptable?</li>
+                    </ul>
                   </>
                 }
                 advanced={
                   <>
-                    <div className="text-xs text-ui-faint">
-                      Landing intentionally suppresses raw links and quality diagnostics. Dashboards reveal them for audit and deeper analysis.
-                    </div>
+                    This scan translates to a stable “trend context” vocabulary:
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      <li>Percentile = distribution extremity.</li>
+                      <li>MA7 vs MA30 = regime alignment.</li>
+                      <li>Daily vs MA7 = event-like deviation.</li>
+                      <li>Coverage/lag = robustness guardrail.</li>
+                    </ul>
                   </>
                 }
               />
@@ -243,32 +246,42 @@ export default function MethodologyPage() {
 
         {/* What we do NOT do */}
         <section>
-          <SectionTitle id="what-not" title="What this product does NOT do" kicker="Trust requirement" />
+          <SectionTitle id="what-not" title="What we do NOT do" kicker="Hard constraints" />
           <div className="mt-6 grid gap-6 md:grid-cols-2">
-            <Card title="Explicit exclusions (non-negotiable)">
+            <Card title="No price series anywhere">
               <BasicAdvanced
-                basic={
+                basic={<>We do not display price charts, price-derived indicators, or price narratives.</>}
+                advanced={
                   <>
-                    We deliberately do not include:
-                    <ul className="mt-2 list-disc space-y-1 pl-5">
-                      <li><span className="text-ui-text font-semibold">No prices</span>, no price charts, no “value narratives”.</li>
-                      <li><span className="text-ui-text font-semibold">No forecasts</span> (no predictions of future behavior).</li>
-                      <li><span className="text-ui-text font-semibold">No advice</span> (“buy/sell”, “bullish/bearish”, “should”).</li>
-                      <li><span className="text-ui-text font-semibold">No causality</span> claims (we don’t assert drivers).</li>
-                    </ul>
-                    You get descriptive context and auditability — not recommendations.
+                    This is enforced by content policy and code conventions. If a metric implies price or valuation, it is excluded from the platform.
                   </>
                 }
+              />
+            </Card>
+
+            <Card title="No advice / no forecasts">
+              <BasicAdvanced
+                basic={<>We do not say what you should do and we do not predict outcomes.</>}
+                advanced={
+                  <>
+                    Wording is constrained. The build includes a legal copy scan that blocks predictive, advisory, sentiment, and price-causal language.
+                  </>
+                }
+              />
+            </Card>
+
+            <Card title="No causal claims">
+              <BasicAdvanced
+                basic={<>We describe what is measured. We do not claim why it happened.</>}
                 advanced={
                   <>
                     <div className="space-y-2">
-                      <div>Language constraints (enforced in UI + content):</div>
-                      <ul className="mt-2 list-disc space-y-1 pl-5">
-                        <li>We use descriptive terms: “above baseline”, “below baseline”, “high percentile”, “low coverage”.</li>
-                        <li>We avoid normative/causal terms: “bullish”, “undervalued”, “should”, “because X happened”.</li>
-                      </ul>
-                      <div className="text-xs text-ui-faint">
-                        Exceptions: we may explain data quality (coverage/lag/missing days) because that is about measurement, not market behavior.
+                      <div>
+                        The UI uses descriptive wording: “above baseline”, “below baseline”, “historically elevated”,
+                        “unusually low/high in this window”.
+                      </div>
+                      <div>
+                        It avoids causal framing: “because”, “driven by”, “signals”, “leads to”, “causes”.
                       </div>
                     </div>
                   </>
@@ -276,22 +289,12 @@ export default function MethodologyPage() {
               />
             </Card>
 
-            <Card title="Why we exclude these things">
+            <Card title="No black-box models">
               <BasicAdvanced
-                basic={
-                  <>
-                    Many dashboards become noisy because they mix signal with price narratives and calls to action.
-                    Our goal is the opposite: stable trend context that stays useful even when you don’t watch the market every day.
-                  </>
-                }
+                basic={<>Everything shown can be explained and reproduced.</>}
                 advanced={
                   <>
-                    <div className="space-y-2">
-                      <div>
-                        The product is designed to be auditable: every displayed number must be reproducible from published artifacts.
-                        Forecasting or “advice” language typically breaks that auditability and increases model risk.
-                      </div>
-                    </div>
+                    If a calculation cannot be fully explained with explicit formulas and assumptions, it is not shipped.
                   </>
                 }
               />
@@ -299,63 +302,67 @@ export default function MethodologyPage() {
           </div>
         </section>
 
-        {/* Artifacts */}
+        {/* Published artifacts & versioning */}
         <section>
           <SectionTitle id="artifacts" title="Published artifacts & versioning" kicker="Auditability" />
           <div className="mt-6 grid gap-6 md:grid-cols-2">
-            <Card title="What is published">
+            <Card title="Static artifacts are the source of truth">
               <BasicAdvanced
-                basic={
+                basic={<>All charts and labels are derived from published JSON files.</>}
+                advanced={
                   <>
-                    Each chain publishes JSON artifacts under{" "}
-                    <span className="font-mono text-ui-text">/data/published/v1</span>. The UI reads these artifacts.
-                    Every artifact includes an <span className="font-mono text-ui-text">as-of</span> date and a revision identifier so you can audit exactly what you are seeing.
+                    The product ships auditable artifacts (gold / derived / meta) under a versioned path. UI changes do
+                    not change what was published; revisions are explicit.
                   </>
                 }
+              />
+            </Card>
+
+            <Card title="dataset_id and revision_id">
+              <BasicAdvanced
+                basic={<>Every artifact set is labeled with identifiers so you can trace what you are looking at.</>}
+                advanced={
+                  <>
+                    dataset_id and revision_id are displayed in the UI and present in exported JSON. They represent the
+                    dataset partition and the pipeline revision for that publication.
+                  </>
+                }
+              />
+            </Card>
+
+            <Card title="Publication layout">
+              <BasicAdvanced
+                basic={<>Artifacts are organized in a deterministic folder structure.</>}
                 advanced={
                   <>
                     <div className="space-y-2">
-                      <div>
-                        Artifact families:
-                        <ul className="mt-2 list-disc space-y-1 pl-5">
-                          <li><span className="font-mono text-ui-text">gold</span>: primary daily chain metrics (price-agnostic).</li>
-                          <li><span className="font-mono text-ui-text">derived</span>: computed features (e.g., MA, z, percentiles) when published.</li>
-                          <li><span className="font-mono text-ui-text">meta</span>: coverage, lag, data-quality annotations.</li>
-                          <li><span className="font-mono text-ui-text">landing</span>: landing metadata (charts, supported windows, defaults).</li>
-                        </ul>
-                      </div>
-                      <div>
-                        Versioning rules:
-                        <ul className="mt-2 list-disc space-y-1 pl-5">
-                          <li>Any definition change increments a version and is documented (including “Previously”).</li>
-                          <li>UI wording must reference definitions, not ad-hoc phrasing.</li>
-                        </ul>
-                      </div>
+                      <Math>
+                        {"public/data/published/v1/{gold|derived|meta}/{chain}/..."} <br />
+                        {"manifest.json defines availability and as-of."}
+                      </Math>
                     </div>
                   </>
                 }
               />
             </Card>
 
-            <Card title="How to audit a chart">
+            <Card title="Versioning discipline">
               <BasicAdvanced
                 basic={
                   <>
-                    On a chain page, you can open the raw artifacts behind each chart. Audit by checking:{" "}
-                    <span className="text-ui-text">window</span>, <span className="text-ui-text">coverage</span>, and{" "}
-                    <span className="text-ui-text">as-of/lag</span>.
+                    Definitions and computations are versioned. When changes happen, earlier definitions remain available in documentation.
                   </>
                 }
                 advanced={
                   <>
                     <div className="space-y-2">
-                      <div>Reproducibility checklist:</div>
-                      <ul className="mt-2 list-disc space-y-1 pl-5">
-                        <li>Identify metric key (e.g., <span className="font-mono text-ui-text">tx_count_daily</span>).</li>
-                        <li>Fetch reference window (typically <span className="font-mono text-ui-text">last365d</span>).</li>
-                        <li>Compute MA and context metrics on the reference series.</li>
-                        <li>Slice the display window last (prevents edge artifacts).</li>
-                      </ul>
+                      <div>
+                        Artifacts can carry identifiers like <span className="font-mono text-ui-text">dataset_id</span> and{" "}
+                        <span className="font-mono text-ui-text">revision_id</span> to tie a UI view to a specific publish revision.
+                      </div>
+                      <div className="text-xs text-ui-faint">
+                        The contract check script enforces alignment across gold/derived/meta where identifiers are present.
+                      </div>
                     </div>
                   </>
                 }
@@ -366,28 +373,28 @@ export default function MethodologyPage() {
 
         {/* Windows & slicing */}
         <section>
-          <SectionTitle id="windows" title="Windows & slicing (critical rule)" kicker="UI integrity" />
+          <SectionTitle id="windows" title="Windows & slicing (critical rule)" kicker="Consistency" />
           <div className="mt-6 grid gap-6 md:grid-cols-2">
-            <Card title="Displayed window vs reference window">
+            <Card title="The critical rule">
               <BasicAdvanced
                 basic={
                   <>
-                    You can view last 7d/30d/90d/180d/365d. But smoothing (MA7/MA30) should be computed on a longer{" "}
-                    reference window so lines don’t disappear at the start when you zoom in.
+                    All computations happen inside an explicit date window. If a day is missing, it stays missing.
+                    We never fill missing values with zeros.
                   </>
                 }
                 advanced={
                   <>
-                    <div className="space-y-3">
-                      <div className="text-ui-text font-semibold">Critical rule</div>
+                    <div className="space-y-2">
+                      <div className="text-ui-text font-semibold">Slice first, then compute</div>
                       <div>
-                        Compute rolling statistics on the <span className="text-ui-text">reference</span> series{" "}
-                        (e.g., last365d), then slice to the user’s chosen window.
+                        The series is sliced to the requested window (e.g., last 365 days aligned to manifest as-of). Derived metrics (MA, percentile, tags)
+                        are computed on that slice using explicit null handling.
                       </div>
                       <Math>
-                        {"Let R be reference series (e.g., 365 days). Let W be display slice (e.g., 90 days)."} <br />
-                        {"Compute MA_k on R: MA_k(R)."} <br />
-                        {"Display: slice(daily(R), W) and slice(MA_k(R), W)."}
+                        {"Given gold series x(t) with nulls:"} <br />
+                        {"slice = x(t) for t in [start, end]"} <br />
+                        {"compute derived metrics on slice (exclude nulls with explicit minimum coverage rules)"}
                       </Math>
                     </div>
                   </>
@@ -399,18 +406,16 @@ export default function MethodologyPage() {
               <BasicAdvanced
                 basic={
                   <>
-                    If you compute MA30 only on last90d, the first ~29 days can’t have a 30-day mean. The MA30 line starts late and looks “broken”.
-                    Using a longer reference window makes MA lines continuous across the whole visible slice.
+                    Window consistency makes comparisons meaningful. Coverage and lag are surfaced so the user can judge whether the window is “thin” or “stale”.
                   </>
                 }
                 advanced={
                   <>
-                    <Math>
-                      {"MA30_t requires {x_{t-29}, …, x_t}."} <br />
-                      {"If the series begins at t0, then MA30 exists only for t ≥ t0+29."}
-                    </Math>
-                    <div className="text-xs text-ui-faint">
-                      Larger reference windows reduce “edge effects” when switching windows.
+                    <div className="space-y-2">
+                      <div>
+                        When comparing chains, the UI makes the window explicit and exposes per-chain freshness/lag. If two chains have different as-of dates,
+                        you are comparing different data horizons.
+                      </div>
                     </div>
                   </>
                 }
@@ -423,44 +428,42 @@ export default function MethodologyPage() {
         <section>
           <SectionTitle id="ma" title="Moving averages (MA7 / MA30)" kicker="Smoothing" />
           <div className="mt-6 grid gap-6 md:grid-cols-2">
-            <Card title="What MA7 and MA30 represent">
+            <Card title="MA7 and MA30">
               <BasicAdvanced
                 basic={
                   <>
-                    <span className="text-ui-text font-semibold">MA7</span> is the short-term regime (roughly “this week”).
-                    <span className="text-ui-text font-semibold"> MA30</span> is the structural baseline (roughly “this month”).
-                    Comparing them helps you see whether recent activity sits above or below the broader baseline.
+                    MA7 is a last-week baseline. MA30 is a last-month baseline. They reduce noise so you can see regimes rather than spikes.
                   </>
                 }
                 advanced={
                   <>
-                    <Math>
-                      {"MA_n(t) = (1/n) · Σ_{i=0..n-1} x_{t-i}"} <br />
-                      {"Defined only when all n inputs are non-null (otherwise null)."}
-                    </Math>
-                    <div className="text-xs text-ui-faint">
-                      We do not “partially average” fewer points, because that changes the meaning of MA_n.
+                    <div className="space-y-2">
+                      <div>
+                        Rolling mean is computed on non-null values with a minimum coverage threshold. If coverage is insufficient, MA is null for that day.
+                      </div>
+                      <Math>
+                        {"MA_k(t) uses last k calendar days."} <br />
+                        {"V = non-null values in that window."} <br />
+                        {"If |V| / k < minCoverage => MA_k(t) = null"} <br />
+                        {"Else MA_k(t) = mean(V)"}
+                      </Math>
                     </div>
                   </>
                 }
               />
             </Card>
 
-            <Card title="Percent deltas shown under charts">
+            <Card title="Why null handling matters">
               <BasicAdvanced
-                basic={
-                  <>
-                    Under charts we show deltas like “Daily is -25% vs MA7”. This means today is 25% lower than the last-week baseline.
-                    It’s a descriptive distance-from-baseline indicator — not a prediction.
-                  </>
-                }
+                basic={<>If data is missing, smoothing cannot pretend it exists. Nulls stay null, and the chart shows gaps.</>}
                 advanced={
                   <>
-                    <Math>
-                      {"Δ(daily vs MA7) = (x_t − MA7_t) / |MA7_t|"} <br />
-                      {"Δ(MA7 vs MA30) = (MA7_t − MA30_t) / |MA30_t|"} <br />
-                      {"If the denominator is 0 or null → delta is null."}
-                    </Math>
+                    <div className="space-y-2">
+                      <div>
+                        This prevents accidental “flatlines” that would appear if missing values were replaced by zeros. It also prevents overstated confidence
+                        when coverage is low.
+                      </div>
+                    </div>
                   </>
                 }
               />
@@ -470,87 +473,94 @@ export default function MethodologyPage() {
 
         {/* Context metrics */}
         <section>
-          <SectionTitle id="context" title="Context metrics" kicker="Interpretation (descriptive)" />
+          <SectionTitle id="context" title="Context metrics (percentile, z, trend, volatility)" kicker="Positioning" />
           <div className="mt-6 grid gap-6 md:grid-cols-2">
-            <Card title="Percentile (distribution context)">
+            <Card title="Percentile">
               <BasicAdvanced
                 basic={
                   <>
-                    Percentile tells you where today’s daily value sits compared with other daily values in the selected window.
-                    Example: “6th percentile” means today is lower than most days in this window.
+                    Percentile tells you where today ranks versus historical values in the selected window. Higher percentile means the value is high relative
+                    to that window’s history.
                   </>
                 }
                 advanced={
                   <>
-                    <Math>
-                      {"Given values V = {x_i} in the reference window (non-null only):"} <br />
-                      {"percentile(x_t) = ( # { v ∈ V : v ≤ x_t } ) / |V|"} <br />
-                      {"Reported as 0..100. Null if too few non-null points."}
-                    </Math>
-                    <div className="text-xs text-ui-faint">
-                      Percentile is distribution position, not a forecast.
+                    <div className="space-y-2">
+                      <div>
+                        Percentile is computed over non-null values within the sliced window. If there are too few points, percentile is null.
+                      </div>
+                      <Math>
+                        {"Given non-null values {v_1..v_N} and x_t:"} <br />
+                        {"rank = number of values <= x_t"} <br />
+                        {"pct = (rank - 1) / (N - 1)"} <br />
+                        {"If N < minN => pct = null"}
+                      </Math>
                     </div>
                   </>
                 }
               />
             </Card>
 
-            <Card title="Z-score (standardized deviation)">
+            <Card title="Trend tags">
               <BasicAdvanced
                 basic={
                   <>
-                    Z-score expresses how far a value is from the mean, measured in standard deviations.
-                    It helps compare “unusualness” across metrics with different units.
+                    Trend tags describe short-term baseline relative to long-term baseline (MA7 vs MA30) and whether today deviates from MA7. They do not imply prediction.
                   </>
                 }
                 advanced={
                   <>
-                    <Math>
-                      {"z_t = (x_t − μ) / σ"} <br />
-                      {"μ = mean(V),  σ = stdev(V),  V = non-null values in the reference window"} <br />
-                      {"If σ is ~0 or sample too small → z is null (guardrail)."}
-                    </Math>
-                  </>
-                }
-              />
-            </Card>
-
-            <Card title="Trend (Rising / Flat / Falling)">
-              <BasicAdvanced
-                basic={
-                  <>
-                    Trend is estimated from smoothed movement (usually MA30). It describes persistent drift, not daily noise.
-                  </>
-                }
-                advanced={
-                  <>
-                    <Math>
-                      {"Fit a line to MA30 over time: MA30_t ≈ a + b·t"} <br />
-                      {"If b > +τ → Rising; if b < −τ → Falling; else Flat"} <br />
-                      {"Strength buckets use |b| relative to typical scale."}
-                    </Math>
-                    <div className="text-xs text-ui-faint">
-                      Exact thresholds (τ) are fixed and documented per model version.
+                    <div className="space-y-2">
+                      <div className="text-ui-text font-semibold">Example descriptive labels</div>
+                      <ul className="mt-2 list-disc space-y-1 pl-5">
+                        <li>Short-term above baseline (MA7 &gt; MA30)</li>
+                        <li>Short-term below baseline (MA7 &lt; MA30)</li>
+                        <li>Unusual day versus MA7 (|daily − MA7| large)</li>
+                      </ul>
                     </div>
                   </>
                 }
               />
             </Card>
 
-            <Card title="Volatility (Coefficient of Variation)">
+            <Card title="Volatility tags">
               <BasicAdvanced
                 basic={
                   <>
-                    Volatility describes how noisy daily values are relative to their typical level. “Highly variable” means large swings are common.
+                    Volatility tags describe variability in daily values relative to baselines inside the selected window, without implying forward-looking behavior.
                   </>
                 }
                 advanced={
                   <>
-                    <Math>
-                      {"CV = σ / |μ|"} <br />
-                      {"σ = stdev(daily),  μ = mean(daily)  (over the reference window)"} <br />
-                      {"Bucket CV into labels using fixed thresholds."}
-                    </Math>
+                    <div className="space-y-2">
+                      <div>
+                        Variability can be described using windowed dispersion (e.g., robust scale like median absolute deviation) computed on non-null values.
+                      </div>
+                      <div className="text-xs text-ui-faint">
+                        Exact formulas are documented per metric in the Wiki (where used).
+                      </div>
+                    </div>
+                  </>
+                }
+              />
+            </Card>
+
+            <Card title="Z-like scale (standardization)">
+              <BasicAdvanced
+                basic={
+                  <>
+                    A standardized score can express how far today is from the window’s typical value, in units of variability. It is purely descriptive.
+                  </>
+                }
+                advanced={
+                  <>
+                    <div className="space-y-2">
+                      <Math>
+                        {"Example robust z:"} <br />
+                        {"z = (x_t − median(window)) / (1.4826 * MAD(window))"} <br />
+                        {"Computed on non-null values; if insufficient points => null."}
+                      </Math>
+                    </div>
                   </>
                 }
               />
@@ -558,11 +568,11 @@ export default function MethodologyPage() {
           </div>
         </section>
 
-        {/* Coverage & freshness */}
+        {/* Coverage / missing / freshness */}
         <section>
           <SectionTitle id="quality" title="Coverage, missing days, freshness" kicker="Data quality" />
           <div className="mt-6 grid gap-6 md:grid-cols-2">
-            <Card title="Coverage & missing days">
+            <Card title="Coverage and missing days">
               <BasicAdvanced
                 basic={
                   <>
@@ -739,7 +749,7 @@ export default function MethodologyPage() {
                         <span className="text-ui-text">Allowed:</span> “MA7 is below MA30”, “today is in the 6th percentile”, “coverage is low”.
                       </li>
                       <li>
-                        <span className="text-ui-text">Not allowed:</span> “bullish”, “buy/sell”, “undervalued”, “will go up”.
+                        <span className="text-ui-text">Not allowed:</span> “sentiment labels”, “trade calls”, “valuation claims”, “directional predictions”.
                       </li>
                       <li>
                         <span className="text-ui-text">No causality:</span> we do not claim drivers unless it is purely a measurement/coverage explanation.

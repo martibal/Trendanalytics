@@ -66,11 +66,6 @@ export type MetricCatalogEntry = {
   };
 };
 
-const A = (key: string) => ({
-  methodology: `/methodology#${key}`,
-  wiki: `/wiki#${key}`,
-});
-
 export const METRIC_CATALOG: Record<string, MetricCatalogEntry> = {
   tx_count_daily: {
     key: "tx_count_daily",
@@ -126,7 +121,10 @@ export const METRIC_CATALOG: Record<string, MetricCatalogEntry> = {
           "Nulls typically indicate upstream indexing lag/incomplete coverage rather than zero activity; interpret with coverage/confidence.",
       },
     },
-    anchors: A("tx_count_daily"),
+    anchors: {
+      methodology: "/methodology#tx_count_daily",
+      wiki: "/wiki#tx_count_daily",
+    },
   },
 
   unique_active_addresses: {
@@ -186,7 +184,10 @@ export const METRIC_CATALOG: Record<string, MetricCatalogEntry> = {
         reason_advanced: "Nulls usually indicate indexing lag/incomplete address extraction rather than no activity.",
       },
     },
-    anchors: A("unique_active_addresses"),
+    anchors: {
+      methodology: "/methodology#unique_active_addresses",
+      wiki: "/wiki#unique_active_addresses",
+    },
   },
 
   median_tx_fee_native: {
@@ -233,7 +234,10 @@ export const METRIC_CATALOG: Record<string, MetricCatalogEntry> = {
       arbitrum: { kind: "available" },
       base: { kind: "available" },
     },
-    anchors: A("median_tx_fee_native"),
+    anchors: {
+      methodology: "/methodology#median_tx_fee_native",
+      wiki: "/wiki#median_tx_fee_native",
+    },
   },
 
   gas_utilization_pct: {
@@ -283,7 +287,10 @@ export const METRIC_CATALOG: Record<string, MetricCatalogEntry> = {
       arbitrum: { kind: "available" },
       base: { kind: "available" },
     },
-    anchors: A("gas_utilization_pct"),
+    anchors: {
+      methodology: "/methodology#gas_utilization_pct",
+      wiki: "/wiki#gas_utilization_pct",
+    },
   },
 
   failed_tx_rate: {
@@ -333,7 +340,10 @@ export const METRIC_CATALOG: Record<string, MetricCatalogEntry> = {
       arbitrum: { kind: "available" },
       base: { kind: "available" },
     },
-    anchors: A("failed_tx_rate"),
+    anchors: {
+      methodology: "/methodology#failed_tx_rate",
+      wiki: "/wiki#failed_tx_rate",
+    },
   },
 
   avg_block_time_sec: {
@@ -379,7 +389,10 @@ export const METRIC_CATALOG: Record<string, MetricCatalogEntry> = {
       arbitrum: { kind: "available" },
       base: { kind: "available" },
     },
-    anchors: A("avg_block_time_sec"),
+    anchors: {
+      methodology: "/methodology#avg_block_time_sec",
+      wiki: "/wiki#avg_block_time_sec",
+    },
   },
 
   block_count_daily: {
@@ -424,7 +437,10 @@ export const METRIC_CATALOG: Record<string, MetricCatalogEntry> = {
       arbitrum: { kind: "available" },
       base: { kind: "available" },
     },
-    anchors: A("block_count_daily"),
+    anchors: {
+      methodology: "/methodology#block_count_daily",
+      wiki: "/wiki#block_count_daily",
+    },
   },
 
   value_transferred_native: {
@@ -471,7 +487,10 @@ export const METRIC_CATALOG: Record<string, MetricCatalogEntry> = {
       arbitrum: { kind: "available" },
       base: { kind: "available" },
     },
-    anchors: A("value_transferred_native"),
+    anchors: {
+      methodology: "/methodology#value_transferred_native",
+      wiki: "/wiki#value_transferred_native",
+    },
   },
 
   median_tx_value_native: {
@@ -521,7 +540,10 @@ export const METRIC_CATALOG: Record<string, MetricCatalogEntry> = {
       arbitrum: { kind: "available" },
       base: { kind: "available" },
     },
-    anchors: A("median_tx_value_native"),
+    anchors: {
+      methodology: "/methodology#median_tx_value_native",
+      wiki: "/wiki#median_tx_value_native",
+    },
   },
 };
 

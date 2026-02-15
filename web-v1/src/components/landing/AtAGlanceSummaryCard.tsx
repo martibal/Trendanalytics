@@ -30,17 +30,15 @@ export function AtAGlanceSummaryCard(props: {
   const earliestAcrossLayers = minNonEmptyISO([metaMin, derivedMin, goldMin]);
 
   return (
-    <div className="relative -mt-8 rounded-2xl border border-ui-border bg-ui-surface p-5 shadow-sm md:-mt-10">
+    <div className="ui-card ui-lift relative -mt-8 rounded-3xl border border-ui-border bg-ui-bg/20 p-6 md:-mt-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-ui-text">At a glance</div>
-          <div className="mt-1 text-xs text-ui-faint">
-            Quick context about freshness and coverage across published layers.
-          </div>
+          <div className="mt-1 text-xs text-ui-faint">Quick context about freshness and coverage across published layers.</div>
         </div>
 
         {/* Top-right metadata pill */}
-        <div className="rounded-xl border border-ui-border bg-ui-bg/40 px-3 py-2 text-[11px] text-ui-muted backdrop-blur">
+        <div className="rounded-2xl border border-ui-border bg-ui-bg/30 px-4 py-3 text-[11px] text-ui-muted backdrop-blur">
           <div>
             Computed (UTC): <span className="text-ui-text">{fmtISOOrDash(computedAtUtc)}</span>
           </div>
@@ -51,14 +49,14 @@ export function AtAGlanceSummaryCard(props: {
       </div>
 
       {/* Three cards */}
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-4 py-3 transition hover:bg-ui-bg/40">
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-ui-border bg-ui-bg/15 px-4 py-3 transition hover:bg-ui-bg/25">
           <div className="text-[11px] uppercase tracking-wide text-ui-faint">Chains</div>
           <div className="mt-1 text-sm text-ui-text">{supportedChains.length}</div>
           <div className="mt-1 text-xs text-ui-faint">Supported: {supportedChains.join(", ")}</div>
         </div>
 
-        <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-4 py-3 transition hover:bg-ui-bg/40">
+        <div className="rounded-2xl border border-ui-border bg-ui-bg/15 px-4 py-3 transition hover:bg-ui-bg/25">
           <div className="text-[11px] uppercase tracking-wide text-ui-faint">Layer as-of (min)</div>
           <div className="mt-2 space-y-1 text-xs text-ui-muted">
             <div>
@@ -73,7 +71,7 @@ export function AtAGlanceSummaryCard(props: {
           </div>
         </div>
 
-        <div className="rounded-xl border border-ui-border bg-ui-bg/30 px-4 py-3 transition hover:bg-ui-bg/40">
+        <div className="rounded-2xl border border-ui-border bg-ui-bg/15 px-4 py-3 transition hover:bg-ui-bg/25">
           <div className="text-[11px] uppercase tracking-wide text-ui-faint">Coherent bundle date</div>
           <div className="mt-1 text-sm text-ui-text">{fmtISOOrDash(earliestAcrossLayers)}</div>
           <div className="mt-1 text-xs text-ui-faint">
@@ -83,7 +81,7 @@ export function AtAGlanceSummaryCard(props: {
       </div>
 
       {/* Guardrails strip */}
-      <div className="mt-4 rounded-xl border border-ui-border bg-ui-bg/20 px-4 py-3 text-xs text-ui-muted">
+      <div className="mt-5 rounded-2xl border border-ui-border bg-ui-bg/15 px-4 py-3 text-xs text-ui-muted">
         <span className="text-ui-text">Guardrails:</span> descriptive only. Missing values are gaps (null), never zeros.
       </div>
     </div>

@@ -50,6 +50,16 @@ async function readJsonSafe(filePath: string): Promise<any | null> {
   }
 }
 
+async function readJsonWithRawSafe(filePath: string): Promise<{ json: any; raw: string } | null> {
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    const json = JSON.parse(raw);
+    return { json, raw };
+  } catch {
+    return null;
+  }
+}
+
 function parseRevisionId(v: any): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "") {
@@ -78,12 +88,9 @@ function requireExportAuth(req: NextRequest): NextResponse | null {
 
   const token = tokenFromHeader ?? tokenFromQuery;
   if (!token || token !== expected) {
-    return jsonError(
-      "UNAUTHORIZED",
-      "Missing or invalid export token.",
-      401,
-      { hint: "Provide Authorization: Bearer <token> (or ?token=... for testing)." }
-    );
+    return jsonError("UNAUTHORIZED", "Missing or invalid export token.", 401, {
+      hint: "Provide Authorization: Bearer <token> (or ?token=... for testing).",
+    });
   }
   return null;
 }
@@ -103,6 +110,10 @@ function headersFor(req: NextRequest, etag?: string) {
   };
   if (etag) h.ETag = etag;
   return h;
+}
+
+function shortHash(input: string): string {
+  return crypto.createHash("sha256").update(input).digest("hex").slice(0, 16);
 }
 
 export async function GET(req: NextRequest) {
@@ -126,9 +137,9 @@ export async function GET(req: NextRequest) {
   const revision_id: number | null = parseRevisionId(datasetJson?.revision_id);
 
   const filePath = path.join(root, genre, chain, `last${window}d.json`);
-  const data = await readJsonSafe(filePath);
+  const loaded = await readJsonWithRawSafe(filePath);
 
-  if (data === null) {
+  if (loaded === null) {
     return jsonError("NOT_FOUND", "Not found or invalid JSON.", 404, {
       dataset_id,
       revision_id,
@@ -139,7 +150,20 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const cacheKey = `${dataset_id ?? "no_dataset"}|${revision_id ?? "no_revision"}|export_window|${genre}|${chain}|${window}`;
+  const data = loaded.json;
+  const data_hash = shortHash(loaded.raw);
+
+  // Robust cache identity: include a content hash of the window file itself.
+  const cacheKey = [
+    dataset_id ?? "no_dataset",
+    revision_id ?? "no_revision",
+    "export_window",
+    genre,
+    chain,
+    window,
+    `data_hash=${data_hash}`,
+  ].join("|");
+
   const etag = `W/"${crypto.createHash("sha256").update(cacheKey).digest("hex")}"`;
 
   if (!authEnabled()) {
@@ -149,8 +173,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json(
-    { dataset_id, revision_id, chain, genre, window, data },
-    { status: 200, headers: headersFor(req, etag) }
-  );
+  return NextResponse.json({ dataset_id, revision_id, chain, genre, window, data }, { status: 200, headers: headersFor(req, etag) });
 }

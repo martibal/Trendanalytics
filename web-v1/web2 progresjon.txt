@@ -1,0 +1,271 @@
+
+
+# WEB2 PROGRESJON – REVIDERT STATUS
+
+*(Basert på gjeldende kodebase i full.zip)*
+
+---
+
+# 1. LEGAL / COMPLIANCE LAYER
+
+## 1.1 Descriptive-only enforcement
+
+### Status: DELVIS FULLFØRT
+
+Implementert:
+
+* `src/lib/legal/forbiddenLanguage.ts`
+* `scripts/legal-check.mjs`
+* Tydelig “No prices / No advice / No forecasts” i UI (landing, chain, wiki, methodology)
+* InlineDisclaimer-komponent brukt på Wiki og Methodology
+
+Mangler:
+
+* Automatisk enforcement i build pipeline (ikke koblet til `prebuild`)
+* Ingen CI-krav som blokkerer build ved brudd
+* Ikke dokumentert pre-commit hook-løsning
+
+Tiltak:
+
+* Legg til `npm run test:legal`
+* Kjør legal-check i `prebuild`
+* Dokumenter hook/CI-policy
+
+---
+
+# 2. UI / ANALYTICS LAYER
+
+## 2.1 ChainDiagnosticHeader
+
+### Status: FULLFØRT (utvidet)
+
+Implementert:
+
+* Regime label (meta.regime.label)
+* Axes: Demand / Friction / Capacity
+* Abnormality: z-score + percentile
+* Persistence: MA7 vs MA30 + streak
+* Én-linjers “Chain diagnosis” (descriptive)
+* Audit-dimensjoner (coverage, lag, confidence)
+
+Oppfyller Web2-krav om:
+
+* Deskriptiv forklaring
+* Ikke-normativ språkbruk
+* Audit-synlighet
+
+---
+
+## 2.2 MetricPanel
+
+### Status: FULLFØRT
+
+Implementert:
+
+* Tri-line chart (Daily / MA7 / MA30)
+* Percentile
+* Z-score (med fallback)
+* Coverage gating (<70%)
+* Freshness / lag
+* Missing days
+* Dataset_id / revision_id
+* Raw export links (gold/derived/meta)
+* Basic + Advanced interpretation
+* MetricDocBox (What / How / Why / Value)
+
+Oppfyller:
+
+* 4 obligatoriske forklaringer
+* Basic + Advanced
+* Null-handling
+* Reproduserbarhet
+
+---
+
+## 2.3 Landing Page
+
+### Status: FULLFØRT
+
+Implementert:
+
+* Snapshot cards
+* MA7 vs MA30 regime
+* Percentile sentence
+* Mini z-score
+* Descriptive guardrails
+
+Oppfyller:
+
+* 30-sekunders mental modell
+* Ingen pris
+* Ingen forecast
+* Ingen anbefaling
+
+---
+
+# 3. TAXONOMY / STRUCTURE
+
+## 3.1 Chain taxonomy
+
+### Status: FULLFØRT
+
+Chains er strukturert etter:
+
+* Demand
+* Friction
+* Capacity
+* Throughput / Diagnostics
+
+Dette samsvarer med Web2 chainProfiles-ideen.
+
+---
+
+## 3.2 Wiki
+
+### Status: FULLFØRT
+
+Implementert:
+
+* Global concepts
+* Per-metric What / How / Why / Value
+* Basic + Advanced
+* Stable anchors
+* Kobling til methodology
+
+Dokumentasjonen er allerede katalog-drevet.
+
+---
+
+## 3.3 Methodology
+
+### Status: FULLFØRT
+
+Implementert:
+
+* Mental model
+* Guardrails (hard exclusions)
+* Artifacts & versioning
+* Windows & slicing rule
+* Null policy
+* JSON layer separation
+* Wording guardrails
+
+Dette er Web2-compliant.
+
+---
+
+# 4. DATA LAYER
+
+## 4.1 Gold / Derived / Meta separation
+
+### Status: FULLFØRT
+
+Implementert:
+
+* gold
+* derived
+* meta
+* manifest
+* dataset_id / revision_id
+* Lag / freshness
+
+Oppfyller Web2 krav om auditability.
+
+---
+
+## 4.2 Window slicing discipline
+
+### Status: FULLFØRT
+
+* Slice first
+* Compute inside window
+* Null stays null
+* Coverage explicit
+
+---
+
+# 5. NOTABLES SYSTEM
+
+### Status: IMPLEMENTERT, MEN IKKE FULLT FORMALISERT
+
+Implementert:
+
+* Descriptive policy page
+* Percentile, z, persistence brukes i UI
+
+Mangler:
+
+* Formell “Notables classification spec” (f.eks. exact thresholds dokumentert ett sted)
+* Systematisk kobling mellom summary.caveats og Notables policy
+
+---
+
+# 6. TESTING / QA
+
+### Status: IKKE IMPLEMENTERT
+
+Mangler:
+
+* Test-runner (Jest/Vitest)
+* Snapshot tests
+* Legal-check i CI
+* Regression tests
+
+Web2 nevner testing — dette er fortsatt åpent.
+
+---
+
+# 7. CMS / CONTENT MANAGEMENT
+
+### Status: IKKE IMPLEMENTERT SOM EGET SYSTEM
+
+Per nå fungerer:
+
+* METRIC_CATALOG som “content source”
+
+Men:
+
+* Ingen separat CMS
+* Ingen admin-lag
+* Ingen redaktør-workflow
+
+Dette kan enten:
+A) Implementeres
+eller
+B) Web2-dokumentet oppdateres for å definere katalogen som CMS
+
+---
+
+# 8. PERFORMANCE REQUIREMENTS
+
+### Status: IKKE FORMALISERT
+
+UI er performant, men:
+
+* Ingen eksplisitte SLA-krav dokumentert
+* Ingen Lighthouse/Perf-mål definert
+
+---
+
+# 9. OVERORDNET VURDERING
+
+Web2 status (realistisk):
+
+Legal:               75%
+UI/Analytics:        100%
+Taxonomy:            100%
+Documentation:       100%
+Data separation:     100%
+Notables formalism:  70%
+Testing/CI:          0%
+CMS layer:           0%
+Performance spec:    0%
+
+Total Web2-implementasjon:
+≈ 80–85% ferdig
+
+Det som gjenstår er hovedsakelig:
+
+* Operasjonelle krav (CI/testing/enforcement)
+* CMS-lag (hvis fortsatt ønsket)
+* Formell spesifikasjon av Notables-thresholds

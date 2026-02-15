@@ -1,3 +1,4 @@
+// src/components/charts/MetricTriLineChart.tsx
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -195,7 +196,7 @@ export function MetricTriLineChart({ data, height = 160 }: { data: TriSeriesPoin
     return { xMin: xmin, xMax: xmax, yMin: yd.min, yMax: yd.max };
   }, [ready, clean]);
 
-  // Layout (reduced dead space, clearer axes)
+  // Layout
   const padL = 54;
   const padR = 12;
   const padT = 10;
@@ -260,9 +261,9 @@ export function MetricTriLineChart({ data, height = 160 }: { data: TriSeriesPoin
     const { p } = hoveredPoint;
 
     const lines = [
-      { label: "Daily", v: p.daily, color: "rgba(255,255,255,0.92)" },
-      { label: "MA7", v: p.ma7, color: "rgba(147, 197, 253, 0.92)" },
-      { label: "MA30", v: p.ma30, color: "rgba(253, 230, 138, 0.92)" },
+      { label: "Daily", v: p.daily, color: "rgb(var(--chart-daily) / 0.95)" },
+      { label: "MA7", v: p.ma7, color: "rgb(var(--chart-ma7) / 0.95)" },
+      { label: "MA30", v: p.ma30, color: "rgb(var(--chart-ma30) / 0.95)" },
     ].filter((x) => x.v !== null && Number.isFinite(x.v as number));
 
     const title = p.date;
@@ -292,23 +293,51 @@ export function MetricTriLineChart({ data, height = 160 }: { data: TriSeriesPoin
           onPointerLeave={onPointerLeave}
         >
           {/* plot background */}
-          <rect x={0} y={0} width={size.w} height={size.h} rx={14} fill="rgba(0,0,0,0.18)" stroke="rgba(255,255,255,0.08)" />
+          <rect
+            x={0}
+            y={0}
+            width={size.w}
+            height={size.h}
+            rx={14}
+            fill="rgb(var(--surface) / 0.35)"
+            stroke="rgb(var(--border) / 0.10)"
+          />
 
           {/* grid */}
           {xTicks.map((t, i) => {
             const X = x(t);
-            return <line key={`xg-${i}`} x1={X} y1={padT} x2={X} y2={padT + innerH} stroke="rgba(255,255,255,0.10)" strokeDasharray="3 3" />;
+            return (
+              <line
+                key={`xg-${i}`}
+                x1={X}
+                y1={padT}
+                x2={X}
+                y2={padT + innerH}
+                stroke="rgb(var(--border) / 0.10)"
+                strokeDasharray="3 3"
+              />
+            );
           })}
           {yTicks.map((v, i) => {
             const Y = y(v);
-            return <line key={`yg-${i}`} x1={padL} y1={Y} x2={padL + innerW} y2={Y} stroke="rgba(255,255,255,0.10)" strokeDasharray="3 3" />;
+            return (
+              <line
+                key={`yg-${i}`}
+                x1={padL}
+                y1={Y}
+                x2={padL + innerW}
+                y2={Y}
+                stroke="rgb(var(--border) / 0.10)"
+                strokeDasharray="3 3"
+              />
+            );
           })}
 
           {/* axes labels */}
           {yTicks.map((v, i) => {
             const Y = y(v);
             return (
-              <text key={`yl-${i}`} x={padL - 10} y={Y + 4} textAnchor="end" fontSize={11} fill="rgba(255,255,255,0.58)">
+              <text key={`yl-${i}`} x={padL - 10} y={Y + 4} textAnchor="end" fontSize={11} fill="rgb(var(--text-faint) / 0.95)">
                 {fmtCompact(v)}
               </text>
             );
@@ -316,38 +345,60 @@ export function MetricTriLineChart({ data, height = 160 }: { data: TriSeriesPoin
           {xTicks.map((t, i) => {
             const X = x(t);
             return (
-              <text key={`xl-${i}`} x={X} y={padT + innerH + 18} textAnchor="middle" fontSize={11} fill="rgba(255,255,255,0.58)">
+              <text
+                key={`xl-${i}`}
+                x={X}
+                y={padT + innerH + 18}
+                textAnchor="middle"
+                fontSize={11}
+                fill="rgb(var(--text-faint) / 0.95)"
+              >
                 {fmtTickFromMs(t)}
               </text>
             );
           })}
 
-          {/* lines - visual hierarchy */}
-          {/* Daily: thinner, slightly transparent */}
+          {/* lines — web2 hierarchy: MA30 (strong) → MA7 (secondary) → Daily (subtle) */}
+
+          {/* Daily: thinnest + most subtle */}
           {pathDaily ? (
-            <path d={pathDaily} fill="none" stroke="rgba(255,255,255,0.80)" strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+            <path
+              d={pathDaily}
+              fill="none"
+              stroke="rgb(var(--chart-daily) / 0.70)"
+              strokeWidth={1.6}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
           ) : null}
 
-          {/* MA7: thick + high contrast */}
+          {/* MA7: secondary */}
           {pathMA7 ? (
             <>
-              <path d={pathMA7} fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={6.5} strokeLinecap="round" opacity="0.55" />
-              <path d={pathMA7} fill="none" stroke="rgba(147, 197, 253, 0.95)" strokeWidth={3.2} strokeLinejoin="round" strokeLinecap="round" />
+              {/* subtle shadow for separation */}
+              <path d={pathMA7} fill="none" stroke="rgb(0 0 0 / 0.45)" strokeWidth={5.4} strokeLinecap="round" opacity="0.55" />
+              <path
+                d={pathMA7}
+                fill="none"
+                stroke="rgb(var(--chart-ma7) / 0.92)"
+                strokeWidth={2.8}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
             </>
           ) : null}
 
-          {/* MA30: thick + dashed (ALWAYS) */}
+          {/* MA30: primary structural baseline */}
           {pathMA30 ? (
             <>
-              <path d={pathMA30} fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={6.0} strokeLinecap="round" opacity="0.50" strokeDasharray="10 8" />
+              <path d={pathMA30} fill="none" stroke="rgb(0 0 0 / 0.45)" strokeWidth={6.2} strokeLinecap="round" opacity="0.55" />
               <path
                 d={pathMA30}
                 fill="none"
-                stroke="rgba(253, 230, 138, 0.92)"
-                strokeWidth={3.0}
+                stroke="rgb(var(--chart-ma30) / 0.95)"
+                strokeWidth={3.2}
                 strokeLinejoin="round"
                 strokeLinecap="round"
-                strokeDasharray="10 8"
               />
             </>
           ) : null}
@@ -355,16 +406,16 @@ export function MetricTriLineChart({ data, height = 160 }: { data: TriSeriesPoin
           {/* hover crosshair + dots */}
           {hoveredPoint ? (
             <>
-              <line x1={hoveredPoint.X} y1={padT} x2={hoveredPoint.X} y2={padT + innerH} stroke="rgba(255,255,255,0.18)" />
+              <line x1={hoveredPoint.X} y1={padT} x2={hoveredPoint.X} y2={padT + innerH} stroke="rgb(var(--border) / 0.22)" />
 
               {hoveredPoint.p.daily !== null && Number.isFinite(hoveredPoint.p.daily) ? (
-                <circle cx={hoveredPoint.X} cy={y(hoveredPoint.p.daily)} r={3.2} fill="rgba(255,255,255,0.95)" />
+                <circle cx={hoveredPoint.X} cy={y(hoveredPoint.p.daily)} r={3.0} fill="rgb(var(--chart-daily) / 0.95)" />
               ) : null}
               {hoveredPoint.p.ma7 !== null && Number.isFinite(hoveredPoint.p.ma7) ? (
-                <circle cx={hoveredPoint.X} cy={y(hoveredPoint.p.ma7)} r={3.2} fill="rgba(147, 197, 253, 0.95)" />
+                <circle cx={hoveredPoint.X} cy={y(hoveredPoint.p.ma7)} r={3.0} fill="rgb(var(--chart-ma7) / 0.95)" />
               ) : null}
               {hoveredPoint.p.ma30 !== null && Number.isFinite(hoveredPoint.p.ma30) ? (
-                <circle cx={hoveredPoint.X} cy={y(hoveredPoint.p.ma30)} r={3.2} fill="rgba(253, 230, 138, 0.95)" />
+                <circle cx={hoveredPoint.X} cy={y(hoveredPoint.p.ma30)} r={3.0} fill="rgb(var(--chart-ma30) / 0.95)" />
               ) : null}
             </>
           ) : null}
@@ -372,12 +423,21 @@ export function MetricTriLineChart({ data, height = 160 }: { data: TriSeriesPoin
           {/* tooltip */}
           {tip ? (
             <g>
-              <rect x={tip.left} y={tip.top} width={tip.boxW} height={tip.boxH} rx={12} ry={12} fill="rgba(10,10,10,0.96)" stroke="rgba(255,255,255,0.14)" />
+              <rect
+                x={tip.left}
+                y={tip.top}
+                width={tip.boxW}
+                height={tip.boxH}
+                rx={12}
+                ry={12}
+                fill="rgb(var(--bg) / 0.92)"
+                stroke="rgb(var(--border) / 0.14)"
+              />
               <text
                 x={tip.left + 10}
                 y={tip.top + 15}
                 fontSize={12}
-                fill="rgba(255,255,255,0.85)"
+                fill="rgb(var(--text-muted) / 0.95)"
                 fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
               >
                 {tip.title}
@@ -386,8 +446,8 @@ export function MetricTriLineChart({ data, height = 160 }: { data: TriSeriesPoin
               {tip.lines.map((ln, i) => (
                 <g key={ln.label}>
                   <rect x={tip.left + 10} y={tip.top + 22 + i * 18 - 8} width={8} height={8} rx={2} fill={ln.color} />
-                  <text x={tip.left + 24} y={tip.top + 22 + i * 18} fontSize={12} fill="rgba(255,255,255,0.82)">
-                    {ln.label}: <tspan fill="rgba(255,255,255,0.95)">{fmtCompact(ln.v)}</tspan>
+                  <text x={tip.left + 24} y={tip.top + 22 + i * 18} fontSize={12} fill="rgb(var(--text-muted) / 0.92)">
+                    {ln.label}: <tspan fill="rgb(var(--text) / 0.95)">{fmtCompact(ln.v)}</tspan>
                   </text>
                 </g>
               ))}

@@ -33,6 +33,25 @@ function parseGenre(s: string | null): Genre | null {
   return null;
 }
 
+function isValidISODate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+function normalizeAvailableDays(v: any): string[] {
+  const raw: string[] = Array.isArray(v) ? v : [];
+  const kept = raw.filter((d) => typeof d === "string" && isValidISODate(d));
+  return Array.from(new Set(kept)).sort();
+}
+
+function stableHashStringList(xs: string[]): string {
+  const h = crypto.createHash("sha256");
+  for (const s of xs) {
+    h.update(s);
+    h.update("|");
+  }
+  return h.digest("hex");
+}
+
 async function readJsonSafe(filePath: string): Promise<any | null> {
   try {
     const raw = await fs.readFile(filePath, "utf8");
@@ -70,12 +89,9 @@ function requireExportAuth(req: NextRequest): NextResponse | null {
 
   const token = tokenFromHeader ?? tokenFromQuery;
   if (!token || token !== expected) {
-    return jsonError(
-      "UNAUTHORIZED",
-      "Missing or invalid export token.",
-      401,
-      { hint: "Provide Authorization: Bearer <token> (or ?token=... for testing)." }
-    );
+    return jsonError("UNAUTHORIZED", "Missing or invalid export token.", 401, {
+      hint: "Provide Authorization: Bearer <token> (or ?token=... for testing).",
+    });
   }
   return null;
 }
@@ -91,7 +107,7 @@ function headersFor(req: NextRequest, etag?: string) {
     return h;
   }
 
-  // Without gate: allow CDN caching of immutable dataset versions (etag changes by dataset/revision).
+  // Without gate: allow CDN caching (etag changes by manifest content signature).
   const h: Record<string, string> = {
     "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
   };
@@ -135,8 +151,21 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Only use ETag/304 in the non-auth (public cache) mode.
-  const cacheKey = `${dataset_id ?? "no_dataset"}|${revision_id ?? "no_revision"}|export_manifest|${genre}|${chain}`;
+  // ETag identity must change when manifest content changes (not only dataset/revision).
+  const asof: string | null = typeof (data as any)?.asof === "string" ? (data as any).asof : null;
+  const available_days = normalizeAvailableDays((data as any)?.available_days);
+  const available_days_hash = stableHashStringList(available_days).slice(0, 16);
+
+  const cacheKey = [
+    dataset_id ?? "no_dataset",
+    revision_id ?? "no_revision",
+    "export_manifest",
+    genre,
+    chain,
+    asof && isValidISODate(asof) ? `asof=${asof}` : "asof=none",
+    `available_days_hash=${available_days_hash}`,
+    `available_days_count=${available_days.length}`,
+  ].join("|");
   const etag = `W/"${crypto.createHash("sha256").update(cacheKey).digest("hex")}"`;
 
   if (!authEnabled()) {
@@ -146,8 +175,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json(
-    { dataset_id, revision_id, chain, genre, data },
-    { status: 200, headers: headersFor(req, etag) }
-  );
+  return NextResponse.json({ dataset_id, revision_id, chain, genre, data }, { status: 200, headers: headersFor(req, etag) });
 }

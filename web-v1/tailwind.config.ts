@@ -1,3 +1,4 @@
+// tailwind.config.ts
 import type { Config } from "tailwindcss";
 
 const config: Config = {
@@ -39,13 +40,42 @@ const config: Config = {
           ma30: "rgb(var(--chart-ma30) / <alpha-value>)",
         },
       },
+
+      // Web2-intent: consistent typography across OS + clear mono for audit IDs/keys.
+      fontFamily: {
+        sans: [
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica",
+          "Arial",
+          "Apple Color Emoji",
+          "Segoe UI Emoji",
+        ],
+        mono: [
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          "Liberation Mono",
+          "Courier New",
+          "monospace",
+        ],
+      },
+
       borderRadius: {
         "2xl": "1rem",
         "3xl": "1.5rem",
       },
+
+      // Web2-intent: premium dark surfaces with subtle depth (not “glowy”).
       boxShadow: {
         "ui-sm": "0 1px 3px rgba(0,0,0,0.30)",
         "ui-md": "0 6px 16px rgba(0,0,0,0.40)",
+        "ui-lg": "0 18px 45px rgba(0,0,0,0.42)",
       },
     },
   },

@@ -289,7 +289,10 @@ export function ChainDetail({ chain }: { chain: string }) {
 
   // Deterministic ISO window boundaries for MetricPanel (API-backed)
   const startISO = useMemo(() => (chartDates.length ? chartDates[0] : derivedAsof ?? null), [chartDates, derivedAsof]);
-  const endISO = useMemo(() => (chartDates.length ? chartDates[chartDates.length - 1] : derivedAsof ?? null), [chartDates, derivedAsof]);
+  const endISO = useMemo(
+    () => (chartDates.length ? chartDates[chartDates.length - 1] : derivedAsof ?? null),
+    [chartDates, derivedAsof]
+  );
 
   const [rows, setRows] = useState<DerivedSeriesRow[]>([]);
   const [rowsLoading, setRowsLoading] = useState(false);
@@ -332,10 +335,7 @@ export function ChainDetail({ chain }: { chain: string }) {
 
       setRowsLoading(true);
 
-      const [derivedRaw, goldRaw] = await Promise.all([
-        fetchDerivedSeries(chainId, chartDates),
-        fetchGoldSeries(chainId, chartDates),
-      ]);
+      const [derivedRaw, goldRaw] = await Promise.all([fetchDerivedSeries(chainId, chartDates), fetchGoldSeries(chainId, chartDates)]);
       if (!alive) return;
 
       const derivedByDate = new Map<string, Record<string, number>>();
@@ -568,9 +568,7 @@ export function ChainDetail({ chain }: { chain: string }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-semibold text-ui-text">Notables</div>
-            <div className="mt-1 text-xs text-ui-faint">
-              Descriptive highlights based on deviation, ranks, and coverage (no causal claims).
-            </div>
+            <div className="mt-1 text-xs text-ui-faint">Descriptive highlights based on deviation, ranks, and coverage (no causal claims).</div>
           </div>
           <Link href="/methodology" className="text-xs text-ui-muted underline">
             Methodology
@@ -698,7 +696,7 @@ export function ChainDetail({ chain }: { chain: string }) {
           <InfoBox
             title="How gold supports the charts"
             basic="Gold provides canonical daily series for some metrics (when present). Derived provides MA7/MA30 smoothing for trend context."
-            advanced="For the same (chain,date) partition, gold daily metrics should be consistent with derived’s smoothed counterparts and meta’s snapshot, enabling auditability."
+            advanced="For the same (chain,date) partition, gold daily metrics are checked for consistency with derived’s smoothed counterparts and meta’s snapshot, enabling auditability."
           />
         </div>
       </div>
@@ -806,15 +804,7 @@ export function ChainDetail({ chain }: { chain: string }) {
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {primaryPanels.map((p) => (
-              <MetricPanel
-                key={p.baseKey}
-                chain={chainId}
-                metric={p.baseKey}
-                start={startISO}
-                end={endISO}
-                title={p.label}
-                // subtitle will default from catalog; keep explicit if you want, but not needed
-              />
+              <MetricPanel key={p.baseKey} chain={chainId} metric={p.baseKey} start={startISO} end={endISO} title={p.label} />
             ))}
           </div>
         )}
@@ -858,14 +848,7 @@ export function ChainDetail({ chain }: { chain: string }) {
           ) : (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {advancedPanels.slice(0, advancedLimit).map((p) => (
-                <MetricPanel
-                  key={`all-${p.baseKey}`}
-                  chain={chainId}
-                  metric={p.baseKey}
-                  start={startISO}
-                  end={endISO}
-                  title={p.label}
-                />
+                <MetricPanel key={`all-${p.baseKey}`} chain={chainId} metric={p.baseKey} start={startISO} end={endISO} title={p.label} />
               ))}
             </div>
           )}

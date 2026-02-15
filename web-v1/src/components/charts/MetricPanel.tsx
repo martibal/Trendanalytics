@@ -69,6 +69,139 @@ type TriSeriesPoint = {
   percentile?: number | null;
 };
 
+type RegimeContext = {
+  kind: "near" | "persistent_above" | "persistent_below" | "transient_above" | "transient_below" | "insufficient";
+  relDiff: number | null; // (ma7 - ma30)/|ma30|
+  streakDays: number | null;
+  headline: string;
+  detail: string;
+  tone: "neutral" | "warn";
+};
+
+function computeRegimeContext(points: TriSeriesPoint[]): RegimeContext {
+  // Web2: "persistent vs transient" context is based on MA7 vs MA30 divergence.
+  // This is descriptive: it flags sustained deviations from the structural baseline.
+  //
+  // Heuristics (stable + deterministic):
+  // - threshold: absolute relative divergence needed to call it "meaningful"
+  // - streak: consecutive end-of-window days sustaining that divergence with consistent sign
+  const threshold = 0.08; // 8% of MA30
+  const minStreak = 5; // days
+  const lookbackMax = 21; // cap work; enough to detect persistence
+
+  if (!Array.isArray(points) || points.length < 2) {
+    return {
+      kind: "insufficient",
+      relDiff: null,
+      streakDays: null,
+      headline: "Regime context unavailable",
+      detail: "Not enough usable MA7/MA30 points in this window.",
+      tone: "neutral",
+    };
+  }
+
+  // Find latest usable point.
+  let latestIdx = -1;
+  for (let i = points.length - 1; i >= 0; i--) {
+    const p = points[i];
+    if (typeof p?.ma7 === "number" && Number.isFinite(p.ma7) && typeof p?.ma30 === "number" && Number.isFinite(p.ma30)) {
+      latestIdx = i;
+      break;
+    }
+  }
+
+  if (latestIdx < 0) {
+    return {
+      kind: "insufficient",
+      relDiff: null,
+      streakDays: null,
+      headline: "Regime context unavailable",
+      detail: "MA7/MA30 are missing for the latest part of this window.",
+      tone: "neutral",
+    };
+  }
+
+  const latest = points[latestIdx];
+  const ma7 = latest.ma7 as number;
+  const ma30 = latest.ma30 as number;
+
+  if (ma30 === 0) {
+    return {
+      kind: "insufficient",
+      relDiff: null,
+      streakDays: null,
+      headline: "Regime context unavailable",
+      detail: "MA30 is ~0, so relative divergence is not stable.",
+      tone: "neutral",
+    };
+  }
+
+  const relDiff = (ma7 - ma30) / Math.abs(ma30);
+  const sign = relDiff === 0 ? 0 : relDiff > 0 ? 1 : -1;
+  const absRel = Math.abs(relDiff);
+
+  if (!Number.isFinite(relDiff)) {
+    return {
+      kind: "insufficient",
+      relDiff: null,
+      streakDays: null,
+      headline: "Regime context unavailable",
+      detail: "Could not compute stable MA7/MA30 divergence.",
+      tone: "neutral",
+    };
+  }
+
+  if (absRel < threshold) {
+    return {
+      kind: "near",
+      relDiff,
+      streakDays: 0,
+      headline: "Regime near baseline",
+      detail: "MA7 is close to the structural baseline (MA30). Short-term and structural levels are aligned.",
+      tone: "neutral",
+    };
+  }
+
+  // Count consecutive days sustaining divergence with same sign.
+  let streak = 0;
+  const startIdx = Math.max(0, latestIdx - lookbackMax);
+  for (let i = latestIdx; i >= startIdx; i--) {
+    const p = points[i];
+    const m7 = p?.ma7;
+    const m30 = p?.ma30;
+    if (typeof m7 !== "number" || !Number.isFinite(m7) || typeof m30 !== "number" || !Number.isFinite(m30) || m30 === 0) break;
+    const rd = (m7 - m30) / Math.abs(m30);
+    if (!Number.isFinite(rd)) break;
+    const s = rd === 0 ? 0 : rd > 0 ? 1 : -1;
+    if (s !== sign) break;
+    if (Math.abs(rd) < threshold) break;
+    streak += 1;
+  }
+
+  const pct = Math.round(absRel * 1000) / 10; // 1 decimal
+  const dir = sign >= 0 ? "above" : "below";
+
+  if (streak >= minStreak) {
+    return {
+      kind: sign >= 0 ? "persistent_above" : "persistent_below",
+      relDiff,
+      streakDays: streak,
+      headline: `Persistent regime ${dir} baseline`,
+      detail: `MA7 is ~${pct}% ${dir} MA30, sustained for ${streak} consecutive days (end of window).`,
+      tone: "warn",
+    };
+  }
+
+  return {
+    kind: sign >= 0 ? "transient_above" : "transient_below",
+    relDiff,
+    streakDays: streak,
+    headline: `Short-term ${dir} baseline (not yet persistent)`,
+    detail: `MA7 is ~${pct}% ${dir} MA30, but the divergence is not sustained long enough to call persistent (streak: ${streak}d).`,
+    tone: "neutral",
+  };
+}
+
 function fmtCompact(x: unknown) {
   if (x == null) return "—";
   const n = Number(x);
@@ -96,27 +229,28 @@ function toTitle(metric: string) {
 
 function Chip(props: { label: string; value: string; tone?: "neutral" | "warn" }) {
   const tone = props.tone ?? "neutral";
+
   const cls =
     tone === "warn"
-      ? "border-amber-400/25 bg-amber-400/10 text-amber-100"
-      : "border-white/10 bg-black/20 text-white/80";
+      ? "border-ui-border bg-[rgb(var(--bad)/0.10)] text-ui-text"
+      : "border-ui-border bg-ui-bg/15 text-ui-muted";
 
   return (
     <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] ${cls}`}>
-      <span className="text-white/60">{props.label}</span>
-      <span className="font-mono tabular-nums">{props.value}</span>
+      <span className="text-ui-faint">{props.label}</span>
+      <span className="font-mono tabular-nums text-ui-muted">{props.value}</span>
     </div>
   );
 }
 
 function PercentileCopy({ p }: { p: number | null | undefined }) {
-  if (p == null || !Number.isFinite(p)) return <span>—</span>;
+  if (p == null || !Number.isFinite(p)) return <span className="text-ui-muted">—</span>;
   const pct = Math.max(0, Math.min(100, Math.round(p)));
   const below = 100 - pct;
   return (
-    <span className="text-white/70">
-      Today ranks in the <span className="font-semibold text-white">{pct}th</span> percentile{" "}
-      <span className="text-white/60">(lower than ~{below}% of days in this window)</span>.
+    <span className="text-ui-muted">
+      Today ranks in the <span className="font-semibold text-ui-text">{pct}th</span> percentile{" "}
+      <span className="text-ui-faint">(lower than ~{below}% of days in this window)</span>.
     </span>
   );
 }
@@ -234,7 +368,9 @@ export function MetricPanel(props: {
   }, [series]);
 
   const title = props.title ?? (metricEntry ? metricEntry.label : toTitle(props.metric));
-  const subtitle = props.subtitle ?? (metricEntry ? metricEntry.doc.why.basic : "Undocumented metric (no catalog entry).");
+  const subtitle =
+    props.subtitle ??
+    (metricEntry ? metricEntry.doc?.why?.basic ?? "Descriptive metric panel (documentation incomplete)." : "Undocumented metric (no catalog entry).");
 
   const nonNull = series?.coverage?.nonNull_ratio ?? null;
   const isLowCoverage = nonNull !== null && nonNull < 0.7;
@@ -277,18 +413,32 @@ export function MetricPanel(props: {
     return (x - mu) / sd;
   }, [summary]);
 
-  const zLatest = (zFromSeries != null && Number.isFinite(zFromSeries)) ? zFromSeries : zFallback;
+  const zLatest = zFromSeries != null && Number.isFinite(zFromSeries) ? zFromSeries : zFallback;
   const zText = zLabel(zLatest);
 
+  const regime = useMemo(() => computeRegimeContext(triData), [triData]);
+
+  const regimeBadge = useMemo(() => {
+    const rd = regime.relDiff;
+    if (rd == null || !Number.isFinite(rd)) return "—";
+    const pct = Math.round(Math.abs(rd) * 1000) / 10;
+    const dir = rd >= 0 ? "above" : "below";
+    return `MA7 ~${pct}% ${dir} MA30`;
+  }, [regime.relDiff]);
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold text-white">{title}</div>
-          <div className="mt-0.5 text-xs text-white/60">{subtitle}</div>
+    <div className="rounded-3xl border border-ui-border bg-ui-bg/15 p-6 ui-lift">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-ui-text">{title}</div>
+          <div className="mt-0.5 text-xs text-ui-muted">{subtitle}</div>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            {missingCount > 0 ? <Chip label="missing days" value={`${missingCount}`} tone="warn" /> : <Chip label="missing days" value="0" />}
+            {missingCount > 0 ? (
+              <Chip label="missing days" value={`${missingCount}`} tone="warn" />
+            ) : (
+              <Chip label="missing days" value="0" />
+            )}
 
             {nonNull !== null ? (
               <Chip label="non-null" value={`${(nonNull * 100).toFixed(1)}%`} tone={isLowCoverage ? "warn" : "neutral"} />
@@ -298,18 +448,18 @@ export function MetricPanel(props: {
           </div>
         </div>
 
-        <div className="flex flex-col items-end gap-1 text-[11px] text-white/60">
+        <div className="flex flex-col items-start gap-1 text-[11px] text-ui-faint md:items-end">
           <div>
-            Window: <span className="text-white/80 tabular-nums">{props.start}</span> →{" "}
-            <span className="text-white/80 tabular-nums">{series?.end ?? props.end ?? "—"}</span>
+            Window: <span className="font-mono text-ui-muted">{props.start}</span> →{" "}
+            <span className="font-mono text-ui-muted">{series?.end ?? props.end ?? "—"}</span>
           </div>
           <div>
-            As-of: <span className="text-white/80 tabular-nums">{series?.freshness?.asof ?? "—"}</span>{" "}
-            <span className="text-white/50">(lag {series?.freshness?.lag_days ?? "—"}d)</span>
+            As-of: <span className="font-mono text-ui-muted">{series?.freshness?.asof ?? "—"}</span>{" "}
+            <span className="text-ui-faint">(lag {series?.freshness?.lag_days ?? "—"}d)</span>
           </div>
           <div>
             Coverage:{" "}
-            <span className="text-white/80 tabular-nums">
+            <span className="font-mono text-ui-muted">
               {series ? `${series.coverage.present_days}/${series.coverage.expected_days}` : "—"}
             </span>
           </div>
@@ -317,101 +467,127 @@ export function MetricPanel(props: {
       </div>
 
       {loading ? (
-        <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">Loading metric…</div>
+        <div className="mt-4 rounded-2xl border border-ui-border bg-ui-bg/15 p-4 text-sm text-ui-muted">Loading metric…</div>
       ) : err ? (
-        <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {err}
-          <div className="mt-2 text-xs text-red-200/80">
-            This metric is blocked by the documentation guardrail. Add it to <span className="font-mono">METRIC_CATALOG</span> before exposing it.
+        <div className="mt-4 rounded-2xl border border-ui-border bg-[rgb(var(--bad)/0.10)] p-4 text-sm text-ui-text">
+          <div className="font-semibold text-[rgb(var(--bad)/0.95)]">Blocked: documentation guardrail</div>
+          <div className="mt-2 text-ui-muted">{err}</div>
+          <div className="mt-2 text-xs text-ui-faint">
+            Add this metric to the catalog documentation before exposing it publicly.
           </div>
         </div>
       ) : props.hideIfLowCoverage && isLowCoverage ? (
-        <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
-          <div className="text-sm font-semibold text-white">Hidden due to insufficient coverage</div>
-          <div className="mt-2 text-xs text-white/60">
+        <div className="mt-4 rounded-2xl border border-ui-border bg-ui-bg/15 p-4">
+          <div className="text-sm font-semibold text-ui-text">Hidden due to insufficient coverage</div>
+          <div className="mt-2 text-xs text-ui-muted">
             This metric is hidden because the selected window has{" "}
-            <span className="font-mono text-white/75">{((nonNull ?? 0) * 100).toFixed(1)}%</span> non-null values
-            (threshold: <span className="font-mono text-white/75">70%</span>). Missing days are not interpolated.
+            <span className="font-mono text-ui-text">{((nonNull ?? 0) * 100).toFixed(1)}%</span> non-null values
+            (threshold: <span className="font-mono text-ui-text">70%</span>). Missing days are not interpolated.
           </div>
-          <div className="mt-2 text-xs text-white/60">
+          <div className="mt-2 text-xs text-ui-muted">
             See:{" "}
-            <a className="underline underline-offset-4 hover:text-white" href="/notables#data-quality">
+            <a className="underline underline-offset-4 hover:text-ui-text" href="/notables#data-quality">
               Notables policy (data quality)
             </a>
           </div>
         </div>
       ) : (
         <>
-          {/* Taller chart (was 240px) */}
+          {/* Persistent vs transient regime context (web2) */}
+          <div
+            className={`mt-4 rounded-2xl border border-ui-border p-4 ${
+              regime.tone === "warn" ? "bg-[rgb(var(--bad)/0.10)]" : "bg-ui-bg/15"
+            }`}
+          >
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-ui-faint">Regime context</div>
+                <div className="mt-1 text-sm font-semibold text-ui-text">{regime.headline}</div>
+                <div className="mt-1 text-sm text-ui-muted">{regime.detail}</div>
+                <div className="mt-2 text-xs text-ui-faint">
+                  Based on MA7 vs MA30 divergence (short-term regime vs structural baseline). Descriptive only.
+                </div>
+              </div>
+
+              <div className="mt-2 flex shrink-0 flex-wrap gap-2 md:mt-0 md:justify-end">
+                <Chip label="MA7 vs MA30" value={regimeBadge} tone={regime.tone === "warn" ? "warn" : "neutral"} />
+                {regime.streakDays != null ? (
+                  <Chip
+                    label="streak"
+                    value={regime.kind === "near" ? "—" : `${regime.streakDays}d`}
+                    tone={regime.tone === "warn" ? "warn" : "neutral"}
+                  />
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {/* Taller chart (web2 readability) */}
           <div className="mt-4 h-[320px] w-full">
             <MetricTriLineChart data={triData} height={320} />
           </div>
 
-          {/* Context tiles (now 5, responsive) */}
+          {/* Context tiles */}
           <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-white/50">Latest</div>
-              <div className="mt-1 text-sm font-semibold text-white tabular-nums">{fmtCompact(summary?.current?.daily)}</div>
-              <div className="mt-1 text-[11px] text-white/55">Observed latest day (can be noisy).</div>
+            <div className="rounded-2xl border border-ui-border bg-ui-bg/15 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-ui-faint">Latest</div>
+              <div className="mt-1 text-sm font-semibold text-ui-text tabular-nums">{fmtCompact(summary?.current?.daily)}</div>
+              <div className="mt-1 text-[11px] text-ui-faint">Observed latest day (can be noisy).</div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-white/50">MA7</div>
-              <div className="mt-1 text-sm font-semibold text-white tabular-nums">{fmtCompact(summary?.current?.ma7)}</div>
-              <div className="mt-1 text-[11px] text-white/55">Short-term baseline (last week).</div>
+            <div className="rounded-2xl border border-ui-border bg-ui-bg/15 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-ui-faint">MA7</div>
+              <div className="mt-1 text-sm font-semibold text-ui-text tabular-nums">{fmtCompact(summary?.current?.ma7)}</div>
+              <div className="mt-1 text-[11px] text-ui-faint">Short-term baseline (last week).</div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-white/50">MA30</div>
-              <div className="mt-1 text-sm font-semibold text-white tabular-nums">{fmtCompact(summary?.current?.ma30)}</div>
-              <div className="mt-1 text-[11px] text-white/55">Structural baseline (last month).</div>
+            <div className="rounded-2xl border border-ui-border bg-ui-bg/15 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-ui-faint">MA30</div>
+              <div className="mt-1 text-sm font-semibold text-ui-text tabular-nums">{fmtCompact(summary?.current?.ma30)}</div>
+              <div className="mt-1 text-[11px] text-ui-faint">Structural baseline (last month).</div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-white/50">Percentile (historical)</div>
-              <div className="mt-1 text-sm font-semibold text-white tabular-nums">{pctInt == null ? "—" : `${pctInt}%`}</div>
-              <div className="mt-1 text-[11px] text-white/55">Where today ranks in this window.</div>
+            <div className="rounded-2xl border border-ui-border bg-ui-bg/15 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-ui-faint">Percentile (historical)</div>
+              <div className="mt-1 text-sm font-semibold text-ui-text tabular-nums">{pctInt == null ? "—" : `${pctInt}%`}</div>
+              <div className="mt-1 text-[11px] text-ui-faint">Where today ranks in this window.</div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-white/50">Z-score (context)</div>
-              <div className="mt-1 text-sm font-semibold text-white tabular-nums">{fmtZ(zLatest)}</div>
-              <div className="mt-1 text-[11px] text-white/55">{zText ?? "Standardized distance from mean."}</div>
+            <div className="rounded-2xl border border-ui-border bg-ui-bg/15 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-ui-faint">Z-score (context)</div>
+              <div className="mt-1 text-sm font-semibold text-ui-text tabular-nums">{fmtZ(zLatest)}</div>
+              <div className="mt-1 text-[11px] text-ui-faint">{zText ?? "Standardized distance from mean."}</div>
             </div>
           </div>
 
           {/* Percentile explanation */}
-          <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-white/50">What “percentile” means</div>
-            <div className="mt-1 text-sm">
+          <div className="mt-4 rounded-2xl border border-ui-border bg-ui-bg/15 p-4">
+            <div className="text-[11px] uppercase tracking-wide text-ui-faint">What “percentile” means</div>
+            <div className="mt-2 text-sm">
               <PercentileCopy p={pctInt} />
             </div>
 
-            <details className="mt-3">
-              <summary className="cursor-pointer select-none text-xs font-semibold text-white/80">
-                Advanced definition
-              </summary>
-              <div className="mt-2 text-xs text-white/70 leading-relaxed">
-                Percentile ranks today’s <span className="text-white/85">daily</span> value among{" "}
-                <span className="text-white/85">non-null daily</span> values in the selected window. It is distribution context —{" "}
-                <span className="text-white/85">not a forecast</span>.
+            <details className="mt-3 rounded-2xl border border-ui-border bg-ui-bg/10 p-3">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-ui-text">Advanced definition</summary>
+              <div className="mt-2 text-xs text-ui-muted leading-relaxed">
+                Percentile ranks today’s <span className="text-ui-text">daily</span> value among{" "}
+                <span className="text-ui-text">non-null daily</span> values in the selected window. It is distribution context —{" "}
+                <span className="text-ui-text">not a forecast</span>.
               </div>
             </details>
           </div>
 
           {/* Z-score explanation */}
-          <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-white/50">What “z-score” means</div>
-            <div className="mt-1 text-sm text-white/70">
-              Z-score tells you how far today is from the window’s average in <span className="text-white/85">standard deviation units</span>.
-              <span className="ml-2 text-white/60">Rule of thumb: |z|≈1 typical, |z|≈2 unusual, |z|≥3 rare.</span>
+          <div className="mt-3 rounded-2xl border border-ui-border bg-ui-bg/15 p-4">
+            <div className="text-[11px] uppercase tracking-wide text-ui-faint">What “z-score” means</div>
+            <div className="mt-2 text-sm text-ui-muted">
+              Z-score tells you how far today is from the window’s average in <span className="text-ui-text">standard deviation units</span>.
+              <span className="ml-2 text-ui-faint">Rule of thumb: |z|≈1 typical, |z|≈2 unusual, |z|≥3 rare.</span>
             </div>
 
-            <details className="mt-3">
-              <summary className="cursor-pointer select-none text-xs font-semibold text-white/80">
-                Advanced definition
-              </summary>
-              <div className="mt-2 text-xs text-white/70 leading-relaxed">
+            <details className="mt-3 rounded-2xl border border-ui-border bg-ui-bg/10 p-3">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-ui-text">Advanced definition</summary>
+              <div className="mt-2 text-xs text-ui-muted leading-relaxed">
                 z = (x − μ) / σ, where x is today’s daily value, μ is the mean of non-null daily values in the selected window,
                 and σ is the standard deviation. If σ is ~0 or sample is too small, z is null. This is context, not causality or prediction.
               </div>
@@ -419,13 +595,13 @@ export function MetricPanel(props: {
           </div>
 
           {/* Interpretation */}
-          <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-white/50">Basic</div>
-            <div className="mt-1 text-sm text-white/85">{summary?.interpretation?.basic ?? "—"}</div>
+          <div className="mt-4 rounded-2xl border border-ui-border bg-ui-bg/15 p-4">
+            <div className="text-[11px] uppercase tracking-wide text-ui-faint">Basic</div>
+            <div className="mt-2 text-sm text-ui-text">{summary?.interpretation?.basic ?? "—"}</div>
 
-            <details className="mt-3">
-              <summary className="cursor-pointer select-none text-xs font-semibold text-white/80">Advanced details</summary>
-              <div className="mt-2 space-y-1 text-xs text-white/70">
+            <details className="mt-3 rounded-2xl border border-ui-border bg-ui-bg/10 p-3">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-ui-text">Advanced details</summary>
+              <div className="mt-2 space-y-1 text-xs text-ui-muted">
                 {(summary?.interpretation?.advanced ?? []).map((b, i) => (
                   <div key={i} className="leading-relaxed">
                     • {b}
@@ -433,9 +609,9 @@ export function MetricPanel(props: {
                 ))}
 
                 {(summary?.caveats?.length ?? 0) > 0 ? (
-                  <div className="mt-2 rounded-lg border border-white/10 bg-white/5 p-2">
-                    <div className="text-[11px] uppercase tracking-wide text-white/50">Data notes</div>
-                    <div className="mt-1 space-y-1">
+                  <div className="mt-3 rounded-2xl border border-ui-border bg-ui-bg/10 p-3">
+                    <div className="text-[11px] uppercase tracking-wide text-ui-faint">Data notes</div>
+                    <div className="mt-2 space-y-1">
                       {summary!.caveats.map((c, i) => (
                         <div key={i}>- {c}</div>
                       ))}
@@ -447,52 +623,53 @@ export function MetricPanel(props: {
           </div>
 
           {/* Links */}
-          <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-white/70">
-            <a className="underline underline-offset-2 hover:text-white" href={methodologyHref}>
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-ui-faint">
+            <a className="underline underline-offset-2 hover:text-ui-text" href={methodologyHref}>
               Methodology
             </a>
-            <a className="underline underline-offset-2 hover:text-white" href={wikiHref}>
+            <a className="underline underline-offset-2 hover:text-ui-text" href={wikiHref}>
               Wiki
             </a>
 
             {rawGoldDailyHref ? (
-              <a className="underline underline-offset-2 hover:text-white" href={rawGoldDailyHref} target="_blank" rel="noreferrer">
+              <a className="underline underline-offset-2 hover:text-ui-text" href={rawGoldDailyHref} target="_blank" rel="noreferrer">
                 Raw gold (daily)
               </a>
             ) : null}
             {rawDerivedDailyHref ? (
-              <a className="underline underline-offset-2 hover:text-white" href={rawDerivedDailyHref} target="_blank" rel="noreferrer">
+              <a className="underline underline-offset-2 hover:text-ui-text" href={rawDerivedDailyHref} target="_blank" rel="noreferrer">
                 Raw derived (daily)
               </a>
             ) : null}
             {rawMetaDailyHref ? (
-              <a className="underline underline-offset-2 hover:text-white" href={rawMetaDailyHref} target="_blank" rel="noreferrer">
+              <a className="underline underline-offset-2 hover:text-ui-text" href={rawMetaDailyHref} target="_blank" rel="noreferrer">
                 Raw meta (daily)
               </a>
             ) : null}
 
-            <a className="underline underline-offset-2 hover:text-white" href={rawGoldWindowHref} target="_blank" rel="noreferrer">
+            <a className="underline underline-offset-2 hover:text-ui-text" href={rawGoldWindowHref} target="_blank" rel="noreferrer">
               Raw gold (last365d)
             </a>
-            <a className="underline underline-offset-2 hover:text-white" href={rawDerivedWindowHref} target="_blank" rel="noreferrer">
+            <a className="underline underline-offset-2 hover:text-ui-text" href={rawDerivedWindowHref} target="_blank" rel="noreferrer">
               Raw derived (last365d)
             </a>
-            <a className="underline underline-offset-2 hover:text-white" href={rawMetaWindowHref} target="_blank" rel="noreferrer">
+            <a className="underline underline-offset-2 hover:text-ui-text" href={rawMetaWindowHref} target="_blank" rel="noreferrer">
               Raw meta (last365d)
             </a>
 
-            <a className="underline underline-offset-2 hover:text-white" href={rawGoldManifestHref} target="_blank" rel="noreferrer">
+            <a className="underline underline-offset-2 hover:text-ui-text" href={rawGoldManifestHref} target="_blank" rel="noreferrer">
               Manifest (gold)
             </a>
-            <a className="underline underline-offset-2 hover:text-white" href={rawDerivedManifestHref} target="_blank" rel="noreferrer">
+            <a className="underline underline-offset-2 hover:text-ui-text" href={rawDerivedManifestHref} target="_blank" rel="noreferrer">
               Manifest (derived)
             </a>
-            <a className="underline underline-offset-2 hover:text-white" href={rawMetaManifestHref} target="_blank" rel="noreferrer">
+            <a className="underline underline-offset-2 hover:text-ui-text" href={rawMetaManifestHref} target="_blank" rel="noreferrer">
               Manifest (meta)
             </a>
 
-            <span className="ml-auto text-[11px] text-white/50">
-              dataset: {series?.dataset_id ?? "—"} / rev: {series?.revision_id ?? "—"}
+            <span className="ml-auto text-[11px] text-ui-faint">
+              dataset: <span className="font-mono text-ui-muted">{series?.dataset_id ?? "—"}</span> / rev:{" "}
+              <span className="font-mono text-ui-muted">{series?.revision_id ?? "—"}</span>
             </span>
           </div>
         </>

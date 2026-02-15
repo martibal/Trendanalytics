@@ -95,6 +95,25 @@ function buildHighlights(meta: any): string[] {
   return out.slice(0, 3);
 }
 
+function FactPill(props: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-ui-border bg-ui-bg/15 px-3 py-1 text-[11px]">
+      <span className="text-ui-faint">{props.label}</span>
+      <span className="font-mono text-ui-muted">{props.value}</span>
+    </div>
+  );
+}
+
+function LegendDot(props: { rgbVar: "--chart-daily" | "--chart-ma7" | "--chart-ma30" }) {
+  return (
+    <span
+      className="inline-block h-2.5 w-2.5 rounded-sm"
+      style={{ background: `rgb(var(${props.rgbVar}) / 0.95)` }}
+      aria-hidden="true"
+    />
+  );
+}
+
 export function ChainSnapshotCard(props: {
   chain: ChainId;
   metaAsof?: string;
@@ -223,8 +242,11 @@ export function ChainSnapshotCard(props: {
   const primerText = useMemo(() => chainPrimer(chain), [chain]);
   const highlights = useMemo(() => buildHighlights(meta), [meta]);
 
+  const lagPolicy = meta?.publish_lag_days_policy;
+  const updatedThrough = meta?.updated_through;
+
   return (
-    <div className="ui-card ui-lift p-4">
+    <div className="ui-card ui-lift rounded-3xl border border-ui-border bg-ui-bg/20 p-5">
       {/* Top row */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -237,6 +259,14 @@ export function ChainSnapshotCard(props: {
         {regimeLabel ? <RegimeBadge label={regimeLabel} /> : null}
       </div>
 
+      {/* Facts (explicit dimensions) */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <FactPill label="derived as-of" value={derivedAsof ?? "—"} />
+        <FactPill label="gold as-of" value={goldAsof ?? "—"} />
+        {typeof lagPolicy === "number" && Number.isFinite(lagPolicy) ? <FactPill label="lag policy" value={`${lagPolicy}d`} /> : null}
+        {typeof updatedThrough === "string" && updatedThrough.length ? <FactPill label="updated through" value={updatedThrough} /> : null}
+      </div>
+
       {/* Primer */}
       <div className="mt-3 text-xs text-ui-muted">{primerText}</div>
 
@@ -244,16 +274,30 @@ export function ChainSnapshotCard(props: {
       <div className="mt-4">
         <div className="flex items-baseline justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] text-ui-faint">Default trend</div>
+            <div className="text-[11px] text-ui-faint">Primary signal</div>
             <div className="mt-1 truncate text-xs text-ui-text">{metricLabel}</div>
           </div>
 
-          <div className="shrink-0 rounded-full border border-ui-border bg-ui-bg/20 px-2 py-1 text-[11px] text-ui-faint">
-            Daily • MA7 • MA30
+          {/* Legend with token-aligned semantics */}
+          <div className="shrink-0 rounded-full border border-ui-border bg-ui-bg/15 px-2.5 py-1 text-[11px] text-ui-faint">
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-flex items-center gap-1">
+                <LegendDot rgbVar="--chart-daily" />
+                <span>Daily</span>
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <LegendDot rgbVar="--chart-ma7" />
+                <span>MA7</span>
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <LegendDot rgbVar="--chart-ma30" />
+                <span>MA30</span>
+              </span>
+            </span>
           </div>
         </div>
 
-        <div className="mt-2 h-28 min-h-[112px] w-full rounded-xl border border-ui-border bg-ui-bg/20 p-2">
+        <div className="mt-2 h-28 min-h-[112px] w-full rounded-2xl border border-ui-border/15 bg-ui-bg/10 p-2">
           {bundleLoading || rowsLoading ? (
             <div className="flex h-full items-center justify-center text-xs text-ui-muted">Loading…</div>
           ) : triSeries.length === 0 ? (
@@ -281,9 +325,9 @@ export function ChainSnapshotCard(props: {
       <div className="mt-4">
         <Link
           href={`/chains/${chain}`}
-          className="inline-flex items-center justify-center rounded-xl border border-ui-border bg-ui-bg/20 px-3 py-2 text-xs text-ui-text hover:bg-ui-bg/30 focus:outline-none focus:ring-2 focus:ring-ui-accent/30"
+          className="inline-flex items-center justify-center rounded-full border border-ui-border bg-ui-bg/15 px-4 py-2 text-xs font-semibold text-ui-text hover:bg-ui-bg/25 focus:outline-none focus:ring-2 focus:ring-ui-accent/30"
         >
-          Open diagnostics
+          Open dashboard
         </Link>
       </div>
     </div>
