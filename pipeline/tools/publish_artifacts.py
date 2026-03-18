@@ -10,6 +10,8 @@ To:
 Plus:
   data/published/v1/dataset.json
   data/published/v1/index.json                (BACK-COMPAT ALIAS)
+  data/published/v1/latest.json               (BACK-COMPAT ALIAS)
+  data/published/v1/contract.json             (CONTRACT / SCHEMA / DEFAULTS)
   data/published/v1/{genre}/{chain}/manifest.json
 Plus:
   data/published/v1/landing/index.json
@@ -389,6 +391,223 @@ def _source_dir_for_genre(calculated_root: Path, genre: str) -> Path:
     return calculated_root / genre
 
 
+def _build_contract(methodology_version: str = "v1") -> Dict[str, Any]:
+    """
+    Contract is the schema + methodology surface for published v1.
+    This is intentionally descriptive-only (no normative language, no prices).
+    """
+    # Canonical defaults for customer threshold config (v1).
+    threshold_config_default = {
+        "version": "v1",
+        "gate": {"confidence_threshold": 0.40},
+        "band": {
+            "high": {"pct": 80, "z": 1.5},
+            "extreme_high": {"pct": 90, "z": 2.5},
+            "low": {"pct": 20, "z": -1.5},
+            "extreme_low": {"pct": 10, "z": -2.5},
+        },
+        "trend": {"eps": 0.15},
+    }
+
+    # NEW: explicit default mapping between scorecard component ids and regime.signal ids
+    # so users do not experience scorecard + signals as "two universes".
+    default_signal_aliases_by_profile = {
+        "btc": {
+            "tx_count": "tx_count_daily",
+            "blocktime_instability": "blocktime_instability",
+            "fee_burden_proxy": "median_tx_fee_native",
+        },
+        "eth_l1": {
+            "tx_count": "tx_count_daily",
+            "active_addresses": "unique_active_addresses",
+            "fee_burden_proxy": "median_tx_fee_native",
+            "failed_tx_rate": "failed_tx_rate",
+            "utilization": "gas_utilization_pct",
+            "blocktime_instability": "blocktime_instability",
+        },
+        "l2": {
+            "tx_count": "tx_count_daily",
+            "active_addresses": "unique_active_addresses",
+            "fee_burden_proxy": "median_tx_fee_native",
+            "failed_tx_rate": "failed_tx_rate",
+            "utilization": "capacity_util_pct",
+            "blocktime_instability": "blocktime_instability",
+        },
+    }
+
+    return {
+        "contract_version": "v1",
+        "methodology_version": methodology_version,
+        "schema_versions": {
+            "dataset": "dataset.v1",
+            "gold": "gold.v1",
+            "meta": "meta.v1",
+            "derived": "derived.v1",
+        },
+        "derived_definition": {
+            "schema_version": "derived_definition.v1",
+            "method": "rolling_mean",
+            "windows_days": [7, 30],
+            "suffix_format": "__ma{window}",
+            "min_periods": 1,
+            "notes": [
+                "Derived metrics are computed from numeric GOLD fields.",
+                "For each numeric gold field X, we publish X__ma7 and X__ma30 as rolling means.",
+                "min_periods=1 (early days are partial-window means).",
+            ],
+        },
+        "gate": {
+            "type": "gate.v1",
+            "policy": "deterministic_in_ui",
+            "notes": [
+                "Gate state is derived deterministically from META fields + this contract.",
+                "Historical META day-json are not backfilled with gate fields.",
+            ],
+        },
+        "meta": {
+            "confidence": {
+                "gating_threshold_default": 0.40,
+                "gating_reason_taxonomy": [
+                    "missing_data",
+                    "confidence_below_threshold",
+                    "insufficient_coverage",
+                    "stale_data",
+                    "ok",
+                ],
+                "confidence_score": {
+                    "type": "number",
+                    "range": [0.0, 1.0],
+                    "what": "A 0..1 data-quality confidence score used to gate regime labels.",
+                    "how": "Computed upstream in META; clamped to [0,1] in the engine.",
+                    "why": "Prevents overclaiming when coverage/quality/freshness are insufficient.",
+                },
+            },
+            "regime": {
+                "signals": {
+                    "schema_version": "meta.regime.signals.v1",
+                    "what": "Evidence surface for threshold re-parameterization: one entry per metric used by the regime engine.",
+                    "why": "Enables customers to reproduce or customize classification without changing canonical labels.",
+                    "fields": {
+                        "axis": {"type": "string", "enum": ["demand", "friction", "capacity"]},
+                        "current": {"type": ["number", "null"], "what": "Latest value for this metric/signal on as-of date."},
+                        "pct_90d": {
+                            "type": "number",
+                            "what": "Percentile rank over last 90 days.",
+                            "how": "Computed using <= counting within the last 90 finite observations (0..100).",
+                        },
+                        "z_robust": {
+                            "type": "number",
+                            "what": "Robust z-score over last 180 days.",
+                            "how": "0.6745*(x - median)/MAD; MAD computed over last 180 finite observations.",
+                        },
+                        "momentum_7d_vs_30d": {
+                            "type": "number",
+                            "what": "Short-vs-long momentum in robust-z space.",
+                            "how": "(robust_z(mean(last 7d))) - (robust_z(mean(last 30d))).",
+                        },
+                        "current_raw": {
+                            "type": ["number", "null"],
+                            "what": "Optional raw input value when the signal is a transform.",
+                        },
+                        "transform": {
+                            "type": ["object", "null"],
+                            "what": "Optional transform metadata when the signal is not a raw metric.",
+                        },
+                    },
+                    "windows": {"pct_90d_days": 90, "z_robust_days": 180, "momentum_short_days": 7, "momentum_long_days": 30},
+                    "notes": [
+                        "signals is publishable evidence and must not change canonical identity hashes.",
+                        "Missing data should be treated as unknown (null), never zero.",
+                    ],
+                },
+                "signal_aliases": {
+                    "schema_version": "meta.regime.signal_aliases.v1",
+                    "what": "Optional mapping from scorecard component keys to regime signal keys.",
+                    "why": "Prevents confusion when scorecard uses compact component ids but signals use canonical metric ids.",
+                    "defaults_by_profile": default_signal_aliases_by_profile,
+                    "notes": [
+                        "A client may display these aliases explicitly so users can trace scorecard components to signals.",
+                        "Some signals are transforms. Example: blocktime_instability is a transform of avg_block_time_sec; it should carry transform/current_raw metadata.",
+                    ],
+                },
+            },
+        },
+
+        # NEW (C): Explicit canonical vs custom identity semantics
+        "identity": {
+            "schema_version": "identity.v1",
+            "what": "Identity semantics to prevent canonical vs custom confusion.",
+            "canonical": {
+                "field": "meta.regime.determinism_hash",
+                "what": "Canonical identity hash for the regime snapshot computed by the pipeline.",
+                "how": "Stable hash over a canonicalized payload (chain, ruleset_id, label, asof_date, drivers) when NOT gated.",
+                "notes": [
+                    "If gated, determinism_hash may be null/absent; UI must treat regime label as UNKNOWN/DEGRADED.",
+                    "Canonical hash must not be affected by any client-side custom threshold configuration.",
+                ],
+            },
+            "custom": {
+                "field": "custom_regime.identity_hash",
+                "what": "Custom identity hash for a client-provided threshold config evaluation.",
+                "how": "Stable hash over (canonical inputs + effective threshold config + custom outputs).",
+                "notes": [
+                    "Custom hash must never be presented as canonical.",
+                    "Clients must explicitly mark custom outputs as custom (e.g., 'custom': true).",
+                ],
+            },
+        },
+
+        # NEW (C): Explicit custom regime schema surface (API output contract)
+        "custom_regime": {
+            "schema_version": "custom_regime.v1",
+            "what": "Schema for custom threshold re-classification results (non-canonical).",
+            "why": "Allows professional users to test alternative thresholds without mutating published canonical artifacts.",
+            "fields": {
+                "schema_version": {"type": "string", "const": "custom_regime.v1"},
+                "config_version": {"type": "string", "what": "Threshold config version, e.g. 'v1'."},
+                "label": {"type": "string", "what": "Custom regime label computed from canonical evidence + effective config."},
+                "axes": {"type": ["object", "null"], "what": "Optional custom axes aggregation output."},
+                "drivers": {"type": "array", "items": {"type": "object"}, "what": "Optional custom driver list; may be empty."},
+                "notes": {"type": "array", "items": {"type": "string"}, "what": "Descriptive notes, never advisory."},
+                "identity_hash": {"type": ["string", "null"], "what": "Custom identity hash (see identity.custom)."},
+            },
+            "constraints": [
+                "Custom outputs are descriptive-only and must not include price, advice, or forecasts.",
+                "Custom outputs must be clearly labeled as custom in any API/client response.",
+                "Custom outputs must never overwrite canonical meta files.",
+            ],
+        },
+
+        "threshold_config_default": threshold_config_default,
+        "threshold_config_schema": {
+            "schema_version": "threshold_config.v1",
+            "what": "Customer threshold configuration for custom classification.",
+            "notes": [
+                "Canonical labels in META remain unchanged.",
+                "Custom labels must be explicitly marked as custom by any API/client.",
+                "Custom outputs should be traceable via identity_hash (see contract.identity.custom).",
+            ],
+        },
+        "regime": {
+            "labels": ["STABLE", "HEATING", "CONGESTED", "CHEAP", "UNKNOWN/DEGRADED"],
+            "axes": ["demand", "friction", "capacity"],
+            "driver_fields": ["axis", "metric", "z_robust", "pct_90d", "momentum_7d_vs_30d", "band", "trend"],
+            "notes": [
+                "Regime labels are 100% descriptive (no price, no forecasts).",
+                "If gated, the headline label must be treated as UNKNOWN/DEGRADED in UI.",
+            ],
+        },
+        "metric_dictionary": {
+            "schema_version": "metric_dictionary.v1",
+            "common": {"date": {"type": "string", "format": "YYYY-MM-DD"}, "chain": {"type": "string"}},
+            "notes": [
+                "This dictionary is intentionally minimal in v1 and will be expanded.",
+                "Fields not listed here must be interpreted via their source schema (gold/meta/derived).",
+            ],
+        },
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True, help="Project root (e.g. d:/css/main)")
@@ -414,6 +633,13 @@ def main() -> int:
     asof_by_genre_chain: Dict[str, Dict[str, str]] = {g: {} for g in genres}
     copied_counts: Dict[str, Dict[str, int]] = {g: {} for g in genres}
 
+    # dataset.coverage[chain][genre] summary
+    # Required keys: days, from, to, asof
+    coverage: Dict[str, Dict[str, Dict[str, Any]]] = {c: {} for c in chains}
+    for c in chains:
+        for g in genres:
+            coverage[c][g] = {"days": 0, "from": "", "to": "", "asof": ""}
+
     for genre in genres:
         src_genre = _source_dir_for_genre(calculated, genre)
         dst_genre = published / genre
@@ -433,6 +659,8 @@ def main() -> int:
                 copied_counts[genre][chain] = copied
 
             available_days = _collect_days(dst_chain)
+            asof_manifest = available_days[-1] if available_days else ""
+
             manifest = {
                 "dataset_id": dataset_id,
                 "revision_id": revision_id,
@@ -441,7 +669,7 @@ def main() -> int:
                 "chain": chain,
                 "schema_version": _schema_version(genre),
                 "methodology_version": "v1",
-                "asof": available_days[-1] if available_days else "",
+                "asof": asof_manifest,
                 "available_days_count": len(available_days),
                 "available_days": available_days,
                 "windows_supported": windows,
@@ -451,6 +679,30 @@ def main() -> int:
                 },
             }
             _write_json(dst_chain / "manifest.json", manifest)
+
+            if available_days:
+                coverage[chain][genre]["days"] = len(available_days)
+                coverage[chain][genre]["from"] = available_days[0]
+                coverage[chain][genre]["to"] = available_days[-1]
+                coverage[chain][genre]["asof"] = available_days[-1]
+            else:
+                coverage[chain][genre]["days"] = 0
+                coverage[chain][genre]["from"] = ""
+                coverage[chain][genre]["to"] = ""
+                coverage[chain][genre]["asof"] = ""
+
+    derived_definition = {
+        "schema_version": "derived_definition.v1",
+        "method": "rolling_mean",
+        "windows_days": [7, 30],
+        "suffix_format": "__ma{window}",
+        "min_periods": 1,
+        "notes": [
+            "Derived metrics are computed from numeric GOLD fields.",
+            "For each numeric gold field X, we publish X__ma7 and X__ma30 as rolling means.",
+            "min_periods=1 (early days are partial-window means).",
+        ],
+    }
 
     dataset = {
         "dataset_id": dataset_id,
@@ -462,6 +714,8 @@ def main() -> int:
         "schema_versions": {g: _schema_version(g) for g in genres},
         "methodology_version": "v1",
         "asof_by_genre_chain": asof_by_genre_chain,
+        "coverage": coverage,
+        "derived_definition": derived_definition,
         "copied_file_counts": copied_counts,
         "notes": [
             "Published dataset is the only intended input for the website.",
@@ -470,14 +724,13 @@ def main() -> int:
         ],
     }
 
-    # Primary dataset contract
     _write_json(published / "dataset.json", dataset)
-
-    # Back-compat aliases (some web code fetches these)
     _write_json(published / "index.json", dataset)
     _write_json(published / "latest.json", dataset)
 
-    # Landing export (website depends on it)
+    contract = _build_contract(methodology_version="v1")
+    _write_json(published / "contract.json", contract)
+
     _export_landing(
         published_root=published,
         dataset_id=dataset_id,

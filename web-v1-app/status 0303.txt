@@ -1,0 +1,413 @@
+TrendAnalytics Web Platform
+Operational Handover Document (Technical)
+
+Date: 2026-03-03
+Project: TrendAnalytics – Descriptive Regime Analytics Platform
+Layer: Web (Next.js 16, App Router, TypeScript)
+
+1. Purpose of This Document
+
+This document enables a new development team to:
+
+Understand the current architecture
+
+Know exactly what has been implemented
+
+Identify what remains
+
+Continue development without violating governance constraints
+
+Avoid breaking deterministic and descriptive policies
+
+This is a technical continuation guide, not a strategy summary.
+
+2. Non-Negotiable Governance Constraints
+
+These rules must never be violated.
+
+2.1 Strictly Descriptive
+
+No price data
+
+No forecasts
+
+No advisory language
+
+No inferred conclusions
+
+No derived models beyond published JSON
+
+Frontend may only:
+
+Read published JSON artifacts
+
+Display values
+
+Sort / window deterministically
+
+Format numbers for UI
+
+It may NOT:
+
+Recompute models
+
+Apply additional smoothing
+
+Change regime logic
+
+Add interpretation text
+
+2.2 Deterministic Transparency
+
+All UI values must trace directly to:
+
+/public/data/published/v1/
+
+Displayed values must expose source paths where appropriate.
+
+2.3 Data Hierarchy (Immutable Contract)
+RAW parquet
+  → gold parquet
+    → gold/YYYY-MM-DD.json
+  → derived/YYYY-MM-DD.json
+  → meta/<chain>/latest.json
+  → dataset.json
+
+Frontend consumes only:
+
+meta
+
+gold (daily)
+
+derived (daily)
+
+dataset.json
+
+3. Current Codebase Structure
+/src
+  /app
+    layout.tsx
+    page.tsx                    → Home
+    /chains
+      /[chain]
+        page.tsx                → Chain detail
+        history/page.tsx        → Regime history (last 90d)
+    /status
+      page.tsx
+    /glossary
+      page.tsx
+
+  /components
+    MetricLineChart.tsx         → Recharts wrapper
+    (UI primitives inline)
+
+  /lib
+    (utility functions inside page files currently)
+
+public/
+  /data/published/v1/
+    /gold/<chain>/YYYY-MM-DD.json
+    /derived/<chain>/YYYY-MM-DD.json
+    /meta/<chain>/latest.json
+    dataset.json
+4. Implemented Features
+4.1 Chain Detail Page (/chains/[chain]/page.tsx)
+
+Displays:
+
+Regime (status.label fallback regime.label)
+
+Confidence (confidence_score)
+
+Confidence band (UI derived only from numeric thresholds)
+
+Determinism hash
+
+Window days
+
+WHN (top 5 drivers sorted by |z_robust|)
+
+Full drivers table
+
+Scorecard (demand, friction, capacity)
+
+Chain profile note
+
+90-day raw + MA charts
+
+4.2 Chart System
+Data Source Strategy
+
+Derived:
+
+public/data/published/v1/derived/<chain>/YYYY-MM-DD.json
+
+Gold:
+
+public/data/published/v1/gold/<chain>/YYYY-MM-DD.json
+
+Aggregation logic:
+
+Determine max available date from derived disk files
+
+Build dense 90-calendar-day window
+
+Read matching daily files
+
+Join by date
+
+Preserve null gaps
+
+No interpretation applied
+
+Chart Displays:
+
+Raw daily value
+
+MA7
+
+MA30
+
+4.3 Regime History
+
+File:
+
+/chains/[chain]/history/page.tsx
+
+Displays:
+
+Daily regime label
+
+Confidence
+
+Band
+
+90-day window
+
+No interpretation layer.
+
+4.4 Status Page
+
+Displays:
+
+All chains
+
+Regime
+
+Confidence
+
+Band
+
+Lag
+
+Updated through
+
+Gold last feature date
+
+Strictly descriptive.
+
+5. Utility Logic Currently Embedded
+
+Inside /chains/[chain]/page.tsx:
+
+Date parsing (UTC-safe)
+
+Calendar window construction
+
+Dense window building
+
+Disk JSON reading
+
+Gold metric extraction (multiple schema fallback)
+
+Driver sorting by |z|
+
+These should eventually be moved to:
+
+/lib/dataReaders.ts
+/lib/windowing.ts
+/lib/format.ts
+
+Refactor recommended but not mandatory.
+
+6. Known Technical Debt
+
+Disk readers embedded in page component
+
+No central data layer abstraction
+
+Recharts width warning (cosmetic)
+
+No loading skeleton
+
+No error boundary per section
+
+No memoized cache layer
+
+No JSON schema validation
+
+None of the above violate governance.
+
+7. Unimplemented Governance Requirements
+7.1 Basic / Advanced Explanation Toggle
+
+Required by governance.
+
+Location:
+
+Chain page (Scorecard + Drivers section)
+
+Missing:
+
+Toggle component
+
+Separate explanation blocks
+
+Methodology link
+
+7.2 Methodology / Wiki Section
+
+Not implemented.
+
+Required:
+
+Dedicated /methodology route
+
+Basic explanation
+
+Advanced explanation
+
+Explicit formula descriptions
+
+Transform documentation
+
+7.3 Version Change Archive
+
+Required:
+
+Display previous methodology versions
+
+Compare old vs new definitions
+
+“Previously” section
+
+Not implemented.
+
+7.4 Regime Persistence Metrics
+
+Not implemented:
+
+Regime duration counter
+
+Regime transition markers
+
+Persistence percentile
+
+7.5 Subscription Gating
+
+Not implemented:
+
+Tier enforcement
+
+API key validation
+
+Historical depth gating
+
+8. Immediate Next Sprint (Recommended Order)
+Sprint 1 – Governance Completion
+
+Create /methodology/page.tsx
+
+Add Basic/Advanced toggle component
+
+Add info-box system for metrics
+
+Centralize data readers to /lib
+
+Add JSON schema type guards
+
+Sprint 2 – Regime Context Depth
+
+Regime duration display
+
+Regime change marker in history
+
+Driver evolution chart (optional)
+
+Confidence history mini-chart
+
+Sprint 3 – Access Layer
+
+Subscription gating logic
+
+API key validation
+
+Historical window restriction by tier
+
+9. “Do Not Break” Rules for Developers
+
+Never introduce price fields
+
+Never compute new metrics in frontend
+
+Never modify confidence thresholds without backend change
+
+Never infer conclusions from combinations of values
+
+Never apply smoothing beyond MA fields already published
+
+Never remove determinism hash display
+
+10. Testing Checklist
+
+Before merging any PR:
+
+Charts still read disk daily files
+
+Window remains deterministic 90 calendar days
+
+No interpretation text introduced
+
+Drivers sorted by |z|
+
+Confidence band matches numeric threshold
+
+No async misuse in server components
+
+No conditional hook usage in client components
+
+11. Current System State
+
+Architecture: Stable
+Data integrity: Correct
+Governance compliance: High (not complete)
+Production ready: No (documentation + gating incomplete)
+Development ready: Yes
+
+12. Restart Prompt for New Chat / New AI Session
+
+Use this to continue work in a new session:
+
+We are continuing development of TrendAnalytics Web Platform.
+Phase 2 complete: Chain page, history, status, glossary implemented.
+Charts read gold and derived daily disk files deterministically.
+Platform must remain strictly descriptive (no price, no forecast, no interpretation).
+Next objective: Governance-complete implementation starting with methodology and Basic/Advanced toggle.
+
+13. Summary
+
+The platform is functionally complete at MVP level and governance-aligned at core.
+
+Remaining work is:
+
+Governance depth
+
+Documentation layer
+
+Subscription enforcement
+
+Regime context expansion
+
+The foundation is stable and safe for continued structured development.
+
+End of Operational Handover Document.

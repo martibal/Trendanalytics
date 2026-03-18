@@ -1,0 +1,557 @@
+
+
+# 0) Mål og ikke-mål
+
+## Mål
+
+* Produktet skal kommunisere én ting: **“Regime change vs noise”**.
+* Alt i UI skal være **forankret i publisert data-kontrakt** (Gold/Meta/Derived).
+* Full transparens: **What / How / Why / Assumptions** for hver nøkkel, hver modellkomponent, hver visning.
+* API/JSON er kjerneverdien: **maskinlesbart rett ut av boksen** + **400+ dager historikk**.
+
+## Ikke-mål
+
+* Ikke “flere metrikker” for å konkurrere med ChartInspect.
+* Ikke prisdata, prognoser eller normativt språk.
+* Ikke intradag.
+
+---
+
+# 1) De 4 utbedringspunktene (rammeverk / published kontrakt)
+
+Dette er endringer som gir “pro-grade transparency” uten å recompute 400+ dager.
+
+## Punkt 1 — Maskinlesbar gating-kontrakt (`gate`)
+
+### Problem
+
+I dag må UI tolke “degraded/unknown” indirekte fra `confidence_score`, `missing`, `lag_days`. Dette oppleves som implicit logikk (= black box).
+
+### Mål
+
+Standardisert og eksplisitt gating-kontrakt som forklarer *hvorfor* regime eventuelt ikke er pålitelig.
+
+### Løsning (uten backfill)
+
+* **Ikke** skrive `gate` inn i alle historiske meta day-json nå.
+* **I stedet**:
+
+  * Publiser gating-regel i `contract.json` (threshold, reason taxonomy).
+  * Beregn gate deterministisk i web (UI / API-layer) fra meta-feltene.
+
+### Akseptansekriterier
+
+* UI kan alltid vise: `is_gated`, `reason`, `threshold`, `confidence_score`, uten hardkodede “magic numbers”.
+* Gating-reason er en av: `missing_data`, `confidence_below_threshold`, `insufficient_coverage`, `stale_data`, `ok`.
+
+---
+
+## Punkt 2 — Coverage-summary i `dataset.json`
+
+### Problem
+
+Coverage finnes per manifest, men `dataset.json` mangler en rask summary. Dette gjør global status/landing vanskelig uten mange fetches.
+
+### Mål
+
+`dataset.json` skal inneholde coverage pr chain/genre:
+
+* `days`, `from`, `to`, `asof`
+
+### Akseptansekriterier
+
+* Forside og chain-sider kan vise “441 days available (from YYYY-MM-DD)” uten å hente alle manifests.
+
+---
+
+## Punkt 3 — Publisert `contract.json` (metodikk + schema + thresholds)
+
+### Problem
+
+Metodikk og schema ligger i kode og hodet. For et premium dataset må kontrakten være publisert og versjonert.
+
+### Mål
+
+Ny fil: `data/published/v1/contract.json` som beskriver:
+
+* schema versions (gold/meta/derived)
+* derived definition
+* confidence definition + gating thresholds
+* scorecard: dimensjoner, robust z, mapping
+* regime: labels, axes, driver fields, ruleset id
+* metric dictionary (felt → enhet → type → forklaring “what/how/why” referanse)
+
+### Akseptansekriterier
+
+* Web kan generere Methodology/Data Contract-sider uten å gjette parametre.
+* Contract skal være stabil og versjonert (`contract_version`, `methodology_version`).
+
+---
+
+## Punkt 4 — Derived definition eksplisitt (ikke inferert fra nøkkelnavn)
+
+### Problem
+
+I dag kan man “gjette” at `__ma7` betyr MA7 mean, men pro-nivå krever eksplisitt definisjon.
+
+### Mål
+
+Derived-definisjon publiseres eksplisitt (minimalt) i `dataset.json` og `contract.json`.
+
+### Akseptansekriterier
+
+* UI kan alltid vise: MA windows, method, min_periods.
+* Ingen endring kreves i historiske derived day-json.
+
+---
+
+# 2) Pipeline / src.zip – konkrete patcher
+
+> Disse patchene er “publish-layer” og krever ikke regenerering av 400+ day-json.
+
+## 2.1 Endre: `pipeline/tools/publish_artifacts.py`
+
+### Endringer
+
+1. **Bygg coverage summary** ved å lese `manifest.json`/available days du allerede samler i publish-steg.
+2. **Utvid `dataset.json`** med:
+
+   * `coverage`
+   * `derived_definition`
+3. **Skriv ny fil `contract.json`** til published root.
+
+### Hvorfor
+
+* Flytter metodikk/definisjoner ut av implicit kode og inn i publisert kontrakt → pro-grade transparens.
+* Reduserer behovet for mange manifest-fetches i web.
+
+### Akseptansekriterier
+
+* Etter publish finnes:
+
+  * `data/published/v1/dataset.json` med `coverage` og `derived_definition`
+  * `data/published/v1/contract.json`
+
+---
+
+## 2.2 Endre: `pipeline/tools/validate_published_dataset.py`
+
+### Endringer
+
+* Legg til validering:
+
+  * `dataset.json.coverage` finnes og har entries for alle chains/genres
+  * `dataset.json.derived_definition` finnes og matcher contract
+  * `contract.json` finnes og har minimum felter (`contract_version`, `methodology_version`, `derived_definition`, `meta.confidence.gating_threshold_default`, osv.)
+
+### Hvorfor
+
+* Sikrer at “pro-grade contract surface” aldri blir delvis publisert.
+
+---
+
+# 3) Web / web.zip – “pro-grade regime vs noise” implementasjon
+
+## 3.1 Overordnet informasjonsarkitektur (krav)
+
+Dette er viktigere enn estetikk: det avgjør om du fremstår som “lite dashboard” eller “diagnostic dataset”.
+
+### Absolutte UI-krav (må)
+
+1. **Regime først**: `META.regime.label + confidence + drivers` skal være “above the fold” på chain side.
+2. **Provenance alltid synlig**: as-of, lag, coverage, version.
+3. **JSON er first-class**: lenker til gold/meta/derived day-json + manifest + dataset + contract.
+4. **What/How/Why** for alt: hvert panel/graf må ha info-boks som er koblet til contract/methodology.
+
+---
+
+## 3.2 Konkrete filendringer i web-kodebasen
+
+### A) Endre: `src/lib/types.ts`
+
+#### Hva
+
+* Utvid `DatasetIndex` til å støtte nye felter:
+
+  * `coverage`
+  * `derived_definition`
+* Opprett nye typer:
+
+  * `ContractFile`
+  * `DerivedDefinition`
+  * `GateState` (UI-level)
+
+#### Hvorfor
+
+* Pro-nivå krever type-safe contract.
+
+#### Akseptansekriterier
+
+* Ingen `any` i contract path.
+* Compile-time brudd ved schema drift.
+
+---
+
+### B) Endre: `src/lib/data.ts`
+
+#### Hva (konkret)
+
+1. Legg til:
+
+   * `fetchContract(): Promise<ContractFile>` → henter `/data/published/v1/contract.json`
+2. Utvid dataset loader slik at den returnerer `coverage` og `derived_definition`.
+3. Legg til “manifest fetch” generisk (hvis du fortsatt trenger manifest per chain):
+
+   * `fetchManifest(chain, genre)` via `/api/export/manifest?chain=...&genre=...`
+4. Standardiser “bundle date resolution”:
+
+   * En felles funksjon `resolveBundleDate(metaAsof, derivedAsof, goldAsof)` (bruk eksisterende `chooseBundleDate` men gjør det til eneste autoritative sted).
+
+#### Hvorfor
+
+* Én “source of truth” for dato og kontrakt → mindre black box og færre inkonsistenser.
+
+#### Akseptansekriterier
+
+* Alle sider bruker samme bundle-date policy.
+* “Which date are we showing?” er alltid forklarbar.
+
+---
+
+### C) Ny fil: `src/lib/gate.ts`
+
+#### Hva
+
+* Implementer deterministisk gating basert på meta + contract:
+
+  * threshold fra `contract.meta.confidence.gating_threshold_default`
+  * reason taxonomy (standardisert)
+* Returner `GateState`:
+
+  * `{ is_gated, reason, threshold, confidence_score, lag_days, missing }`
+
+#### Hvorfor
+
+* Punkt 1 (gate) uten backfill.
+
+#### Akseptansekriterier
+
+* Chain-side viser alltid gate state deterministisk.
+
+---
+
+### D) Endre: `src/app/layout.tsx`
+
+#### Hva
+
+* Rendre en global `DataStatusBar` rett under top-nav:
+
+  * dataset_id, revision_id, methodology_version
+  * global “as-of coverage” (minst: “All chains: 400+ days” + min as-of)
+
+#### Hvorfor
+
+* Pro-plattformer viser alltid dataset governance.
+
+#### Akseptansekriterier
+
+* Alle sider viser dataset metadata uten scrolling.
+
+---
+
+### E) Endre: `src/components/Nav.tsx`
+
+#### Hva
+
+* Oppdater meny:
+
+  * Product / Chains / Methodology / Data Contract / API
+
+#### Hvorfor
+
+* Informasjonsarkitektur må signalisere “dataset + methodology”, ikke “charts site”.
+
+#### Akseptansekriterier
+
+* “Methodology” og “Data Contract” er alltid 1 klikk fra landing.
+
+---
+
+### F) Endre: `src/app/chains/[chain]/ChainClient.tsx`
+
+#### Hva (konkret)
+
+1. Hent:
+
+   * dataset index
+   * contract
+   * manifests for gold/meta/derived (eller bruk dataset.asof_by_genre_chain + manifest kun for days list)
+2. Beregn:
+
+   * `bundleDate = min(metaAsof, derivedAsof, goldAsof)`
+3. Render øverst:
+
+   * **Regime card** (META)
+   * **Confidence + gate** (fra `computeGate(meta, contract)`)
+   * **Coverage** (fra dataset.coverage eller manifest)
+   * **JSON links** for bundleDate:
+
+     * meta/gold/derived day-json
+     * manifest.json
+     * dataset.json
+     * contract.json
+
+#### Hvorfor
+
+* Dette er kjernen i “regime vs noise” produktet.
+
+#### Akseptansekriterier
+
+* Bruker ser i første skjerm:
+
+  * regime label
+  * confidence score
+  * gate reason (om gated)
+  * bundle date + as-of rationale
+  * direkte lenker til JSON.
+
+---
+
+### G) Endre: `src/components/chains/ChainDiagnosticHeader.tsx`
+
+#### Hva
+
+* Utvid visning til å inkludere:
+
+  * `meta.regime.drivers` top 3–5 (axis, metric, z_robust, pct_90d, momentum_7d_vs_30d, trend)
+  * “Why this regime?” tekst generert fra drivers + contract (deskriptiv)
+* Vis “UNKNOWN/DEGRADED” konsekvent hvis gate.is_gated.
+
+#### Hvorfor
+
+* Drivers er den viktigste “anti-black-box” komponenten du har.
+
+#### Akseptansekriterier
+
+* Drivers-listen er alltid synlig (ikke skjult bak flere klikk).
+
+---
+
+### H) Endre: `src/components/charts/MetricPanel.tsx`
+
+#### Hva
+
+* Legg til “Provenance + Contract hook”:
+
+  * “This chart uses: derived MA7/MA30” (fra contract)
+  * “Source: gold metric X”
+  * “As-of / bundle date / coverage”
+* Legg til en info-boks (What/How/Why) som leser fra contract (eller linker til methodology anchor).
+* Legg til “Open JSON”:
+
+  * day-json for bundleDate
+  * series endpoint (hvis relevant)
+
+#### Hvorfor
+
+* Pro-analytikere forventer provenance og definisjoner tett på visningen.
+
+#### Akseptansekriterier
+
+* Ingen graf uten forklaringsboks og datakilde-link.
+
+---
+
+### I) Endre: `src/app/page.tsx` og `src/components/landing/LandingHero.tsx`
+
+#### Hva
+
+* Landing må uttrykke kontrakten, ikke funksjonsliste:
+
+  * “Regime vs noise, without price”
+  * “Meta = regime + confidence + drivers; Gold = daily fundamentals; Derived = trend layer”
+* CTA knapper:
+
+  * “Explore Chains”
+  * “Methodology”
+  * “Data Contract”
+
+#### Hvorfor
+
+* For å unngå direkte “dashboard comparison” med ChartInspect.
+
+#### Akseptansekriterier
+
+* “Methodology” er synlig og friksjonsfri fra landing.
+
+---
+
+## 3.3 Nye sider og komponenter i web (må lages)
+
+### 1) Ny side: `src/app/methodology/page.tsx`
+
+#### Rolle
+
+* Den “offisielle manualen” som forklarer formål, modellstruktur, tester, forbehold.
+* Basic / Advanced toggle.
+
+#### Innhold (må)
+
+* Formål: “regime vs noise” + hva det ikke er (ikke pris, ikke råd).
+* Overordnet pipeline (Gold→Meta→Derived).
+* Validation:
+
+  * regime persistence metrics (median duration, flip-rate)
+  * confidence calibration checks (monotonicity vs lag, gating behavior)
+* Linker til Data Contract (schemas).
+
+#### Akseptansekriterier
+
+* Methodology forklarer både “how” og “why” per modul.
+
+---
+
+### 2) Ny side: `src/app/data-contract/page.tsx`
+
+#### Rolle
+
+* “Line-by-line JSON key reference” (slik du beskrev).
+
+#### Funksjon
+
+* Leser `contract.json` og viser:
+
+  * Gold keys
+  * Meta keys
+  * Derived keys
+  * Thresholds / windows / baseline definitions
+* Hver nøkkel har:
+
+  * What / How (formula) / Why / Assumptions / Caveats / Units
+
+#### Akseptansekriterier
+
+* Bruker kan navigere nøkkel for nøkkel og forstå beregning + forbehold.
+
+---
+
+### 3) Ny side: `src/app/api/page.tsx` (evt `api-docs` for å unngå routing-konflikt)
+
+#### Rolle
+
+* Klar “copy/paste” dokumentasjon for endpoints, inkl “bundle date policy”.
+
+#### Innhold
+
+* Paths for:
+
+  * `/data/published/v1/gold/{chain}/{date}.json`
+  * `/data/published/v1/meta/{chain}/{date}.json`
+  * `/data/published/v1/derived/{chain}/{date}.json`
+  * `/data/published/v1/*/manifest.json`
+  * `/data/published/v1/dataset.json`
+  * `/data/published/v1/contract.json`
+* Policy: date selection (min as-of).
+
+#### Akseptansekriterier
+
+* API-siden er “right out of the box” for integrasjon.
+
+---
+
+### 4) Ny komponent: `src/components/DataStatusBar.tsx`
+
+#### Rolle
+
+* Global dataset governance bar.
+
+#### Viser (minimum)
+
+* methodology_version, dataset_id, revision_id
+* computed_at_utc
+* global coverage summary (min days)
+* link til contract.json + dataset.json
+
+#### Akseptansekriterier
+
+* Alltid synlig, alltid korrekt.
+
+---
+
+### 5) Ny komponent: `src/components/JsonViewer.tsx`
+
+#### Rolle
+
+* “Pro viewer” for JSON med copy/open/format.
+
+#### Akseptansekriterier
+
+* Bruker kan åpne JSON for valgt date direkte i UI.
+
+---
+
+# 4) Strenge “proff plattform” krav til utseende og oppførsel (uten å være estetikk-prat)
+
+Dette er funksjonelle designkrav som avgjør pro-inntrykk.
+
+## 4.1 Regime-first layout (chain side)
+
+**Øverst (over fold):**
+
+1. Regime label (stor typografi)
+2. Confidence score + gate state (synlig)
+3. Drivers (top 3–5) med tall (z, pct, momentum)
+4. Provenance row: bundleDate, as-of (meta/gold/derived), lag days, coverage days
+5. JSON links row: Meta/Gold/Derived + contract/dataset/manifest
+
+**Aldri** start med grafer.
+
+## 4.2 “No black box” UI-regler
+
+* Hver visning må ha:
+
+  * Data source (hvilken JSON)
+  * Definisjon (What)
+  * Formel/vindu (How)
+  * Begrunnelse (Why)
+  * Forbehold (Assumptions)
+* Ingen “insight” tekst uten referanse til drivers/scorecard.
+
+## 4.3 Pro-oppførsel ved mangler
+
+* Hvis meta/gold/derived mangler for dato:
+
+  * UI viser “Nearest available date” fra manifest
+  * UI forklarer hvorfor (publish lag / coverage)
+* Hvis gate.is_gated:
+
+  * Regime settes til UNKNOWN/DEGRADED i UI (selv om label finnes)
+  * Reason vises eksplisitt.
+
+---
+
+# 5) Leveransepakke (hva teamet faktisk skal levere)
+
+## Backend/publish deliverables
+
+* [ ] `dataset.json` utvidet med `coverage` + `derived_definition`
+* [ ] `contract.json` publisert i v1 root
+* [ ] Validator oppdatert
+
+## Web deliverables
+
+* [ ] Regime-first chain page (META-driven)
+* [ ] Global status bar (dataset governance)
+* [ ] Methodology page (Basic/Advanced)
+* [ ] Data Contract page (key-by-key)
+* [ ] API page (copy/paste)
+* [ ] JSON viewer og deep-links overalt
+
+---
+
+# 6) Viktigste “why” (for teamet)
+
+Dette er setningen du kan lime inn øverst i ticketen:
+
+> “We are not building a charting dashboard. We are productizing a versioned, machine-readable regime diagnostics dataset. The UI must therefore be contract-first, provenance-first, and regime-first.”
+

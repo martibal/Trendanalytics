@@ -1,0 +1,361 @@
+
+## 0) Absolutte regler (gjelder alle patcher)
+
+**0.1 Descriptive-only**
+All tekst i UI skal være “what this shows / commonly used for / supports analysis of”.
+Ingen: “you should”, “buy/sell”, “bullish/bearish”, “likely to go up”.
+
+**0.2 No price**
+Ingen prisdata, prisgrafer, prisreferanser.
+
+**0.3 Determinisme**
+
+* Samme inputs → samme output.
+* Ingen `Math.random()`.
+* Hash/identity skal være stabil sortert JSON.
+
+**0.4 Hooks-sikkerhet (fra deres krav)**
+
+* Aldri `await` utenfor `async`.
+* Ingen “Rendered more hooks than during previous render” (ingen hooks bak betingelser).
+
+---
+
+# 1) Eksisterende filer som SKAL patches (og eksakt hva)
+
+## 1.1 `src/components/regime/VerdictCard.tsx`
+
+**Hvorfor:** Web6 krever at *kjernepaneler* har umiddelbar bruksverdi (PanelPurpose).
+
+**Hva skal innfris:**
+
+* Legg inn `<PanelPurpose …/>` øverst eller rett under tittelen.
+* Tekst (English):
+
+  * `whatThisShows`: forklar hva verdict/label/gate betyr (deskriptivt).
+  * `commonlyUsedFor`: 2–4 bullets (audit, persistence, gating).
+* Skal ikke endre eksisterende regime-beregning.
+
+**Hvordan (konkret):**
+
+* `import { PanelPurpose } from "@/components/info-boxes/PanelPurpose";`
+* Render `PanelPurpose` med tydelig “No advice”/“descriptive only” tone.
+* Ikke endre props-kontrakt til VerdictCard (ikke brekk callers).
+
+---
+
+## 1.2 `src/components/charts/MetricPanel.tsx`
+
+**Hvorfor:** Web6 krever purpose-tekst på “hver graf og hvert panel”.
+
+**Hva skal innfris:**
+
+* Legg inn `<PanelPurpose …/>` rett etter header/metadata-blokken.
+* Purpose må bruke metric-doc der den finnes:
+
+  * `whatThisShows`: 1–2 setninger som forklarer hva grafen viser (daily/MA7/MA30 + coverage).
+  * `commonlyUsedFor`: 3 bullets (trend vs baseline, anomaly context, audit).
+  * `learnMoreHref`: link til Methodology/Wiki for metrikken (bruk eksisterende `metricLinks()`).
+* Ikke endre chart rendering.
+
+**Hvordan:**
+
+* Reuse eksisterende `title/subtitle/methodologyHref/wikiHref`.
+* Ikke flytt/fjern eksisterende “Regime context” eller coverage chips – bare legg til purpose-blokken.
+
+---
+
+## 1.3 `src/components/charts/ComputedRatioPanel.tsx`
+
+**Hvorfor:** Computed/derived panels må ha samme “what this shows”-standard.
+
+**Hva skal innfris:**
+
+* Legg inn `PanelPurpose` med forklaring på ratio + datakilder (numerator/denominator), og at dette er deskriptivt.
+* `commonlyUsedFor`: 2–3 bullets (composition shifts, structural baseline, audit).
+
+**Hvordan:**
+
+* Ikke endre ratio-beregning. Kun tekst + lenker.
+
+---
+
+## 1.4 `src/components/scorecard/Scorecard.tsx` **og** `src/components/scorecard/MiniScorecard.tsx`
+
+**Hvorfor:** Axes/scorecard er et “primary decision surface” og må være forklarbart.
+
+**Hva skal innfris:**
+
+* Begge scorecard-komponenter skal ha PanelPurpose (Mini kan være kortere).
+* Tekst må:
+
+  * Definere at scorecard er et “multi-axis summary”.
+  * Forklare at det er basert på canonical META og gating.
+* Zero normative språk.
+
+**Hvordan:**
+
+* Legg `PanelPurpose` i toppen (før første grid).
+* Ikke endre layout/signatur.
+
+---
+
+## 1.5 `src/app/chains/[chain]/ChainClient.tsx`
+
+**Hvorfor:** Web6 krever Trust & Validation-seksjon i chain view, og at den fylles med historikk.
+
+**Hva skal innfris:**
+
+1. **Hent** `/api/regime/history?chain=X&days=450`
+2. **Render** `TrustSection` og gi den:
+
+   * `chain`
+   * `points` (eller la TrustSection hente selv – men web6 foretrekker én canonical fetch)
+   * `id="trust"` slik at `#trust` fungerer.
+3. **Scroll anchor**: siden må ha et element med `id="trust"`.
+
+**Hvordan:**
+
+* Der dere rendrer hovedinnhold i chain view: legg inn `<TrustSection id="trust" chain={chain} …/>` under hoveddiagnostikk.
+* Sørg for at `TrustSection` alltid rendres (men viser “history unavailable” hvis tomt).
+
+---
+
+## 1.6 `src/components/landing/ChainHeroCard.tsx` (og evt `LandingHero.tsx`)
+
+**Hvorfor:** Web6 krever “trust entry” fra landing.
+
+**Hva skal innfris:**
+
+* Legg inn CTA-lenke: **“View history →”**
+* URL: `/chains/${chain}#trust`
+
+**Hvordan:**
+
+* Ikke bytt routingmodell. Bare `Link href={`/chains/${chain}#trust`}`.
+
+---
+
+## 1.7 `src/app/how-to/custom-thresholds/page.tsx`
+
+**Hvorfor:** Web6 krever at how-to er “copy/paste”, og inkluderer history-validering.
+
+**Hva skal innfris (konkret):**
+Siden må ha **3 copy/paste blokker**:
+
+1. `GET /api/export/daily?chain=X&genre=meta&date=YYYY-MM-DD` (+ jq som viser `dataset_id/revision_id/regime/gate`)
+2. `POST /api/regime/custom?chain=X&date=YYYY-MM-DD` (med eksempel-config)
+3. `GET /api/regime/history?chain=X&days=450` (vis `.count`, `.range`, sample first/last point)
+
+Og en kort seksjon som definerer:
+
+* `pct` (percentile)
+* `z` (robust z-score)
+* `momentum` (MA7 vs MA30 eller definert divergens)
+
+**Hvordan:**
+
+* Ikke rewrite siden fra scratch.
+* Patch: legg til manglende seksjoner, behold eksisterende struktur/komponenter.
+
+---
+
+# 2) Trust engine – filer som skal finnes (nye hvis mangler) + eksakt innholdskrav
+
+> I din zip finnes allerede `src/components/trust/*` og `/api/regime/history`. Hvis teamet starter fra en annen branch, er dette lista over filer som **må eksistere**.
+
+## 2.1 `src/app/api/regime/history/route.ts`
+
+**Hvorfor:** Trust UI trenger 400+ dager komprimert timeline.
+
+**Skal innfri:**
+
+* Support `?days=` og `?start=&end=`
+* Returnere: `{ ok, chain, contract_gate_threshold_default, range, count, points }`
+* `points[]` minimum: `date,label,verdict,confidence_score,gate_pass,drivers[]`
+
+**Hvordan:**
+
+* Les fra published META day-json i `public/data/published/v1/meta/<chain>/day/<YYYY-MM-DD>.json`
+* Komprimer til `points` (ikke send full META).
+
+---
+
+## 2.2 `src/components/trust/TrustSection.tsx`
+
+**Hvorfor:** Samle alt trust-UI på ett sted.
+
+**Skal innfri:**
+
+* Render i rekkefølge:
+
+  1. `RegimeTimeline`
+  2. `RegimeStatsPanel`
+  3. `HistoricalInspectorDrawer`
+  4. `NoiseFilterPanel`
+  5. `ThresholdIntegrityPanel`
+* Må ha `id="trust"` når den mountes.
+* Må være robust: viser error-state hvis history ikke laster.
+
+**Hvordan:**
+
+* Enten: TrustSection fetcher history selv, eller får `points` som prop (begge ok, men ikke dobbel-fetch).
+* Selected day state i TrustSection (date string).
+* On select date → fetch selected day META via `/api/export/daily`.
+
+---
+
+## 2.3 `src/components/trust/RegimeTimeline.tsx`
+
+**Hvorfor:** Interaktiv timeline som lar bruker inspisere historikk.
+
+**Skal innfri:**
+
+* Vis 400–450 punkter komprimert.
+* Fargekode etter verdict.
+* Klikk på dag setter `selectedDate`.
+* Tooltip/inline info: `label`, `confidence`, `gate`/insufficient.
+
+**Hvordan:**
+
+* Props:
+
+  * `points: RegimeHistoryPoint[]`
+  * `selectedDate: string|null`
+  * `onSelectDate(date: string)`
+
+---
+
+## 2.4 `src/components/trust/RegimeStatsPanel.tsx`
+
+**Hvorfor:** Web6 krever historisk “stability summary”.
+
+**Skal innfri (beregninger fra points):**
+
+* Flip rate: 30d / 90d / full
+* Median regime duration
+* Share insufficient days
+* Share gate-fail days (hvis tilgjengelig)
+
+**Hvordan:**
+
+* All logikk deterministisk fra `points`.
+* Ingen ekstra API-kall.
+
+---
+
+## 2.5 `src/components/trust/HistoricalInspectorDrawer.tsx` (Web6 §3.7)
+
+**Hvorfor:** Drilldown for en dato må være reproduserbar.
+
+**Skal innfri:**
+
+* Vise canonical: `label`, `verdict`, `confidence_score`, `gate status`
+* Vise `drivers` top 3 + axes (hvis dere har axes i meta)
+* **Streak før/etter** (beregnet fra history points på verdict)
+* **Signals for driver metrics** fra `meta.regime.signals`:
+
+  * pct (typisk `pct_90d`)
+  * z (typisk `z_robust`)
+  * momentum (typisk `momentum_7d_vs_30d`)
+  * transform (hvis finnes)
+* Link: “Open full meta JSON →” til `/api/export/daily?chain=…&genre=meta&date=…`
+
+**Hvordan:**
+
+* Props:
+
+  * `points` (history)
+  * `selected` (point)
+  * `metaDay` (loaded day-json, eller drawer fetcher selv)
+* Mapping: Driver metric name → signal entry (defensiv lookup)
+* Ikke vis hele meta JSON inline som default; vis lenke + evt details-toggle.
+
+---
+
+## 2.6 `src/components/trust/NoiseFilterPanel.tsx` (Web6 §3.8)
+
+**Hvorfor:** Demonstrere “noise filtering” ved spike-counting.
+
+**Skal innfri:**
+
+* Dropdown signal keys hentet fra `selectedMeta.regime.signals`
+
+  * driver metrics først, deretter resten
+* Spike-mode:
+
+  * `z`: `|z| >= threshold` (default 2.0)
+  * `pct`: `pct >= threshold` (default 95)
+* Window bakover fra selected date (default 120d)
+* Counting:
+
+  * candidates (signal finnes)
+  * spikes
+  * spikes → noise / shift / insufficient (via history verdict)
+  * shares %
+
+**Hvordan (viktig):**
+
+* For å telle spikes historisk må panel ha tilgang til per-day signals for vinduet.
+* Derfor: TrustSection skal bygge `metaDayMap[date] = metaDayJson` for vinduet (prefetch med concurrency ≤ 6) og sende den til NoiseFilterPanel.
+* Panel må degrade gracefully hvis metaDayMap ikke finnes (vise “spike counting unavailable”).
+
+---
+
+## 2.7 `src/components/trust/ThresholdIntegrityPanel.tsx` (Web6 §3.9)
+
+**Hvorfor:** Bevise mekanisk integritet mellom thresholds og klassifisering.
+
+**Skal innfri (konkret visning):**
+
+1. Canonical:
+
+   * gate threshold (default og brukt)
+   * gate pass rate (i valgt vindu eller hele range)
+2. Custom:
+
+   * effective threshold config (kompakt)
+   * custom verdict/label (for valgt dato)
+3. **Signal compliance** på “structural days”:
+
+   * For structural_shift-days: hvor ofte oppfyller N driver-signals terskler (f.eks. pct≥95 eller |z|≥2)
+   * Dette er deskriptivt “compliance”, ikke “riktig/feil”.
+
+**Hvordan:**
+
+* Bruk `history points` til å definere hvilke dager som er structural vs noise.
+* Bruk `metaDayMap` til å sjekke signals på disse dagene.
+* Presenter som counts + shares.
+
+---
+
+# 3) “Skal lages som nye filer” (kun hvis de mangler i branch)
+
+Disse finnes i zip-en din nå, men i en ren web6-implementasjon er de “new files”:
+
+* `src/components/info-boxes/PanelPurpose.tsx`
+* `src/components/trust/*` (TrustSection, RegimeTimeline, RegimeStatsPanel, HistoricalInspectorDrawer, NoiseFilterPanel, ThresholdIntegrityPanel, types)
+* `src/app/api/regime/history/route.ts`
+
+---
+
+# 4) Konkret implementasjonsrekkefølge (min risiko)
+
+1. Patch `ChainHeroCard.tsx` → “View history → #trust”
+2. Patch `ChainClient.tsx` → mount `TrustSection id="trust"`
+3. Bekreft `/api/regime/history` leverer 450d points
+4. Patch `VerdictCard`, `MetricPanel`, `ComputedRatioPanel`, `Scorecard`, `MiniScorecard` → PanelPurpose
+5. Fullfør trust: Inspector (streak + signals) → NoiseFilter (real spike counting) → ThresholdIntegrity (compliance)
+
+---
+
+# 5) Enkleste “DoD”-sjekk per fil (QA)
+
+* **VerdictCard/MetricPanel/Scorecard**: Har PanelPurpose og ingen normative ord.
+* **Landing**: “View history →” går til riktig chain og scroller til trust.
+* **TrustSection**: Viser timeline + stats + inspector + noise + integrity uten errors.
+* **NoiseFilter**: Default z=2.0 og pct=95; teller spikes i 120d vindu.
+* **Inspector**: Viser streak før/etter + driver signals + open-meta link.
+* **How-to**: 3 copy/paste blocks inkludert history.
+
+---

@@ -1,0 +1,625 @@
+Her er en **konkret kravspec / patchliste** for å løse kostnadsspørsmålet i leseveien på nettsiden, basert på hvordan koden faktisk er strukturert nå.
+
+Dette bygger på den faktiske leseformen i blant annet:
+
+* [`src/app/chains/page.tsx`](sandbox:/tmp/webinspect/src/app/chains/page.tsx)
+* [`src/app/chains/[chain]/page.tsx`](sandbox:/tmp/webinspect/src/app/chains/[chain]/page.tsx)
+* [`src/app/chains/[chain]/history/page.tsx`](sandbox:/tmp/webinspect/src/app/chains/[chain]/history/page.tsx)
+* [`src/lib/dataReaders.ts`](sandbox:/tmp/webinspect/src/lib/dataReaders.ts)
+
+## 1. Problembeskrivelse
+
+Kostnadsrisikoen i dagens løsning ligger **ikke** i at webappen leser parquet direkte. Den ligger i at runtime-lesingen av publiserte JSON-filer er for lite deterministisk.
+
+Det skjer i praksis gjennom fire mønstre:
+
+1. **Serverkomponenter gjør self-fetch via HTTP mot egen app**
+
+   * unødvendig overhead
+   * vanskeligere caching
+   * flere objektkall enn nødvendig
+
+2. **Chain detail page har lang fallback-kjede**
+
+   * prøver mange filer i rekkefølge til en finnes
+   * gir uforutsigbart antall lesinger per request
+
+3. **Chain detail page har runtime-repair**
+
+   * hvis bundle er ufullstendig, henter den manglende dagsfiler én og én
+   * dette er den største kostnadsrisikoen
+
+4. **Det finnes disk-/mappeskanningsmønstre i `src/lib/dataReaders.ts`**
+
+   * greit lokalt
+   * dårlig egnet mot objektlagring i sky
+
+Det overordnede målet må derfor være:
+
+> **Én sidevisning skal kreve et lite, fast og kjent antall JSON-lesinger, uten fallback-stiger og uten reparasjon i runtime.**
+
+---
+
+## 2. Målarkitektur
+
+Dette er målbildet som skal innfris.
+
+### 2.1 Generelle regler
+
+1. Runtime skal **aldri** lese parquet.
+2. Runtime skal **aldri** liste mapper eller søke gjennom filsystem/bucket for å finne “noe som kanskje finnes”.
+3. Runtime skal **aldri** hente enkeltdagsfiler som fallback for å reparere et vindu.
+4. Runtime skal lese kun:
+
+   * `latest.json`
+   * eksplisitte ferdigpubliserte window-bundles
+   * eventuelt én indeksfil for oversiktssider
+5. Hvis en nødvendig bundle mangler eller er ufullstendig, skal siden vise en kontrollert “incomplete / unavailable published window”-tilstand. Det er et pipeline-problem, ikke et frontend-problem.
+
+### 2.2 Maks tillatt leseprofil per side
+
+#### Forside / chains overview
+
+Maks:
+
+* **1 samlet index-fil**
+  eller i overgangsfase
+* **maks 1 fil per kjede**
+
+#### Chain detail page
+
+Maks:
+
+* **1 meta latest**
+* **1 gold bundle for valgt vindu**
+* **1 derived bundle for valgt vindu**
+
+Altså normalt **3 lesinger**, ikke 10–50.
+
+#### History page
+
+Maks:
+
+* **1 meta history-bundle**
+
+#### Status page
+
+Maks:
+
+* **1 status-endepunkt**
+* og internt maks noen få faste filer via storage-adapter
+
+---
+
+## 3. Normative krav som skal implementeres
+
+## KRAV A — Fjern self-fetch fra serverkomponenter
+
+### Bakgrunn
+
+I dagens kode kaller flere serverkomponenter `fetch("http://localhost:3000/...")` mot egne publiserte data. Dette er et ekstra lag som ikke gir verdi internt i appen.
+
+### Hvorfor dette må endres
+
+Self-fetch gir:
+
+* ekstra HTTP-overhead
+* mindre kontroll på caching
+* mer komplisert feilbilde
+* mer uforutsigbar kostnad når storage flyttes til sky
+
+### Løsning
+
+Alle interne server-side lesinger skal gå via én felles intern lesevei:
+
+* `readStorageObject(...)`
+* `readPublishedJson(...)`
+* eventuelt en liten `publishedReader.ts`
+
+### Godkjenningskrav
+
+Ingen serverkomponent i app-rutene skal gjøre self-fetch mot:
+
+* `/data/published/...`
+* `/api/v1/...`
+  for å lese egne publiserte artefakter.
+
+---
+
+## KRAV B — Fjern runtime fallback-stiger for gold/derived bundles
+
+### Bakgrunn
+
+Chain detail page prøver nå flere bundle-filer i rekkefølge:
+
+* valgt vindu
+* så 365d
+* så 180d
+* så 90d
+* osv.
+
+### Hvorfor dette må endres
+
+Dette gjør antall lesinger per request uforutsigbart og øker object GETs i sky.
+
+### Løsning
+
+For hver visning skal det finnes en **kanonisk publisert fil**. Runtime skal lese **kun den filen**.
+
+Eksempel:
+
+* valgt 30d → les kun `last30d.json`
+* valgt 90d → les kun `last90d.json`
+* valgt 365d → les kun `last365d.json`
+
+Hvis filen mangler:
+
+* vis “Published window unavailable”
+* ikke forsøk andre filer
+
+### Godkjenningskrav
+
+Ingen runtime-kode skal gjøre sekvensiell prøving av flere vindusfiler for samme datasett.
+
+---
+
+## KRAV C — Fjern runtime repair av manglende dager
+
+### Bakgrunn
+
+I chain detail page finnes logikk som oppdager hull i bundle og deretter henter manglende dagsfiler individuelt.
+
+### Hvorfor dette må endres
+
+Dette er den mest kostnadsfarlige delen av dagens design:
+
+* mange små objektkall
+* stor variasjon i kostnad per request
+* skjult last ved ufullstendige publiserte filer
+
+### Løsning
+
+Repair flyttes ut av runtime fullstendig.
+
+Kun to tillatte modeller:
+
+#### Modell 1: hard published contract
+
+* bundle må være komplett
+* hvis ikke: vis avvik/ufullstendig
+
+#### Modell 2: pipeline repair før publisering
+
+* pipeline fyller eventuelle hull før publisering
+* runtime får kun ferdige, komplette filer
+
+### Godkjenningskrav
+
+Ingen runtime-rute eller komponent skal lese enkeltdagsfiler for å kompensere for ufullstendige bundles.
+
+---
+
+## KRAV D — Fjern directory scanning / `readdir`-mønstre fra runtime-paths
+
+### Bakgrunn
+
+`src/lib/dataReaders.ts` inneholder mønstre som går gjennom mapper og leser mange filer.
+
+### Hvorfor dette må endres
+
+Dette er lokaldiskvennlig, men dårlig egnet for objektlagring:
+
+* listing er dyrere og tregere
+* skalaen blir dårligere jo flere kjeder som legges til
+* det gir uforutsigbar I/O
+
+### Løsning
+
+Runtime skal bruke eksplisitte paths, aldri listing-basert discovery.
+
+Hvis en oversiktsside trenger mange objekter, skal pipeline publisere en samlet index-fil.
+
+### Godkjenningskrav
+
+Ingen runtime-rute skal bruke:
+
+* `readdir`
+* mappebasert discovery
+* “les alt og filtrer etterpå”
+  for publiserte artefakter.
+
+---
+
+## KRAV E — Introduser eksplisitte index-filer for overview-sider
+
+### Bakgrunn
+
+Chains overview kan i dag lese én latest per kjede. Det er akseptabelt nå, men dårligere når antall kjeder vokser.
+
+### Hvorfor dette bør endres
+
+Når kjedeutvalget vokser betydelig, vil “én latest per kjede” også bli mange lesinger.
+
+### Løsning
+
+Pipeline skal publisere én samlet oversiktsfil, for eksempel:
+
+* `data/published/v1/chains/index.json`
+  eller bruke en eksisterende landing/index hvis den dekker behovet fullt ut.
+
+Denne skal inneholde, per kjede:
+
+* chain id
+* label
+* as_of
+* regime label
+* confidence score
+* lag_days
+* kort descriptive status
+
+### Godkjenningskrav
+
+Overview-sider skal kunne rendre fullt ut fra én samlet index-fil.
+
+---
+
+## KRAV F — Standardiser bundle-kontrakter per sidebehov
+
+### Bakgrunn
+
+Mye av dagens kompleksitet skyldes at runtime prøver å finne riktig datasammensetning.
+
+### Løsning
+
+Definer eksplisitt hvilke filer hver side får lov til å lese.
+
+### Normativ kontrakt
+
+#### Chains overview
+
+* `chains/index.json`
+
+#### Chain detail
+
+* `meta/<chain>/latest.json`
+* `gold/<chain>/last{window}d.json`
+* `derived/<chain>/last{window}d.json`
+
+#### History page
+
+* `meta/<chain>/last90d.json`
+  eller annen eksplisitt kanonisk historikkbundle
+
+#### Status page
+
+* `dataset.json`
+* `meta/<chain>/latest.json` per kjede
+  eller en samlet status-index hvis ønskelig senere
+
+### Godkjenningskrav
+
+Hver side skal dokumentere sin tillatte leseprofil eksplisitt.
+
+---
+
+## 4. Teknisk patchmetodikk
+
+Her er fil-for-fil hva som skal gjøres.
+
+## Patch 1 — Opprett felles intern published reader
+
+### Ny fil
+
+* `src/lib/published/readPublishedJson.ts`
+
+### Formål
+
+Gi alle serverkomponenter én intern lesevei via storage-adapteren.
+
+### Skal gjøre
+
+* bruke `readStorageObject(...)`
+* parse JSON
+* returnere `null` ved manglende fil / parsefeil
+* ingen HTTP-fetch
+
+### Resultat
+
+Alle sider kan lese publiserte JSON-filer uten self-fetch.
+
+---
+
+## Patch 2 — Refaktorer `src/app/chains/page.tsx`
+
+### Nåværende problem
+
+Siden leser via self-fetch.
+
+### Endring
+
+* fjern `readPublicJson(...)` som bruker URL/fetch
+* bruk intern published reader
+* i første fase kan siden fortsatt lese `meta/<chain>/latest.json` per kjede
+* i fase 2 skal den over på `chains/index.json`
+
+### Godkjent når
+
+* ingen self-fetch
+* ingen HTTP-tilgang til egen app internt
+* fast antall lesinger
+
+---
+
+## Patch 3 — Refaktorer `src/app/chains/[chain]/history/page.tsx`
+
+### Nåværende problem
+
+Siden prøver flere history-filer i fallback-rekkefølge.
+
+### Endring
+
+* velg én normativ historikkfil
+* les kun den
+* hvis mangler: vis unavailable state
+
+### Godkjent når
+
+* history-siden gjør én deterministisk lesing
+
+---
+
+## Patch 4 — Refaktorer `src/app/chains/[chain]/page.tsx`
+
+### Nåværende problem
+
+Dette er hovedproblemet:
+
+* self-fetch
+* mange fallback-kall
+* runtime repair
+* potensielt mange enkeltdagskall
+
+### Endring
+
+1. fjern self-fetch
+2. fjern alle fallback-stiger
+3. fjern `fetchMissingDailyRows(...)`
+4. les kun:
+
+   * `meta/<chain>/latest.json`
+   * `gold/<chain>/last{window}d.json`
+   * `derived/<chain>/last{window}d.json`
+5. hvis bundle mangler/er ufullstendig:
+
+   * vis kontrollert state
+   * ikke reparer
+
+### Godkjent når
+
+* maksimal leseprofil for detail page er fast og liten
+* ingen per-dag repair finnes i runtime
+
+---
+
+## Patch 5 — Avgrens eller deaktiver runtime-bruk av `src/lib/dataReaders.ts`
+
+### Nåværende problem
+
+Filens mønstre er potensielt dyre mot sky.
+
+### Endring
+
+* identifiser hvilke funksjoner som brukes i runtime-paths
+* flytt dem enten til:
+
+  * dev-only utilities
+  * pipeline-only helpers
+  * eller erstatt dem med eksplisitt bundle-lesing
+
+### Godkjent når
+
+* ingen runtime-side er avhengig av listing/discovery-basert lesing
+
+---
+
+## Patch 6 — Pipeline-endring: publiser `chains/index.json`
+
+### Formål
+
+Skalerbar overview-side ved mange kjeder.
+
+### Skal inneholde
+
+For hver kjede:
+
+* `chain`
+* `label`
+* `name`
+* `as_of`
+* `lag_days`
+* `published_regime`
+* `confidence_score`
+* `status`
+
+### Effekt
+
+Overview blir én lesing, ikke én lesing per kjede.
+
+---
+
+## Patch 7 — Pipeline-endring: bundles må være komplette før publisering
+
+### Formål
+
+Fjerne behovet for runtime repair.
+
+### Skal gjøre
+
+Pipeline skal validere at:
+
+* `last7d`
+* `last30d`
+* `last90d`
+* `last180d`
+* `last365d`
+  har forventet dekningsgrad
+
+Hvis ikke:
+
+* enten publiseres ikke filen
+* eller publiseres med eksplisitt completeness-flag
+
+### Effekt
+
+Frontend trenger aldri å reparere.
+
+---
+
+## Patch 8 — Introduser completeness metadata i bundles
+
+### Formål
+
+Gi frontend eksplisitt informasjon om bundle-kvalitet.
+
+### Eksempel på felt
+
+* `window_days`
+* `expected_rows`
+* `actual_rows`
+* `coverage_ratio`
+* `is_complete`
+
+### Effekt
+
+Frontend kan vise kontrollert beskjed hvis bundle er ufullstendig, uten ekstra lesinger.
+
+---
+
+## Patch 9 — Caching-policy for alle read-mostly routes
+
+### Formål
+
+Redusere repetitive storage-lesinger.
+
+### Skal gjøre
+
+For alle ruter som leser published data:
+
+* bruk server-side cache/revalidate der det er trygt
+* unngå `cache: "no-store"` med mindre det er absolutt nødvendig
+* la status/overview/history bruke eksplisitt revalidate-vindu
+
+### Effekt
+
+Mindre antall objektkall ved gjentatte sidevisninger.
+
+---
+
+## 5. Endelig ønsket leseprofil etter patch
+
+Når alt er implementert, skal leseprofilen være:
+
+### `/chains`
+
+* 1 lesing:
+
+  * `chains/index.json`
+
+### `/chains/[chain]`
+
+* 3 lesinger:
+
+  * `meta/<chain>/latest.json`
+  * `gold/<chain>/last{window}d.json`
+  * `derived/<chain>/last{window}d.json`
+
+### `/chains/[chain]/history`
+
+* 1 lesing:
+
+  * `meta/<chain>/last90d.json`
+
+### `/status`
+
+* 1 dataset-manifest
+* 1 latest per kjede
+  eller senere én samlet status-index
+
+### `/dashboard` og auth-lag
+
+* ikke avhengig av store published datastrukturer
+
+Dette er den typen struktur som gjør kostnad og latency forutsigbar når antall kjeder øker.
+
+---
+
+## 6. Forretningsmessig begrunnelse
+
+Dette er ikke bare en teknisk “optimalisering”. Det er nødvendig fordi du vurderer å øke antall kjeder betydelig.
+
+Hvis du ikke gjør dette, vil du få:
+
+* flere objektkall per pageview
+* dårligere latency
+* mindre forutsigbare kostnader
+* mer kompleks feiloppførsel
+* større forskjell mellom lokal diskadferd og skyadferd
+
+Hvis du gjør dette, får du:
+
+* nesten lineær kostnad mot antall visninger
+* lavere og mer stabil request-belastning
+* enklere overgang til S3/R2/B2
+* enklere produksjonsdrift
+* tydelig skille mellom pipelineansvar og frontendansvar
+
+---
+
+## 7. Godkjenningskriterier
+
+Arbeidet er først ferdig når alle disse punktene er oppfylt:
+
+1. Ingen serverkomponent bruker self-fetch for interne published data.
+2. Ingen runtime-side bruker fallback-stiger for å finne alternate window-filer.
+3. Ingen runtime-side leser enkeltdagsfiler for repair.
+4. Ingen runtime-side bruker `readdir`/listing/discovery over published data.
+5. Chains overview kan rendre fra én indeksfil.
+6. Chain detail har fast og liten leseprofil.
+7. Pipeline publiserer komplette bundles eller eksplisitt completeness-metadata.
+8. Runtime viser kontrollert unavailable/incomplete state i stedet for å reparere.
+9. Caching/revalidate er satt på read-mostly routes.
+10. Storage-adapteren er eneste lesevei mot published artifacts.
+
+---
+
+## 8. Prioritert implementeringsrekkefølge
+
+Dette er rekkefølgen jeg ville gitt utviklingsteamet:
+
+### Prioritet 1
+
+* Patch 1: felles published reader
+* Patch 2: refaktor `chains/page.tsx`
+* Patch 3: refaktor `history/page.tsx`
+* Patch 4: refaktor `chains/[chain]/page.tsx`
+
+### Prioritet 2
+
+* Patch 5: fjern runtime-avhengighet til `dataReaders.ts`
+* Patch 9: caching-policy
+
+### Prioritet 3
+
+* Patch 6: pipeline publiserer `chains/index.json`
+* Patch 7: bundle completeness i pipeline
+* Patch 8: completeness metadata
+
+---
+
+## 9. Endelig beslutning
+
+Den riktige løsningen er **ikke** å prøve å gjøre dagens runtime-reparasjonsmodell “litt billigere”.
+Den riktige løsningen er å endre kontrakten mellom pipeline og frontend:
+
+> **Pipeline skal publisere ferdige, komplette, eksplisitte bundle-filer. Frontend skal lese få, faste filer og aldri reparere dem.**
+

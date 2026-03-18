@@ -8,27 +8,6 @@ import pandas as pd
 import numpy as np
 
 
-# ----------------------------
-# Deterministic regime engine
-# ----------------------------
-#
-# Goal: stable, explainable labels for weekly decision context:
-#   STABLE / HEATING / CONGESTED / CHEAP
-#
-# Method: per-metric signals using:
-#   - percentile bands (90d)
-#   - robust z-score (180d, median/MAD)
-#   - momentum: 7d vs 30d (mean level difference in robust-z space)
-#
-# Profiles:
-#   - btc
-#   - eth_l1
-#   - l2
-#
-# Output includes "drivers": the 2–3 metrics that most contributed to the decision.
-# The implementation is deterministic (no randomness; stable sorting w/ tie-breakers).
-
-
 def _safe_num(x: Any) -> Optional[float]:
     try:
         v = float(x)
@@ -52,15 +31,6 @@ def _ensure_date(df: pd.DataFrame) -> pd.DataFrame:
     return d
 
 
-def _median(x: np.ndarray) -> float:
-    return float(np.nanmedian(x))
-
-
-def _mad(x: np.ndarray) -> float:
-    med = np.nanmedian(x)
-    return float(np.nanmedian(np.abs(x - med)))
-
-
 def _robust_z(x: np.ndarray, current: float) -> float:
     med = np.nanmedian(x)
     mad = np.nanmedian(np.abs(x - med))
@@ -71,7 +41,6 @@ def _robust_z(x: np.ndarray, current: float) -> float:
 
 
 def _percentile_rank(x: np.ndarray, current: float) -> float:
-    # Percentile (0..100) of current within x, using <= counting (upper bound).
     x = x[np.isfinite(x)]
     if x.size == 0:
         return 50.0
@@ -110,13 +79,11 @@ def _signal_for_metric(d: pd.DataFrame, metric: str) -> Optional[Dict[str, Any]]
     z = _robust_z(hist180 if hist180.size else s.to_numpy(dtype=float), cur)
     pct = _percentile_rank(hist90 if hist90.size else s.to_numpy(dtype=float), cur)
 
-    # momentum: compare mean z over last 7 vs last 30
     m7 = _mean_last(s, 7)
     m30 = _mean_last(s, 30)
     if m7 is None or m30 is None:
         mom = 0.0
     else:
-        # compute momentum in robust-z space (deterministic)
         z7 = _robust_z(hist180 if hist180.size else s.to_numpy(dtype=float), m7)
         z30 = _robust_z(hist180 if hist180.size else s.to_numpy(dtype=float), m30)
         mom = float(z7 - z30)
@@ -130,9 +97,83 @@ def _signal_for_metric(d: pd.DataFrame, metric: str) -> Optional[Dict[str, Any]]
     }
 
 
+def _signal_for_blocktime_instability(
+    d: pd.DataFrame,
+    *,
+    col: str = "avg_block_time_sec",
+    window_days: int = 7,
+    instability_rolling_median_days: int = 30,
+) -> Optional[Dict[str, Any]]:
+    """
+    Scorecard-compatible instability proxy:
+
+    inst(t) = |bt(t) - median_30(t)| / median_30(t)
+    then rolling-mean over window_days.
+
+    IMPORTANT:
+    - "current_raw" is the raw block time (seconds) at as-of.
+    - "current" is the *instability* value at as-of (rolling mean).
+    - z/pct/momentum are computed on the instability series (not raw bt).
+    """
+    if d.empty or "date" not in d.columns or col not in d.columns:
+        return None
+
+    bt = pd.to_numeric(d[col], errors="coerce")
+    if bt.dropna().empty:
+        return None
+
+    # rolling median baseline for instability
+    med30 = bt.rolling(
+        instability_rolling_median_days,
+        min_periods=max(10, instability_rolling_median_days // 2),
+    ).median()
+    denom = med30.replace({0.0: np.nan})
+    inst = (bt - med30).abs() / denom
+
+    # smooth over window_days
+    win = int(window_days) if int(window_days) > 0 else 7
+    inst_ra = inst.rolling(win, min_periods=max(3, win // 2)).mean()
+
+    cur_inst = _safe_num(inst_ra.iloc[-1])
+    cur_raw = _safe_num(bt.iloc[-1])
+
+    # if we can't compute the instability point, do not emit a misleading signal
+    if cur_inst is None:
+        return None
+
+    hist180 = _window_values(inst_ra, 180)
+    hist90 = _window_values(inst_ra, 90)
+
+    z = _robust_z(hist180 if hist180.size else inst_ra.to_numpy(dtype=float), cur_inst)
+    pct = _percentile_rank(hist90 if hist90.size else inst_ra.to_numpy(dtype=float), cur_inst)
+
+    m7 = _mean_last(inst_ra, 7)
+    m30 = _mean_last(inst_ra, 30)
+    if m7 is None or m30 is None:
+        mom = 0.0
+    else:
+        z7 = _robust_z(hist180 if hist180.size else inst_ra.to_numpy(dtype=float), m7)
+        z30 = _robust_z(hist180 if hist180.size else inst_ra.to_numpy(dtype=float), m30)
+        mom = float(z7 - z30)
+
+    return {
+        "metric": "blocktime_instability",
+        "current": float(cur_inst),          # instability value
+        "current_raw": float(cur_raw) if cur_raw is not None else None,  # raw seconds
+        "z_robust": float(z),
+        "pct_90d": float(pct),
+        "momentum_7d_vs_30d": float(mom),
+        "transform": {
+            "type": "instability_proxy",
+            "input_metric": col,
+            "instability_rolling_median_days": int(instability_rolling_median_days),
+            "window_days": int(win),
+            "formula": "rolling_mean(|bt - median_30| / median_30)",
+        },
+    }
+
+
 def _band(pct: float, z: float) -> str:
-    # Combine percentile and z into discrete, stable bands.
-    # Uses conservative thresholds.
     if pct >= 90.0 or z >= 2.5:
         return "EXTREME_HIGH"
     if pct >= 80.0 or z >= 1.5:
@@ -173,9 +214,7 @@ PROFILE_SPECS: Dict[str, ProfileSpec] = {
         profile_type="l2",
         ruleset_id="l2_v1",
         demand_metrics=("tx_count_daily", "unique_active_addresses"),
-        # L2 fees still matter; failed tx rate sometimes exists but can be sparse.
         friction_metrics=("median_tx_fee_native", "failed_tx_rate"),
-        # Prefer capacity util if present; otherwise fall back to avg block time
         capacity_metrics=("capacity_util_pct", "avg_block_time_sec"),
     ),
     "btc": ProfileSpec(
@@ -188,51 +227,77 @@ PROFILE_SPECS: Dict[str, ProfileSpec] = {
 }
 
 
+SIGNAL_ALIASES_BY_PROFILE: Dict[str, Dict[str, str]] = {
+    "btc": {
+        "tx_count": "tx_count_daily",
+        # IMPORTANT: map scorecard instability component to a matching instability signal (not raw bt)
+        "blocktime_instability": "blocktime_instability",
+        "fee_burden_proxy": "median_tx_fee_native",
+    },
+    "eth_l1": {
+        "tx_count": "tx_count_daily",
+        "active_addresses": "unique_active_addresses",
+        "fee_burden_proxy": "median_tx_fee_native",
+        "failed_tx_rate": "failed_tx_rate",
+        "utilization": "gas_utilization_pct",
+        "blocktime_instability": "blocktime_instability",
+    },
+    "l2": {
+        "tx_count": "tx_count_daily",
+        "active_addresses": "unique_active_addresses",
+        "fee_burden_proxy": "median_tx_fee_native",
+        "failed_tx_rate": "failed_tx_rate",
+        "utilization": "capacity_util_pct",
+        "blocktime_instability": "blocktime_instability",
+    },
+}
+
+
 def _aggregate_axis(signals: List[Dict[str, Any]]) -> Dict[str, Any]:
-    # Determine worst-case band on the axis (HIGH > NORMAL > LOW), and dominant trend.
+    """
+    Contract semantics:
+    - band_high: strongest *high-side* (HIGH/EXTREME_HIGH). If none => NORMAL.
+    - band_low: strongest *low-side* (LOW/EXTREME_LOW). If none => NORMAL.
+    """
     if not signals:
-        return {"band": "NORMAL", "trend": "FLAT", "signals": []}
+        return {"band_high": "NORMAL", "band_low": "NORMAL", "trend": "FLAT", "signals": []}
 
-    # Determine band severity score
-    band_order = {"EXTREME_HIGH": 3, "HIGH": 2, "NORMAL": 1, "LOW": 0, "EXTREME_LOW": -1}
-    def band_score(b: str) -> int:
-        return band_order.get(b, 1)
+    # Explicitly enforce contract semantics, even if unexpected bands appear.
+    bands = [str(s.get("band", "NORMAL")) for s in signals]
 
-    # Choose max severity by absolute distance from NORMAL (prefer EXTREME)
-    best = None
-    best_score = -999
-    for s in signals:
-        b = s["band"]
-        sc = band_score(b)
-        # prioritize extremes and highs for congestion/heat; lows for cheap
-        # use absolute magnitude w/ sign
-        mag = abs(sc - 1)
-        # tie-break: deterministic by metric name
-        score_key = (mag, sc, s["metric"])
-        if best is None or score_key > best_score:
-            pass
+    if "EXTREME_HIGH" in bands:
+        band_high = "EXTREME_HIGH"
+    elif "HIGH" in bands:
+        band_high = "HIGH"
+    else:
+        band_high = "NORMAL"
 
-    # Compute axis band as max band_score among signals
-    max_band = max(signals, key=lambda s: (band_score(s["band"]), s["metric"]))["band"]
-    min_band = min(signals, key=lambda s: (band_score(s["band"]), s["metric"]))["band"]
+    if "EXTREME_LOW" in bands:
+        band_low = "EXTREME_LOW"
+    elif "LOW" in bands:
+        band_low = "LOW"
+    else:
+        band_low = "NORMAL"
 
-    # Determine trend via average momentum of top-2 magnitude z
-    top = sorted(signals, key=lambda s: (abs(float(s.get("z_robust", 0.0))), abs(float(s.get("momentum_7d_vs_30d", s.get("momentum", 0.0)))), s.get("metric","")), reverse=True)[:2]
+    top = sorted(
+        signals,
+        key=lambda s: (
+            abs(float(s.get("z_robust", 0.0))),
+            abs(float(s.get("momentum_7d_vs_30d", s.get("momentum", 0.0)))),
+            str(s.get("metric", "")),
+        ),
+        reverse=True,
+    )[:2]
     mom_avg = float(np.mean([float(t.get("momentum_7d_vs_30d", t.get("momentum", 0.0))) for t in top])) if top else 0.0
-    return {
-        "band_high": max_band,
-        "band_low": min_band,
-        "trend": _trend(mom_avg),
-        "signals": signals,
-    }
+
+    return {"band_high": band_high, "band_low": band_low, "trend": _trend(mom_avg), "signals": signals}
 
 
 def _driver_score(s: Dict[str, Any], weight: float) -> float:
-    # Deterministic scalar used for ranking drivers.
     z = float(s.get("z_robust", 0.0))
     pct = float(s.get("pct_90d", 50.0))
     mom = float(s.get("momentum_7d_vs_30d", 0.0))
-    pct_dist = abs(pct - 50.0) / 50.0  # 0..1
+    pct_dist = abs(pct - 50.0) / 50.0
     return float(weight * (abs(z) + 0.75 * pct_dist + 0.50 * abs(mom)))
 
 
@@ -246,9 +311,6 @@ def compute_regime(
     confidence_score: Optional[float] = None,
     confidence_threshold: float = 0.40,
 ) -> Dict[str, Any]:
-    # Quantitative data-quality gate: if confidence is below threshold, we must not
-    # present a definitive regime. Downstream UI/reporting can still show the
-    # underlying drivers, but the headline regime becomes UNKNOWN/DEGRADED.
     try:
         cs = float(confidence_score) if confidence_score is not None else None
         if cs is not None and (not math.isfinite(cs)):
@@ -256,32 +318,24 @@ def compute_regime(
     except Exception:
         cs = None
 
-    if cs is not None and cs < float(confidence_threshold):
+    is_gated = cs is not None and cs < float(confidence_threshold)
+
+    d = _ensure_date(gold_df)
+    if d.empty:
         return {
             "chain": chain,
-            "missing": False,
-            "label": "UNKNOWN/DEGRADED",
+            "missing": True,
+            "label": None,
             "asof_date": asof_date,
             "window_days": window_days,
             "ruleset_id": None,
             "drivers": [],
-            "determinism_hash": None,
-            "axes": {},
-            "gate": {
-                "type": "confidence_threshold",
-                "threshold": float(confidence_threshold),
-                "confidence_score": float(cs),
-                "explanation": "Confidence is below the product threshold; regime is withheld to avoid overclaiming.",
-            },
         }
-    d = _ensure_date(gold_df)
-    if d.empty:
-        return {"chain": chain, "missing": True, "label": None, "asof_date": asof_date, "window_days": window_days, "ruleset_id": None, "drivers": []}
 
     ptype = str((profile or {}).get("type") or "eth_l1")
     spec = PROFILE_SPECS.get(ptype, PROFILE_SPECS["eth_l1"])
 
-    demand = []
+    demand: List[Dict[str, Any]] = []
     for m in spec.demand_metrics:
         sig = _signal_for_metric(d, m)
         if sig:
@@ -289,7 +343,7 @@ def compute_regime(
             sig["trend"] = _trend(sig["momentum_7d_vs_30d"])
             demand.append(sig)
 
-    friction = []
+    friction: List[Dict[str, Any]] = []
     for m in spec.friction_metrics:
         sig = _signal_for_metric(d, m)
         if sig:
@@ -297,7 +351,7 @@ def compute_regime(
             sig["trend"] = _trend(sig["momentum_7d_vs_30d"])
             friction.append(sig)
 
-    capacity = []
+    capacity: List[Dict[str, Any]] = []
     for m in spec.capacity_metrics:
         sig = _signal_for_metric(d, m)
         if sig:
@@ -305,34 +359,70 @@ def compute_regime(
             sig["trend"] = _trend(sig["momentum_7d_vs_30d"])
             capacity.append(sig)
 
-    # Axis summaries
+    # Add scorecard-compatible instability signal (if input exists).
+    # This DOES NOT change regime logic; it only enriches the evidence surface + mapping.
+    inst_sig = _signal_for_blocktime_instability(d, col="avg_block_time_sec", window_days=int(window_days))
+    if inst_sig:
+        inst_sig["axis"] = "capacity"
+        inst_sig["band"] = _band(float(inst_sig["pct_90d"]), float(inst_sig["z_robust"]))
+        inst_sig["trend"] = _trend(float(inst_sig["momentum_7d_vs_30d"]))
+        # keep it out of axis aggregation arrays unless you explicitly want it (we don't, for now)
+        # capacity.append(inst_sig)  # intentionally NOT included to avoid regime changes
+
+    # Full evidence surface
+    signals: Dict[str, Any] = {}
+
+    def _emit(axis: str, s: Dict[str, Any]) -> None:
+        metric = str(s["metric"])
+        out = {
+            "axis": axis,
+            "current": s.get("current"),
+            "pct_90d": s.get("pct_90d"),
+            "z_robust": s.get("z_robust"),
+            "momentum_7d_vs_30d": s.get("momentum_7d_vs_30d"),
+        }
+        # carry optional extras (for transforms)
+        if "current_raw" in s:
+            out["current_raw"] = s.get("current_raw")
+        if "transform" in s:
+            out["transform"] = s.get("transform")
+        signals[metric] = out
+
+    for s in demand:
+        _emit("demand", s)
+    for s in friction:
+        _emit("friction", s)
+    for s in capacity:
+        _emit("capacity", s)
+    if inst_sig:
+        _emit("capacity", inst_sig)
+
     ax_d = _aggregate_axis(demand)
     ax_f = _aggregate_axis(friction)
     ax_c = _aggregate_axis(capacity)
 
     def is_high(b: str) -> bool:
         return b in ("HIGH", "EXTREME_HIGH")
+
     def is_extreme_high(b: str) -> bool:
         return b == "EXTREME_HIGH"
+
     def is_low(b: str) -> bool:
         return b in ("LOW", "EXTREME_LOW")
 
-    # Decision table (explicit, ordered)
     label = "STABLE"
-
-    # Congested: capacity pressure + friction are both high (or capacity extreme).
     if is_extreme_high(ax_c["band_high"]) or (is_high(ax_c["band_high"]) and is_high(ax_f["band_high"])):
         label = "CONGESTED"
-    # Cheap: low friction + low capacity pressure (per your choice A)
     elif is_low(ax_f["band_low"]) and is_low(ax_c["band_low"]):
         label = "CHEAP"
-    # Heating: demand high and trend heating in either demand or capacity or friction.
     elif is_high(ax_d["band_high"]) and (ax_d["trend"] == "HEATING" or ax_c["trend"] == "HEATING" or ax_f["trend"] == "HEATING"):
         label = "HEATING"
     else:
         label = "STABLE"
 
-    # Drivers: rank candidate metrics with weights per axis, but only those supporting the chosen label.
+    if is_gated:
+        label = "UNKNOWN/DEGRADED"
+
     candidates: List[Tuple[float, Dict[str, Any]]] = []
     for s in demand:
         candidates.append((_driver_score(s, 1.0), {**s, "axis": "demand"}))
@@ -341,10 +431,11 @@ def compute_regime(
     for s in capacity:
         candidates.append((_driver_score(s, 1.2), {**s, "axis": "capacity"}))
 
-    # Filter candidates to those that "agree" with regime (deterministic, conservative)
     def agrees(s: Dict[str, Any]) -> bool:
         b = s.get("band", "NORMAL")
         tr = s.get("trend", "FLAT")
+        if label == "UNKNOWN/DEGRADED":
+            return True
         if label == "CONGESTED":
             return is_high(b) or tr == "HEATING"
         if label == "CHEAP":
@@ -356,29 +447,37 @@ def compute_regime(
     filtered = [c for c in candidates if agrees(c[1])]
     filtered.sort(key=lambda t: (-t[0], str(t[1].get("metric"))))
 
-    drivers = []
+    drivers: List[Dict[str, Any]] = []
     for _, s in filtered[:3]:
-        drivers.append({
-            "metric": s["metric"],
-            "axis": s["axis"],
-            "current": s["current"],
-            "z_robust": s["z_robust"],
-            "pct_90d": s["pct_90d"],
-            "trend": s["trend"],
-            "momentum_7d_vs_30d": s["momentum_7d_vs_30d"],
-        })
+        drivers.append(
+            {
+                "metric": s["metric"],
+                "axis": s["axis"],
+                "current": s["current"],
+                "z_robust": s["z_robust"],
+                "pct_90d": s["pct_90d"],
+                "trend": s["trend"],
+                "momentum_7d_vs_30d": s["momentum_7d_vs_30d"],
+            }
+        )
 
-    # Determinism hash (stable across rebuilds if data unchanged)
-    # We avoid python's hash randomization by hashing a canonical JSON string.
-    det_payload = {
-        "chain": chain,
-        "ruleset_id": spec.ruleset_id,
-        "label": label,
-        "asof_date": asof_date,
-        "drivers": drivers,
-    }
-    canon = json_dumps_canonical(det_payload)
-    det_hash = stable_sha256_12(canon)
+    det_hash: Optional[str] = None
+    if not is_gated:
+        det_payload = {
+            "chain": chain,
+            "ruleset_id": spec.ruleset_id,
+            "label": label,
+            "asof_date": asof_date,
+            "drivers": drivers,
+        }
+        canon = json_dumps_canonical(det_payload)
+        det_hash = stable_sha256_12(canon)
+
+    aliases = SIGNAL_ALIASES_BY_PROFILE.get(spec.profile_type, {})
+    alias_to_signal: Dict[str, str] = {}
+    for alias_key, signal_key in aliases.items():
+        if signal_key in signals:
+            alias_to_signal[str(alias_key)] = str(signal_key)
 
     return {
         "chain": chain,
@@ -389,11 +488,24 @@ def compute_regime(
         "ruleset_id": spec.ruleset_id,
         "drivers": drivers,
         "determinism_hash": det_hash,
+        "gate": {
+            "type": "confidence_threshold",
+            "threshold": float(confidence_threshold),
+            "confidence_score": float(cs) if cs is not None else None,
+            "status": "ok" if not is_gated else "gated",
+            "explanation": (
+                "Confidence is below the product threshold; regime is withheld to avoid overclaiming."
+                if is_gated
+                else "OK"
+            ),
+        },
         "axes": {
             "demand": {"band_high": ax_d["band_high"], "band_low": ax_d["band_low"], "trend": ax_d["trend"]},
             "friction": {"band_high": ax_f["band_high"], "band_low": ax_f["band_low"], "trend": ax_f["trend"]},
             "capacity": {"band_high": ax_c["band_high"], "band_low": ax_c["band_low"], "trend": ax_c["trend"]},
         },
+        "signals": signals,
+        "signal_aliases": alias_to_signal,
     }
 
 

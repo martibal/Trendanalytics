@@ -1,0 +1,97 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum SubscriptionTier {
+  basic
+  pro
+}
+
+enum SubscriptionStatus {
+  active
+  inactive
+}
+
+enum ApiKeyStatus {
+  active
+  suspended
+  revoked
+}
+
+model Account {
+  id                 String         @id @default(uuid()) @db.Uuid
+  authProviderUserId String         @unique @map("auth_provider_user_id")
+  email              String?
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subscriptions      Subscription[]
+  apiKeys            ApiKey[]
+  customOutputs      CustomOutput[]
+
+  @@map("accounts")
+}
+
+model Subscription {
+  id                   String             @id @default(uuid()) @db.Uuid
+  accountId            String             @map("account_id") @db.Uuid
+  stripeCustomerId     String             @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?            @unique @map("stripe_subscription_id")
+  tier                 SubscriptionTier
+  historyUnlocked      Boolean            @default(false) @map("history_unlocked")
+  entitledChain        String?            @map("entitled_chain")
+  status               SubscriptionStatus
+  currentPeriodEnd     DateTime?          @map("current_period_end") @db.Timestamptz(6)
+  updatedAt            DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  account              Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], map: "subscriptions_account_id_idx")
+  @@index([status], map: "subscriptions_status_idx")
+  @@index([tier], map: "subscriptions_tier_idx")
+  @@index([entitledChain], map: "subscriptions_entitled_chain_idx")
+  @@map("subscriptions")
+}
+
+model ApiKey {
+  id          String       @id @default(uuid()) @db.Uuid
+  accountId   String       @map("account_id") @db.Uuid
+  keyHash     String       @unique @map("key_hash")
+  keyPrefix   String       @map("key_prefix")
+  keyLast4    String?      @map("key_last4")
+  label       String?
+  status      ApiKeyStatus
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt  DateTime?    @map("last_used_at") @db.Timestamptz(6)
+
+  account     Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], map: "api_keys_account_id_idx")
+  @@index([status], map: "api_keys_status_idx")
+  @@index([keyPrefix], map: "api_keys_key_prefix_idx")
+  @@map("api_keys")
+}
+
+model CustomOutput {
+  id                  String    @id @default(uuid()) @db.Uuid
+  accountId           String    @map("account_id") @db.Uuid
+  canonicalRevisionId Int       @map("canonical_revision_id")
+  identityHash        String    @map("identity_hash")
+  thresholdsJson      Json      @map("thresholds_json")
+  storagePath         String    @map("storage_path")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  account             Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, identityHash], map: "custom_outputs_account_id_identity_hash_key")
+  @@index([accountId], map: "custom_outputs_account_id_idx")
+  @@index([canonicalRevisionId], map: "custom_outputs_canonical_revision_id_idx")
+  @@map("custom_outputs")
+}

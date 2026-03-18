@@ -1,0 +1,373 @@
+
+
+1. **Custom thresholds (kundens terskeltilpasning)**
+2. **Ny meta JSON-struktur (`meta.regime.signals`)** som gjør re-parametrisering “pro”
+3. **Mulighet for å kjøre full historikk-rebuild kun for META** (uten full pipeline), inkl. en **GUI-knapp** som trigger dette
+4. Nøyaktige **filer som må endres/lagres**, hva som skal implementeres, og hvorfor
+5. Akseptansekriterier/QA
+
+---
+
+# 1) Mål
+
+## 1.1 Hovedmål
+
+* Gjøre produktet **re-parametriserbart**: kundene kan bruke dine publiserte signaler og justere terskler for egen klassifikasjon (uten å endre canonical).
+* Dette må være **API-first** og **reproduserbart**.
+* Ny funksjonalitet må være tilgjengelig **på hele 400+ dagers historikk fra dag 1**.
+
+## 1.2 Ikke-mål
+
+* Ikke endre canonical regimesystem eller historiske labels (canonical skal være stabil).
+* Ikke legge inn prisdata eller normativt språk.
+
+---
+
+# 2) Data/Schema-krav: Ny `meta.regime.signals`
+
+## 2.1 Hvorfor
+
+I dag finnes rike signaler mest via `drivers[]` (topp 3). For ekte terskeltilpasning trenger kundene **komplette signaler per metrikk per dag**, ikke bare topp-drivers.
+
+## 2.2 Krav
+
+I hver `meta/<chain>/<date>.json` skal `meta.regime` inneholde:
+
+### `meta.regime.signals` (må)
+
+Et objekt med én entry per metrikk som inngår i regime engine (demand/friction/capacity). Eksempel:
+
+```json
+"regime": {
+  "label": "HEATING",
+  "ruleset_id": "...",
+  "confidence_score": 0.82,
+  "drivers": [...],
+  "signals": {
+    "tx_count_daily": {
+      "axis": "demand",
+      "current": 123,
+      "pct_90d": 87.0,
+      "z_robust": 1.62,
+      "momentum_7d_vs_30d": 0.22
+    },
+    "median_tx_fee_native": {
+      "axis": "friction",
+      "current": 0.0012,
+      "pct_90d": 12.0,
+      "z_robust": -1.8,
+      "momentum_7d_vs_30d": -0.35
+    }
+  }
+}
+```
+
+### Vinduer (må, dokumenteres)
+
+* `pct_90d`: percentile-rank over siste **90 dager**
+* `z_robust`: robust z over siste **180 dager** (median/MAD)
+* `momentum_7d_vs_30d`: (robust z av mean(7d)) – (robust z av mean(30d))
+
+> Viktig: `signals` skal være “evidence surface” og skal **ikke** inngå i `determinism_hash` hvis dere har hash for canonical identity.
+
+---
+
+# 3) Customer Threshold Config (API / docs)
+
+## 3.1 Hva kunden kan styre (v1)
+
+Konfig skal mappe direkte til dagens regime_engine terskler:
+
+* Gating:
+
+  * `gate.confidence_threshold` (default 0.40)
+
+* Band-thresholds (mapping til `_band(pct,z)`):
+
+  * `band.high`: pct=80, z=1.5
+  * `band.extreme_high`: pct=90, z=2.5
+  * `band.low`: pct=20, z=-1.5
+  * `band.extreme_low`: pct=10, z=-2.5
+
+* Trend-threshold (mapping til `_trend(mom, eps)`):
+
+  * `trend.eps` (default 0.15)
+
+Konfig-skjema (v1):
+
+```json
+{
+  "version": "v1",
+  "gate": { "confidence_threshold": 0.40 },
+  "band": {
+    "high": { "pct": 80, "z": 1.5 },
+    "extreme_high": { "pct": 90, "z": 2.5 },
+    "low": { "pct": 20, "z": -1.5 },
+    "extreme_low": { "pct": 10, "z": -2.5 }
+  },
+  "trend": { "eps": 0.15 }
+}
+```
+
+## 3.2 Canonical vs Custom
+
+* Canonical label forblir **uendret** (det du publiserer i meta i dag).
+* Custom label beregnes av kunden / ditt custom API, og merkes alltid “custom”.
+
+---
+
+# 4) Pipeline-endringer (src.zip): filer og endringer
+
+## 4.1 Endre: `api/regime_engine.py` (MÅ)
+
+### Endring
+
+* I `compute_regime()` (eller tilsvarende funksjon) bygg `signals` fra eksisterende lister:
+
+  * `demand`, `friction`, `capacity` (allerede signal dicts fra `_signal_for_metric()`)
+
+### Output
+
+* Returner `signals` i `regime`-objektet som eksporteres til meta JSON.
+
+### Hvorfor
+
+* Minimal endring: dere beregner allerede signalene; dere må bare publisere dem.
+
+### Akseptansekriterier
+
+* `meta.regime.signals` finnes for alle aktuelle chains/dager der data finnes.
+* Keys i `signals` er stabile og matcher metric-nøklene dere bruker i engine.
+
+---
+
+## 4.2 Contract/publish (hvis dere bruker `contract.json`) (MÅ)
+
+### Endre: `pipeline/tools/publish_artifacts.py` (eller tilsvarende)
+
+* Oppdater `contract.json` schema til å inkludere:
+
+  * `meta.regime.signals` + definisjon av vinduer og enheter
+  * default threshold config (canonical defaults)
+
+### Endre: `pipeline/tools/validate_published_dataset.py`
+
+* Validér at `meta.regime.signals` eksisterer og har forventet format for minst én dag per chain.
+
+---
+
+# 5) Ny funksjonalitet: META-only historikk rebuild (CLI + GUI)
+
+Dette er den “siste endringen” du ba om: **kjøre full historikk på ny meta-struktur uten full pipeline**.
+
+## 5.1 CLI: meta-only history export (MÅ)
+
+Det finnes allerede et tool:
+
+* `pipeline/tools/export_meta_json_history.py`
+
+### Krav
+
+* Teamet skal dokumentere én kommando som:
+
+  * Regenererer `data/calculated/meta/<chain>/<date>.json` for hele historikken
+  * Inkluderer den nye `meta.regime.signals`
+  * Uten å kjøre gold/derived på nytt
+
+### Standard-parametre
+
+* `--mode rebuild`
+* `--start` settes automatisk (se 5.2) eller manuelt til earliest gold date
+* `--windows 7,30,90,180,365` (samme som dere bruker ellers)
+
+### Akseptansekriterier
+
+* Kjøring produserer meta JSON for alle dager/chains som har gold coverage.
+* Nytt felt `meta.regime.signals` finnes i output.
+
+---
+
+## 5.2 Ny wrapper: Auto-start + enkel kjøring (MÅ)
+
+Lag en ny fil (repo root eller `pipeline/tools/`):
+
+**Ny fil:** `pipeline/tools/reexport_meta_only.py` (eller `tools/reexport_meta_only.py`)
+
+### Hva den gjør
+
+* Leser supported chains (samme kilde som pipeline)
+* Leser gold-datoer og finner earliest available date
+* Kaller `export_meta_json_history.py` med korrekt `--start` automatisk
+
+### Hvorfor
+
+* Unngå manuell dato-setting og feil.
+
+### Akseptansekriterier
+
+* “one command” meta rebuild fungerer på en ny maskin med kun repo + data.
+
+---
+
+## 5.3 Publish: meta-only publish til `data/published/v1` (MÅ hvis web leser published)
+
+Hvis web bruker published zip/dataset:
+
+* Legg til mulighet til å publishe **kun meta** (uten gold/derived) etter rebuild.
+
+**Krav:**
+
+* En kommando eller flagg som gjør “publish meta only”:
+
+  * tar input fra `data/calculated/meta`
+  * skriver `data/published/v1/meta/...`
+
+Akseptansekriterier:
+
+* Etter meta rebuild + meta publish, web ser nye `meta.regime.signals` uten å republishe alt.
+
+---
+
+## 5.4 GUI: “Rebuild META (history)” knapp (MÅ)
+
+Du sa du kun har “Kjør pipeline” i GUI. Teamet må legge til:
+
+### Ny GUI-knapp
+
+**Label:** “Rebuild META (History)”
+
+### Oppførsel
+
+* Trigger wrapper-scriptet (5.2) eller direkte tool-kall (5.1)
+* Logger progresjon:
+
+  * chain
+  * date range
+  * antall dager skrevet
+* På slutten:
+
+  * (valgfritt) trigger “Publish META only” (5.3) hvis UI/web er avhengig av published
+
+### Sikkerhet
+
+* Bekreftelse/varsel i UI: “This will rewrite meta history JSON.”
+
+### Akseptansekriterier
+
+* Knappen gjør **kun** meta export (og ev meta publish), ikke resten av pipeline.
+* Ingen endring i gold/derived.
+
+---
+
+# 6) Web-endringer (web.zip) for kundens terskeltilpasning
+
+## 6.1 Ny API for custom thresholds (MÅ)
+
+**Ny route:** `src/app/api/regime/custom/route.ts`
+
+### Request (POST)
+
+```json
+{
+  "chain": "ethereum",
+  "date": "YYYY-MM-DD",
+  "config": { "version": "v1", ... overrides ... }
+}
+```
+
+### Response
+
+* Canonical label (fra meta JSON)
+* Custom label (computed)
+* Axes breakdown (band/trend)
+* `effective_config` (merged defaults + overrides)
+* `reasons[]` (human readable)
+
+### Implementasjon
+
+* Les `meta/<chain>/<date>.json` fra public/published
+* Bruk `meta.regime.signals` som input
+* Evaluer bands/trend/decision table med config
+
+---
+
+## 6.2 Custom evaluator (MÅ)
+
+**Nye filer:**
+
+* `src/lib/customThresholds/schema.ts` (type + validation)
+* `src/lib/customThresholds/defaults.ts` (canonical defaults)
+* `src/lib/customThresholds/merge.ts` (defaults + overrides)
+* `src/lib/customThresholds/evaluate.ts` (compute custom regime)
+
+Evaluator må implementere nøyaktig samme decision table som canonical (men med nye terskler).
+
+---
+
+## 6.3 “How to” side (MÅ)
+
+**Ny side:** `src/app/how-to/custom-thresholds/page.tsx`
+
+Må inneholde:
+
+* Kort forklaring: canonical vs custom
+* Tabell over parametre + default + “what it means”
+* 3 copy/paste `curl` eksempler:
+
+  * Stricter bands
+  * Higher trend eps
+  * Higher confidence gate
+* Forklaring av pct vs z vs momentum i enkel tekst
+
+---
+
+# 7) QA / Akseptansekriterier (MÅ)
+
+## 7.1 Data
+
+* Etter meta rebuild:
+
+  * `meta.regime.signals` finnes for hele historikken for alle chains med data
+  * `signals` har kun de metrikker regime engine faktisk bruker (ingen junk)
+
+## 7.2 Canonical stabilitet
+
+* Canonical label, drivers, scorecard **endres ikke** av at `signals` legges til.
+* `signals` påvirker ikke `determinism_hash` (hvis dere har determinism).
+
+## 7.3 Custom API determinisme
+
+* Samme meta day-json + samme config → alltid samme custom output.
+* `effective_config` returneres eksplisitt.
+
+## 7.4 GUI
+
+* “Rebuild META (History)” kjører uten å trigge full pipeline
+* Logger progresjon og resultat
+* Etter fullført, web kan lese nye meta-filer
+
+---
+
+# 8) Leveransepakke (checklist)
+
+### Pipeline
+
+* [ ] `api/regime_engine.py`: meta.regime.signals publiseres
+* [ ] `pipeline/tools/reexport_meta_only.py` (wrapper) implementert
+* [ ] Dokumentert kommando for meta rebuild
+* [ ] (Hvis nødvendig) meta-only publish kommando/støtte
+* [ ] Oppdatert contract/validator
+
+### GUI
+
+* [ ] Ny knapp: “Rebuild META (History)”
+* [ ] Logger og feilrapportering
+
+### Web
+
+* [ ] Custom regime API route
+* [ ] Custom thresholds evaluator + defaults
+* [ ] How-to side med curl-eksempler
+
+---
+

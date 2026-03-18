@@ -1,0 +1,472 @@
+Her er en **konkret, patch-orientert kravspec** basert på faktisk kodestruktur i `full.zip` (Next.js App Router). Når dev-teamet er ferdig med punktene under, har dere en nettside som:
+
+1. tydelig kommuniserer **bruks-/nytteverdi** av verdier og grafer (deskriptivt)
+2. har en **interaktiv historisk validerings-/tillitsmotor** som lar brukere kvalitetssikre det dere selger fra dag 1
+
+Jeg refererer til **eksisterende filer** som finnes i zippen, og spesifiserer **nøyaktig hva som skal patches**, samt **hvilke nye filer** som må lages.
+
+---
+
+# 0) Overordnet regel (gjelder alle endringer)
+
+All UI-tekst skal være **deskriptiv, ikke normativ**.
+Det betyr: “what this shows / commonly used for / supports analysis of” – aldri retorikk som antyder anbefalt handling.
+
+---
+
+# 1) Status i dagens kode (kort diagnose)
+
+Dere har allerede mye av det vi trenger:
+
+* Canonical regime + verdict UI er i gang (`src/components/regime/VerdictCard.tsx`, brukt fra `ChainDiagnosticHeader.tsx`)
+* Custom thresholds er i stor grad implementert (`src/components/thresholds/ThresholdPanel.tsx`, `src/lib/customThresholds/*`, `/api/regime/custom`)
+* Landing har regime/verdict-logikk (`src/components/landing/LandingHero.tsx`, `ChainHeroCard.tsx`)
+
+Det som **mangler** for å være “100% i mål” med kravene vi har satt:
+
+1. Et konsistent “**What this shows / Commonly used for**”-lag knyttet til **hver graf og hvert panel** (ikke bare på metodikk-sider).
+2. Den store tingen: en **Trust & Validation**-seksjon på chain-sidene med:
+
+   * historisk regime timeline (400+ dager)
+   * varighet/flip-rate statistikk
+   * interaktiv “inspect date”
+   * demonstrasjon av “noise filtering” (spikes vs structural)
+   * “threshold integrity” (mekanisk konsistens mellom terskler og klassifikasjon)
+3. En effektiv måte å hente 400+ dagers meta-historikk (dag-JSON) uten å være låst til `window=365` i `/api/export/window`.
+
+---
+
+# 2) Kravspec – Bruks-/nytteverdi: “What this shows / Commonly used for” på alle panels
+
+## 2.1 Ny felles komponent: `PanelPurpose`
+
+**NY FIL**
+
+* `src/components/info-boxes/PanelPurpose.tsx`
+
+**Hva den skal gjøre**
+
+* Standardisert, liten boks som rendrer:
+
+  * **What this shows** (1–2 setninger)
+  * **Commonly used for** (3–5 bullets)
+  * Valgfritt: lenke “Learn more” til wiki/metodikk
+
+**Hvorfor**
+
+* Dere må ha en konsekvent måte å kommunisere nytteverdi uten rådgivende språk.
+* Dette løser “hva skal vi med dette?” direkte i konteksten av hver graf.
+
+---
+
+## 2.2 Patch: `VerdictCard` skal inkludere purpose-tekst (kort)
+
+**ENDRE**
+
+* `src/components/regime/VerdictCard.tsx`
+
+**Patch**
+
+* Under verdict/labels: legg inn `PanelPurpose` med:
+
+  * What this shows: beskriv klassifikasjonen (noise/structural/insufficient) som historisk-normalisert tilstandsbeskrivelse
+  * Commonly used for: filtrering, prioritering av videre analyse, audit/reporting
+
+**Hvorfor**
+
+* Verdict er “produktets kjerne”. Den må umiddelbart svare på “hva representerer dette?” og “hva brukes det typisk til?” – deskriptivt.
+
+---
+
+## 2.3 Patch: Chart panels skal få purpose-tekst
+
+Dere har chart panels som brukes i chain-view:
+
+* `src/components/charts/MetricPanel.tsx`
+* `src/components/charts/ComputedRatioPanel.tsx`
+* `src/components/charts/MetricLineChart.tsx` / `MetricTriLineChart.tsx`
+
+**ENDRE**
+
+* `src/components/charts/MetricPanel.tsx`
+* `src/components/charts/ComputedRatioPanel.tsx`
+
+**Patch**
+
+* På slutten av hvert panel: rendrer `PanelPurpose`.
+* Knyt purpose-innhold til metrikken (via eksisterende `getMetric()` fra `@/lib/metrics/catalog` og/eller hardkodet mapping i panelene).
+
+**Hvorfor**
+
+* Dette gjør at “grafene” ikke bare er grafer, men forklarte observasjonsflater med tydelig bruksverdi.
+
+---
+
+## 2.4 Patch: Axes/scorecard panel skal få purpose-tekst
+
+**ENDRE**
+
+* `src/components/scorecard/Scorecard.tsx` (og evt `MiniScorecard.tsx`)
+* `src/components/chains/ChainDiagnosticHeader.tsx` hvis den rendrer aksene direkte
+
+**Patch**
+
+* Legg `PanelPurpose` for “Axes overview / Scorecard” (demand/friction/capacity):
+
+  * What this shows: hvilke dimensjoner som driver regimet
+  * Commonly used for: diagnostikk/fortolkning, konsistent sammenligning over tid
+
+---
+
+# 3) Kravspec – Trust & Validation (historisk kvalitetssikring i UI)
+
+Dette er hovedleveransen som gjør at dere kan forsvare premium-prising uten å “bare være grafer”.
+
+## 3.1 Ny seksjon på chain-side: `TrustSection`
+
+**NYE FILER**
+
+* `src/components/trust/TrustSection.tsx`
+* `src/components/trust/RegimeTimeline.tsx`
+* `src/components/trust/RegimeStatsPanel.tsx`
+* `src/components/trust/HistoricalInspectorDrawer.tsx`
+* `src/components/trust/NoiseFilterPanel.tsx`
+* `src/components/trust/ThresholdIntegrityPanel.tsx`
+
+**Hva `TrustSection` skal inneholde**
+
+1. **RegimeTimeline (400+ days)**
+2. **RegimeStatsPanel** (duration + flip-rate + gated share)
+3. **HistoricalInspectorDrawer** (klikk en dato → full detalj)
+4. **NoiseFilterPanel** (spike vs structural)
+5. **ThresholdIntegrityPanel** (konsistens mellom terskler og structural-dager)
+
+Alle disse modulene skal også bruke `PanelPurpose` (deskriptivt).
+
+---
+
+## 3.2 Datagrunnlag: krever meta-historikk (400+ dager)
+
+Per dag trenger dere minimum:
+
+* `date`
+* `regime.label`
+* `regime.gate.status`
+* `confidence.confidence_score` (eller `regime.gate.confidence_score`)
+* `regime.drivers` (top 1–3)
+* `regime.axes`
+* `regime.signals` (for noise filter + integrity)
+
+Dette finnes i deres published meta day-json.
+
+---
+
+## 3.3 Ny API-route for historikk: `/api/regime/history`
+
+Dere er i dag bundet til `export/window` som kun støtter 365 max i klientkode (`AllowedWindow` i `ChainClient.tsx`), og `public/data/published/v1` har day-filer.
+
+**NY FIL**
+
+* `src/app/api/regime/history/route.ts`
+
+**Request**
+
+* `GET /api/regime/history?chain=bitcoin&days=450`
+
+  * `days` default: 450 (eller “all available” med øvre grense)
+* evt støtte for `start`/`end`:
+
+  * `GET /api/regime/history?chain=bitcoin&start=2024-01-01&end=2026-02-24`
+
+**Response (komprimert timeline)**
+Returner en array med:
+
+```ts
+type RegimeHistoryPoint = {
+  date: string;
+  label: string;
+  verdict: "LIKELY_NOISE" | "STRUCTURAL_SHIFT" | "INSUFFICIENT_DATA";
+  confidence_score: number | null;
+  gate_status: string | null;
+  drivers: Array<{ metric: string; axis?: string; band?: string; trend?: string }>;
+  axes?: Record<string, { band_high: string; band_low: string; trend: string }>;
+};
+```
+
+**Hvorfor**
+
+* UI trenger en lett payload for å tegne timeline + stats uten å lese 450 separate filer i browser.
+* Day-json kan fortsatt brukes on-demand i `HistoricalInspectorDrawer` for en spesifikk dato.
+
+---
+
+## 3.4 Implementasjon: dataflyt i chain-client
+
+**ENDRE**
+
+* `src/app/chains/[chain]/ChainClient.tsx`
+
+**Patch**
+
+* Legg inn fetch av historikk til TrustSection:
+
+  * `GET /api/regime/history?...`
+* Hold dette separat fra dagens `fetchMetaWindow()` (som dere allerede bruker for canonical “Now”).
+* Pass historikk inn i `TrustSection`.
+
+**Hvorfor**
+
+* Dere må ha både “Now” (latest meta) og “History” (timeline) på samme side.
+
+---
+
+## 3.5 `RegimeTimeline` krav (UI)
+
+**NY FIL**
+
+* `src/components/trust/RegimeTimeline.tsx`
+
+**Skal gjøre**
+
+* Rendrer 400+ datapunkter i en kompakt timeline (SVG/canvas/div grid).
+* Hover tooltip:
+
+  * date, verdict, label, confidence, top driver metric
+* Klikk på dag → åpne `HistoricalInspectorDrawer(date)`.
+
+---
+
+## 3.6 `RegimeStatsPanel` krav (beregning)
+
+**NY FIL**
+
+* `src/components/trust/RegimeStatsPanel.tsx`
+
+**Skal beregne fra historikk**
+
+* Flip-rate per 30 og 90 dager
+* Median varighet for “noise” vs “structural”
+* Andel “insufficient data”
+* Antall regime transitions i valgt periode
+
+**Skal vise**
+
+* 6–8 nøkkeltall (ikke grafer nødvendig, men lov)
+
+---
+
+## 3.7 `HistoricalInspectorDrawer` krav
+
+**NY FIL**
+
+* `src/components/trust/HistoricalInspectorDrawer.tsx`
+
+**Skal vise når man velger en dato**
+
+* Canonical verdict + label + gate/confidence
+* Drivers (top 3) + axes
+* Signals for driver-metrikkene (pct/z/momentum + transform hvis finnes)
+* Regime varighet: “streak” før/etter (beregnes fra historikk)
+* Link/knapp: “Open full meta JSON for this date” (download / view raw)
+
+**Datakilde**
+
+* On-demand fetch av full meta day-json for valgt dato:
+
+  * via ny route (valgfritt): `/api/export/day?chain=...&genre=meta&date=...`
+  * eller direkte `fetch('/data/published/v1/meta/<chain>/<date>.json')`
+
+Anbefalt: lag en liten server-route for day fetch for å unngå path-lekkasje/edge-problemer.
+
+---
+
+## 3.8 `NoiseFilterPanel` krav
+
+**NY FIL**
+
+* `src/components/trust/NoiseFilterPanel.tsx`
+
+**Skal demonstrere**
+
+* Velg metrikk (dropdown basert på hvilke `regime.signals` som finnes)
+* Highlight dager hvor:
+
+  * `pct_90d >= threshold` eller `z_robust >= threshold`
+* Vis telling:
+
+  * antall “threshold spikes”
+  * hvor mange av disse endte i structural verdict
+  * hvor mange ble værende noise/filtered
+
+**Formål**
+
+* Gir umiddelbar visuell “aha”: persistens/klassifikasjon er ikke en spike-detektor.
+
+---
+
+## 3.9 `ThresholdIntegrityPanel` krav
+
+**NY FIL**
+
+* `src/components/trust/ThresholdIntegrityPanel.tsx`
+
+**Skal beregne**
+For dager med structural verdict:
+
+* andel dager hvor minst N relevante signals faktisk er over canonical terskler (pct/z/momentum)
+* gate-pass rate
+* optional: distribusjon (min/median/max) av pct/z i structural vs noise
+
+**Formål**
+
+* Metodefolk kan etterprøve at “reglene dere dokumenterer faktisk gjenspeiles i historikken”.
+
+---
+
+# 4) Landing og Chains overview – sikre at “trust entry” finnes fra forsiden
+
+Dere har landing regime/verdict allerede, men dere mangler en “quick trust entry”:
+
+## 4.1 Patch: Chain hero cards skal linke direkte til TrustSection
+
+**ENDRE**
+
+* `src/components/landing/ChainHeroCard.tsx`
+* `src/components/landing/LandingHero.tsx`
+
+**Patch**
+
+* CTA-lenke: “View history” → `/chains/[chain]#trust`
+* (Valgfritt) vis “last 90d flips” som et lite tall hvis dere henter historikk light (ikke nødvendig i MVP)
+
+---
+
+# 5) “How-to” og metodikk – koble UI til API-validering
+
+Dere har:
+
+* `src/app/how-to/custom-thresholds/` allerede
+* `src/app/methodology/regime/` finnes
+
+## 5.1 Patch: How-to siden skal være “copy/paste”
+
+**ENDRE**
+
+* `src/app/how-to/custom-thresholds/page.tsx`
+
+**Skal inneholde**
+
+* Kort deskriptiv forklaring
+* 3 copy/paste eksempler:
+
+  * hent canonical meta for dato
+  * kall `/api/regime/custom` med overrides
+  * kall `/api/regime/history` for timeline-validering
+* Forklaring av pct/z/momentum i enkel form
+
+---
+
+# 6) Filer som bør ryddes (ikke funksjonelt krav, men viktig for team)
+
+Dette er ikke produktkrav, men vil spare tid/feil:
+
+* `src/components/ChainsOverview û Kopi.tsx` (duplikat/feil navn)
+* rotfil `ChainDetail.tsx` + `src/components/ChainDetail.tsx` (to steder)
+* filen med navn `{` i repo root (ser ut som en artefakt)
+
+**To-do**
+
+* [ ] Slett/arkiver duplikater og artefakter, eller marker tydelig “unused”.
+
+---
+
+# 7) Konkret patch-liste: hvilke filer endres og hvorfor
+
+## Endres (eksisterende)
+
+1. `src/components/regime/VerdictCard.tsx`
+   **Hvorfor:** legge inn deskriptiv bruksverdi (PanelPurpose)
+
+2. `src/components/charts/MetricPanel.tsx`
+   **Hvorfor:** purpose-tekst knyttet til hver metrikk-graf
+
+3. `src/components/charts/ComputedRatioPanel.tsx`
+   **Hvorfor:** purpose-tekst for computed ratio-panel
+
+4. `src/components/scorecard/Scorecard.tsx` (+ evt `MiniScorecard.tsx`)
+   **Hvorfor:** purpose-tekst for axes/scorecard
+
+5. `src/app/chains/[chain]/ChainClient.tsx`
+   **Hvorfor:** hente historikk + rendrer TrustSection + #trust anchor
+
+6. `src/components/landing/LandingHero.tsx` og `src/components/landing/ChainHeroCard.tsx`
+   **Hvorfor:** inngang til historikkvalidering (link til #trust)
+
+7. `src/app/how-to/custom-thresholds/page.tsx`
+   **Hvorfor:** how-to må inkludere historikkvalidering og API-eksempler
+
+## Nye filer (må lages)
+
+A) Purpose UI
+
+* `src/components/info-boxes/PanelPurpose.tsx`
+
+B) Trust engine UI
+
+* `src/components/trust/TrustSection.tsx`
+* `src/components/trust/RegimeTimeline.tsx`
+* `src/components/trust/RegimeStatsPanel.tsx`
+* `src/components/trust/HistoricalInspectorDrawer.tsx`
+* `src/components/trust/NoiseFilterPanel.tsx`
+* `src/components/trust/ThresholdIntegrityPanel.tsx`
+
+C) Trust engine API
+
+* `src/app/api/regime/history/route.ts`
+* (valgfritt men anbefalt) `src/app/api/export/day/route.ts` (for trygg day-fetch)
+
+---
+
+# 8) Akseptansekriterier (Definition of Done)
+
+Når teamet er ferdig, skal dette være sant:
+
+1. **Alle hovedpaneler på chain-siden** (Verdict, Axes/Scorecard, hver graf-panel) har:
+
+   * “What this shows”
+   * “Commonly used for”
+     (deskriptivt)
+
+2. Chain-siden har en tydelig **TrustSection** under “Now”, med:
+
+   * Timeline ≥ 400 dager (eller “all available” capped)
+   * Flip-rate + duration stats
+   * Click-to-inspect date
+   * Noise filtering demonstration
+   * Threshold integrity summary
+
+3. Landing har en klar inngang til historikk:
+
+   * “View history” → `/chains/[chain]#trust`
+
+4. How-to siden lar en bruker:
+
+   * hente canonical meta for dato
+   * kjøre custom thresholds via API
+   * hente historikk via `/api/regime/history`
+
+5. Alt språk er deskriptivt (ingen anbefalinger).
+
+---
+
+# 9) Implementasjonsrekkefølge (for lav risiko)
+
+1. Lag `PanelPurpose` og patch Verdict + én graf (MetricPanel)
+2. Implementer `/api/regime/history` + `RegimeTimeline` + `RegimeStatsPanel`
+3. Implementer `HistoricalInspectorDrawer`
+4. Implementer `NoiseFilterPanel` + `ThresholdIntegrityPanel`
+5. Patch landing med “View history”
+6. Oppdater how-to siden med history-API og eksempler
+
+---
+
