@@ -84,6 +84,11 @@ type DerivedRow = {
 
 type GoldRow = Record<string, unknown> & { date?: string; chain?: string };
 
+type ChainPageSearchParams = {
+  level?: string;
+  window?: string;
+};
+
 async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
   const result = await readStorageObject(storagePath);
 
@@ -313,18 +318,21 @@ function TogglePill({ active, children }: { active: boolean; children: ReactNode
   return <span className={`${base} ${active ? "bg-muted" : "bg-transparent"}`}>{children}</span>;
 }
 
-export default async function ChainPage(props: {
-  params: { chain: string } | Promise<{ chain: string }>;
-  searchParams?: { level?: string; window?: string } | Promise<{ level?: string; window?: string }>;
+export default async function ChainPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ chain: string }>;
+  searchParams?: Promise<ChainPageSearchParams>;
 }) {
-  const { chain } = await Promise.resolve(props.params);
+  const { chain } = await params;
   if (!chain) return notFound();
 
   const cfg = getChainConfig(chain);
   if (!cfg) return notFound();
   const chainId: ChainId = cfg.id;
 
-  const sp = await Promise.resolve(props.searchParams ?? {});
+  const sp = (await searchParams) ?? {};
   const level = normalizeLevel(sp.level);
   const requestedWindow = normalizeWindow(sp.window);
 
