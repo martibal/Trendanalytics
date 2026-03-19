@@ -25,16 +25,18 @@ function toArrayBuffer(buffer: Buffer): ArrayBuffer {
   return bytes.buffer;
 }
 
+function getDefaultPublishedDataRoot(): string {
+  return path.join(process.cwd(), "public", "data", "published", "v1");
+}
+
 function getLocalDataRoot(): string {
   const configured = process.env.LOCAL_DATA_PATH?.trim();
 
-  if (!configured) {
-    throw new Error(
-      "Local storage is not configured. Missing LOCAL_DATA_PATH. Expected an absolute path to the published/v1 data root."
-    );
+  if (configured) {
+    return configured;
   }
 
-  return configured;
+  return getDefaultPublishedDataRoot();
 }
 
 function buildLocalAbsolutePath(storagePath: string): string {
