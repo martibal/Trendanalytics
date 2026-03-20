@@ -2,30 +2,42 @@
  * @jest-environment node
  */
 
-import type { Mock } from "jest-mock";
+const authMocks = {
+  validateRequestApiKey: jest.fn(),
+  buildAuthErrorResponseBody: jest.fn(),
+};
 
-const validateRequestApiKeyMock = jest.fn();
-const buildAuthErrorResponseBodyMock = jest.fn();
-const enforceAccountRateLimitMock = jest.fn();
-const buildRateLimitHeadersMock = jest.fn();
-const evaluateFileEntitlementMock = jest.fn();
-const readStorageObjectMock = jest.fn();
-const currentDataSourceMock = jest.fn();
-const getOrCreateRequestIdMock = jest.fn();
-const logApiEventMock = jest.fn();
+const rateLimitMocks = {
+  enforceAccountRateLimit: jest.fn(),
+  buildRateLimitHeaders: jest.fn(),
+};
+
+const entitlementMocks = {
+  evaluateFileEntitlement: jest.fn(),
+};
+
+const storageMocks = {
+  readStorageObject: jest.fn(),
+  currentDataSource: jest.fn(),
+};
+
+const auditMocks = {
+  getOrCreateRequestId: jest.fn(),
+  logApiEvent: jest.fn(),
+};
 
 jest.mock("@/lib/auth/validateToken", () => ({
-  validateRequestApiKey: (...args: unknown[]) => validateRequestApiKeyMock(...args),
-  buildAuthErrorResponseBody: (...args: unknown[]) => buildAuthErrorResponseBodyMock(...args),
+  validateRequestApiKey: (...args: unknown[]) => authMocks.validateRequestApiKey(...args),
+  buildAuthErrorResponseBody: (...args: unknown[]) => authMocks.buildAuthErrorResponseBody(...args),
 }));
 
 jest.mock("@/lib/auth/rateLimit", () => ({
-  enforceAccountRateLimit: (...args: unknown[]) => enforceAccountRateLimitMock(...args),
-  buildRateLimitHeaders: (...args: unknown[]) => buildRateLimitHeadersMock(...args),
+  enforceAccountRateLimit: (...args: unknown[]) => rateLimitMocks.enforceAccountRateLimit(...args),
+  buildRateLimitHeaders: (...args: unknown[]) => rateLimitMocks.buildRateLimitHeaders(...args),
 }));
 
 jest.mock("@/lib/auth/entitlements", () => ({
-  evaluateFileEntitlement: (...args: unknown[]) => evaluateFileEntitlementMock(...args),
+  evaluateFileEntitlement: (...args: unknown[]) => entitlementMocks.evaluateFileEntitlement(...args),
   isWindowToken: (value: string) =>
     value === "latest" ||
     value === "7d" ||
@@ -36,13 +48,13 @@ jest.mock("@/lib/auth/entitlements", () => ({
 }));
 
 jest.mock("@/lib/storage", () => ({
-  readStorageObject: (...args: unknown[]) => readStorageObjectMock(...args),
-  currentDataSource: (...args: unknown[]) => currentDataSourceMock(...args),
+  readStorageObject: (...args: unknown[]) => storageMocks.readStorageObject(...args),
+  currentDataSource: (...args: unknown[]) => storageMocks.currentDataSource(...args),
 }));
 
 jest.mock("@/lib/auditLog", () => ({
-  getOrCreateRequestId: (...args: unknown[]) => getOrCreateRequestIdMock(...args),
-  logApiEvent: (...args: unknown[]) => logApiEventMock(...args),
+  getOrCreateRequestId: (...args: unknown[]) => auditMocks.getOrCreateRequestId(...args),
+  logApiEvent: (...args: unknown[]) => auditMocks.logApiEvent(...args),
 }));
 
 describe("GET /api/v1/files/[...path]", () => {
@@ -59,11 +71,11 @@ describe("GET /api/v1/files/[...path]", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    getOrCreateRequestIdMock.mockReturnValue("req_test_123");
-    currentDataSourceMock.mockReturnValue("local");
-    buildRateLimitHeadersMock.mockReturnValue({});
-    logApiEventMock.mockResolvedValue(undefined);
-    buildAuthErrorResponseBodyMock.mockReturnValue({
+    auditMocks.getOrCreateRequestId.mockReturnValue("req_test_123");
+    storageMocks.currentDataSource.mockReturnValue("local");
+    rateLimitMocks.buildRateLimitHeaders.mockReturnValue({});
+    auditMocks.logApiEvent.mockResolvedValue(undefined);
+    authMocks.buildAuthErrorResponseBody.mockReturnValue({
       code: "unauthenticated",
       message: "Missing API key.",
       detail: "missing_api_key",
@@ -81,7 +93,7 @@ describe("GET /api/v1/files/[...path]", () => {
   }
 
   it("returns auth failure with X-Request-Id and logs auth_failed", async () => {
-    validateRequestApiKeyMock.mockResolvedValue({
+    authMocks.validateRequestApiKey.mockResolvedValue({
       ok: false,
       code: "unauthenticated",
       detail: "missing_api_key",
@@ -102,7 +114,7 @@ describe("GET /api/v1/files/[...path]", () => {
       detail: "missing_api_key",
     });
 
-    expect(logApiEventMock).toHaveBeenCalledWith(
+    expect(auditMocks.logApiEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         requestId: "req_test_123",
         eventType: "auth_failed",
@@ -113,7 +125,7 @@ describe("GET /api/v1/files/[...path]", () => {
   });
 
   it("returns 429 and logs rate_limited", async () => {
-    validateRequestApiKeyMock.mockResolvedValue({
+    authMocks.validateRequestApiKey.mockResolvedValue({
       ok: true,
       accountId: "acct_1",
       keyId: "key_1",
@@ -123,14 +135,14 @@ describe("GET /api/v1/files/[...path]", () => {
       },
     });
 
-    enforceAccountRateLimitMock.mockResolvedValue({
+    rateLimitMocks.enforceAccountRateLimit.mockResolvedValue({
       success: false,
       limit: 100,
       remaining: 0,
       reset: 123456,
     });
 
-    buildRateLimitHeadersMock.mockReturnValue({
+    rateLimitMocks.buildRateLimitHeaders.mockReturnValue({
       "X-RateLimit-Limit": "100",
       "X-RateLimit-Remaining": "0",
       "X-RateLimit-Reset": "123456",
@@ -148,7 +160,7 @@ describe("GET /api/v1/files/[...path]", () => {
     expect(response.headers.get("X-RateLimit-Limit")).toBe("100");
     expect(body.code).toBe("rate_limited");
 
-    expect(logApiEventMock).toHaveBeenCalledWith(
+    expect(auditMocks.logApiEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         requestId: "req_test_123",
         eventType: "rate_limited",
@@ -160,7 +172,7 @@ describe("GET /api/v1/files/[...path]", () => {
   });
 
   it("returns 403 and logs entitlement_forbidden when entitlement check fails", async () => {
-    validateRequestApiKeyMock.mockResolvedValue({
+    authMocks.validateRequestApiKey.mockResolvedValue({
       ok: true,
       accountId: "acct_1",
       keyId: "key_1",
@@ -170,14 +182,14 @@ describe("GET /api/v1/files/[...path]", () => {
       },
     });
 
-    enforceAccountRateLimitMock.mockResolvedValue({
+    rateLimitMocks.enforceAccountRateLimit.mockResolvedValue({
       success: true,
       limit: 1000,
       remaining: 999,
       reset: 123456,
     });
 
-    evaluateFileEntitlementMock.mockReturnValue({
+    entitlementMocks.evaluateFileEntitlement.mockReturnValue({
       ok: false,
       code: "chain_not_entitled",
     });
@@ -194,7 +206,7 @@ describe("GET /api/v1/files/[...path]", () => {
     expect(body.code).toBe("forbidden");
     expect(body.detail).toBe("chain_not_entitled");
 
-    expect(logApiEventMock).toHaveBeenCalledWith(
+    expect(auditMocks.logApiEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         requestId: "req_test_123",
         eventType: "entitlement_forbidden",
@@ -210,7 +222,7 @@ describe("GET /api/v1/files/[...path]", () => {
   });
 
   it("returns file content and logs file_served", async () => {
-    validateRequestApiKeyMock.mockResolvedValue({
+    authMocks.validateRequestApiKey.mockResolvedValue({
       ok: true,
       accountId: "acct_1",
       keyId: "key_1",
@@ -220,20 +232,20 @@ describe("GET /api/v1/files/[...path]", () => {
       },
     });
 
-    enforceAccountRateLimitMock.mockResolvedValue({
+    rateLimitMocks.enforceAccountRateLimit.mockResolvedValue({
       success: true,
       limit: 1000,
       remaining: 999,
       reset: 123456,
     });
 
-    evaluateFileEntitlementMock.mockReturnValue({
+    entitlementMocks.evaluateFileEntitlement.mockReturnValue({
       ok: true,
     });
 
     const bodyBytes = new TextEncoder().encode('{"ok":true}');
 
-    readStorageObjectMock.mockResolvedValue({
+    storageMocks.readStorageObject.mockResolvedValue({
       body: bodyBytes,
       contentType: "application/json; charset=utf-8",
       contentLength: bodyBytes.byteLength,
@@ -258,7 +270,7 @@ describe("GET /api/v1/files/[...path]", () => {
     expect(response.headers.get("X-Data-Source")).toBe("local");
     expect(response.headers.get("X-Storage-Backend")).toBe("local");
 
-    expect(logApiEventMock).toHaveBeenCalledWith(
+    expect(auditMocks.logApiEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         requestId: "req_test_123",
         eventType: "file_served",
@@ -273,7 +285,7 @@ describe("GET /api/v1/files/[...path]", () => {
   });
 
   it("returns 500 and logs server_error when storage throws", async () => {
-    validateRequestApiKeyMock.mockResolvedValue({
+    authMocks.validateRequestApiKey.mockResolvedValue({
       ok: true,
       accountId: "acct_1",
       keyId: "key_1",
@@ -283,18 +295,18 @@ describe("GET /api/v1/files/[...path]", () => {
       },
     });
 
-    enforceAccountRateLimitMock.mockResolvedValue({
+    rateLimitMocks.enforceAccountRateLimit.mockResolvedValue({
       success: true,
       limit: 1000,
       remaining: 999,
       reset: 123456,
     });
 
-    evaluateFileEntitlementMock.mockReturnValue({
+    entitlementMocks.evaluateFileEntitlement.mockReturnValue({
       ok: true,
     });
 
-    readStorageObjectMock.mockRejectedValue(new Error("storage exploded"));
+    storageMocks.readStorageObject.mockRejectedValue(new Error("storage exploded"));
 
     const response = await GET(
       makeRequest("http://localhost:3000/api/v1/files/meta/bitcoin/latest.json"),
@@ -308,7 +320,7 @@ describe("GET /api/v1/files/[...path]", () => {
     expect(body.code).toBe("server_error");
     expect(body.detail).toBe("storage exploded");
 
-    expect(logApiEventMock).toHaveBeenCalledWith(
+    expect(auditMocks.logApiEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         requestId: "req_test_123",
         eventType: "server_error",
