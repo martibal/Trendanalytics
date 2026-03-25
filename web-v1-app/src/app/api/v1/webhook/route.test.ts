@@ -1,312 +1,427 @@
-// src/app/api/v1/keys/route.test.ts
 /**
  * @jest-environment node
  */
 
 export {};
 
-const authMock = jest.fn();
-const findUniqueMock = jest.fn();
-const createMock = jest.fn();
-const updateMock = jest.fn();
-const findFirstMock = jest.fn();
+const constructEventMock = jest.fn();
+const upsertSubscriptionMock = jest.fn();
+const findUniqueSubscriptionMock = jest.fn();
+const updateManyApiKeysMock = jest.fn();
+const findUniqueAccountMock = jest.fn();
+const upsertAccountMock = jest.fn();
+const stripeCtorMock = jest.fn();
 
-jest.mock("@clerk/nextjs/server", () => ({
-  auth: () => authMock(),
-}));
+jest.mock("stripe", () => {
+  return {
+    __esModule: true,
+    default: jest.fn().mockImplementation((...args: unknown[]) => {
+      stripeCtorMock(...args);
+      return {
+        webhooks: {
+          constructEvent: (...constructArgs: unknown[]) =>
+            constructEventMock(...constructArgs),
+        },
+      };
+    }),
+  };
+});
 
 jest.mock("@/lib/db", () => ({
   db: {
     account: {
-      findUnique: (...args: unknown[]) => findUniqueMock(...args),
+      findUnique: (...args: unknown[]) => findUniqueAccountMock(...args),
+      upsert: (...args: unknown[]) => upsertAccountMock(...args),
+    },
+    subscription: {
+      findUnique: (...args: unknown[]) => findUniqueSubscriptionMock(...args),
+      upsert: (...args: unknown[]) => upsertSubscriptionMock(...args),
     },
     apiKey: {
-      create: (...args: unknown[]) => createMock(...args),
-      update: (...args: unknown[]) => updateMock(...args),
-      findFirst: (...args: unknown[]) => findFirstMock(...args),
+      updateMany: (...args: unknown[]) => updateManyApiKeysMock(...args),
     },
   },
 }));
-
-jest.mock("next/server", () => ({
-  NextResponse: {
-    json: (body: unknown, init?: { status?: number }) => ({
-      status: init?.status ?? 200,
-      async json() {
-        return body;
-      },
-    }),
-  },
-}));
-
-type MockJsonRequest = {
-  json: () => Promise<unknown>;
-};
 
 type MockJsonResponse = {
   status: number;
   json: () => Promise<unknown>;
 };
 
-let keysPost: (request: MockJsonRequest) => Promise<MockJsonResponse>;
-let keysDelete: (request: MockJsonRequest) => Promise<MockJsonResponse>;
+let webhookPost: (request: Request) => Promise<MockJsonResponse>;
+const originalEnv = process.env;
 
-beforeAll(async () => {
-  const routeModule = await import("@/app/api/v1/keys/route");
+function makeRequest(payload: unknown, signature?: string) {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
 
-  keysPost = routeModule.POST as unknown as (
-    request: MockJsonRequest
-  ) => Promise<MockJsonResponse>;
+  if (signature !== undefined) {
+    headers["stripe-signature"] = signature;
+  }
 
-  keysDelete = routeModule.DELETE as unknown as (
-    request: MockJsonRequest
-  ) => Promise<MockJsonResponse>;
-});
+  return new Request("http://localhost:3000/api/v1/webhook", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+}
 
-describe("/api/v1/keys route", () => {
+describe("/api/v1/webhook route", () => {
+  beforeAll(async () => {
+    process.env = {
+      ...originalEnv,
+      STRIPE_SECRET_KEY: "sk_test_stripe",
+      STRIPE_WEBHOOK_SECRET: "whsec_test_123",
+    };
+
+    const routeModule = await import("@/app/api/v1/webhook/route");
+    webhookPost = routeModule.POST as unknown as (
+      request: Request
+    ) => Promise<MockJsonResponse>;
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
+
+    process.env.STRIPE_SECRET_KEY = "sk_test_stripe";
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_123";
+
+    upsertSubscriptionMock.mockResolvedValue({});
+    findUniqueSubscriptionMock.mockResolvedValue({ accountId: "acct_1" });
+    updateManyApiKeysMock.mockResolvedValue({ count: 1 });
+    findUniqueAccountMock.mockResolvedValue({ id: "acct_1" });
+    upsertAccountMock.mockResolvedValue({});
   });
 
-  describe("POST", () => {
-    it("returns 401 when unauthenticated", async () => {
-      authMock.mockResolvedValue({ userId: null });
+  it("returns 503 when stripe webhook config is missing", async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = "";
 
-      const request: MockJsonRequest = {
-        json: async () => ({ label: "local dev" }),
-      };
+    const request = makeRequest({ id: "evt_1" }, "sig_test");
+    const response = await webhookPost(request);
+    const payload = (await response.json()) as {
+      code: string;
+      detail: string | null;
+    };
 
-      const response = await keysPost(request);
-      const payload = (await response.json()) as { code: string };
+    expect(response.status).toBe(503);
+    expect(payload.code).toBe("webhook_not_configured");
+    expect(payload.detail).toBe("Missing STRIPE_WEBHOOK_SECRET.");
+    expect(constructEventMock).not.toHaveBeenCalled();
+  });
 
-      expect(response.status).toBe(401);
-      expect(payload.code).toBe("unauthenticated");
-      expect(createMock).not.toHaveBeenCalled();
+  it("returns 400 when stripe signature is missing", async () => {
+    const request = makeRequest({ id: "evt_1" });
+    const response = await webhookPost(request);
+    const payload = (await response.json()) as {
+      code: string;
+      detail: string | null;
+    };
+
+    expect(response.status).toBe(400);
+    expect(payload.code).toBe("invalid_signature");
+    expect(payload.detail).toBe("Missing stripe-signature.");
+    expect(constructEventMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when stripe signature verification fails", async () => {
+    constructEventMock.mockImplementation(() => {
+      throw new Error("No signatures found matching the expected signature for payload.");
     });
 
-    it("returns 404 when the authenticated user has no linked account", async () => {
-      authMock.mockResolvedValue({ userId: "user_123" });
-      findUniqueMock.mockResolvedValue(null);
+    const request = makeRequest({ id: "evt_bad" }, "sig_test");
+    const response = await webhookPost(request);
+    const payload = (await response.json()) as {
+      code: string;
+      detail: string | null;
+    };
 
-      const request: MockJsonRequest = {
-        json: async () => ({ label: "local dev" }),
-      };
+    expect(response.status).toBe(400);
+    expect(payload.code).toBe("invalid_signature");
+    expect(payload.detail).toBe(
+      "No signatures found matching the expected signature for payload."
+    );
+  });
 
-      const response = await keysPost(request);
-      const payload = (await response.json()) as { code: string };
-
-      expect(findUniqueMock).toHaveBeenCalled();
-      expect(response.status).toBe(404);
-      expect(payload.code).toBe("account_not_found");
-      expect(createMock).not.toHaveBeenCalled();
+  it("handles customer.subscription.created by upserting subscription and activating keys", async () => {
+    constructEventMock.mockReturnValue({
+      id: "evt_created",
+      type: "customer.subscription.created",
+      data: {
+        object: {
+          id: "sub_stripe_123",
+          customer: "cus_123",
+          status: "active",
+          current_period_end: 1775001600,
+          metadata: {
+            account_id: "acct_1",
+            entitled_chain: "bitcoin",
+            history_unlocked: "false",
+            checkout_plan: "basic",
+          },
+          items: {
+            data: [],
+          },
+        },
+      },
     });
 
-    it("returns 403 when the subscription is inactive", async () => {
-      authMock.mockResolvedValue({ userId: "user_123" });
-      findUniqueMock.mockResolvedValue({
+    const request = makeRequest({ any: "payload" }, "sig_test");
+    const response = await webhookPost(request);
+    const payload = (await response.json()) as { code?: string; received?: boolean };
+
+    expect(response.status).toBe(200);
+    expect(payload.code ?? "ok").toBe("ok");
+    expect(upsertAccountMock).toHaveBeenCalledWith({
+      where: { id: "acct_1" },
+      update: {},
+      create: {
         id: "acct_1",
-        subscriptions: [{ status: "inactive" }],
-        apiKeys: [],
-      });
-
-      const request: MockJsonRequest = {
-        json: async () => ({ label: "local dev" }),
-      };
-
-      const response = await keysPost(request);
-      const payload = (await response.json()) as { code: string };
-
-      expect(response.status).toBe(403);
-      expect(payload.code).toBe("inactive_subscription");
-      expect(createMock).not.toHaveBeenCalled();
+        authProviderUserId: "stripe:cus_123",
+        email: null,
+      },
     });
-
-    it("returns 409 when two non-revoked keys already exist", async () => {
-      authMock.mockResolvedValue({ userId: "user_123" });
-      findUniqueMock.mockResolvedValue({
-        id: "acct_1",
-        subscriptions: [{ status: "active" }],
-        apiKeys: [
-          { id: "k1", status: "active" },
-          { id: "k2", status: "suspended" },
-        ],
-      });
-
-      const request: MockJsonRequest = {
-        json: async () => ({ label: "local dev" }),
-      };
-
-      const response = await keysPost(request);
-      const payload = (await response.json()) as { code: string };
-
-      expect(response.status).toBe(409);
-      expect(payload.code).toBe("key_limit_reached");
-      expect(createMock).not.toHaveBeenCalled();
-    });
-
-    it("creates an api key and returns the one-time secret", async () => {
-      authMock.mockResolvedValue({ userId: "user_123" });
-      findUniqueMock.mockResolvedValue({
-        id: "acct_1",
-        subscriptions: [{ status: "active" }],
-        apiKeys: [],
-      });
-
-      createMock.mockResolvedValue({
-        id: "key_1",
-        label: "local dev",
-        keyPrefix: "ta_live_abcd",
-        keyLast4: "1234",
+    expect(upsertSubscriptionMock).toHaveBeenCalledWith({
+      where: { stripeCustomerId: "cus_123" },
+      update: {
+        stripeSubscriptionId: "sub_stripe_123",
+        tier: "basic",
+        historyUnlocked: false,
+        entitledChain: "bitcoin",
         status: "active",
-        createdAt: new Date("2026-03-18T12:00:00.000Z"),
-      });
-
-      const request: MockJsonRequest = {
-        json: async () => ({ label: "local dev" }),
-      };
-
-      const response = await keysPost(request);
-      const payload = (await response.json()) as {
-        secret: string;
-        key: {
-          id: string;
-          label: string | null;
-          status: string;
-        };
-      };
-
-      expect(response.status).toBe(201);
-      expect(payload.secret).toMatch(/^ta_live_/);
-      expect(payload.key.id).toBe("key_1");
-      expect(payload.key.label).toBe("local dev");
-      expect(payload.key.status).toBe("active");
-
-      expect(createMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            accountId: "acct_1",
-            label: "local dev",
-            status: "active",
-            keyHash: expect.stringContaining("scrypt:"),
-          }),
-        })
-      );
+        currentPeriodEnd: new Date(1775001600 * 1000),
+      },
+      create: {
+        accountId: "acct_1",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_stripe_123",
+        tier: "basic",
+        historyUnlocked: false,
+        entitledChain: "bitcoin",
+        status: "active",
+        currentPeriodEnd: new Date(1775001600 * 1000),
+      },
+    });
+    expect(updateManyApiKeysMock).toHaveBeenCalledWith({
+      where: { accountId: "acct_1" },
+      data: { status: "active" },
     });
   });
 
-  describe("DELETE", () => {
-    it("returns 401 when unauthenticated", async () => {
-      authMock.mockResolvedValue({ userId: null });
-
-      const request: MockJsonRequest = {
-        json: async () => ({ keyId: "key_1" }),
-      };
-
-      const response = await keysDelete(request);
-      const payload = (await response.json()) as { code: string };
-
-      expect(response.status).toBe(401);
-      expect(payload.code).toBe("unauthenticated");
-      expect(updateMock).not.toHaveBeenCalled();
+  it("handles customer.subscription.updated by updating entitlement snapshot and activating keys", async () => {
+    constructEventMock.mockReturnValue({
+      id: "evt_updated",
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_stripe_123",
+          customer: "cus_123",
+          status: "active",
+          current_period_end: 1775001600,
+          metadata: {
+            account_id: "acct_1",
+            entitled_chain: "ethereum",
+            history_unlocked: "true",
+            checkout_plan: "pro",
+          },
+          items: {
+            data: [],
+          },
+        },
+      },
     });
 
-    it("returns 400 when keyId is missing", async () => {
-      authMock.mockResolvedValue({ userId: "user_123" });
-      findUniqueMock.mockResolvedValue({
+    const request = makeRequest({ any: "payload" }, "sig_test");
+    const response = await webhookPost(request);
+    const payload = (await response.json()) as { code?: string; received?: boolean };
+
+    expect(response.status).toBe(200);
+    expect(payload.code ?? "ok").toBe("ok");
+    expect(upsertAccountMock).toHaveBeenCalledWith({
+      where: { id: "acct_1" },
+      update: {},
+      create: {
         id: "acct_1",
-        subscriptions: [{ status: "active" }],
-        apiKeys: [],
-      });
-
-      const request: MockJsonRequest = {
-        json: async () => ({}),
-      };
-
-      const response = await keysDelete(request);
-      const payload = (await response.json()) as { code: string };
-
-      expect(response.status).toBe(400);
-      expect(payload.code).toBe("invalid_request");
-      expect(updateMock).not.toHaveBeenCalled();
+        authProviderUserId: "stripe:cus_123",
+        email: null,
+      },
     });
-
-    it("returns 404 when the key does not belong to the account", async () => {
-      authMock.mockResolvedValue({ userId: "user_123" });
-      findUniqueMock.mockResolvedValue({
-        id: "acct_1",
-        subscriptions: [{ status: "active" }],
-        apiKeys: [],
-      });
-      findFirstMock.mockResolvedValue(null);
-
-      const request: MockJsonRequest = {
-        json: async () => ({ keyId: "key_missing" }),
-      };
-
-      const response = await keysDelete(request);
-      const payload = (await response.json()) as { code: string };
-
-      expect(response.status).toBe(404);
-      expect(payload.code).toBe("not_found");
-      expect(updateMock).not.toHaveBeenCalled();
-    });
-
-    it("revokes an existing active key", async () => {
-      authMock.mockResolvedValue({ userId: "user_123" });
-      findUniqueMock.mockResolvedValue({
-        id: "acct_1",
-        subscriptions: [{ status: "active" }],
-        apiKeys: [],
-      });
-      findFirstMock.mockResolvedValue({
-        id: "key_1",
+    expect(upsertSubscriptionMock).toHaveBeenCalledWith({
+      where: { stripeCustomerId: "cus_123" },
+      update: {
+        stripeSubscriptionId: "sub_stripe_123",
+        tier: "pro",
+        historyUnlocked: true,
+        entitledChain: "ethereum",
         status: "active",
-      });
+        currentPeriodEnd: new Date(1775001600 * 1000),
+      },
+      create: {
+        accountId: "acct_1",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_stripe_123",
+        tier: "pro",
+        historyUnlocked: true,
+        entitledChain: "ethereum",
+        status: "active",
+        currentPeriodEnd: new Date(1775001600 * 1000),
+      },
+    });
+    expect(updateManyApiKeysMock).toHaveBeenCalledWith({
+      where: { accountId: "acct_1" },
+      data: { status: "active" },
+    });
+  });
 
-      const request: MockJsonRequest = {
-        json: async () => ({ keyId: "key_1" }),
-      };
-
-      const response = await keysDelete(request);
-      const payload = (await response.json()) as {
-        revoked: boolean;
-        keyId: string;
-      };
-
-      expect(response.status).toBe(200);
-      expect(payload.revoked).toBe(true);
-      expect(payload.keyId).toBe("key_1");
-
-      expect(updateMock).toHaveBeenCalledWith({
-        where: { id: "key_1" },
-        data: { status: "revoked" },
-      });
+  it("handles customer.subscription.deleted by suspending api keys", async () => {
+    constructEventMock.mockReturnValue({
+      id: "evt_deleted",
+      type: "customer.subscription.deleted",
+      data: {
+        object: {
+          id: "sub_stripe_123",
+          customer: "cus_123",
+          status: "canceled",
+          current_period_end: null,
+          metadata: {
+            account_id: "acct_1",
+            entitled_chain: "bitcoin",
+            history_unlocked: "false",
+            checkout_plan: "basic",
+          },
+          items: {
+            data: [],
+          },
+        },
+      },
     });
 
-    it("does not update an already revoked key but still returns success", async () => {
-      authMock.mockResolvedValue({ userId: "user_123" });
-      findUniqueMock.mockResolvedValue({
+    const request = makeRequest({ any: "payload" }, "sig_test");
+    const response = await webhookPost(request);
+    const payload = (await response.json()) as { code?: string; received?: boolean };
+
+    expect(response.status).toBe(200);
+    expect(payload.code ?? "ok").toBe("ok");
+    expect(upsertSubscriptionMock).toHaveBeenCalledWith({
+      where: { stripeCustomerId: "cus_123" },
+      update: {
+        stripeSubscriptionId: "sub_stripe_123",
+        tier: "basic",
+        historyUnlocked: false,
+        entitledChain: "bitcoin",
+        status: "inactive",
+        currentPeriodEnd: null,
+      },
+      create: {
+        accountId: "acct_1",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_stripe_123",
+        tier: "basic",
+        historyUnlocked: false,
+        entitledChain: "bitcoin",
+        status: "inactive",
+        currentPeriodEnd: null,
+      },
+    });
+    expect(updateManyApiKeysMock).toHaveBeenCalledWith({
+      where: { accountId: "acct_1" },
+      data: { status: "suspended" },
+    });
+  });
+
+  it("handles checkout.session.completed without failing", async () => {
+    constructEventMock.mockReturnValue({
+      id: "evt_checkout_done",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_123",
+          mode: "subscription",
+          customer: "cus_123",
+          subscription: "sub_stripe_123",
+          client_reference_id: "acct_1",
+          customer_details: {
+            email: "test@example.com",
+          },
+          metadata: {
+            account_id: "acct_1",
+            auth_provider_user_id: "user_123",
+            entitled_chain: "ethereum",
+            history_unlocked: "true",
+            checkout_plan: "pro",
+          },
+        },
+      },
+    });
+
+    const request = makeRequest({ any: "payload" }, "sig_test");
+    const response = await webhookPost(request);
+    const payload = (await response.json()) as { code?: string; received?: boolean };
+
+    expect(response.status).toBe(200);
+    expect(payload.code ?? "ok").toBe("ok");
+    expect(upsertAccountMock).toHaveBeenCalledWith({
+      where: { id: "acct_1" },
+      update: {
+        authProviderUserId: "user_123",
+        email: "test@example.com",
+      },
+      create: {
         id: "acct_1",
-        subscriptions: [{ status: "active" }],
-        apiKeys: [],
-      });
-      findFirstMock.mockResolvedValue({
-        id: "key_1",
-        status: "revoked",
-      });
-
-      const request: MockJsonRequest = {
-        json: async () => ({ keyId: "key_1" }),
-      };
-
-      const response = await keysDelete(request);
-      const payload = (await response.json()) as {
-        revoked: boolean;
-      };
-
-      expect(response.status).toBe(200);
-      expect(payload.revoked).toBe(true);
-      expect(updateMock).not.toHaveBeenCalled();
+        authProviderUserId: "user_123",
+        email: "test@example.com",
+      },
     });
+    expect(upsertSubscriptionMock).toHaveBeenCalledWith({
+      where: { stripeCustomerId: "cus_123" },
+      update: {
+        stripeSubscriptionId: "sub_stripe_123",
+        tier: "pro",
+        historyUnlocked: true,
+        entitledChain: "ethereum",
+        status: "active",
+        currentPeriodEnd: null,
+      },
+      create: {
+        accountId: "acct_1",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_stripe_123",
+        tier: "pro",
+        historyUnlocked: true,
+        entitledChain: "ethereum",
+        status: "active",
+        currentPeriodEnd: null,
+      },
+    });
+    expect(updateManyApiKeysMock).toHaveBeenCalledWith({
+      where: { accountId: "acct_1" },
+      data: { status: "active" },
+    });
+  });
+
+  it("ignores unrelated event types safely", async () => {
+    constructEventMock.mockReturnValue({
+      id: "evt_other",
+      type: "invoice.created",
+      data: {
+        object: {
+          id: "in_123",
+        },
+      },
+    });
+
+    const request = makeRequest({ any: "payload" }, "sig_test");
+    const response = await webhookPost(request);
+    const payload = (await response.json()) as { received?: boolean; code?: string };
+
+    expect(response.status).toBe(200);
+    expect(payload.received ?? true).toBe(true);
+    expect(upsertSubscriptionMock).not.toHaveBeenCalled();
+    expect(updateManyApiKeysMock).not.toHaveBeenCalled();
+    expect(upsertAccountMock).not.toHaveBeenCalled();
   });
 });

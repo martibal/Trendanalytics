@@ -6,6 +6,7 @@ import {
 } from "@/lib/auth/entitlements";
 import {
   findApiKeyRecord,
+  findPersistedApiKeyRecord,
   getApiKeyDisplayRows,
   loadDevelopmentApiKeys,
   type ApiKeyRecord,
@@ -51,6 +52,17 @@ export function getApiKeyFromRequest(request: Request): string | null {
   return getApiKeyFromHeaders(request.headers);
 }
 
+async function resolveApiKeyRecord(token: string): Promise<ApiKeyRecord | null> {
+  const persistedRecord = await findPersistedApiKeyRecord(token);
+
+  if (persistedRecord) {
+    return persistedRecord;
+  }
+
+  const devRecords = loadDevelopmentApiKeys();
+  return findApiKeyRecord(token, devRecords);
+}
+
 export async function validateApiKeyToken(token: string | null): Promise<ValidatedToken> {
   if (!token) {
     return {
@@ -72,8 +84,7 @@ export async function validateApiKeyToken(token: string | null): Promise<Validat
     };
   }
 
-  const records = loadDevelopmentApiKeys();
-  const record = findApiKeyRecord(normalized, records);
+  const record = await resolveApiKeyRecord(normalized);
 
   if (!record) {
     return {

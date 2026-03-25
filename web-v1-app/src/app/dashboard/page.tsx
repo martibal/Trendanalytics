@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import Stripe from "stripe";
 import { CHAIN_LIST } from "@/config/chains";
 import { getCurrentAccountView } from "@/lib/auth/account";
-import { getAccountApiKeyDisplayRows } from "@/lib/auth/validateToken";
+import { getPersistedApiKeyDisplayRows } from "@/lib/auth/apiKeys";
 import ApiKeyManagerClient from "@/components/dashboard/ApiKeyManagerClient";
 
 type DashboardSubscriptionState = "not_connected" | "inactive" | "active";
@@ -159,7 +159,7 @@ export default async function DashboardPage() {
   }
 
   const accountView = await getCurrentAccountView();
-  const apiKeys = getAccountApiKeyDisplayRows(accountView.account?.accountId ?? null);
+  const apiKeys = await getPersistedApiKeyDisplayRows(accountView.account?.accountId ?? null);
 
   const subscriptionState = deriveSubscriptionState({
     authConfigured: accountView.authConfigured,
@@ -518,116 +518,49 @@ export default async function DashboardPage() {
                 </p>
               </div>
               <span className={statusBadgeClass(billingReady ? "active" : "inactive")}>
-                {billingReady ? "portal ready" : "not ready"}
+                {billingReady ? "active" : "inactive"}
               </span>
             </div>
 
-            <div className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground">
-              {billingReady
-                ? "Billing linkage is present. Use the button below to open the Stripe-hosted customer portal."
-                : "Billing portal becomes available once the signed-in account is linked to both a Stripe customer and Stripe subscription."}
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-3">
-              <form action={openBillingPortalAction}>
-                <button
-                  type="submit"
-                  disabled={!billingReady}
-                  className={[
-                    "inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium transition",
-                    billingReady
-                      ? "bg-foreground text-background hover:opacity-90"
-                      : "cursor-not-allowed border border-border bg-muted text-muted-foreground",
-                  ].join(" ")}
-                >
-                  Manage subscription
-                </button>
-              </form>
-
-              <Link
-                href="/api-docs"
-                className="inline-flex items-center rounded-lg border px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-              >
-                Review API delivery docs
-              </Link>
-            </div>
-
-            <div className="mt-4 space-y-2 text-xs text-muted-foreground">
-              <p>Portal requires: authenticated session, linked account, Stripe customer, and Stripe subscription.</p>
+            <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <p>
-                Portal return target: <span className="text-foreground">/dashboard?portal=return</span>
+                Portal availability requires an authenticated user, a linked account record, and both{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5 text-[12px]">stripeCustomerId</code> and{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5 text-[12px]">stripeSubscriptionId</code>.
               </p>
+
+              {billingReady ? (
+                <form action={openBillingPortalAction}>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/15"
+                  >
+                    Open billing portal
+                  </button>
+                </form>
+              ) : (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100/90">
+                  Billing portal becomes available once the Stripe customer and subscription linkage has
+                  been synced onto the authenticated account record.
+                </div>
+              )}
             </div>
           </section>
 
           <section className="rounded-2xl border p-6">
-            <h2 className="text-lg font-semibold">Lifecycle checkpoints</h2>
-            <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-              <p>
-                Identity provider configured:{" "}
-                <span className="text-foreground">{accountView.authConfigured ? "yes" : "no"}</span>
-              </p>
-              <p>
-                Signed-in session present:{" "}
-                <span className="text-foreground">{accountView.isAuthenticated ? "yes" : "no"}</span>
-              </p>
-              <p>
-                Subscriber account linked:{" "}
-                <span className="text-foreground">{accountView.account?.accountId ? "yes" : "no"}</span>
-              </p>
-              <p>
-                Stripe customer linked:{" "}
-                <span className="text-foreground">{accountView.account?.stripeCustomerId ? "yes" : "no"}</span>
-              </p>
-              <p>
-                Stripe subscription linked:{" "}
-                <span className="text-foreground">{accountView.account?.stripeSubscriptionId ? "yes" : "no"}</span>
-              </p>
-              <p>
-                Active entitlement:{" "}
-                <span className="text-foreground">
-                  {subscriptionState === "active" ? "yes" : "no"}
-                </span>
-              </p>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border p-6">
-            <h2 className="text-lg font-semibold">Implementation notes</h2>
-            <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-              <p>
-                This page intentionally does not fabricate billing state. It is a shell that becomes
-                fully live when Clerk account mapping, Stripe sync, and API key mutation endpoints are wired.
-              </p>
-              <p>
-                The account surface and the file-delivery route now share the same server-side API key source.
-              </p>
-              <p>
-                API key creation and revocation are now wired; one-time secret display happens only in the active client state immediately after creation.
-              </p>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border p-6">
-            <h2 className="text-lg font-semibold">Navigation</h2>
-            <div className="mt-3 flex flex-col gap-2 text-sm">
-              <Link href="/api-docs" className="text-muted-foreground hover:underline">
-                API Docs
+            <h2 className="text-lg font-semibold">Quick links</h2>
+            <div className="mt-4 flex flex-wrap gap-3 text-sm">
+              <Link className="rounded-lg border px-3 py-2 hover:bg-muted" href="/api-docs">
+                API docs
               </Link>
-              <Link href="/thresholds" className="text-muted-foreground hover:underline">
-                Thresholds
+              <Link className="rounded-lg border px-3 py-2 hover:bg-muted" href="/status">
+                Public status
               </Link>
-              <Link href="/status" className="text-muted-foreground hover:underline">
-                System Status
+              <Link className="rounded-lg border px-3 py-2 hover:bg-muted" href="/methodology">
+                Methodology
               </Link>
-              <Link href="/about" className="text-muted-foreground hover:underline">
-                About
-              </Link>
-              <Link href="/privacy" className="text-muted-foreground hover:underline">
-                Privacy
-              </Link>
-              <Link href="/terms" className="text-muted-foreground hover:underline">
-                Terms
+              <Link className="rounded-lg border px-3 py-2 hover:bg-muted" href="/thresholds">
+                Threshold simulator
               </Link>
             </div>
           </section>

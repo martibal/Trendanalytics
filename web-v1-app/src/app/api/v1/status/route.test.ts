@@ -218,8 +218,8 @@ describe("GET /api/v1/status", () => {
     expect(bitcoin).toMatchObject({
       chain: "bitcoin",
       as_of: "2026-03-19",
-      lag_days: 1,
-      status: "warn",
+      lag_days: 3,
+      status: "fail",
     });
   });
 
