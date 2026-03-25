@@ -55,9 +55,24 @@ type MetaLatest = {
     confidence_score?: number;
     notes?: { interpretation?: string };
     dimensions?: {
-      demand?: { score?: number; level?: string; coverage_factor?: number; effective_confidence?: number };
-      friction?: { score?: number; level?: string; coverage_factor?: number; effective_confidence?: number };
-      capacity?: { score?: number; level?: string; coverage_factor?: number; effective_confidence?: number };
+      demand?: {
+        score?: number;
+        level?: string;
+        coverage_factor?: number;
+        effective_confidence?: number;
+      };
+      friction?: {
+        score?: number;
+        level?: string;
+        coverage_factor?: number;
+        effective_confidence?: number;
+      };
+      capacity?: {
+        score?: number;
+        level?: string;
+        coverage_factor?: number;
+        effective_confidence?: number;
+      };
     };
   };
 
@@ -133,6 +148,30 @@ function confidencePill(v?: number) {
   return pillClass("neutral");
 }
 
+function confidenceNotice(v?: number) {
+  const band = confidenceBand(v);
+
+  if (band === "Caution") {
+    return {
+      tone: "caution" as const,
+      title: "Reduced confidence",
+      body:
+        "Confidence is reduced due to limited history or missing components. Published scores are pulled toward neutral (50) to reduce over-interpretation, while the canonical regime label remains visible.",
+    };
+  }
+
+  if (band === "Degraded") {
+    return {
+      tone: "degraded" as const,
+      title: "Degraded confidence",
+      body:
+        "Confidence is below the canonical threshold. The regime should be treated as UNKNOWN/DEGRADED, while the latest available data remains visible for traceability.",
+    };
+  }
+
+  return null;
+}
+
 function fmtNum(v?: number, digits = 3) {
   if (typeof v !== "number" || Number.isNaN(v)) return "—";
   return v.toFixed(digits);
@@ -159,7 +198,12 @@ function sortDrivers(drivers: Driver[]) {
 function guessMetricKeysForChain(chain: string): string[] {
   switch (chain) {
     case "bitcoin":
-      return ["tx_count_daily", "median_tx_fee_native", "avg_block_time_sec", "block_count_daily"];
+      return [
+        "tx_count_daily",
+        "median_tx_fee_native",
+        "avg_block_time_sec",
+        "block_count_daily",
+      ];
     default:
       return [
         "tx_count_daily",
@@ -191,7 +235,9 @@ function parseIsoDayToUtcMs(d: unknown): number | null {
   if (typeof d !== "string") return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
   const [y, m, day] = d.split("-").map((x) => Number(x));
-  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(day)) return null;
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(day)) {
+    return null;
+  }
   return Date.UTC(y, m - 1, day);
 }
 
@@ -313,9 +359,19 @@ function normalizeWindow(q?: string): 30 | 90 | 180 | 365 {
   return 365;
 }
 
-function TogglePill({ active, children }: { active: boolean; children: ReactNode }) {
+function TogglePill({
+  active,
+  children,
+}: {
+  active: boolean;
+  children: ReactNode;
+}) {
   const base = "rounded-full border px-3 py-1 text-sm";
-  return <span className={`${base} ${active ? "bg-muted" : "bg-transparent"}`}>{children}</span>;
+  return (
+    <span className={`${base} ${active ? "bg-muted" : "bg-transparent"}`}>
+      {children}
+    </span>
+  );
 }
 
 export default async function ChainPage({
@@ -328,57 +384,46 @@ export default async function ChainPage({
   const { chain } = await params;
   if (!chain) return notFound();
 
-  const cfg = getChainConfig(chain);
+  const cfg = getChainConfig(chain as ChainId);
   if (!cfg) return notFound();
-  const chainId: ChainId = cfg.id;
 
-  const sp = (await searchParams) ?? {};
-  const level = normalizeLevel(sp.level);
-  const requestedWindow = normalizeWindow(sp.window);
+  const chainId = cfg.id;
 
-  const base = "data/published/v1";
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const level = normalizeLevel(resolvedSearchParams?.level);
+  const requestedWindow = normalizeWindow(resolvedSearchParams?.window);
+  const effectiveWindowDays = requestedWindow;
 
-  const metaPath = `${base}/meta/${chainId}/latest.json`;
-  const goldPath = `${base}/gold/${chainId}/last${requestedWindow}d.json`;
-  const derivedPath = `${base}/derived/${chainId}/last${requestedWindow}d.json`;
+  const metaPath = `meta/${chainId}/latest.json`;
+  const goldPath = `gold/${chainId}/last${effectiveWindowDays}d.json`;
+  const derivedPath = `derived/${chainId}/last${effectiveWindowDays}d.json`;
 
-  const meta = await readPublishedJson<MetaLatest>(metaPath);
+  const [meta, goldPayload, derivedPayload] = await Promise.all([
+    readPublishedJson<MetaLatest>(metaPath),
+    readPublishedJson<GoldRow[] | { rows?: GoldRow[] }>(goldPath),
+    readPublishedJson<DerivedRow[] | { rows?: DerivedRow[] }>(derivedPath),
+  ]);
+
   if (!meta) return notFound();
 
-  const derivedPayload = await readPublishedJson<unknown>(derivedPath);
-  let derivedRows: DerivedRow[] = [];
-  if (derivedPayload) {
-    if (Array.isArray(derivedPayload)) {
-      derivedRows = derivedPayload as DerivedRow[];
-    } else {
-      const obj = asRecord(derivedPayload);
-      const rows = obj ? obj.rows : null;
-      if (Array.isArray(rows)) derivedRows = rows as DerivedRow[];
-    }
-  }
-
-  const goldPayload = await readPublishedJson<unknown>(goldPath);
-  let goldRows: GoldRow[] = [];
-  if (goldPayload) {
-    if (Array.isArray(goldPayload)) {
-      goldRows = goldPayload as GoldRow[];
-    } else {
-      const obj = asRecord(goldPayload);
-      const rows = obj ? obj.rows : null;
-      if (Array.isArray(rows)) {
-        goldRows = rows as GoldRow[];
-      } else if (obj) {
-        goldRows = [obj as GoldRow];
-      }
-    }
-  }
-
-  const effectiveWindowDays = requestedWindow;
+  const goldRows = Array.isArray(goldPayload)
+    ? goldPayload
+    : Array.isArray(goldPayload?.rows)
+    ? goldPayload.rows
+    : [];
+  const derivedRows = Array.isArray(derivedPayload)
+    ? derivedPayload
+    : Array.isArray(derivedPayload?.rows)
+    ? derivedPayload.rows
+    : [];
 
   const maxDerived = maxDateMsFromRows(derivedRows);
   const maxGold = maxDateMsFromRows(goldRows);
   const maxFromMeta = parseIsoDayToUtcMs(
-    meta.updated_through ?? meta.regime?.asof_date ?? meta.scorecard?.asof_date ?? meta.date
+    meta.updated_through ??
+      meta.regime?.asof_date ??
+      meta.scorecard?.asof_date ??
+      meta.date
   );
   const maxMs = maxDerived ?? maxGold ?? maxFromMeta;
   if (maxMs === null) return notFound();
@@ -389,23 +434,60 @@ export default async function ChainPage({
   const derivedByDate = buildDerivedByDate(derivedRows);
   const goldByDate = buildGoldByDate(goldRows);
 
+  // Supplement bundle with individual daily files for dates missing from the bundle.
+  // The lastNd.json bundles may not cover the full window (pipeline produces them
+  // incrementally). Individual daily files are always canonical per date.
+  const missingDays = dayList.filter(
+    (d) => !derivedByDate.has(d) || !goldByDate.has(d)
+  );
+  if (missingDays.length > 0) {
+    const dailyResults = await Promise.all(
+      missingDays.map(async (d) => {
+        const [dr, gr] = await Promise.all([
+          derivedByDate.has(d)
+            ? Promise.resolve(null)
+            : readPublishedJson<DerivedRow>(`derived/${chainId}/${d}.json`),
+          goldByDate.has(d)
+            ? Promise.resolve(null)
+            : readPublishedJson<GoldRow>(`gold/${chainId}/${d}.json`),
+        ]);
+        return { date: d, derived: dr, gold: gr };
+      })
+    );
+    for (const { date, derived: dr, gold: gr } of dailyResults) {
+      if (dr && typeof dr.date === "string") derivedByDate.set(date, dr);
+      if (gr && typeof (gr as GoldRow).date === "string") goldByDate.set(date, gr as GoldRow);
+    }
+  }
+
   const displayName = meta.profile?.label ?? cfg.name;
   const asOf =
-    meta.updated_through ?? meta.regime?.asof_date ?? meta.scorecard?.asof_date ?? meta.date ?? meta.confidence?.date;
+    meta.updated_through ??
+    meta.regime?.asof_date ??
+    meta.scorecard?.asof_date ??
+    meta.date ??
+    meta.confidence?.date;
 
   const regimeLabel = meta.status?.label ?? meta.regime?.label ?? "UNKNOWN";
   const oneLiner = meta.status?.one_liner;
 
   const conf = meta.confidence?.confidence_score;
   const confBand = confidenceBand(conf);
+  const confNotice = confidenceNotice(conf);
 
-  const driversAll = Array.isArray(meta.regime?.drivers) ? sortDrivers(meta.regime.drivers) : [];
+  const driversAll = Array.isArray(meta.regime?.drivers)
+    ? sortDrivers(meta.regime.drivers)
+    : [];
   const whn = driversAll.slice(0, 5);
 
   const dims = meta.scorecard?.dimensions;
 
-  const hidden = new Set((meta.profile?.hidden_metrics ?? cfg.hiddenMetrics ?? []).map(String));
-  const driverMetrics = driversAll.map((d) => d.metric).filter((m): m is string => typeof m === "string");
+  const hidden = new Set(
+    (meta.profile?.hidden_metrics ?? cfg.hiddenMetrics ?? []).map(String)
+  );
+  const driverMetrics = driversAll
+    .map((d) => d.metric)
+    .filter((m): m is string => typeof m === "string");
   const defaults = guessMetricKeysForChain(chainId);
 
   const candidates = Array.from(new Set([...driverMetrics, ...defaults]))
@@ -435,22 +517,76 @@ export default async function ChainPage({
   const levelAdvancedHref = `/chains/${chainId}?level=advanced&window=${requestedWindow}`;
 
   const windowOptions = [
-    { key: "30", label: "30d", href: `/chains/${chainId}?level=${level.toLowerCase()}&window=30` },
-    { key: "90", label: "90d", href: `/chains/${chainId}?level=${level.toLowerCase()}&window=90` },
-    { key: "180", label: "180d", href: `/chains/${chainId}?level=${level.toLowerCase()}&window=180` },
-    { key: "365", label: "365d", href: `/chains/${chainId}?level=${level.toLowerCase()}&window=365` },
+    {
+      key: "30",
+      label: "30d",
+      href: `/chains/${chainId}?level=${level.toLowerCase()}&window=30`,
+    },
+    {
+      key: "90",
+      label: "90d",
+      href: `/chains/${chainId}?level=${level.toLowerCase()}&window=90`,
+    },
+    {
+      key: "180",
+      label: "180d",
+      href: `/chains/${chainId}?level=${level.toLowerCase()}&window=180`,
+    },
+    {
+      key: "365",
+      label: "365d",
+      href: `/chains/${chainId}?level=${level.toLowerCase()}&window=365`,
+    },
   ];
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
-      <StalenessBar chain={chainId} lagDays={meta.confidence?.lag_days_vs_utc_today} asOfDate={asOf} />
+      <StalenessBar
+        chain={chainId}
+        lagDays={meta.confidence?.lag_days_vs_utc_today}
+        asOfDate={asOf}
+      />
+
+      {confNotice ? (
+        <section
+          className={[
+            "mb-6 rounded-2xl border px-4 py-4 text-sm",
+            confNotice.tone === "degraded"
+              ? "border-red-200 bg-red-50"
+              : "border-yellow-200 bg-yellow-50",
+          ].join(" ")}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-medium">{confNotice.title}</div>
+              <p className="mt-1 text-muted-foreground">{confNotice.body}</p>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Source: <InlineCode>confidence.confidence_score</InlineCode>
+              {typeof conf === "number" ? (
+                <>
+                  {" "}
+                  · Current value{" "}
+                  <span className="font-medium text-foreground">
+                    {conf.toFixed(3)}
+                  </span>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <header className="mb-8">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
-                <ChainIcon chain={chainId} className="h-10 w-10 text-base" label={`${displayName} icon`} />
+                <ChainIcon
+                  chain={chainId}
+                  className="h-10 w-10 text-base"
+                  label={`${displayName} icon`}
+                />
                 <h1 className="text-3xl font-semibold">{displayName}</h1>
               </div>
 
@@ -460,10 +596,15 @@ export default async function ChainPage({
                 <span className="text-muted-foreground">As of:</span>
                 <span className="font-medium">{fmtDate(asOf)}</span>
                 {typeof meta.confidence?.lag_days_vs_utc_today === "number" ? (
-                  <span className="text-muted-foreground">(lag: {meta.confidence.lag_days_vs_utc_today}d)</span>
+                  <span className="text-muted-foreground">
+                    (lag: {meta.confidence.lag_days_vs_utc_today}d)
+                  </span>
                 ) : null}
                 <span className="text-muted-foreground">·</span>
-                <Link href={`/chains/${chainId}/history`} className="text-muted-foreground hover:underline">
+                <Link
+                  href={`/chains/${chainId}/history`}
+                  className="text-muted-foreground hover:underline"
+                >
                   View history
                 </Link>
               </div>
@@ -477,7 +618,9 @@ export default async function ChainPage({
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Explanation level</span>
+              <span className="text-sm text-muted-foreground">
+                Explanation level
+              </span>
               <Link href={levelBasicHref} prefetch={false}>
                 <TogglePill active={level === "Basic"}>Basic</TogglePill>
               </Link>
@@ -529,27 +672,31 @@ export default async function ChainPage({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm font-medium">Scorecard</div>
                   <div className="text-xs text-muted-foreground">
-                    Level: <span className="font-medium text-foreground">{level}</span>
+                    Level:{" "}
+                    <span className="font-medium text-foreground">{level}</span>
                   </div>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">What:</span> Published dimension scores per axis (Demand/Friction/Capacity).
+                  <span className="font-medium text-foreground">What:</span>{" "}
+                  Published dimension scores per axis (Demand/Friction/Capacity).
                 </div>
               </summary>
 
               <div className="mt-3 text-sm leading-6 text-muted-foreground">
                 {level === "Basic" ? (
                   <>
-                    The scorecard summarizes the chain’s current conditions across three axes. Each axis is a published
-                    0–100 score and a published qualitative level label.
+                    The scorecard summarizes the chain’s current conditions across
+                    three axes. Each axis is a published 0–100 score and a
+                    published qualitative level label.
                   </>
                 ) : (
                   <>
                     Source contract: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> →{" "}
                     <InlineCode>scorecard.dimensions</InlineCode>. The frontend renders{" "}
                     <InlineCode>score</InlineCode>, <InlineCode>level</InlineCode>,{" "}
-                    <InlineCode>coverage_factor</InlineCode>, and <InlineCode>effective_confidence</InlineCode>{" "}
-                    exactly as published. No recomputation.
+                    <InlineCode>coverage_factor</InlineCode>, and{" "}
+                    <InlineCode>effective_confidence</InlineCode> exactly as
+                    published. No recomputation.
                   </>
                 )}
 
@@ -557,7 +704,10 @@ export default async function ChainPage({
                   <div className="font-medium text-foreground">Traceability</div>
                   <ul className="mt-2 list-disc pl-5">
                     <li>
-                      Source: <InlineCode>/public/data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode>
+                      Source:{" "}
+                      <InlineCode>
+                        /public/data/published/v1/meta/&lt;chain&gt;/latest.json
+                      </InlineCode>
                     </li>
                     <li>
                       Field: <InlineCode>scorecard.dimensions.*</InlineCode>
@@ -575,25 +725,30 @@ export default async function ChainPage({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm font-medium">Drivers</div>
                   <div className="text-xs text-muted-foreground">
-                    Level: <span className="font-medium text-foreground">{level}</span>
+                    Level:{" "}
+                    <span className="font-medium text-foreground">{level}</span>
                   </div>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">What:</span> Published driver rows describing unusual metrics relative to history.
+                  <span className="font-medium text-foreground">What:</span>{" "}
+                  Published driver rows describing unusual metrics relative to
+                  history.
                 </div>
               </summary>
 
               <div className="mt-3 text-sm leading-6 text-muted-foreground">
                 {level === "Basic" ? (
                   <>
-                    Drivers list which metrics are currently most unusual, and how they compare to recent history. The
-                    site displays the published fields and sorts deterministically.
+                    Drivers list which metrics are currently most unusual, and
+                    how they compare to recent history. The site displays the
+                    published fields and sorts deterministically.
                   </>
                 ) : (
                   <>
                     Source contract: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> →{" "}
-                    <InlineCode>regime.drivers[]</InlineCode>. Sorting rule (UI-only): order by{" "}
-                    <InlineCode>abs(z_robust)</InlineCode> descending. No new statistics are computed in the frontend.
+                    <InlineCode>regime.drivers[]</InlineCode>. Sorting rule
+                    (UI-only): order by <InlineCode>abs(z_robust)</InlineCode>{" "}
+                    descending. No new statistics are computed in the frontend.
                   </>
                 )}
 
@@ -601,7 +756,10 @@ export default async function ChainPage({
                   <div className="font-medium text-foreground">Traceability</div>
                   <ul className="mt-2 list-disc pl-5">
                     <li>
-                      Source: <InlineCode>/public/data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode>
+                      Source:{" "}
+                      <InlineCode>
+                        /public/data/published/v1/meta/&lt;chain&gt;/latest.json
+                      </InlineCode>
                     </li>
                     <li>
                       Field: <InlineCode>regime.drivers[]</InlineCode>
@@ -621,7 +779,8 @@ export default async function ChainPage({
             <RegimeBadge label={regimeLabel} statusColor={meta.status?.color} />
           </div>
           <div className="mt-3 text-xs text-muted-foreground">
-            Source: <InlineCode>status.label</InlineCode> (fallback <InlineCode>regime.label</InlineCode>)
+            Source: <InlineCode>status.label</InlineCode> (fallback{" "}
+            <InlineCode>regime.label</InlineCode>)
           </div>
         </div>
 
@@ -630,7 +789,9 @@ export default async function ChainPage({
             <div className="text-sm text-muted-foreground">Confidence</div>
             <span className={confidencePill(conf)}>{confBand}</span>
           </div>
-          <div className="mt-3 text-2xl font-semibold">{typeof conf === "number" ? conf.toFixed(3) : "—"}</div>
+          <div className="mt-3 text-2xl font-semibold">
+            {typeof conf === "number" ? conf.toFixed(3) : "—"}
+          </div>
           <div className="mt-3 text-xs text-muted-foreground">
             Source: <InlineCode>confidence.confidence_score</InlineCode>
           </div>
@@ -641,11 +802,15 @@ export default async function ChainPage({
           <div className="mt-3 text-sm">
             <div>
               <span className="text-muted-foreground">Hash:</span>{" "}
-              <span className="font-medium">{meta.regime?.determinism_hash ?? "—"}</span>
+              <span className="font-medium">
+                {meta.regime?.determinism_hash ?? "—"}
+              </span>
             </div>
             <div className="mt-2">
               <span className="text-muted-foreground">Window days:</span>{" "}
-              <span className="font-medium">{meta.regime?.window_days ?? meta.scorecard?.window_days ?? "—"}</span>
+              <span className="font-medium">
+                {meta.regime?.window_days ?? meta.scorecard?.window_days ?? "—"}
+              </span>
             </div>
           </div>
           <div className="mt-3 text-xs text-muted-foreground">
@@ -670,7 +835,8 @@ export default async function ChainPage({
           </div>
         ) : charts.length === 0 ? (
           <div className="rounded-xl border p-6 text-sm text-muted-foreground">
-            Derived loaded from <InlineCode>{derivedPath}</InlineCode>, but no chartable series were found for the selected metrics.
+            Derived loaded from <InlineCode>{derivedPath}</InlineCode>, but no
+            chartable series were found for the selected metrics.
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
@@ -678,16 +844,20 @@ export default async function ChainPage({
               <MetricLineChart
                 key={c.metric}
                 title={c.metric}
-                subtitle={`MA: ${derivedPath} · Raw: ${goldPath} · Window: ${utcMsToIsoDay(bounds.minMs)} → ${utcMsToIsoDay(bounds.maxMs)} (${effectiveWindowDays} calendar days) · Runtime repair: OFF`}
+                subtitle={`MA: ${derivedPath} · Raw: ${goldPath} · Window: ${utcMsToIsoDay(
+                  bounds.minMs
+                )} → ${utcMsToIsoDay(bounds.maxMs)} (${effectiveWindowDays} calendar days)`}
                 unitLabel={c.unitLabel}
                 data={c.data}
+                windowDays={effectiveWindowDays}
               />
             ))}
           </div>
         )}
 
         <div className="mt-3 text-xs text-muted-foreground">
-          Source contract: one canonical bundle per selected window. No alternate-window fallback. No missing-day runtime repair.
+          Source contract: one canonical bundle per selected window. No
+          alternate-window fallback. No missing-day runtime repair.
         </div>
       </section>
 
@@ -704,7 +874,9 @@ export default async function ChainPage({
               <div key={`${d.metric ?? "driver"}-${i}`} className="rounded-xl border p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm text-muted-foreground">{d.axis ?? "—"}</div>
-                  <div className="text-xs text-muted-foreground">z={fmtNum(d.z_robust, 2)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    z={fmtNum(d.z_robust, 2)}
+                  </div>
                 </div>
 
                 <div className="mt-2 text-lg font-semibold">{d.metric ?? "—"}</div>
@@ -721,18 +893,25 @@ export default async function ChainPage({
                   </div>
 
                   <div>
-                    <div className="text-muted-foreground">Momentum (7d vs 30d)</div>
-                    <div className="font-medium">{fmtNum(d.momentum_7d_vs_30d, 3)}</div>
+                    <div className="text-muted-foreground">
+                      Momentum (7d vs 30d)
+                    </div>
+                    <div className="font-medium">
+                      {fmtNum(d.momentum_7d_vs_30d, 3)}
+                    </div>
                   </div>
 
                   <div>
                     <div className="text-muted-foreground">Current</div>
-                    <div className="font-medium">{typeof d.current === "number" ? String(d.current) : "—"}</div>
+                    <div className="font-medium">
+                      {typeof d.current === "number" ? String(d.current) : "—"}
+                    </div>
                   </div>
                 </div>
 
                 <div className="mt-3 text-xs text-muted-foreground">
-                  Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> → <InlineCode>regime.drivers[]</InlineCode>
+                  Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> →{" "}
+                  <InlineCode>regime.drivers[]</InlineCode>
                 </div>
 
                 <div className="mt-4">
@@ -756,7 +935,8 @@ export default async function ChainPage({
 
         {!dims ? (
           <div className="rounded-xl border p-6 text-sm text-muted-foreground">
-            No scorecard dimensions found in <InlineCode>scorecard.dimensions</InlineCode>.
+            No scorecard dimensions found in{" "}
+            <InlineCode>scorecard.dimensions</InlineCode>.
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
@@ -765,7 +945,10 @@ export default async function ChainPage({
               { key: "friction", label: "Friction", dim: dims.friction },
               { key: "capacity", label: "Capacity", dim: dims.capacity },
             ].map(({ key, label, dim }) => {
-              const score = typeof dim?.score === "number" && Number.isFinite(dim.score) ? dim.score : null;
+              const score =
+                typeof dim?.score === "number" && Number.isFinite(dim.score)
+                  ? dim.score
+                  : null;
               const levelLabel = dim?.level ?? "—";
 
               return (
@@ -777,23 +960,33 @@ export default async function ChainPage({
 
                   <div className="mt-4 flex items-center justify-center">
                     {score === null ? (
-                      <div className="text-sm text-muted-foreground">Score not available</div>
+                      <div className="text-sm text-muted-foreground">
+                        Score not available
+                      </div>
                     ) : (
-                      <ScoreGauge score={score} label={label} note={String(levelLabel)} />
+                      <ScoreGauge
+                        score={score}
+                        label={label}
+                        note={String(levelLabel)}
+                      />
                     )}
                   </div>
 
                   <div className="mt-3 text-2xl font-semibold">
                     {fmtScore100(dim?.score)}
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">/ 100</span>
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      / 100
+                    </span>
                   </div>
 
                   <div className="mt-3 text-xs text-muted-foreground">
-                    Source: <InlineCode>{`scorecard.dimensions.${key}.score`}</InlineCode>
+                    Source:{" "}
+                    <InlineCode>{`scorecard.dimensions.${key}.score`}</InlineCode>
                   </div>
 
                   <div className="mt-3 text-xs text-muted-foreground">
-                    Coverage: {fmtNum(dim?.coverage_factor, 3)} · Effective conf: {fmtNum(dim?.effective_confidence, 3)}
+                    Coverage: {fmtNum(dim?.coverage_factor, 3)} · Effective conf:{" "}
+                    {fmtNum(dim?.effective_confidence, 3)}
                   </div>
                 </div>
               );
@@ -803,7 +996,9 @@ export default async function ChainPage({
 
         {meta.scorecard?.notes?.interpretation ? (
           <div className="mt-4 rounded-xl border p-5 text-sm text-muted-foreground">
-            <div className="font-medium text-foreground">Interpretation note (published)</div>
+            <div className="font-medium text-foreground">
+              Interpretation note (published)
+            </div>
             <div className="mt-2">{meta.scorecard.notes.interpretation}</div>
           </div>
         ) : null}
@@ -833,14 +1028,21 @@ export default async function ChainPage({
                 </thead>
                 <tbody>
                   {driversAll.map((d, i) => (
-                    <tr key={`${d.metric ?? "driver"}-${i}`} className="border-b last:border-b-0">
+                    <tr
+                      key={`${d.metric ?? "driver"}-${i}`}
+                      className="border-b last:border-b-0"
+                    >
                       <td className="px-4 py-3">{d.axis ?? "—"}</td>
                       <td className="px-4 py-3 font-medium">{d.metric ?? "—"}</td>
                       <td className="px-4 py-3">{d.trend ?? "—"}</td>
                       <td className="px-4 py-3">{fmtNum(d.z_robust, 2)}</td>
                       <td className="px-4 py-3">{fmtPct0to100(d.pct_90d)}</td>
-                      <td className="px-4 py-3">{fmtNum(d.momentum_7d_vs_30d, 3)}</td>
-                      <td className="px-4 py-3">{typeof d.current === "number" ? String(d.current) : "—"}</td>
+                      <td className="px-4 py-3">
+                        {fmtNum(d.momentum_7d_vs_30d, 3)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {typeof d.current === "number" ? String(d.current) : "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -848,7 +1050,8 @@ export default async function ChainPage({
             </div>
 
             <div className="border-t px-4 py-3 text-xs text-muted-foreground">
-              Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> → <InlineCode>regime.drivers[]</InlineCode>
+              Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> →{" "}
+              <InlineCode>regime.drivers[]</InlineCode>
             </div>
           </div>
         )}
@@ -856,7 +1059,9 @@ export default async function ChainPage({
 
       {meta.profile?.note ? (
         <section className="mt-10 rounded-xl border p-6">
-          <div className="text-sm text-muted-foreground">Chain profile note (published)</div>
+          <div className="text-sm text-muted-foreground">
+            Chain profile note (published)
+          </div>
           <div className="mt-2 text-sm">{meta.profile.note}</div>
         </section>
       ) : null}
@@ -864,10 +1069,18 @@ export default async function ChainPage({
       <section className="mt-10 rounded-xl border p-6 text-xs text-muted-foreground">
         <div className="font-medium text-foreground">Runtime data contract</div>
         <ul className="mt-2 list-disc pl-5">
-          <li>Data source: <InlineCode>{currentDataSource()}</InlineCode></li>
-          <li>Meta path: <InlineCode>{metaPath}</InlineCode></li>
-          <li>Gold path: <InlineCode>{goldPath}</InlineCode></li>
-          <li>Derived path: <InlineCode>{derivedPath}</InlineCode></li>
+          <li>
+            Data source: <InlineCode>{currentDataSource()}</InlineCode>
+          </li>
+          <li>
+            Meta path: <InlineCode>{metaPath}</InlineCode>
+          </li>
+          <li>
+            Gold path: <InlineCode>{goldPath}</InlineCode>
+          </li>
+          <li>
+            Derived path: <InlineCode>{derivedPath}</InlineCode>
+          </li>
           <li>No alternate-window fallback</li>
           <li>No per-day runtime repair</li>
         </ul>

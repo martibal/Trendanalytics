@@ -36,10 +36,10 @@ function clampScore(score: number) {
 }
 
 /**
- * SVG arc math
- * We draw a half-moon gauge on the top half of a circle:
- * - start angle 180° (left)
- * - end angle 0° (right)
+ * SVG arc math — gauge convention:
+ * angleDeg=0 points UP (12 o'clock), increases clockwise.
+ * Half-moon gauge: startAngle=-180 (left/9 o'clock) → endAngle=0 (right/3 o'clock)
+ * drawn clockwise (sweep=1) through the top.
  */
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   const a = ((angleDeg - 90) * Math.PI) / 180.0;
@@ -53,23 +53,15 @@ function describeArc(
   startAngle: number,
   endAngle: number
 ) {
-  const start = polarToCartesian(cx, cy, r, endAngle);
-  const end = polarToCartesian(cx, cy, r, startAngle);
+  const start = polarToCartesian(cx, cy, r, startAngle);
+  const end   = polarToCartesian(cx, cy, r, endAngle);
 
-  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+  const largeArcFlag = endAngle - startAngle >= 180 ? "1" : "0";
 
   return [
-    "M",
-    start.x,
-    start.y,
-    "A",
-    r,
-    r,
-    0,
-    largeArcFlag,
-    0,
-    end.x,
-    end.y,
+    "M", start.x, start.y,
+    "A", r, r, 0, largeArcFlag, 1,
+    end.x, end.y,
   ].join(" ");
 }
 
@@ -93,12 +85,13 @@ export default function ScoreGauge({
   const cy = 118;
   const r = 78;
 
-  // Track (full arc): 180 -> 0
-  const trackD = describeArc(cx, cy, r, 180, 0);
+  // Track: full half-moon from left (-180°) to right (+180°) clockwise through the top
+  const trackD = describeArc(cx, cy, r, -180, 180);
 
-  // Active arc portion: 180 -> (180 - 180*t)
-  const endAngle = 180 - 180 * t;
-  const activeD = describeArc(cx, cy, r, 180, endAngle);
+  // Active arc: from left (-180°) to current score position
+  // score=0 → endAngle=-180 (empty), score=100 → endAngle=+180 (full)
+  const activeEndAngle = -180 + 360 * t;
+  const activeD = t > 0 ? describeArc(cx, cy, r, -180, activeEndAngle) : "";
 
   // Normative styling
   const strokeW = 8;
@@ -152,23 +145,27 @@ export default function ScoreGauge({
         />
 
         {/* active glow */}
-        <path
-          d={activeD}
-          fill="none"
-          stroke={glowColor}
-          strokeWidth={strokeW + 4}
-          strokeLinecap="round"
-          filter={`url(#scoreGaugeGlow-${instanceId.replace(/[:]/g, "")})`}
-        />
+        {activeD ? (
+          <path
+            d={activeD}
+            fill="none"
+            stroke={glowColor}
+            strokeWidth={strokeW + 4}
+            strokeLinecap="round"
+            filter={`url(#scoreGaugeGlow-${instanceId.replace(/[:]/g, "")})`}
+          />
+        ) : null}
 
         {/* active track */}
-        <path
-          d={activeD}
-          fill="none"
-          stroke={`url(#${gradientId})`}
-          strokeWidth={strokeW}
-          strokeLinecap="round"
-        />
+        {activeD ? (
+          <path
+            d={activeD}
+            fill="none"
+            stroke={`url(#${gradientId})`}
+            strokeWidth={strokeW}
+            strokeLinecap="round"
+          />
+        ) : null}
 
         {/* center value */}
         <text
