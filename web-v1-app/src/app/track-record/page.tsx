@@ -4,6 +4,9 @@ import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { currentDataSource, readStorageObject } from "@/lib/storage";
 import ChainIcon from "@/components/ChainIcon";
+import RegimeTimeline from "@/components/track-record/RegimeTimeline";
+import ConfidenceHistory from "@/components/track-record/ConfidenceHistory";
+import TransitionMatrix from "@/components/track-record/TransitionMatrix";
 
 type MetaHistoryRow = {
   chain?: string;
@@ -152,20 +155,20 @@ function confidenceBand(value?: number | null) {
 
 function bandClass(band: string) {
   const base = "rounded-full border px-2 py-1 text-xs";
-  if (band === "Good") return `${base} border-emerald-500/30 bg-emerald-500/10 text-emerald-300`;
-  if (band === "Caution") return `${base} border-amber-500/30 bg-amber-500/10 text-amber-300`;
-  if (band === "Degraded") return `${base} border-red-500/30 bg-red-500/10 text-red-300`;
+  if (band === "Good") return `${base} status-ok border`;
+  if (band === "Caution") return `${base} status-warn border`;
+  if (band === "Degraded") return `${base} status-fail border`;
   return `${base} border-border bg-muted text-muted-foreground`;
 }
 
 function regimeBadgeClass(label?: string | null) {
   const base = "rounded-full border px-2 py-1 text-xs";
   if (!label) return `${base} border-border bg-muted text-muted-foreground`;
-  if (label === "CONGESTED") return `${base} border-red-500/30 bg-red-500/10 text-red-300`;
-  if (label === "HEATING") return `${base} border-amber-500/30 bg-amber-500/10 text-amber-300`;
-  if (label === "STABLE") return `${base} border-emerald-500/30 bg-emerald-500/10 text-emerald-300`;
-  if (label === "COOLING") return `${base} border-blue-500/30 bg-blue-500/10 text-blue-300`;
-  if (label === "UNKNOWN/DEGRADED") return `${base} border-slate-500/30 bg-slate-500/10 text-slate-300`;
+  if (label === "CONGESTED") return `${base} status-fail border`;
+  if (label === "HEATING") return `${base} status-warn border`;
+  if (label === "STABLE") return `${base} status-ok border`;
+  if (label === "COOLING") return `${base} border border-border bg-muted text-muted-foreground`;
+  if (label === "UNKNOWN/DEGRADED") return `${base} status-degraded border`;
   return `${base} border-border bg-muted text-muted-foreground`;
 }
 
@@ -266,10 +269,10 @@ function formatPct(part: number, total: number): string {
 }
 
 function stackSegmentClass(bucket: RegimeBucket): string {
-  if (bucket === "STABLE") return "bg-emerald-400";
-  if (bucket === "HEATING") return "bg-amber-400";
-  if (bucket === "CONGESTED") return "bg-red-400";
-  if (bucket === "UNKNOWN/DEGRADED") return "bg-slate-400";
+  if (bucket === "STABLE") return "bg-regime-stable";
+  if (bucket === "HEATING") return "bg-regime-heating";
+  if (bucket === "CONGESTED") return "bg-regime-congested";
+  if (bucket === "UNKNOWN/DEGRADED") return "bg-regime-unknown";
   return "bg-sky-400";
 }
 
@@ -696,6 +699,44 @@ export default async function TrackRecordPage({
           </InlineCode>
         </div>
       </section>
+
+      {/* === Regime Timeline Visual === */}
+      {filteredRows.length > 0 && (
+        <section className="mb-8 rounded-xl border p-5">
+          <h2 className="mb-4 text-lg font-semibold">Regime Timeline</h2>
+          <RegimeTimeline
+            entries={filteredRows.map((r) => ({
+              date: r.date ?? "",
+              regime: r.regimeLabel ?? "UNKNOWN/DEGRADED",
+              confidence: r.confidence,
+            }))}
+          />
+        </section>
+      )}
+
+      {/* === Confidence History Chart === */}
+      {filteredRows.length > 1 && (
+        <section className="mb-8">
+          <ConfidenceHistory
+            points={filteredRows.map((r) => ({
+              date: r.date ?? "",
+              confidence: r.confidence,
+            }))}
+          />
+        </section>
+      )}
+
+      {/* === Transition Matrix === */}
+      {filteredRows.length > 1 && (
+        <section className="mb-8">
+          <TransitionMatrix
+            transitions={filteredRows.slice(1).map((r, i) => ({
+              from: filteredRows[i]?.regimeLabel ?? "UNKNOWN/DEGRADED",
+              to: r.regimeLabel ?? "UNKNOWN/DEGRADED",
+            }))}
+          />
+        </section>
+      )}
 
       <section className="rounded-xl border">
         <div className="border-b px-4 py-3">

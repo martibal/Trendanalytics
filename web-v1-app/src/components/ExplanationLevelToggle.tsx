@@ -15,18 +15,24 @@ export default function ExplanationLevelToggle({
   label?: string;
 }) {
   const btnBase =
-    "rounded-full border px-3 py-1 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2";
-  const active = "bg-muted";
-  const inactive = "bg-transparent hover:bg-muted/40";
+    "rounded-full px-3 py-1.5 text-sm transition-colors focus-ring";
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="text-sm text-muted-foreground">{label}</div>
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="eyebrow-label">{label}</div>
 
-      <div className="inline-flex items-center gap-1 rounded-full border p-1">
+      <div
+        className="inline-flex items-center gap-1 rounded-full border border-border bg-background/70 p-1"
+        role="group"
+        aria-label={label}
+      >
         <button
           type="button"
-          className={`${btnBase} ${level === "Basic" ? active : inactive}`}
+          className={`${btnBase} ${
+            level === "Basic"
+              ? "bg-muted text-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+          }`}
           onClick={() => onChange("Basic")}
           aria-pressed={level === "Basic"}
         >
@@ -35,7 +41,11 @@ export default function ExplanationLevelToggle({
 
         <button
           type="button"
-          className={`${btnBase} ${level === "Advanced" ? active : inactive}`}
+          className={`${btnBase} ${
+            level === "Advanced"
+              ? "bg-muted text-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+          }`}
           onClick={() => onChange("Advanced")}
           aria-pressed={level === "Advanced"}
         >

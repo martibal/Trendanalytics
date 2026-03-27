@@ -9,11 +9,15 @@ import {
 } from "@/lib/design-tokens";
 
 export type ScoreGaugeProps = {
-  /** 0..100 (will be clamped) */
+  /**
+   * Supports either:
+   * - 0..100
+   * - 0..1 (auto-normalized to 0..100)
+   */
   score: number;
-  /** Dimension name, e.g. "Demand" | "Friction" | "Capacity" */
+  /** Dimension name, e.g. "Demand" | "Friction" | "Capacity" | "Confidence" */
   label: string;
-  /** Optional smaller line under the label (descriptive only) */
+  /** Optional smaller descriptive line */
   note?: string;
   /** Pixel width (normative default 180) */
   widthPx?: number;
@@ -21,48 +25,55 @@ export type ScoreGaugeProps = {
   title?: string;
 };
 
-function clamp01(x: number) {
-  if (Number.isNaN(x)) return 0;
-  if (x < 0) return 0;
-  if (x > 1) return 1;
-  return x;
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return value;
 }
 
-function clampScore(score: number) {
-  if (!Number.isFinite(score)) return 0;
-  if (score < 0) return 0;
-  if (score > 100) return 100;
-  return score;
+function normalizeScore(score: number) {
+  if (!Number.isFinite(score)) {
+    return 0;
+  }
+
+  // Accept both normalized 0..1 and standard 0..100 inputs.
+  if (score >= 0 && score <= 1) {
+    return clampPercent(score * 100);
+  }
+
+  return clampPercent(score);
 }
 
-/**
- * SVG arc math — gauge convention:
- * angleDeg=0 points UP (12 o'clock), increases clockwise.
- * Half-moon gauge: startAngle=-180 (left/9 o'clock) → endAngle=0 (right/3 o'clock)
- * drawn clockwise (sweep=1) through the top.
- */
-function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
-  const a = ((angleDeg - 90) * Math.PI) / 180.0;
-  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
-}
-
-function describeArc(
+function describeTopArc(
   cx: number,
   cy: number,
   r: number,
-  startAngle: number,
-  endAngle: number
-) {
-  const start = polarToCartesian(cx, cy, r, startAngle);
-  const end   = polarToCartesian(cx, cy, r, endAngle);
+  progress01: number
+): { trackD: string; activeD: string; dotX: number; dotY: number } {
+  const leftX = cx - r;
+  const rightX = cx + r;
 
-  const largeArcFlag = endAngle - startAngle >= 180 ? "1" : "0";
+  // Top half track: left -> right via top
+  const trackD = `M ${leftX} ${cy} A ${r} ${r} 0 0 1 ${rightX} ${cy}`;
 
-  return [
-    "M", start.x, start.y,
-    "A", r, r, 0, largeArcFlag, 1,
-    end.x, end.y,
-  ].join(" ");
+  const p = Math.max(0, Math.min(1, progress01));
+
+  // Angle moves along the TOP half:
+  // p=0   => 180° (left)
+  // p=0.5 => 270° (top)
+  // p=1   => 360° (right)
+  const theta = Math.PI + Math.PI * p;
+
+  const dotX = cx + r * Math.cos(theta);
+  const dotY = cy + r * Math.sin(theta);
+
+  const activeD =
+    p <= 0
+      ? ""
+      : `M ${leftX} ${cy} A ${r} ${r} 0 0 1 ${dotX} ${dotY}`;
+
+  return { trackD, activeD, dotX, dotY };
 }
 
 export default function ScoreGauge({
@@ -73,29 +84,23 @@ export default function ScoreGauge({
   className,
   title,
 }: ScoreGaugeProps) {
-  const instanceId = useId();
+  const instanceId = useId().replace(/[:]/g, "");
+  const normalized = normalizeScore(score);
+  const progress = normalized / 100;
 
-  const s = clampScore(score);
-  const t = clamp01(s / 100);
-
-  // Geometry (scaled by width)
   const vbW = 220;
   const vbH = 140;
+
+  // Geometry tuned for a true "half-moon" top gauge.
   const cx = 110;
-  const cy = 118;
-  const r = 78;
+  const cy = 108;
+  const r = 72;
+  const strokeW = 12;
 
-  // Track: full half-moon from left (-180°) to right (+180°) clockwise through the top
-  const trackD = describeArc(cx, cy, r, -180, 180);
+  const { trackD, activeD, dotX, dotY } = describeTopArc(cx, cy, r, progress);
 
-  // Active arc: from left (-180°) to current score position
-  // score=0 → endAngle=-180 (empty), score=100 → endAngle=+180 (full)
-  const activeEndAngle = -180 + 360 * t;
-  const activeD = t > 0 ? describeArc(cx, cy, r, -180, activeEndAngle) : "";
-
-  // Normative styling
-  const strokeW = 8;
-  const gradientId = `scoreGaugeGradient-${instanceId.replace(/[:]/g, "")}`;
+  const gradientId = `scoreGaugeGradient-${instanceId}`;
+  const glowId = `scoreGaugeGlow-${instanceId}`;
 
   const trackColor = getDesignTokenHex("--color-border");
   const lowColor = getRegimeColorByLabel("CONGESTED");
@@ -103,9 +108,13 @@ export default function ScoreGauge({
   const highColor = getRegimeColorByLabel("STABLE");
   const valueColor = getDesignTokenHex("--color-text-primary");
   const labelColor = getDesignTokenHex("--color-text-secondary");
-  const glowColor = hexToRgba(getDesignTokenHex("--color-accent"), 0.16);
+  const mutedColor = hexToRgba(labelColor, 0.8);
+  const glowColor = hexToRgba(getDesignTokenHex("--color-accent"), 0.18);
+  const dotFill = getDesignTokenHex("--color-bg-card");
+  const dotStroke = getDesignTokenHex("--color-accent");
 
-  const aria = `${label} score: ${Math.round(s)} out of 100`;
+  const valueText = `${Math.round(normalized)}`;
+  const aria = `${label} score: ${valueText} out of 100`;
 
   return (
     <div
@@ -116,9 +125,9 @@ export default function ScoreGauge({
     >
       <svg
         width={widthPx}
-        height={Math.round(widthPx * (vbH / vbW) * 0.85)}
+        height={Math.round(widthPx * (vbH / vbW))}
         viewBox={`0 0 ${vbW} ${vbH}`}
-        className="block"
+        className="block overflow-visible"
       >
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -126,8 +135,9 @@ export default function ScoreGauge({
             <stop offset="50%" stopColor={midColor} />
             <stop offset="100%" stopColor={highColor} />
           </linearGradient>
-          <filter id={`scoreGaugeGlow-${instanceId.replace(/[:]/g, "")}`}>
-            <feGaussianBlur stdDeviation="3" result="blur" />
+
+          <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -139,7 +149,7 @@ export default function ScoreGauge({
         <path
           d={trackD}
           fill="none"
-          stroke={trackColor}
+          stroke={hexToRgba(trackColor, 0.9)}
           strokeWidth={strokeW}
           strokeLinecap="round"
         />
@@ -150,13 +160,13 @@ export default function ScoreGauge({
             d={activeD}
             fill="none"
             stroke={glowColor}
-            strokeWidth={strokeW + 4}
+            strokeWidth={strokeW + 6}
             strokeLinecap="round"
-            filter={`url(#scoreGaugeGlow-${instanceId.replace(/[:]/g, "")})`}
+            filter={`url(#${glowId})`}
           />
         ) : null}
 
-        {/* active track */}
+        {/* active arc */}
         {activeD ? (
           <path
             d={activeD}
@@ -167,22 +177,34 @@ export default function ScoreGauge({
           />
         ) : null}
 
-        {/* center value */}
+        {/* endpoint marker */}
+        {activeD ? (
+          <circle
+            cx={dotX}
+            cy={dotY}
+            r={6}
+            fill={dotFill}
+            stroke={dotStroke}
+            strokeWidth={2}
+          />
+        ) : null}
+
+        {/* value */}
         <text
           x={cx}
-          y={86}
+          y={92}
           textAnchor="middle"
-          fontSize="26"
+          fontSize="28"
           fontWeight="700"
           fill={valueColor}
         >
-          {Math.round(s)}
+          {valueText}
         </text>
 
-        {/* dimension label */}
+        {/* label */}
         <text
           x={cx}
-          y={110}
+          y={112}
           textAnchor="middle"
           fontSize="10"
           letterSpacing="1.2"
@@ -194,10 +216,10 @@ export default function ScoreGauge({
         {note ? (
           <text
             x={cx}
-            y={126}
+            y={127}
             textAnchor="middle"
             fontSize="9"
-            fill={labelColor}
+            fill={mutedColor}
           >
             {note}
           </text>

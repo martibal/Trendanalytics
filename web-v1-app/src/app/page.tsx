@@ -1,8 +1,9 @@
-// src/app/page.tsx
 import Link from "next/link";
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { currentDataSource, readStorageObject } from "@/lib/storage";
+import LandingHero from "@/components/landing/LandingHero";
+import CrossChainNotables from "@/components/landing/CrossChainNotables";
 
 type LandingApiChain = {
   chain?: string;
@@ -78,21 +79,15 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-      <h2 className="text-lg font-semibold text-white">{title}</h2>
-      <div className="mt-3 space-y-3 text-sm leading-6 text-slate-300">
-        {children}
-      </div>
+    <section className="section-shell p-6">
+      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+      <div className="mt-3 space-y-3 text-sm leading-7 text-muted-foreground">{children}</div>
     </section>
   );
 }
 
 function InlineCode({ children }: { children: string }) {
-  return (
-    <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-slate-100">
-      {children}
-    </code>
-  );
+  return <code className="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">{children}</code>;
 }
 
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
@@ -142,33 +137,31 @@ function confidenceBand(value?: number | null) {
 }
 
 function statusChipClass(status?: string | null) {
-  const base =
-    "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide";
+  const base = "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide";
   if (status === "ok") {
-    return `${base} border-emerald-400/30 bg-emerald-400/10 text-emerald-200`;
+    return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300`;
   }
   if (status === "warn") {
-    return `${base} border-amber-400/30 bg-amber-400/10 text-amber-200`;
+    return `${base} border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300`;
   }
   if (status === "fail") {
-    return `${base} border-red-400/30 bg-red-400/10 text-red-200`;
+    return `${base} border-red-500/25 bg-red-500/10 text-red-700 dark:text-red-300`;
   }
-  return `${base} border-slate-400/20 bg-slate-400/10 text-slate-200`;
+  return `${base} border-border bg-muted text-muted-foreground`;
 }
 
 function confidenceChipClass(band: string) {
-  const base =
-    "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium";
+  const base = "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium";
   if (band === "Good") {
-    return `${base} border-emerald-400/30 bg-emerald-400/10 text-emerald-200`;
+    return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300`;
   }
   if (band === "Caution") {
-    return `${base} border-amber-400/30 bg-amber-400/10 text-amber-200`;
+    return `${base} border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300`;
   }
   if (band === "Degraded") {
-    return `${base} border-rose-400/30 bg-rose-400/10 text-rose-200`;
+    return `${base} border-red-500/25 bg-red-500/10 text-red-700 dark:text-red-300`;
   }
-  return `${base} border-slate-400/20 bg-slate-400/10 text-slate-200`;
+  return `${base} border-border bg-muted text-muted-foreground`;
 }
 
 function fmtDate(value?: string | null) {
@@ -232,11 +225,7 @@ async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
       const metaPath = `data/published/v1/meta/${chain.id}/latest.json`;
       const meta = await readPublishedJson<MetaLatest>(metaPath);
 
-      const asOf =
-        meta?.updated_through ??
-        meta?.regime?.asof_date ??
-        meta?.date ??
-        null;
+      const asOf = meta?.updated_through ?? meta?.regime?.asof_date ?? meta?.date ?? null;
 
       const lagDays =
         typeof meta?.confidence?.lag_days_vs_utc_today === "number"
@@ -256,13 +245,48 @@ async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
         }),
         published_regime: meta?.status?.label ?? null,
         confidence_score:
-          typeof meta?.confidence?.confidence_score === "number"
-            ? meta.confidence.confidence_score
-            : null,
+          typeof meta?.confidence?.confidence_score === "number" ? meta.confidence.confidence_score : null,
         expected_delay_days: expectedDelayDays(chain.id),
       };
     })
   );
+}
+
+function buildNotables(rows: StatusApiRow[]) {
+  const items: { title: string; body: string }[] = [];
+
+  const degraded = rows.filter((row) => typeof row.confidence_score === "number" && row.confidence_score < 0.4);
+  if (degraded.length > 0) {
+    items.push({
+      title: "Confidence is degraded on part of the surface",
+      body: `${degraded.map((row) => row.label).join(", ")} currently publish confidence below the canonical 0.40 threshold. These states remain visible for traceability, but should be read as UNKNOWN/DEGRADED.`,
+    });
+  }
+
+  const delayed = rows.filter((row) => row.status === "warn" || row.status === "fail");
+  if (delayed.length > 0) {
+    items.push({
+      title: "Freshness requires attention",
+      body: `${delayed.map((row) => row.label).join(", ")} are currently outside their expected publish schedule. Status and lag remain visible so the latest publication can still be interpreted with the right freshness context.`,
+    });
+  }
+
+  const l2s = rows.filter((row) => row.chain === "arbitrum" || row.chain === "base");
+  if (l2s.length > 0) {
+    items.push({
+      title: "L2 publication cadence is intentionally different",
+      body: `Arbitrum and Base are read against an expected publish delay of roughly seven days. A larger lag does not automatically imply a broken feed; it must be judged against the chain-specific policy shown on status and chain pages.`,
+    });
+  }
+
+  if (items.length === 0) {
+    items.push({
+      title: "All supported chains have current published context",
+      body: `The landing surface is currently able to show regime, confidence, and freshness context across all four supported chains using the latest published artifacts.`,
+    });
+  }
+
+  return items.slice(0, 3);
 }
 
 export default async function HomePage() {
@@ -276,10 +300,7 @@ export default async function HomePage() {
 
   const landingChains = extractLandingChains(landingPayload);
 
-  const statusRows =
-    Array.isArray(statusPayload?.chains) && statusPayload.chains.length > 0
-      ? statusPayload.chains
-      : [];
+  const statusRows = Array.isArray(statusPayload?.chains) && statusPayload.chains.length > 0 ? statusPayload.chains : [];
 
   const landingFallbackRows = CHAIN_LIST.map((chain) => {
     const landing = landingChains.find((row) => row.chain === chain.id);
@@ -301,214 +322,137 @@ export default async function HomePage() {
     statusRows.length > 0
       ? statusRows
       : metaFallbackRows.some(
-          (row) =>
-            row.published_regime !== null ||
-            row.confidence_score !== null ||
-            row.as_of !== null ||
-            row.lag_days !== null
-        )
-      ? metaFallbackRows
-      : landingFallbackRows;
+            (row) =>
+              row.published_regime !== null ||
+              row.confidence_score !== null ||
+              row.as_of !== null ||
+              row.lag_days !== null
+          )
+        ? metaFallbackRows
+        : landingFallbackRows;
+
+  const notables = buildNotables(rows);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-slate-100">
-      <header className="mb-8 rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.02] p-8 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="max-w-3xl">
-            <div className="text-sm font-medium text-slate-400">
-              Descriptive blockchain regime context
-            </div>
-            <h1 className="mt-2 max-w-3xl text-4xl font-semibold tracking-tight text-white">
-              Regime change vs noise, without price, forecasts, or advice.
-            </h1>
-            <p className="mt-4 text-sm leading-7 text-slate-300">
-              TrendAnalytics is a publication-driven on-chain analytics product. It explains what the
-              currently published data says about supported chains, how fresh that publication is,
-              and how the current state compares with recent historical output.
-            </p>
+    <div className="space-y-6 py-4">
+      <LandingHero
+        datasetVersion={dataset?.version ?? null}
+        publishedAt={dataset?.published_at ?? null}
+        methodologyVersion={dataset?.methodology_version ?? null}
+        dataSource={currentDataSource()}
+      />
 
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link
-                href="/chains"
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-white transition hover:bg-white/[0.08]"
-              >
-                Open Chains
-              </Link>
-              <Link
-                href="/status"
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-white transition hover:bg-white/[0.08]"
-              >
-                Open Status
-              </Link>
-              <Link
-                href="/track-record"
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-white transition hover:bg-white/[0.08]"
-              >
-                Open Track Record
-              </Link>
-              <Link
-                href="/dashboard"
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-white transition hover:bg-white/[0.08]"
-              >
-                Subscriber Dashboard
-              </Link>
-            </div>
-          </div>
+      <Section title="Interpretation boundary">
+        <ul className="list-disc space-y-1 pl-5">
+          <li>No price data.</li>
+          <li>No forecasts.</li>
+          <li>No advisory language.</li>
+          <li>No hidden portfolio guidance.</li>
+          <li>Only published, descriptive regime context.</li>
+        </ul>
+      </Section>
 
-          <div className="min-w-[300px] rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm">
-            <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
-              Published context
-            </div>
-            <div className="mt-4 space-y-2 text-slate-300">
-              <div>
-                <span className="font-medium text-white">Dataset:</span>{" "}
-                {dataset?.version ?? "—"}
-              </div>
-              <div>
-                <span className="font-medium text-white">Published at:</span>{" "}
-                {dataset?.published_at ?? "—"}
-              </div>
-              <div>
-                <span className="font-medium text-white">Methodology:</span>{" "}
-                {dataset?.methodology_version ?? "—"}
-              </div>
-              <div>
-                <span className="font-medium text-white">Data source:</span>{" "}
-                {currentDataSource()}
-              </div>
-            </div>
-          </div>
+      <section className="section-shell overflow-hidden">
+        <div className="border-b border-border px-6 py-5">
+          <h2 className="text-lg font-semibold text-foreground">Supported chains</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Current published regime, confidence, as-of date, and lag across the four supported
+            chains.
+          </p>
         </div>
-      </header>
 
-      <div className="grid gap-6">
-        <Section title="Interpretation boundary">
-          <ul className="list-disc pl-5">
-            <li>No price data.</li>
-            <li>No forecasts.</li>
-            <li>No advisory language.</li>
-            <li>No hidden portfolio guidance.</li>
-            <li>Only published, descriptive regime context.</li>
-          </ul>
-        </Section>
+        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
+          {rows.map((row) => {
+            const band = confidenceBand(row.confidence_score);
 
-        <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
-          <div className="border-b border-white/10 px-5 py-4">
-            <h2 className="text-lg font-semibold text-white">Supported chains</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Public overview of currently supported chains and their published state.
-            </p>
-          </div>
-
-          <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
-            {rows.map((row) => {
-              const band = confidenceBand(row.confidence_score);
-
-              return (
-                <Link
-                  key={row.chain}
-                  href={`/chains/${row.chain}`}
-                  className="group rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.035] to-white/[0.015] p-5 transition hover:border-white/20 hover:bg-white/[0.05]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xl font-semibold tracking-tight text-white">
-                        {row.label}
-                      </div>
-                      <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
-                        {row.name}
-                      </div>
-                    </div>
-                    <span className={statusChipClass(row.status)}>{row.status}</span>
-                  </div>
-
-                  <div className="mt-5">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                      Published regime
-                    </div>
-                    <div className="mt-1 min-h-[48px] text-lg font-semibold leading-6 text-white">
-                      {row.published_regime ?? "No published label"}
+            return (
+              <Link
+                key={row.chain}
+                href={`/chains/${row.chain}`}
+                className="group surface-card p-5 transition hover:border-primary/30 hover:bg-card"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xl font-semibold tracking-tight text-foreground">{row.label}</div>
+                    <div className="mt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      {row.name}
                     </div>
                   </div>
+                  <span className={statusChipClass(row.status)}>{row.status}</span>
+                </div>
 
-                  <div className="mt-5 rounded-xl border border-white/10 bg-black/10 p-3">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                      Confidence
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <div className="text-2xl font-semibold text-white">
-                        {fmtConfidence(row.confidence_score)}
-                      </div>
-                      <span className={confidenceChipClass(band)}>{band}</span>
+                <div className="mt-5">
+                  <div className="eyebrow-label">Published regime</div>
+                  <div className="mt-2 min-h-[48px] text-lg font-semibold leading-6 text-foreground">
+                    {row.published_regime ?? "No published label"}
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-xl border border-border bg-background/75 p-3">
+                  <div className="eyebrow-label">Confidence</div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <div className="text-2xl font-semibold text-foreground">{fmtConfidence(row.confidence_score)}</div>
+                    <span className={confidenceChipClass(band)}>{band}</span>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-border bg-background/70 p-3">
+                    <div className="eyebrow-label">As of</div>
+                    <div className="mt-1 text-sm font-medium text-foreground">{fmtDate(row.as_of)}</div>
+                  </div>
+                  <div className="rounded-xl border border-border bg-background/70 p-3">
+                    <div className="eyebrow-label">Lag</div>
+                    <div className="mt-1 text-sm font-medium text-foreground">
+                      {row.lag_days !== null ? `${row.lag_days}d` : "—"}
                     </div>
                   </div>
+                </div>
 
-                  <div className="mt-5 grid grid-cols-2 gap-3">
-                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                        As of
-                      </div>
-                      <div className="mt-1 text-sm font-medium text-slate-100">
-                        {fmtDate(row.as_of)}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                        Lag
-                      </div>
-                      <div className="mt-1 text-sm font-medium text-slate-100">
-                        {row.lag_days !== null ? `${row.lag_days}d` : "—"}
-                      </div>
-                    </div>
-                  </div>
+                <div className="mt-4 text-xs text-muted-foreground transition group-hover:text-foreground">
+                  Open chain detail →
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
-                  <div className="mt-4 text-xs text-slate-500 transition group-hover:text-slate-400">
-                    Open chain detail →
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+      <CrossChainNotables items={notables} />
 
+      <div className="grid gap-6 xl:grid-cols-2">
         <Section title="How the product is organized">
-          <ul className="list-disc pl-5">
+          <ul className="list-disc space-y-1 pl-5">
             <li>
-              <Link href="/chains" className="underline decoration-white/20 underline-offset-4">
+              <Link href="/chains" className="underline underline-offset-4">
                 /chains
               </Link>{" "}
               shows current descriptive chain-level state.
             </li>
             <li>
-              <Link href="/status" className="underline decoration-white/20 underline-offset-4">
+              <Link href="/status" className="underline underline-offset-4">
                 /status
               </Link>{" "}
               shows freshness, lag, and publication health.
             </li>
             <li>
-              <Link
-                href="/track-record"
-                className="underline decoration-white/20 underline-offset-4"
-              >
+              <Link href="/track-record" className="underline underline-offset-4">
                 /track-record
               </Link>{" "}
               shows historical descriptive regime output.
             </li>
             <li>
-              <Link
-                href="/methodology"
-                className="underline decoration-white/20 underline-offset-4"
-              >
+              <Link href="/methodology" className="underline underline-offset-4">
                 /methodology
               </Link>{" "}
               and{" "}
-              <Link href="/glossary" className="underline decoration-white/20 underline-offset-4">
+              <Link href="/glossary" className="underline underline-offset-4">
                 /glossary
               </Link>{" "}
               explain the published fields and interpretation boundary.
             </li>
             <li>
-              <Link href="/api-docs" className="underline decoration-white/20 underline-offset-4">
+              <Link href="/api-docs" className="underline underline-offset-4">
                 /api-docs
               </Link>{" "}
               documents public routes and subscriber delivery routes.
@@ -533,70 +477,44 @@ export default async function HomePage() {
             The site presents published Gold, Meta, and Derived artifacts. These should be read as
             descriptive analytical outputs, not as recommendations.
           </p>
-          <ul className="list-disc pl-5">
+          <ul className="list-disc space-y-1 pl-5">
             <li>
-              <span className="font-medium text-white">Gold</span>: descriptive published base metrics
+              <span className="font-medium text-foreground">Gold</span>: descriptive published base
+              metrics.
             </li>
             <li>
-              <span className="font-medium text-white">Meta</span>: status, confidence, scorecard,
-              regime, drivers
+              <span className="font-medium text-foreground">Meta</span>: status, confidence,
+              scorecard, regime, and drivers.
             </li>
             <li>
-              <span className="font-medium text-white">Derived</span>: published rolling trend context
-            </li>
-          </ul>
-        </Section>
-
-        <Section title="Related pages">
-          <ul className="list-disc pl-5">
-            <li>
-              <Link href="/about" className="underline decoration-white/20 underline-offset-4">
-                /about
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/methodology"
-                className="underline decoration-white/20 underline-offset-4"
-              >
-                /methodology
-              </Link>
-            </li>
-            <li>
-              <Link href="/glossary" className="underline decoration-white/20 underline-offset-4">
-                /glossary
-              </Link>
-            </li>
-            <li>
-              <Link href="/thresholds" className="underline decoration-white/20 underline-offset-4">
-                /thresholds
-              </Link>
-            </li>
-            <li>
-              <Link href="/terms" className="underline decoration-white/20 underline-offset-4">
-                /terms
-              </Link>
-            </li>
-            <li>
-              <Link href="/privacy" className="underline decoration-white/20 underline-offset-4">
-                /privacy
-              </Link>
+              <span className="font-medium text-foreground">Derived</span>: published rolling trend
+              context.
             </li>
           </ul>
         </Section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 text-xs text-slate-400">
-          <div className="font-medium text-white">Traceability</div>
-          <p className="mt-2">
-            Dataset context on this page is drawn from{" "}
-            <InlineCode>/public/data/published/v1/dataset.json</InlineCode>.
+        <Section title="Transparency path">
+          <p>
+            Dataset context on this page is drawn from <InlineCode>/public/data/published/v1/dataset.json</InlineCode>.
           </p>
-          <p className="mt-2">
+          <p>
             Chain cards prefer published status/index information where available, then fall back to
-            per-chain meta/latest files, and only then fall back to landing/index context.
+            per-chain <InlineCode>meta/latest.json</InlineCode> files, and only then fall back to
+            landing/index context.
           </p>
-        </section>
+          <div className="flex flex-wrap gap-3 pt-1">
+            <Link href="/status" className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-3 text-sm text-foreground transition hover:bg-muted">
+              System status
+            </Link>
+            <Link href="/methodology" className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-3 text-sm text-foreground transition hover:bg-muted">
+              Methodology
+            </Link>
+            <Link href="/glossary" className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-3 text-sm text-foreground transition hover:bg-muted">
+              Glossary
+            </Link>
+          </div>
+        </Section>
       </div>
-    </main>
+    </div>
   );
 }

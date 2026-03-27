@@ -1,10 +1,10 @@
-// src/app/layout.tsx
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fragment, type ReactNode } from "react";
 import "./globals.css";
 import SiteNavbar from "@/components/site/SiteNavbar";
 import SiteFooter from "@/components/site/SiteFooter";
+import ThemeProvider from "@/components/site/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "TrendAnalytics",
@@ -34,11 +34,15 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="min-h-dvh bg-background text-foreground antialiased">
         <AuthProvider>
-          <div className="flex min-h-dvh flex-col">
-            <SiteNavbar />
-            <div className="flex-1">{children}</div>
-            <SiteFooter />
-          </div>
+          <ThemeProvider>
+            <div className="flex min-h-dvh flex-col bg-background">
+              <SiteNavbar />
+              <div className="flex-1">
+                <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+              </div>
+              <SiteFooter />
+            </div>
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>

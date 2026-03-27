@@ -35,88 +35,60 @@ export default function DriverExplanation({
   momentum,
 }: Props) {
   return (
-    <details className="rounded-lg border p-4 text-sm">
-      <summary className="cursor-pointer select-none font-medium">
+    <details className="rounded-xl border border-border bg-background/50 p-4 text-sm">
+      <summary className="cursor-pointer select-none font-medium text-foreground">
         Metric explanation
       </summary>
 
-      <div className="mt-3 grid gap-3 text-muted-foreground leading-6">
-        <div>
-          <span className="font-medium text-foreground">Metric:</span>{" "}
-          {metric ?? "—"}
-        </div>
-
-        <div>
-          <span className="font-medium text-foreground">Axis:</span>{" "}
-          {axis ?? "—"}
-        </div>
-
-        <div>
-          <span className="font-medium text-foreground">Trend:</span>{" "}
-          {trend ?? "—"}
-        </div>
-
-        <div>
-          <span className="font-medium text-foreground">Robust z-score:</span>{" "}
-          {fmt(z, 2)}
-        </div>
-
-        <div>
-          <span className="font-medium text-foreground">90-day percentile:</span>{" "}
-          {fmtPct(percentile90d)}
-        </div>
-
-        <div>
-          <span className="font-medium text-foreground">
-            Momentum (7d vs 30d):
-          </span>{" "}
-          {fmt(momentum, 3)}
+      <div className="mt-3 grid gap-3 leading-6 text-muted-foreground">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div>
+            <span className="font-medium text-foreground">Metric:</span> {metric ?? "—"}
+          </div>
+          <div>
+            <span className="font-medium text-foreground">Axis:</span> {axis ?? "—"}
+          </div>
+          <div>
+            <span className="font-medium text-foreground">Trend:</span> {trend ?? "—"}
+          </div>
+          <div>
+            <span className="font-medium text-foreground">Robust z-score:</span> {fmt(z, 2)}
+          </div>
+          <div>
+            <span className="font-medium text-foreground">90-day percentile:</span> {fmtPct(percentile90d)}
+          </div>
+          <div>
+            <span className="font-medium text-foreground">Momentum (7d vs 30d):</span> {fmt(momentum, 3)}
+          </div>
         </div>
 
         <MetricTooltip
           title={metric ?? "Driver metric"}
           what={
             <>
-              Published driver row from <InlineCode>regime.drivers[]</InlineCode>,
-              used to explain why the current regime looks notable.
+              Published driver row from <InlineCode>regime.drivers[]</InlineCode>, used to explain why the
+              current regime looks notable.
             </>
           }
           why={
             <>
-              Drivers help connect the regime label to concrete metrics by showing
-              which published fields are currently unusual, elevated, depressed,
-              or changing relative to recent history.
+              Drivers connect the regime label to concrete metrics by showing which published fields are
+              currently unusual, elevated, depressed, or changing relative to recent history.
             </>
           }
           how={
             <>
-              This row is read directly from <InlineCode>meta/&lt;chain&gt;/latest.json</InlineCode>.
-              The UI displays the published driver fields such as metric, axis, trend,
-              robust z-score, percentile, and momentum without recomputing them.
+              This row is read directly from <InlineCode>meta/&lt;chain&gt;/latest.json</InlineCode>. The UI
+              displays the published driver fields such as metric, axis, trend, robust z-score,
+              percentile, and momentum without recomputing them.
             </>
           }
           sourcePath="/public/data/published/v1/meta/<chain>/latest.json"
           fieldPath="regime.drivers[]"
         />
 
-        <div className="rounded-md border bg-muted/30 p-3 text-xs">
-          <div className="font-medium text-foreground">Traceability</div>
-          <ul className="mt-2 list-disc pl-5">
-            <li>
-              Source:{" "}
-              <InlineCode>
-                /public/data/published/v1/meta/&lt;chain&gt;/latest.json
-              </InlineCode>
-            </li>
-            <li>
-              Field: <InlineCode>regime.drivers[]</InlineCode>
-            </li>
-          </ul>
-        </div>
-
         <div className="text-xs text-muted-foreground">
-          This component describes published driver values only.
-          It does not infer causes, provide forecasts, or suggest actions.
+          Descriptive only. This component explains published driver values and does not infer causes or suggest actions.
         </div>
       </div>
     </details>

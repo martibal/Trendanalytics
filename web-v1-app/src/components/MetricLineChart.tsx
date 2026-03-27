@@ -220,7 +220,7 @@ function ChartLegend({
       {showValue && (
         <div className="flex items-center gap-2">
           <svg width="28" height="10" className="flex-shrink-0">
-            <line x1="0" y1="5" x2="28" y2="5" stroke="#60a5fa" strokeWidth="1.5" strokeOpacity="0.5" />
+            <line x1="0" y1="5" x2="28" y2="5" stroke="var(--color-chain-ethereum)" strokeWidth="1.5" strokeOpacity="0.5" />
           </svg>
           <span>Daily raw value</span>
         </div>
@@ -228,7 +228,7 @@ function ChartLegend({
       {showMA7 && (
         <div className="flex items-center gap-2">
           <svg width="28" height="10" className="flex-shrink-0">
-            <line x1="0" y1="5" x2="28" y2="5" stroke="#f59e0b" strokeWidth="2.5" />
+            <line x1="0" y1="5" x2="28" y2="5" stroke="var(--color-regime-heating)" strokeWidth="2.5" />
           </svg>
           <span>MA7 — 7-day moving average</span>
         </div>
@@ -236,8 +236,8 @@ function ChartLegend({
       {showMA30 && (
         <div className="flex items-center gap-2">
           <svg width="28" height="10" className="flex-shrink-0">
-            <line x1="0" y1="5" x2="8" y2="5" stroke="#34d399" strokeWidth="2.5" />
-            <line x1="13" y1="5" x2="21" y2="5" stroke="#34d399" strokeWidth="2.5" />
+            <line x1="0" y1="5" x2="8" y2="5" stroke="var(--color-regime-stable)" strokeWidth="2.5" />
+            <line x1="13" y1="5" x2="21" y2="5" stroke="var(--color-regime-stable)" strokeWidth="2.5" />
           </svg>
           <span>MA30 — 30-day trend baseline</span>
         </div>
@@ -304,13 +304,13 @@ export default function MetricLineChart(props: {
 
   const trendColor =
     trend?.direction === "up"
-      ? "text-emerald-400"
+      ? "text-regime-stable"
       : trend?.direction === "down"
-        ? "text-rose-400"
+        ? "text-regime-congested"
         : "text-muted-foreground";
 
   return (
-    <div className="rounded-xl border p-5 flex flex-col gap-3">
+    <div className="rounded-2xl border border-border bg-card/40 p-5 shadow-sm flex flex-col gap-4">
 
       {/* ── Header ── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -333,7 +333,7 @@ export default function MetricLineChart(props: {
 
         {/* MA7 vs MA30 live readout */}
         {trend && (
-          <div className="rounded-lg border px-3 py-1.5 text-xs flex-shrink-0 text-right">
+          <div className="rounded-xl border border-border bg-background/70 px-3 py-2 text-xs flex-shrink-0 text-right">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">
               Current signal
             </div>
@@ -353,7 +353,7 @@ export default function MetricLineChart(props: {
       >
         {chartWidth > 0 ? (
           <LineChart width={chartWidth} height={height} data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis
               dataKey="date"
               tickFormatter={fmtDateShort}
@@ -384,7 +384,7 @@ export default function MetricLineChart(props: {
                 dataKey="value"
                 dot={false}
                 isAnimationActive={false}
-                stroke="#60a5fa"
+                stroke="var(--color-chain-ethereum)"
                 strokeWidth={1}
                 strokeOpacity={0.4}
               />
@@ -397,7 +397,7 @@ export default function MetricLineChart(props: {
                 dataKey="ma7"
                 dot={false}
                 isAnimationActive={false}
-                stroke="#f59e0b"
+                stroke="var(--color-regime-heating)"
                 strokeWidth={2}
               />
             )}
@@ -409,7 +409,7 @@ export default function MetricLineChart(props: {
                 dataKey="ma30"
                 dot={false}
                 isAnimationActive={false}
-                stroke="#34d399"
+                stroke="var(--color-regime-stable)"
                 strokeWidth={2.5}
                 strokeDasharray="7 3"
               />
@@ -427,7 +427,7 @@ export default function MetricLineChart(props: {
 
       {/* ── Contextual reading guide ── */}
       {ctx?.guide && (
-        <div className="rounded-lg border-l-2 border-l-sky-500 bg-muted/25 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+        <div className="rounded-xl border border-border bg-background/55 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
           <span className="font-semibold text-foreground">
             Reading this at {windowDays}d:&nbsp;
           </span>
@@ -437,7 +437,7 @@ export default function MetricLineChart(props: {
 
       {/* ── Technical footnote ── */}
       {subtitle && (
-        <div className="text-[10px] leading-relaxed text-muted-foreground/50 border-t pt-2">
+        <div className="border-t border-border pt-2 text-[10px] leading-relaxed text-muted-foreground/60">
           {subtitle}
         </div>
       )}

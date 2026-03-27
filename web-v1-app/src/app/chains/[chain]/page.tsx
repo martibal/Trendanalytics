@@ -1,4 +1,3 @@
-// src/app/chains/[chain]/page.tsx
 import type { ReactNode } from "react";
 
 import Link from "next/link";
@@ -133,11 +132,18 @@ function confidenceBand(v?: number) {
 }
 
 function pillClass(kind: "neutral" | "good" | "warn" | "bad") {
-  const base = "rounded-full border px-2 py-1 text-xs";
-  if (kind === "good") return `${base} bg-green-50`;
-  if (kind === "warn") return `${base} bg-yellow-50`;
-  if (kind === "bad") return `${base} bg-red-50`;
-  return `${base} bg-muted`;
+  const base =
+    "rounded-full border px-2.5 py-1 text-xs font-medium tracking-[0.02em]";
+  if (kind === "good") {
+    return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200`;
+  }
+  if (kind === "warn") {
+    return `${base} border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-200`;
+  }
+  if (kind === "bad") {
+    return `${base} border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-200`;
+  }
+  return `${base} border-border bg-muted/50 text-foreground`;
 }
 
 function confidencePill(v?: number) {
@@ -156,7 +162,7 @@ function confidenceNotice(v?: number) {
       tone: "caution" as const,
       title: "Reduced confidence",
       body:
-        "Confidence is reduced due to limited history or missing components. Published scores are pulled toward neutral (50) to reduce over-interpretation, while the canonical regime label remains visible.",
+        "Confidence is moderate because the current row has incomplete evidence relative to the model's coverage standard. This score measures evidence sufficiency for the current classification; freshness is shown separately in the lag state.",
     };
   }
 
@@ -165,11 +171,21 @@ function confidenceNotice(v?: number) {
       tone: "degraded" as const,
       title: "Degraded confidence",
       body:
-        "Confidence is below the canonical threshold. The regime should be treated as UNKNOWN/DEGRADED, while the latest available data remains visible for traceability.",
+        "Confidence is below the canonical threshold because the current row does not have enough evidence coverage for a reliable classification. This is a confidence gate on evidence sufficiency, not a freshness alert; freshness is shown separately in the lag state.",
     };
   }
 
   return null;
+}
+
+function confidenceNoticeClass(tone: "caution" | "degraded") {
+  return tone === "degraded"
+    ? "border-slate-400/40 bg-slate-500/12 text-slate-50"
+    : "border-amber-500/35 bg-amber-500/12 text-amber-50";
+}
+
+function confidenceNoticeMetaClass(tone: "caution" | "degraded") {
+  return tone === "degraded" ? "text-slate-100/85" : "text-amber-100/85";
 }
 
 function fmtNum(v?: number, digits = 3) {
@@ -366,11 +382,54 @@ function TogglePill({
   active: boolean;
   children: ReactNode;
 }) {
-  const base = "rounded-full border px-3 py-1 text-sm";
+  const base =
+    "inline-flex items-center rounded-full border px-3 py-1 text-sm transition-colors";
   return (
-    <span className={`${base} ${active ? "bg-muted" : "bg-transparent"}`}>
+    <span
+      className={`${base} ${
+        active
+          ? "border-border bg-muted text-foreground"
+          : "border-border/80 bg-background text-muted-foreground"
+      }`}
+    >
       {children}
     </span>
+  );
+}
+
+function HelperCard({
+  title,
+  basic,
+  advanced,
+  level,
+  traceability,
+}: {
+  title: string;
+  basic: ReactNode;
+  advanced: ReactNode;
+  level: "Basic" | "Advanced";
+  traceability: ReactNode;
+}) {
+  return (
+    <details className="rounded-xl border p-4">
+      <summary className="cursor-pointer select-none">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-medium">{title}</div>
+          <div className="text-xs text-muted-foreground">
+            Level: <span className="font-medium text-foreground">{level}</span>
+          </div>
+        </div>
+      </summary>
+
+      <div className="mt-3 text-sm leading-6 text-muted-foreground">
+        {level === "Basic" ? basic : advanced}
+
+        <div className="mt-3 rounded-lg border bg-muted/20 p-3 text-xs">
+          <div className="font-medium text-foreground">Traceability</div>
+          <div className="mt-2">{traceability}</div>
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -409,13 +468,13 @@ export default async function ChainPage({
   const goldRows = Array.isArray(goldPayload)
     ? goldPayload
     : Array.isArray(goldPayload?.rows)
-    ? goldPayload.rows
-    : [];
+      ? goldPayload.rows
+      : [];
   const derivedRows = Array.isArray(derivedPayload)
     ? derivedPayload
     : Array.isArray(derivedPayload?.rows)
-    ? derivedPayload.rows
-    : [];
+      ? derivedPayload.rows
+      : [];
 
   const maxDerived = maxDateMsFromRows(derivedRows);
   const maxGold = maxDateMsFromRows(goldRows);
@@ -434,9 +493,6 @@ export default async function ChainPage({
   const derivedByDate = buildDerivedByDate(derivedRows);
   const goldByDate = buildGoldByDate(goldRows);
 
-  // Supplement bundle with individual daily files for dates missing from the bundle.
-  // The lastNd.json bundles may not cover the full window (pipeline produces them
-  // incrementally). Individual daily files are always canonical per date.
   const missingDays = dayList.filter(
     (d) => !derivedByDate.has(d) || !goldByDate.has(d)
   );
@@ -456,7 +512,9 @@ export default async function ChainPage({
     );
     for (const { date, derived: dr, gold: gr } of dailyResults) {
       if (dr && typeof dr.date === "string") derivedByDate.set(date, dr);
-      if (gr && typeof (gr as GoldRow).date === "string") goldByDate.set(date, gr as GoldRow);
+      if (gr && typeof (gr as GoldRow).date === "string") {
+        goldByDate.set(date, gr as GoldRow);
+      }
     }
   }
 
@@ -540,36 +598,35 @@ export default async function ChainPage({
   ];
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto max-w-6xl px-6 py-8 md:py-10">
       <StalenessBar
         chain={chainId}
         lagDays={meta.confidence?.lag_days_vs_utc_today}
         asOfDate={asOf}
+        confidenceScore={conf}
+        className="mb-6"
       />
 
       {confNotice ? (
         <section
           className={[
-            "mb-6 rounded-2xl border px-4 py-4 text-sm",
-            confNotice.tone === "degraded"
-              ? "border-red-200 bg-red-50"
-              : "border-yellow-200 bg-yellow-50",
+            "mb-6 rounded-2xl border px-4 py-4 text-sm shadow-sm",
+            confidenceNoticeClass(confNotice.tone),
           ].join(" ")}
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="font-medium">{confNotice.title}</div>
-              <p className="mt-1 text-muted-foreground">{confNotice.body}</p>
+              <div className="font-medium text-white">{confNotice.title}</div>
+              <p className={`mt-1 max-w-3xl ${confidenceNoticeMetaClass(confNotice.tone)}`}>
+                {confNotice.body}
+              </p>
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className={`text-xs ${confidenceNoticeMetaClass(confNotice.tone)}`}>
               Source: <InlineCode>confidence.confidence_score</InlineCode>
               {typeof conf === "number" ? (
                 <>
-                  {" "}
-                  · Current value{" "}
-                  <span className="font-medium text-foreground">
-                    {conf.toFixed(3)}
-                  </span>
+                  {" "}· Current value{" "}
+                  <span className="font-medium text-white">{conf.toFixed(3)}</span>
                 </>
               ) : null}
             </div>
@@ -577,50 +634,75 @@ export default async function ChainPage({
         </section>
       ) : null}
 
-      <header className="mb-8">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-3">
-                <ChainIcon
-                  chain={chainId}
-                  className="h-10 w-10 text-base"
-                  label={`${displayName} icon`}
-                />
-                <h1 className="text-3xl font-semibold">{displayName}</h1>
-              </div>
-
-              <div className="text-sm text-muted-foreground">{cfg.subtitle}</div>
-
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-muted-foreground">As of:</span>
-                <span className="font-medium">{fmtDate(asOf)}</span>
-                {typeof meta.confidence?.lag_days_vs_utc_today === "number" ? (
-                  <span className="text-muted-foreground">
-                    (lag: {meta.confidence.lag_days_vs_utc_today}d)
-                  </span>
-                ) : null}
-                <span className="text-muted-foreground">·</span>
-                <Link
-                  href={`/chains/${chainId}/history`}
-                  className="text-muted-foreground hover:underline"
-                >
-                  View history
-                </Link>
-              </div>
-
-              {oneLiner ? (
-                <div className="mt-1 rounded-lg border p-3 text-sm">
-                  <span className="text-muted-foreground">Summary:</span>{" "}
-                  <span className="font-medium">{oneLiner}</span>
+      <header className="mb-8 space-y-6">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="rounded-2xl border p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  <ChainIcon
+                    chain={chainId}
+                    className="h-10 w-10 text-base"
+                    label={`${displayName} icon`}
+                  />
+                  <div className="min-w-0">
+                    <h1 className="truncate text-3xl font-semibold">{displayName}</h1>
+                    <div className="mt-1 text-sm text-muted-foreground">{cfg.subtitle}</div>
+                  </div>
                 </div>
-              ) : null}
+
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">As of:</span>
+                  <span className="font-medium">{fmtDate(asOf)}</span>
+                  {typeof meta.confidence?.lag_days_vs_utc_today === "number" ? (
+                    <span className="text-muted-foreground">
+                      (lag: {meta.confidence.lag_days_vs_utc_today}d)
+                    </span>
+                  ) : null}
+                  <span className="text-muted-foreground">·</span>
+                  <Link
+                    href={`/chains/${chainId}/history`}
+                    className="text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    View history
+                  </Link>
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                <RegimeBadge label={regimeLabel} statusColor={meta.status?.color} />
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                Explanation level
-              </span>
+            {oneLiner ? (
+              <div className="mt-5 rounded-xl border bg-muted/20 p-4 text-sm">
+                <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Current summary
+                </div>
+                <div className="mt-2 font-medium leading-6 text-foreground">{oneLiner}</div>
+              </div>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <Link href="/methodology" className="hover:text-foreground hover:underline">
+                Methodology
+              </Link>
+              <span>·</span>
+              <Link href="/glossary" className="hover:text-foreground hover:underline">
+                Glossary
+              </Link>
+              <span>·</span>
+              <Link href="/thresholds" className="hover:text-foreground hover:underline">
+                Thresholds
+              </Link>
+            </div>
+          </section>
+
+          <aside className="rounded-2xl border p-5 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              Explanation level
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <Link href={levelBasicHref} prefetch={false}>
                 <TogglePill active={level === "Basic"}>Basic</TogglePill>
               </Link>
@@ -628,196 +710,164 @@ export default async function ChainPage({
                 <TogglePill active={level === "Advanced"}>Advanced</TogglePill>
               </Link>
             </div>
-          </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Basic keeps the page compact and descriptive. Advanced surfaces more
+              source paths, data-contract details, and implementation context.
+            </p>
+          </aside>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <Link href="/methodology" className="text-muted-foreground hover:underline">
-              Methodology
-            </Link>
-            <span className="text-muted-foreground">·</span>
-            <Link href="/glossary" className="text-muted-foreground hover:underline">
-              Glossary
-            </Link>
-            <span className="text-muted-foreground">·</span>
-            <Link href="/thresholds" className="text-muted-foreground hover:underline">
-              Thresholds
-            </Link>
-          </div>
-
-          <div className="rounded-xl border p-4 text-sm">
-            <div className="font-medium">Traceability</div>
-            <div className="mt-2 grid gap-1 text-muted-foreground">
-              <div>
-                <span className="font-medium text-foreground">Data source:</span>{" "}
-                <InlineCode>{currentDataSource()}</InlineCode>
-              </div>
-              <div>
-                <span className="font-medium text-foreground">Meta path:</span>{" "}
-                <InlineCode>{metaPath}</InlineCode>
-              </div>
-              <div>
-                <span className="font-medium text-foreground">Gold path:</span>{" "}
-                <InlineCode>{goldPath}</InlineCode>
-              </div>
-              <div>
-                <span className="font-medium text-foreground">Derived path:</span>{" "}
-                <InlineCode>{derivedPath}</InlineCode>
-              </div>
+        <section className="grid gap-6 md:grid-cols-3">
+          <div className="rounded-2xl border p-6 shadow-sm">
+            <div className="text-sm text-muted-foreground">Regime</div>
+            <div className="mt-4">
+              <RegimeBadge label={regimeLabel} statusColor={meta.status?.color} />
+            </div>
+            <div className="mt-4 text-xs text-muted-foreground">
+              Source: <InlineCode>status.label</InlineCode> (fallback <InlineCode>regime.label</InlineCode>)
             </div>
           </div>
 
-          <div className="grid gap-4">
-            <details className="rounded-xl border p-4">
-              <summary className="cursor-pointer select-none">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-sm font-medium">Scorecard</div>
-                  <div className="text-xs text-muted-foreground">
-                    Level:{" "}
-                    <span className="font-medium text-foreground">{level}</span>
-                  </div>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">What:</span>{" "}
-                  Published dimension scores per axis (Demand/Friction/Capacity).
-                </div>
-              </summary>
+          <div className="rounded-2xl border p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm text-muted-foreground">Confidence</div>
+              <span className={confidencePill(conf)}>{confBand}</span>
+            </div>
 
-              <div className="mt-3 text-sm leading-6 text-muted-foreground">
-                {level === "Basic" ? (
-                  <>
-                    The scorecard summarizes the chain’s current conditions across
-                    three axes. Each axis is a published 0–100 score and a
-                    published qualitative level label.
-                  </>
-                ) : (
-                  <>
-                    Source contract: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> →{" "}
-                    <InlineCode>scorecard.dimensions</InlineCode>. The frontend renders{" "}
-                    <InlineCode>score</InlineCode>, <InlineCode>level</InlineCode>,{" "}
-                    <InlineCode>coverage_factor</InlineCode>, and{" "}
-                    <InlineCode>effective_confidence</InlineCode> exactly as
-                    published. No recomputation.
-                  </>
-                )}
+            <div className="mt-4 flex items-center justify-center">
+              {typeof conf === "number" ? (
+                <ScoreGauge score={conf} label="Confidence" note={confBand} />
+              ) : (
+                <div className="py-10 text-sm text-muted-foreground">Confidence not available</div>
+              )}
+            </div>
 
-                <div className="mt-3 rounded-lg border bg-muted/20 p-3 text-xs">
-                  <div className="font-medium text-foreground">Traceability</div>
-                  <ul className="mt-2 list-disc pl-5">
-                    <li>
-                      Source:{" "}
-                      <InlineCode>
-                        /public/data/published/v1/meta/&lt;chain&gt;/latest.json
-                      </InlineCode>
-                    </li>
-                    <li>
-                      Field: <InlineCode>scorecard.dimensions.*</InlineCode>
-                    </li>
-                    <li>
-                      Units: <InlineCode>score [0..100]</InlineCode>
-                    </li>
-                  </ul>
+            <div className="mt-2 text-center text-2xl font-semibold">
+              {typeof conf === "number" ? conf.toFixed(3) : "—"}
+            </div>
+
+            <div className="mt-3 text-xs text-muted-foreground">
+              Source: <InlineCode>confidence.confidence_score</InlineCode>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border p-6 shadow-sm">
+            <div className="text-sm text-muted-foreground">Determinism</div>
+            <div className="mt-4 space-y-3 text-sm">
+              <div>
+                <div className="text-muted-foreground">Hash</div>
+                <div className="mt-1 break-all font-medium">
+                  {meta.regime?.determinism_hash ?? "—"}
                 </div>
               </div>
-            </details>
-
-            <details className="rounded-xl border p-4">
-              <summary className="cursor-pointer select-none">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-sm font-medium">Drivers</div>
-                  <div className="text-xs text-muted-foreground">
-                    Level:{" "}
-                    <span className="font-medium text-foreground">{level}</span>
-                  </div>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">What:</span>{" "}
-                  Published driver rows describing unusual metrics relative to
-                  history.
-                </div>
-              </summary>
-
-              <div className="mt-3 text-sm leading-6 text-muted-foreground">
-                {level === "Basic" ? (
-                  <>
-                    Drivers list which metrics are currently most unusual, and
-                    how they compare to recent history. The site displays the
-                    published fields and sorts deterministically.
-                  </>
-                ) : (
-                  <>
-                    Source contract: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> →{" "}
-                    <InlineCode>regime.drivers[]</InlineCode>. Sorting rule
-                    (UI-only): order by <InlineCode>abs(z_robust)</InlineCode>{" "}
-                    descending. No new statistics are computed in the frontend.
-                  </>
-                )}
-
-                <div className="mt-3 rounded-lg border bg-muted/20 p-3 text-xs">
-                  <div className="font-medium text-foreground">Traceability</div>
-                  <ul className="mt-2 list-disc pl-5">
-                    <li>
-                      Source:{" "}
-                      <InlineCode>
-                        /public/data/published/v1/meta/&lt;chain&gt;/latest.json
-                      </InlineCode>
-                    </li>
-                    <li>
-                      Field: <InlineCode>regime.drivers[]</InlineCode>
-                    </li>
-                  </ul>
+              <div>
+                <div className="text-muted-foreground">Window days</div>
+                <div className="mt-1 font-medium">
+                  {meta.regime?.window_days ?? meta.scorecard?.window_days ?? "—"}
                 </div>
               </div>
-            </details>
+            </div>
+            <div className="mt-4 text-xs text-muted-foreground">
+              Source: <InlineCode>regime.determinism_hash</InlineCode>
+            </div>
           </div>
-        </div>
-      </header>
+        </section>
 
-      <section className="grid gap-6 md:grid-cols-3">
-        <div className="rounded-xl border p-6">
-          <div className="text-sm text-muted-foreground">Regime</div>
-          <div className="mt-3">
-            <RegimeBadge label={regimeLabel} statusColor={meta.status?.color} />
-          </div>
-          <div className="mt-3 text-xs text-muted-foreground">
-            Source: <InlineCode>status.label</InlineCode> (fallback{" "}
-            <InlineCode>regime.label</InlineCode>)
-          </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <HelperCard
+            title="Scorecard"
+            level={level}
+            basic={
+              <>
+                The scorecard summarizes the chain’s current published condition across
+                Demand, Friction, and Capacity. Each axis is rendered from the canonical
+                0–100 score and its published level label.
+              </>
+            }
+            advanced={
+              <>
+                Source contract: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> →{" "}
+                <InlineCode>scorecard.dimensions</InlineCode>. The frontend renders
+                <InlineCode> score</InlineCode>, <InlineCode>level</InlineCode>,
+                <InlineCode> coverage_factor</InlineCode>, and
+                <InlineCode> effective_confidence</InlineCode> exactly as published.
+                No recomputation occurs in the UI.
+              </>
+            }
+            traceability={
+              <ul className="list-disc pl-5">
+                <li>
+                  Source: <InlineCode>/public/data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode>
+                </li>
+                <li>
+                  Field: <InlineCode>scorecard.dimensions.*</InlineCode>
+                </li>
+                <li>
+                  Units: <InlineCode>score [0..100]</InlineCode>
+                </li>
+              </ul>
+            }
+          />
+
+          <HelperCard
+            title="Drivers"
+            level={level}
+            basic={
+              <>
+                Drivers list which metrics currently stand out most relative to recent
+                history. The page displays the published fields and sorts them
+                deterministically so the strongest anomalies surface first.
+              </>
+            }
+            advanced={
+              <>
+                Source contract: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> →{" "}
+                <InlineCode>regime.drivers[]</InlineCode>. Sorting rule (UI-only): order
+                by <InlineCode>abs(z_robust)</InlineCode> descending. No new statistics are
+                computed in the frontend.
+              </>
+            }
+            traceability={
+              <ul className="list-disc pl-5">
+                <li>
+                  Source: <InlineCode>/public/data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode>
+                </li>
+                <li>
+                  Field: <InlineCode>regime.drivers[]</InlineCode>
+                </li>
+              </ul>
+            }
+          />
         </div>
 
-        <div className="rounded-xl border p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm text-muted-foreground">Confidence</div>
-            <span className={confidencePill(conf)}>{confBand}</span>
-          </div>
-          <div className="mt-3 text-2xl font-semibold">
-            {typeof conf === "number" ? conf.toFixed(3) : "—"}
-          </div>
-          <div className="mt-3 text-xs text-muted-foreground">
-            Source: <InlineCode>confidence.confidence_score</InlineCode>
-          </div>
-        </div>
+        <details className="rounded-xl border p-4">
+          <summary className="cursor-pointer select-none">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-medium">Data contract & traceability</div>
+              <div className="text-xs text-muted-foreground">Advanced context</div>
+            </div>
+          </summary>
 
-        <div className="rounded-xl border p-6">
-          <div className="text-sm text-muted-foreground">Determinism</div>
-          <div className="mt-3 text-sm">
+          <div className="mt-3 grid gap-1 text-sm text-muted-foreground">
             <div>
-              <span className="text-muted-foreground">Hash:</span>{" "}
-              <span className="font-medium">
-                {meta.regime?.determinism_hash ?? "—"}
-              </span>
+              <span className="font-medium text-foreground">Data source:</span>{" "}
+              <InlineCode>{currentDataSource()}</InlineCode>
             </div>
-            <div className="mt-2">
-              <span className="text-muted-foreground">Window days:</span>{" "}
-              <span className="font-medium">
-                {meta.regime?.window_days ?? meta.scorecard?.window_days ?? "—"}
-              </span>
+            <div>
+              <span className="font-medium text-foreground">Meta path:</span>{" "}
+              <InlineCode>{metaPath}</InlineCode>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Gold path:</span>{" "}
+              <InlineCode>{goldPath}</InlineCode>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Derived path:</span>{" "}
+              <InlineCode>{derivedPath}</InlineCode>
             </div>
           </div>
-          <div className="mt-3 text-xs text-muted-foreground">
-            Source: <InlineCode>regime.determinism_hash</InlineCode>
-          </div>
-        </div>
-      </section>
+        </details>
+      </header>
 
       <section className="mt-10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -856,8 +906,8 @@ export default async function ChainPage({
         )}
 
         <div className="mt-3 text-xs text-muted-foreground">
-          Source contract: one canonical bundle per selected window. No
-          alternate-window fallback. No missing-day runtime repair.
+          Source contract: canonical window bundle first. If a published window bundle is
+          incomplete, canonical daily files may supplement missing dates for traceability.
         </div>
       </section>
 
@@ -871,12 +921,10 @@ export default async function ChainPage({
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {whn.map((d, i) => (
-              <div key={`${d.metric ?? "driver"}-${i}`} className="rounded-xl border p-6">
+              <div key={`${d.metric ?? "driver"}-${i}`} className="rounded-xl border p-6 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm text-muted-foreground">{d.axis ?? "—"}</div>
-                  <div className="text-xs text-muted-foreground">
-                    z={fmtNum(d.z_robust, 2)}
-                  </div>
+                  <div className="text-xs text-muted-foreground">z={fmtNum(d.z_robust, 2)}</div>
                 </div>
 
                 <div className="mt-2 text-lg font-semibold">{d.metric ?? "—"}</div>
@@ -893,12 +941,8 @@ export default async function ChainPage({
                   </div>
 
                   <div>
-                    <div className="text-muted-foreground">
-                      Momentum (7d vs 30d)
-                    </div>
-                    <div className="font-medium">
-                      {fmtNum(d.momentum_7d_vs_30d, 3)}
-                    </div>
+                    <div className="text-muted-foreground">Momentum (7d vs 30d)</div>
+                    <div className="font-medium">{fmtNum(d.momentum_7d_vs_30d, 3)}</div>
                   </div>
 
                   <div>
@@ -935,8 +979,7 @@ export default async function ChainPage({
 
         {!dims ? (
           <div className="rounded-xl border p-6 text-sm text-muted-foreground">
-            No scorecard dimensions found in{" "}
-            <InlineCode>scorecard.dimensions</InlineCode>.
+            No scorecard dimensions found in <InlineCode>scorecard.dimensions</InlineCode>.
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
@@ -952,7 +995,7 @@ export default async function ChainPage({
               const levelLabel = dim?.level ?? "—";
 
               return (
-                <div key={key} className="rounded-xl border p-6">
+                <div key={key} className="rounded-xl border p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm text-muted-foreground">{label}</div>
                     <span className={pillClass("neutral")}>{levelLabel}</span>
@@ -960,28 +1003,19 @@ export default async function ChainPage({
 
                   <div className="mt-4 flex items-center justify-center">
                     {score === null ? (
-                      <div className="text-sm text-muted-foreground">
-                        Score not available
-                      </div>
+                      <div className="text-sm text-muted-foreground">Score not available</div>
                     ) : (
-                      <ScoreGauge
-                        score={score}
-                        label={label}
-                        note={String(levelLabel)}
-                      />
+                      <ScoreGauge score={score} label={label} note={String(levelLabel)} />
                     )}
                   </div>
 
-                  <div className="mt-3 text-2xl font-semibold">
+                  <div className="mt-3 text-center text-2xl font-semibold">
                     {fmtScore100(dim?.score)}
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      / 100
-                    </span>
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">/ 100</span>
                   </div>
 
                   <div className="mt-3 text-xs text-muted-foreground">
-                    Source:{" "}
-                    <InlineCode>{`scorecard.dimensions.${key}.score`}</InlineCode>
+                    Source: <InlineCode>{`scorecard.dimensions.${key}.score`}</InlineCode>
                   </div>
 
                   <div className="mt-3 text-xs text-muted-foreground">
@@ -996,9 +1030,7 @@ export default async function ChainPage({
 
         {meta.scorecard?.notes?.interpretation ? (
           <div className="mt-4 rounded-xl border p-5 text-sm text-muted-foreground">
-            <div className="font-medium text-foreground">
-              Interpretation note (published)
-            </div>
+            <div className="font-medium text-foreground">Interpretation note (published)</div>
             <div className="mt-2">{meta.scorecard.notes.interpretation}</div>
           </div>
         ) : null}
@@ -1028,18 +1060,13 @@ export default async function ChainPage({
                 </thead>
                 <tbody>
                   {driversAll.map((d, i) => (
-                    <tr
-                      key={`${d.metric ?? "driver"}-${i}`}
-                      className="border-b last:border-b-0"
-                    >
+                    <tr key={`${d.metric ?? "driver"}-${i}`} className="border-b last:border-b-0">
                       <td className="px-4 py-3">{d.axis ?? "—"}</td>
                       <td className="px-4 py-3 font-medium">{d.metric ?? "—"}</td>
                       <td className="px-4 py-3">{d.trend ?? "—"}</td>
                       <td className="px-4 py-3">{fmtNum(d.z_robust, 2)}</td>
                       <td className="px-4 py-3">{fmtPct0to100(d.pct_90d)}</td>
-                      <td className="px-4 py-3">
-                        {fmtNum(d.momentum_7d_vs_30d, 3)}
-                      </td>
+                      <td className="px-4 py-3">{fmtNum(d.momentum_7d_vs_30d, 3)}</td>
                       <td className="px-4 py-3">
                         {typeof d.current === "number" ? String(d.current) : "—"}
                       </td>
@@ -1059,9 +1086,7 @@ export default async function ChainPage({
 
       {meta.profile?.note ? (
         <section className="mt-10 rounded-xl border p-6">
-          <div className="text-sm text-muted-foreground">
-            Chain profile note (published)
-          </div>
+          <div className="text-sm text-muted-foreground">Chain profile note (published)</div>
           <div className="mt-2 text-sm">{meta.profile.note}</div>
         </section>
       ) : null}
@@ -1081,8 +1106,8 @@ export default async function ChainPage({
           <li>
             Derived path: <InlineCode>{derivedPath}</InlineCode>
           </li>
-          <li>No alternate-window fallback</li>
-          <li>No per-day runtime repair</li>
+          <li>Canonical window bundle first</li>
+          <li>Daily-file supplementation only when a published window bundle is incomplete</li>
         </ul>
       </section>
     </main>

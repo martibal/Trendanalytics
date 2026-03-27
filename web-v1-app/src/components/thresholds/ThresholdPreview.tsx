@@ -5,6 +5,7 @@ import type { ThresholdControlValues } from "./ThresholdControls";
 
 export type ThresholdPreviewProps = {
   values: ThresholdControlValues;
+  isCustom?: boolean;
   className?: string;
 };
 
@@ -42,25 +43,44 @@ function buildPreviewRows(values: ThresholdControlValues): PreviewRow[] {
   ];
 }
 
-export default function ThresholdPreview(props: ThresholdPreviewProps) {
-  const { values, className } = props;
+export default function ThresholdPreview({ values, isCustom = false, className }: ThresholdPreviewProps) {
   const rows = buildPreviewRows(values);
 
   return (
     <section
-      className={[
-        "rounded-2xl border p-6",
-        className ?? "",
-      ].join(" ")}
+      className={["rounded-2xl border p-6", className ?? ""].join(" ")}
       aria-label="Threshold preview"
     >
-      <div>
-        <h2 className="text-lg font-semibold">Threshold preview</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Human-readable preview of the current threshold control state. This preview is descriptive
-          only and does not replace canonical published methodology.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Threshold preview</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Human-readable preview of the current threshold state. Descriptive only — does not
+            replace canonical published methodology.
+          </p>
+        </div>
+
+        {/* Prominent Custom (Local) badge — cannot be confused with canonical output */}
+        {isCustom ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/50 bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.07 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            Custom (Local) — not canonical
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Canonical defaults
+          </span>
+        )}
       </div>
+
+      {isCustom && (
+        <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-400">
+          <strong>Local simulation only.</strong> These values are stored in your browser and do not
+          affect any published canonical outputs. Refresh or reset to return to canonical defaults.
+        </div>
+      )}
 
       <div className="mt-6 grid gap-3">
         {rows.map((row) => (
