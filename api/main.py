@@ -85,7 +85,7 @@ def get_chain_profile(chain: str) -> dict:
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # These reflect your actual pipeline output layout (junctions OK)
-GOLD_DIR = Path(os.getenv("GOLD_DIR", str(REPO_ROOT / "data" / "calculated" / "gold"))).resolve()
+GOLD_DIR = Path(os.getenv("GOLD_DIR", str(REPO_ROOT / "data" / "published" / "v1" / "gold"))).resolve()
 META_DIR = Path(os.getenv("META_DIR", str(REPO_ROOT / "data" / "calculated" / "meta"))).resolve()
 GOLD_WEEKLY_DIR = Path(os.getenv("GOLD_WEEKLY_DIR", str(REPO_ROOT / "data" / "calculated" / "gold_weekly"))).resolve()
 GOLD_STATUS_DIR = Path(os.getenv("GOLD_STATUS_DIR", str(REPO_ROOT / "data" / "calculated" / "ml_status"))).resolve()
@@ -327,7 +327,86 @@ def _load_gold_df(chain: str, granularity: str = "daily") -> pd.DataFrame:
     g = (granularity or "daily").lower().strip()
     cache_key = f"{chain}|{g}"
 
-    # 1) Parquet if present (optional)
+    # 1) Canonical source of truth: published day-files YYYY-MM-DD.json.
+    #    This avoids stale calculated parquet silently overriding the web contract.
+    jdir = _gold_json_dir(chain, g)
+    if jdir.exists() and jdir.is_dir():
+        day_files: list[Path] = []
+        try:
+            for pth in jdir.glob("*.json"):
+                if re.match(r"^\d{4}-\d{2}-\d{2}\.json$", pth.name):
+                    day_files.append(pth)
+        except Exception:
+            day_files = []
+
+        if day_files:
+            day_files = sorted(day_files, key=lambda p: p.name)
+
+            try:
+                max_days = int(os.getenv("GOLD_JSON_MAX_DAYS", "5000"))
+            except Exception:
+                max_days = 5000
+            if len(day_files) > max_days:
+                day_files = day_files[-max_days:]
+
+            try:
+                latest_mtime = max(p.stat().st_mtime_ns for p in day_files)
+                ent = _GOLD_CACHE.get(cache_key)
+                if ent and ent.mtime_ns == latest_mtime:
+                    return ent.df
+
+                rows: list[dict] = []
+                for pth in day_files:
+                    try:
+                        obj = json.loads(pth.read_text(encoding="utf-8", errors="replace"))
+                        if isinstance(obj, dict):
+                            rows.append(obj)
+                    except Exception:
+                        continue
+
+                if rows:
+                    df = pd.DataFrame(rows)
+                    if "date" not in df.columns and "day" in df.columns:
+                        df = df.rename(columns={"day": "date"})
+                    if "date" in df.columns:
+                        dtv = pd.to_datetime(df["date"], errors="coerce", utc=False)
+                        df = df.assign(date=dtv.dt.date).dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+                    _GOLD_CACHE[cache_key] = GoldCacheEntry(mtime_ns=latest_mtime, df=df)
+                    return df
+            except Exception:
+                return pd.DataFrame()
+
+        # 2) Fallback inside same published tree: aggregated JSON views.
+        p30 = jdir / "last30d.json"
+        platest = jdir / "latest.json"
+        src = p30 if p30.exists() else (platest if platest.exists() else None)
+        if src is not None:
+            try:
+                st = src.stat()
+                ent = _GOLD_CACHE.get(cache_key)
+                if ent and ent.mtime_ns == st.st_mtime_ns:
+                    return ent.df
+
+                obj = json.loads(src.read_text(encoding="utf-8", errors="replace"))
+                if isinstance(obj, list):
+                    df = pd.DataFrame(obj)
+                elif isinstance(obj, dict):
+                    df = pd.DataFrame([obj])
+                else:
+                    return pd.DataFrame()
+
+                if "date" not in df.columns and "day" in df.columns:
+                    df = df.rename(columns={"day": "date"})
+                if "date" in df.columns:
+                    dtv = pd.to_datetime(df["date"], errors="coerce", utc=False)
+                    df = df.assign(date=dtv.dt.date).dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+
+                _GOLD_CACHE[cache_key] = GoldCacheEntry(mtime_ns=st.st_mtime_ns, df=df)
+                return df
+            except Exception:
+                return pd.DataFrame()
+
+    # 3) Last-resort fallback: parquet if no published JSON contract is available.
     p = _gold_path(chain, g)
     if p.exists():
         st = p.stat()
@@ -341,90 +420,7 @@ def _load_gold_df(chain: str, granularity: str = "daily") -> pd.DataFrame:
         _GOLD_CACHE[cache_key] = GoldCacheEntry(mtime_ns=st.st_mtime_ns, df=df)
         return df
 
-    # 2) JSON mode: prefer day-files YYYY-MM-DD.json (your intended contract)
-    jdir = _gold_json_dir(chain, g)
-    if not jdir.exists() or not jdir.is_dir():
-        return pd.DataFrame()
-
-    day_files: list[Path] = []
-    try:
-        for pth in jdir.glob("*.json"):
-            if re.match(r"^\d{4}-\d{2}-\d{2}\.json$", pth.name):
-                day_files.append(pth)
-    except Exception:
-        day_files = []
-
-    if day_files:
-        day_files = sorted(day_files, key=lambda p: p.name)
-
-        try:
-            MAX_DAYS = int(os.getenv("GOLD_JSON_MAX_DAYS", "2000"))
-        except Exception:
-            MAX_DAYS = 2000
-        if len(day_files) > MAX_DAYS:
-            day_files = day_files[-MAX_DAYS:]
-
-        try:
-            latest_mtime = max(p.stat().st_mtime_ns for p in day_files)
-            ent = _GOLD_CACHE.get(cache_key)
-            if ent and ent.mtime_ns == latest_mtime:
-                return ent.df
-
-            rows: list[dict] = []
-            for pth in day_files:
-                try:
-                    obj = json.loads(pth.read_text(encoding="utf-8", errors="replace"))
-                    if isinstance(obj, dict):
-                        rows.append(obj)
-                except Exception:
-                    continue
-
-            if not rows:
-                return pd.DataFrame()
-
-            df = pd.DataFrame(rows)
-            if "date" not in df.columns and "day" in df.columns:
-                df = df.rename(columns={"day": "date"})
-            if "date" in df.columns:
-                dtv = pd.to_datetime(df["date"], errors="coerce", utc=False)
-                df = df.assign(date=dtv.dt.date).dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
-
-            _GOLD_CACHE[cache_key] = GoldCacheEntry(mtime_ns=latest_mtime, df=df)
-            return df
-        except Exception:
-            return pd.DataFrame()
-
-    # 3) Fallback: aggregated files (last30d.json may be array; latest.json is single datapoint)
-    p30 = jdir / "last30d.json"
-    platest = jdir / "latest.json"
-    src = p30 if p30.exists() else (platest if platest.exists() else None)
-    if src is None:
-        return pd.DataFrame()
-
-    try:
-        st = src.stat()
-        ent = _GOLD_CACHE.get(cache_key)
-        if ent and ent.mtime_ns == st.st_mtime_ns:
-            return ent.df
-
-        obj = json.loads(src.read_text(encoding="utf-8", errors="replace"))
-        if isinstance(obj, list):
-            df = pd.DataFrame(obj)
-        elif isinstance(obj, dict):
-            df = pd.DataFrame([obj])
-        else:
-            return pd.DataFrame()
-
-        if "date" not in df.columns and "day" in df.columns:
-            df = df.rename(columns={"day": "date"})
-        if "date" in df.columns:
-            dtv = pd.to_datetime(df["date"], errors="coerce", utc=False)
-            df = df.assign(date=dtv.dt.date).dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
-
-        _GOLD_CACHE[cache_key] = GoldCacheEntry(mtime_ns=st.st_mtime_ns, df=df)
-        return df
-    except Exception:
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 
 def _compute_confidence_from_gold(df: pd.DataFrame, *, chain: str, gold_status: Optional[dict] = None) -> Optional[float]:
@@ -477,6 +473,180 @@ def _compute_confidence_from_gold(df: pd.DataFrame, *, chain: str, gold_status: 
     suff = float(max(0.0, min(1.0, n / 120.0)))
     conf = freshness * completeness * suff
     return float(max(0.0, min(1.0, conf)))
+
+
+def _compute_confidence_snapshot_from_gold(
+    df: pd.DataFrame,
+    *,
+    chain: str,
+    gold_status: Optional[dict] = None,
+    asof_date: Optional[date] = None,
+) -> Dict[str, Any]:
+    """Compute confidence for a specific historical as-of date.
+
+    This helper is meant for META history rebuilds. It intentionally excludes
+    "freshness vs today" from the confidence score so old rows are not penalized
+    merely for being old. Freshness remains available as a separate lag field.
+    """
+    if df is None or df.empty:
+        target_asof = asof_date.isoformat() if hasattr(asof_date, "isoformat") else None
+        return {
+            "chain": chain,
+            "missing": True,
+            "date": target_asof,
+            "asof_date": target_asof,
+            "confidence_score": 0.0,
+            "lag_days_vs_asof_date": None,
+            "lag_days_vs_utc_today": _compute_lag_days(target_asof),
+            "semantics": "evidence_sufficiency_asof_date",
+            "source": "gold_snapshot",
+            "components": {
+                "metric_coverage": 0.0,
+                "recent_density": 0.0,
+                "history_depth": 0.0,
+            },
+        }
+
+    d = df.copy()
+    if "date" not in d.columns and "day" in d.columns:
+        d = d.rename(columns={"day": "date"})
+    if "date" not in d.columns:
+        target_asof = asof_date.isoformat() if hasattr(asof_date, "isoformat") else None
+        return {
+            "chain": chain,
+            "missing": True,
+            "date": target_asof,
+            "asof_date": target_asof,
+            "confidence_score": 0.0,
+            "lag_days_vs_asof_date": None,
+            "lag_days_vs_utc_today": _compute_lag_days(target_asof),
+            "semantics": "evidence_sufficiency_asof_date",
+            "source": "gold_snapshot",
+            "components": {
+                "metric_coverage": 0.0,
+                "recent_density": 0.0,
+                "history_depth": 0.0,
+            },
+        }
+
+    d["date"] = pd.to_datetime(d["date"], errors="coerce")
+    d = d.dropna(subset=["date"]).sort_values("date")
+    if d.empty:
+        target_asof = asof_date.isoformat() if hasattr(asof_date, "isoformat") else None
+        return {
+            "chain": chain,
+            "missing": True,
+            "date": target_asof,
+            "asof_date": target_asof,
+            "confidence_score": 0.0,
+            "lag_days_vs_asof_date": None,
+            "lag_days_vs_utc_today": _compute_lag_days(target_asof),
+            "semantics": "evidence_sufficiency_asof_date",
+            "source": "gold_snapshot",
+            "components": {
+                "metric_coverage": 0.0,
+                "recent_density": 0.0,
+                "history_depth": 0.0,
+            },
+        }
+
+    target_asof = asof_date or d["date"].iloc[-1].date()
+    d = d[d["date"].dt.date <= target_asof].copy()
+    if d.empty:
+        return {
+            "chain": chain,
+            "missing": True,
+            "date": target_asof.isoformat(),
+            "asof_date": target_asof.isoformat(),
+            "confidence_score": 0.0,
+            "lag_days_vs_asof_date": None,
+            "lag_days_vs_utc_today": _compute_lag_days(target_asof.isoformat()),
+            "semantics": "evidence_sufficiency_asof_date",
+            "source": "gold_snapshot",
+            "components": {
+                "metric_coverage": 0.0,
+                "recent_density": 0.0,
+                "history_depth": 0.0,
+            },
+        }
+
+    last_obs = d["date"].iloc[-1].date()
+    lag_days_vs_asof = max(0, (target_asof - last_obs).days)
+
+    if gold_status and isinstance(gold_status, dict):
+        for k in ("confidence_score", "confidence_numeric", "confidence", "score"):
+            v = gold_status.get(k)
+            if isinstance(v, (int, float)) and math.isfinite(float(v)):
+                score = float(max(0.0, min(1.0, float(v))))
+                return {
+                    "chain": chain,
+                    "missing": False,
+                    "date": target_asof.isoformat(),
+                    "asof_date": target_asof.isoformat(),
+                    "confidence_score": score,
+                    "lag_days_vs_asof_date": lag_days_vs_asof,
+                    "lag_days_vs_utc_today": _compute_lag_days(target_asof.isoformat()),
+                    "semantics": "evidence_sufficiency_asof_date",
+                    "source": "gold_status",
+                    "components": {
+                        "metric_coverage": None,
+                        "recent_density": None,
+                        "history_depth": None,
+                    },
+                }
+
+    recent_start = pd.Timestamp(target_asof) - pd.Timedelta(days=29)
+    r = d[d["date"] >= recent_start].copy()
+    if r.empty:
+        r = d.tail(min(len(d), 30)).copy()
+
+    base_fields = ["tx_count_daily", "median_tx_fee_native", "median_tx_value_native", "avg_block_time_sec"]
+    if chain != "bitcoin":
+        base_fields.append("unique_active_addresses")
+    if chain in ("ethereum",):
+        base_fields.append("gas_utilization_pct")
+
+    present = [c for c in base_fields if c in r.columns]
+    if present:
+        rates = []
+        for c in present:
+            s = pd.to_numeric(r[c], errors="coerce")
+            rates.append(float(s.notna().mean()))
+        metric_coverage = float(sum(rates) / len(rates))
+    else:
+        metric_coverage = 0.0
+
+    recent_days_observed = int(r["date"].dt.date.nunique()) if "date" in r.columns else len(r)
+    recent_density = float(max(0.0, min(1.0, recent_days_observed / 30.0)))
+
+    history_days = int(d["date"].dt.date.nunique())
+    history_depth = float(max(0.0, min(1.0, history_days / 120.0)))
+
+    # Weighted blend for smoother, less "mechanical" scores than a raw product.
+    score = (
+        0.50 * metric_coverage
+        + 0.30 * recent_density
+        + 0.20 * history_depth
+    )
+
+    score = float(max(0.0, min(1.0, score)))
+
+    return {
+        "chain": chain,
+        "missing": False,
+        "date": target_asof.isoformat(),
+        "asof_date": target_asof.isoformat(),
+        "confidence_score": score,
+        "lag_days_vs_asof_date": lag_days_vs_asof,
+        "lag_days_vs_utc_today": _compute_lag_days(target_asof.isoformat()),
+        "semantics": "evidence_sufficiency_asof_date",
+        "source": "gold_snapshot",
+        "components": {
+            "metric_coverage": metric_coverage,
+            "recent_density": recent_density,
+            "history_depth": history_depth,
+        },
+    }
 
 
 def _slice_gold_df(df: pd.DataFrame, date_from: Optional[str], date_to: Optional[str], max_rows: Optional[int]) -> List[Dict[str, Any]]:
@@ -625,6 +795,354 @@ def confidence_series(
     return _slice_confidence_df(df, max_rows=max_rows)
 
 
+
+
+LOGICAL_METRIC_ALIASES: Dict[str, List[str]] = {
+    "tx_count_daily": ["tx_count_daily"],
+    "block_count_daily": ["block_count_daily"],
+    "value_transferred_native": ["value_transferred_native"],
+    "median_tx_value_native": ["median_tx_value_native"],
+    "median_tx_fee_native": ["median_tx_fee_native", "median_fee_native"],
+    "failed_tx_rate": ["failed_tx_rate"],
+    "gas_utilization_pct": ["gas_utilization_pct"],
+    "unique_active_addresses": ["unique_active_addresses"],
+    "avg_block_time_sec": ["avg_block_time_sec", "avg_block_time_s"],
+}
+
+CHAIN_REQUIRED_LOGICAL_METRICS: Dict[str, List[str]] = {
+    "bitcoin": [
+        "tx_count_daily",
+        "block_count_daily",
+        "value_transferred_native",
+        "median_tx_value_native",
+        "avg_block_time_sec",
+    ],
+    "ethereum": [
+        "tx_count_daily",
+        "block_count_daily",
+        "value_transferred_native",
+        "median_tx_value_native",
+        "median_tx_fee_native",
+        "failed_tx_rate",
+        "gas_utilization_pct",
+        "unique_active_addresses",
+        "avg_block_time_sec",
+    ],
+    "arbitrum": [
+        "tx_count_daily",
+        "block_count_daily",
+        "value_transferred_native",
+        "median_tx_value_native",
+        "median_tx_fee_native",
+        "unique_active_addresses",
+        "avg_block_time_sec",
+    ],
+    "base": [
+        "tx_count_daily",
+        "block_count_daily",
+        "value_transferred_native",
+        "median_tx_value_native",
+        "median_tx_fee_native",
+        "unique_active_addresses",
+        "avg_block_time_sec",
+    ],
+}
+
+
+def _normalize_gold_daily_df(df: Optional[pd.DataFrame]) -> pd.DataFrame:
+    if df is None or getattr(df, "empty", True):
+        return pd.DataFrame()
+    d = df.copy()
+    if "date" not in d.columns and "day" in d.columns:
+        d = d.rename(columns={"day": "date"})
+    if "date" in d.columns:
+        d["date"] = pd.to_datetime(d["date"], errors="coerce").dt.date
+        d = d.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+    return d
+
+
+def _logical_metric_value(row: pd.Series, logical_name: str) -> Any:
+    for candidate in LOGICAL_METRIC_ALIASES.get(logical_name, [logical_name]):
+        if candidate in row.index:
+            return row.get(candidate)
+    return None
+
+
+def _is_present_value(value: Any) -> bool:
+    if value is None:
+        return False
+    try:
+        return bool(pd.notna(value))
+    except Exception:
+        return False
+
+
+def _required_metrics_for_chain(chain: str) -> List[str]:
+    return list(CHAIN_REQUIRED_LOGICAL_METRICS.get(chain, CHAIN_REQUIRED_LOGICAL_METRICS["ethereum"]))
+
+
+def _row_metric_coverage(row: pd.Series, chain: str) -> Optional[float]:
+    required = _required_metrics_for_chain(chain)
+    if not required:
+        return None
+    present = 0
+    total = 0
+    for logical_name in required:
+        total += 1
+        if _is_present_value(_logical_metric_value(row, logical_name)):
+            present += 1
+    if total <= 0:
+        return None
+    return present / total
+
+
+def _freshness_factor_asof(lag_days: Optional[int], chain: str) -> Optional[float]:
+    if lag_days is None:
+        return None
+    expected = int(PUBLISH_LAG_DAYS_POLICY.get(chain, 1))
+    soft = expected + (1 if expected <= 1 else 3)
+    hard = expected + (3 if expected <= 1 else 8)
+    if lag_days <= expected:
+        return 1.0
+    if lag_days >= hard:
+        return 0.0
+    if lag_days <= soft:
+        span = max(1, soft - expected)
+        return max(0.70, 1.0 - ((lag_days - expected) / span) * 0.30)
+    span = max(1, hard - soft)
+    return max(0.0, 0.70 - ((lag_days - soft) / span) * 0.70)
+
+
+def _compute_data_quality_details(df: Optional[pd.DataFrame], *, chain: str, gold_status: Optional[Dict[str, Any]] = None, asof_date: Optional[str] = None) -> Dict[str, Any]:
+    d = _normalize_gold_daily_df(df)
+    if d.empty:
+        return {
+            "score": None,
+            "updated_through": None,
+            "lag_days_vs_asof_date": None,
+            "components": {
+                "current_row_coverage": None,
+                "recent_metric_coverage": None,
+                "recent_density": None,
+                "history_depth": None,
+                "freshness_asof": None,
+            },
+        }
+
+    latest_row = d.iloc[-1]
+    updated_through = latest_row["date"].isoformat() if hasattr(latest_row["date"], "isoformat") else str(latest_row["date"])
+
+    if asof_date:
+        try:
+            asof_dt = _parse_iso_date(asof_date)
+        except Exception:
+            asof_dt = latest_row["date"]
+    else:
+        asof_dt = latest_row["date"]
+
+    lag_days_vs_asof_date = max(0, (asof_dt - latest_row["date"]).days)
+
+    current_row_coverage = _row_metric_coverage(latest_row, chain)
+
+    recent_start = asof_dt - timedelta(days=29)
+    recent_rows = d[d["date"] >= recent_start].copy()
+    expected_recent_days = 30
+    observed_recent_days = int(recent_rows["date"].nunique()) if not recent_rows.empty else 0
+    recent_density = min(1.0, observed_recent_days / expected_recent_days)
+
+    if not recent_rows.empty:
+        row_coverages = [
+            _row_metric_coverage(row, chain)
+            for _, row in recent_rows.iterrows()
+        ]
+        row_coverages = [float(v) for v in row_coverages if isinstance(v, (int, float)) and math.isfinite(float(v))]
+        recent_metric_coverage = (sum(row_coverages) / len(row_coverages)) if row_coverages else current_row_coverage
+    else:
+        recent_metric_coverage = current_row_coverage
+
+    history_depth = min(1.0, float(d["date"].nunique()) / 90.0)
+    freshness_asof = _freshness_factor_asof(lag_days_vs_asof_date, chain)
+
+    weighted_parts = [
+        (current_row_coverage, 0.30),
+        (recent_metric_coverage, 0.20),
+        (recent_density, 0.20),
+        (history_depth, 0.15),
+        (freshness_asof, 0.15),
+    ]
+    num = 0.0
+    den = 0.0
+    for value, weight in weighted_parts:
+        if isinstance(value, (int, float)) and math.isfinite(float(value)):
+            num += float(value) * weight
+            den += weight
+    score = None if den <= 0 else max(0.0, min(1.0, num / den))
+
+    return {
+        "score": score,
+        "updated_through": updated_through,
+        "lag_days_vs_asof_date": lag_days_vs_asof_date,
+        "components": {
+            "current_row_coverage": current_row_coverage,
+            "recent_metric_coverage": recent_metric_coverage,
+            "recent_density": recent_density,
+            "history_depth": history_depth,
+            "freshness_asof": freshness_asof,
+        },
+    }
+
+
+def _compute_confidence_from_gold(df: Optional[pd.DataFrame], *, chain: str, gold_status: Optional[Dict[str, Any]] = None) -> Optional[float]:
+    details = _compute_data_quality_details(df, chain=chain, gold_status=gold_status)
+    value = details.get("score")
+    return float(value) if isinstance(value, (int, float)) and math.isfinite(float(value)) else None
+
+
+def _score_level_margin(score: Optional[float], level: Optional[str]) -> Optional[float]:
+    if score is None or not isinstance(score, (int, float)) or not math.isfinite(float(score)):
+        return None
+    s = float(score)
+    norm = str(level or "").strip().lower()
+    if not norm:
+        if s >= 67:
+            norm = "high"
+        elif s <= 33:
+            norm = "low"
+        else:
+            norm = "normal"
+    if norm in {"balanced"}:
+        norm = "normal"
+    if norm in {"normal", "neutral"}:
+        margin = min(max(0.0, s - 33.0), max(0.0, 67.0 - s))
+        return max(0.0, min(1.0, margin / 17.0))
+    if norm in {"high", "elevated", "heating", "congested"}:
+        return max(0.0, min(1.0, (s - 67.0) / 33.0))
+    if norm in {"low", "cheap", "cooling"}:
+        return max(0.0, min(1.0, (33.0 - s) / 33.0))
+    if s >= 67:
+        return max(0.0, min(1.0, (s - 67.0) / 33.0))
+    if s <= 33:
+        return max(0.0, min(1.0, (33.0 - s) / 33.0))
+    return max(0.0, min(1.0, min(s - 33.0, 67.0 - s) / 17.0))
+
+
+def _driver_signal_support(regime: Optional[Dict[str, Any]], *, stable_mode: bool = False) -> Optional[float]:
+    drivers = []
+    if isinstance(regime, dict):
+        raw = regime.get("drivers")
+        if isinstance(raw, list):
+            drivers = raw[:5]
+    zs: List[float] = []
+    for driver in drivers:
+        if not isinstance(driver, dict):
+            continue
+        z = driver.get("z_robust")
+        if isinstance(z, (int, float)) and math.isfinite(float(z)):
+            zs.append(max(0.0, min(1.0, abs(float(z)) / 3.0)))
+    if not zs:
+        return None
+    mean_z = sum(zs) / len(zs)
+    if stable_mode:
+        return max(0.0, min(1.0, 1.0 - mean_z))
+    return mean_z
+
+
+def _compute_label_clarity(scorecard: Optional[Dict[str, Any]], regime: Optional[Dict[str, Any]]) -> Optional[float]:
+    if not isinstance(scorecard, dict):
+        return None
+
+    dims = ((scorecard.get("dimensions") or {}) if isinstance(scorecard.get("dimensions"), dict) else {})
+    valid_scores: List[float] = []
+    margins: List[float] = []
+    for axis in ("demand", "friction", "capacity"):
+        block = dims.get(axis) if isinstance(dims.get(axis), dict) else {}
+        score = block.get("score")
+        level = block.get("level")
+        if isinstance(score, (int, float)) and math.isfinite(float(score)):
+            valid_scores.append(float(score))
+        margin = _score_level_margin(score if isinstance(score, (int, float)) else None, level if isinstance(level, str) else None)
+        if isinstance(margin, (int, float)) and math.isfinite(float(margin)):
+            margins.append(float(margin))
+
+    if not valid_scores and not margins:
+        return None
+
+    axis_margin = (sum(margins) / len(margins)) if margins else None
+    neutrality = max(0.0, min(1.0, 1.0 - (sum(abs(v - 50.0) for v in valid_scores) / max(1, len(valid_scores))) / 17.0)) if valid_scores else None
+
+    label = ""
+    if isinstance(regime, dict):
+        label = str(regime.get("label") or "").upper().strip()
+
+    if label in {"", "UNKNOWN/DEGRADED"}:
+        return 0.0
+
+    if label == "STABLE":
+        driver_support = _driver_signal_support(regime, stable_mode=True)
+        parts = [
+            (neutrality, 0.60),
+            (axis_margin, 0.25),
+            (driver_support, 0.15),
+        ]
+    else:
+        driver_support = _driver_signal_support(regime, stable_mode=False)
+        parts = [
+            (axis_margin, 0.65),
+            (driver_support, 0.35),
+        ]
+
+    num = 0.0
+    den = 0.0
+    for value, weight in parts:
+        if isinstance(value, (int, float)) and math.isfinite(float(value)):
+            num += float(value) * weight
+            den += weight
+    if den <= 0:
+        return None
+    return max(0.0, min(1.0, num / den))
+
+
+def _build_confidence_payload(
+    df: Optional[pd.DataFrame],
+    *,
+    chain: str,
+    gold_status: Optional[Dict[str, Any]] = None,
+    scorecard: Optional[Dict[str, Any]] = None,
+    regime: Optional[Dict[str, Any]] = None,
+    asof_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    details = _compute_data_quality_details(df, chain=chain, gold_status=gold_status, asof_date=asof_date)
+    data_quality_score = details.get("score")
+    label_confidence_score = _compute_label_clarity(scorecard, regime)
+
+    if isinstance(data_quality_score, (int, float)) and math.isfinite(float(data_quality_score)):
+        if isinstance(label_confidence_score, (int, float)) and math.isfinite(float(label_confidence_score)):
+            confidence_score = max(0.0, min(1.0, math.sqrt(float(data_quality_score) * float(label_confidence_score))))
+        else:
+            confidence_score = float(data_quality_score)
+    else:
+        confidence_score = None
+
+    updated_through = details.get("updated_through")
+    effective_date = updated_through or asof_date
+
+    return {
+        "chain": chain,
+        "missing": confidence_score is None,
+        "date": effective_date,
+        "asof_date": asof_date,
+        "updated_through": updated_through,
+        "confidence_score": confidence_score,
+        "data_quality_score": float(data_quality_score) if isinstance(data_quality_score, (int, float)) and math.isfinite(float(data_quality_score)) else None,
+        "label_confidence_score": float(label_confidence_score) if isinstance(label_confidence_score, (int, float)) and math.isfinite(float(label_confidence_score)) else None,
+        "lag_days_vs_asof_date": details.get("lag_days_vs_asof_date"),
+        "lag_days_vs_utc_today": _compute_lag_days(effective_date),
+        "semantics": "combined_data_quality_and_label_stability",
+        "source": "gold_history",
+        "components": details.get("components") or {},
+    }
+
+
 def compute_overview(chain: str, *, asof: Optional[str] = None) -> Dict[str, Any]:
     if chain not in SUPPORTED_CHAINS:
         return {"chain": chain, "missing": True, "unsupported": True}
@@ -632,7 +1150,6 @@ def compute_overview(chain: str, *, asof: Optional[str] = None) -> Dict[str, Any
     gs = _load_gold_status(chain)
     df = _load_gold_df(chain, "daily")
 
-    # Optional as-of slicing
     if asof:
         try:
             asof_dt = pd.to_datetime(asof, errors="raise")
@@ -650,23 +1167,60 @@ def compute_overview(chain: str, *, asof: Optional[str] = None) -> Dict[str, Any
                 ddf = ddf[ddf["date"] <= asof_dt]
                 df = ddf
 
-    conf = _load_latest_confidence(chain)
+    if df is None or df.empty:
+        return {
+            "chain": chain,
+            "missing": True,
+            "profile": get_chain_profile(chain),
+            "gold_status": gs,
+            "confidence": {
+                "chain": chain,
+                "missing": True,
+                "date": None,
+                "confidence_score": None,
+                "data_quality_score": None,
+                "label_confidence_score": None,
+                "lag_days_vs_asof_date": None,
+                "lag_days_vs_utc_today": None,
+                "semantics": "combined_data_quality_and_label_stability",
+                "components": {},
+            },
+            "data_confidence": {"missing": True, "confidence_score": None, "date": None, "lag_days_vs_asof_date": None, "lag_days_vs_utc_today": None, "components": {}, "semantics": "data_quality_and_history_coverage_only"},
+            "publish_confidence": {"missing": True, "confidence_score": None, "threshold": CONFIDENCE_THRESHOLD, "eligible": None, "reason": "missing_confidence"},
+            "scorecard": {},
+            "regime": {},
+            "updated_through": None,
+            "publish_lag_days_policy": PUBLISH_LAG_DAYS_POLICY.get(chain, 1),
+            "tier_used": "standard",
+            "status": {"label": "UNKNOWN/DEGRADED", "one_liner": None, "color": "gray"},
+        }
+
+    asof_iso = _last_gold_date_iso(df)
+
+    data_quality_seed = _compute_confidence_from_gold(df, chain=chain, gold_status=gs)
+
+    preliminary_scorecard = compute_market_scorecard(df, chain=chain, confidence_score=data_quality_seed, window_days=7)
+    preliminary_regime = compute_regime(
+        df,
+        chain=chain,
+        profile=get_chain_profile(chain),
+        asof_date=preliminary_scorecard.get("asof_date"),
+        window_days=7,
+        confidence_score=data_quality_seed,
+        confidence_threshold=CONFIDENCE_THRESHOLD,
+    )
+
+    conf = _build_confidence_payload(
+        df,
+        chain=chain,
+        gold_status=gs,
+        scorecard=preliminary_scorecard,
+        regime=preliminary_regime,
+        asof_date=asof_iso,
+    )
     conf_score = conf.get("confidence_score")
 
-    if conf_score is None or (isinstance(conf_score, float) and not math.isfinite(conf_score)):
-        derived = _compute_confidence_from_gold(df, chain=chain, gold_status=gs)
-        conf_score = derived
-        conf = dict(conf or {})
-        conf.update({
-            "chain": chain,
-            "missing": False if derived is not None else True,
-            "date": (_last_gold_date_iso(df) or conf.get("date")),
-            "confidence_score": float(derived) if derived is not None else None,
-            "lag_days_vs_utc_today": _compute_lag_days((_last_gold_date_iso(df) or conf.get("date"))),
-        })
-
     scorecard = compute_market_scorecard(df, chain=chain, confidence_score=conf_score, window_days=7)
-
     regime = compute_regime(
         df,
         chain=chain,
@@ -679,39 +1233,26 @@ def compute_overview(chain: str, *, asof: Optional[str] = None) -> Dict[str, Any
 
     status = _status_from_regime_and_scorecard(regime, scorecard)
     missing = bool(gs.get("missing", False) and (df is None or df.empty))
-    updated_through = _last_gold_date_iso(df)
+    updated_through = conf.get("updated_through") or _last_gold_date_iso(df)
 
-    # Separate two concepts to avoid contradictory UI:
-    data_confidence_score = float(conf_score) if isinstance(conf_score, (int, float)) and math.isfinite(float(conf_score)) else None
+    data_confidence_score = conf.get("data_quality_score")
 
     publish_confidence: Dict[str, Any] = {
-        "missing": True,
-        "confidence_score": None,
-        "threshold": None,
-        "eligible": None,
-        "reason": None,
+        "missing": conf_score is None,
+        "confidence_score": conf_score,
+        "threshold": CONFIDENCE_THRESHOLD,
+        "eligible": bool(conf_score >= CONFIDENCE_THRESHOLD) if isinstance(conf_score, (int, float)) and math.isfinite(float(conf_score)) else None,
+        "reason": "combined_confidence_threshold" if isinstance(conf_score, (int, float)) and math.isfinite(float(conf_score)) else "missing_confidence",
     }
-    try:
-        gate = (regime or {}).get("gate") if isinstance(regime, dict) else None
-        if isinstance(gate, dict) and gate.get("type") == "confidence_threshold":
-            cs = gate.get("confidence_score")
-            th = gate.get("threshold")
-            if isinstance(cs, (int, float)) and math.isfinite(float(cs)):
-                publish_confidence["confidence_score"] = float(cs)
-                publish_confidence["missing"] = False
-            if isinstance(th, (int, float)) and math.isfinite(float(th)):
-                publish_confidence["threshold"] = float(th)
-            if publish_confidence["confidence_score"] is not None and publish_confidence["threshold"] is not None:
-                publish_confidence["eligible"] = bool(publish_confidence["confidence_score"] >= publish_confidence["threshold"])
-            publish_confidence["reason"] = "confidence_threshold"
-    except Exception:
-        pass
 
     data_confidence: Dict[str, Any] = {
         "missing": data_confidence_score is None,
         "confidence_score": data_confidence_score,
-        "date": conf.get("date") if isinstance(conf, dict) else None,
-        "lag_days_vs_utc_today": conf.get("lag_days_vs_utc_today") if isinstance(conf, dict) else None,
+        "date": updated_through,
+        "lag_days_vs_asof_date": conf.get("lag_days_vs_asof_date"),
+        "lag_days_vs_utc_today": conf.get("lag_days_vs_utc_today"),
+        "components": conf.get("components") or {},
+        "semantics": "data_quality_and_history_coverage_only",
     }
 
     return {
