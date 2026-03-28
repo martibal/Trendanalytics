@@ -65,65 +65,72 @@ const THRESHOLD_ROWS: ThresholdRow[] = [
   {
     area: "Confidence",
     field: "confidence.confidence_score",
-    purpose: "Communicate descriptive confidence in the published state.",
+    purpose:
+      "Communicate how strongly the published evidence supports the current daily state.",
     interpretation:
-      "Higher values indicate stronger descriptive confidence in the currently published state. Lower values should be read with greater caution.",
+      "Higher values mean the visible state is supported by stronger published evidence. Lower values mean the state should be read with more caution. This is an evidence score for the current label, not a forecast and not the probability that the label will persist.",
     notes:
-      "Confidence is descriptive context, not a forecast and not a probability of future market behavior.",
+      "The canonical publish floor is 0.40. Values below that floor should be treated as UNKNOWN/DEGRADED rather than as a normal-confidence published state.",
   },
   {
     area: "Lag / staleness",
     field: "confidence.lag_days_vs_utc_today",
-    purpose: "Show how delayed the published state is relative to current UTC date.",
+    purpose:
+      "Show how delayed the published row is relative to the current UTC date.",
     interpretation:
-      "Higher lag means the published artifact is older relative to today and should be interpreted with more freshness caution.",
+      "Higher lag means the currently visible published artifact is older relative to today. Lag affects freshness interpretation, not the economic meaning of the row by itself.",
     notes:
-      "Lag is chain-dependent and must be read together with expected publication delay and system status.",
+      "Lag is chain-dependent. BTC and ETH are expected to be more current than Base and Arbitrum, so lag must be read against the relevant publication policy rather than as a universal threshold.",
   },
   {
     area: "Regime status",
     field: "status.label",
-    purpose: "Express the currently published descriptive regime label.",
+    purpose:
+      "Express the currently published descriptive regime label in compact form.",
     interpretation:
-      "Labels describe currently published conditions and should be understood in context of confidence, lag, scorecard, and drivers.",
+      "Labels such as STABLE, HEATING, CONGESTED, CHEAP, and UNKNOWN/DEGRADED describe the currently published condition of the chain. They should always be read together with confidence, lag, scorecard, and drivers.",
     notes:
-      "Labels are descriptive output categories, not trading signals or recommendations.",
+      "A regime label is not a trade signal, a return expectation, or a recommendation. It is a descriptive state classification built from published evidence.",
   },
   {
     area: "Scorecard dimensions",
     field: "scorecard.dimensions.*.score",
-    purpose: "Summarize descriptive axis state such as demand, friction, and capacity.",
+    purpose:
+      "Summarize descriptive axis state such as demand, friction, and capacity.",
     interpretation:
-      "Scores are intended to show relative descriptive state inside the current methodology, not an objective market-quality ranking.",
+      "These scores tell the user which parts of chain behavior currently look more notable relative to recent history. They are comparative descriptive scores inside the current methodology, not objective ratings of chain quality.",
     notes:
-      "Dimension scores should remain traceable to published meta artifacts and visible methodology context.",
+      "Dimension scores should remain traceable to published meta artifacts and visible methodology context. They are meant to explain the current state, not replace it with a hidden ranking model.",
   },
   {
     area: "Driver unusualness",
     field: "regime.drivers[].z_robust",
-    purpose: "Describe how unusual a driver metric is relative to recent published history.",
+    purpose:
+      "Describe how unusual a driver metric is relative to recent published history.",
     interpretation:
-      "Larger absolute values indicate stronger unusualness relative to the reference context used by the published artifact.",
+      "Larger absolute values mean the metric stands out more strongly versus its recent reference range. This helps explain why a driver is considered notable inside the current regime context.",
     notes:
-      "This is descriptive historical context. It does not imply that unusualness will continue or reverse.",
+      "Unusualness is descriptive historical context only. It does not imply that the condition will continue, mean-revert, or affect price in any specific way.",
   },
   {
     area: "Driver percentile",
     field: "regime.drivers[].pct_90d",
-    purpose: "Provide a descriptive percentile view versus a recent historical window.",
+    purpose:
+      "Show where the current metric sits inside a recent 90-day historical range.",
     interpretation:
-      "Higher or lower percentile placement shows where the current metric sits relative to recent history.",
+      "A high percentile means the metric is near the top of its recent range. A low percentile means it is near the bottom. This helps users read position-in-range more intuitively than z-score alone.",
     notes:
-      "Percentile positioning is contextual and should not be read as a signal by itself.",
+      "Percentile is contextual. It should be read together with trend, z-score, momentum, and the current regime rather than as a standalone signal.",
   },
   {
     area: "Trend smoothing",
     field: "derived metric windows such as __ma7 and __ma30",
-    purpose: "Show rolling descriptive smoothing of published base metrics.",
+    purpose:
+      "Show rolling descriptive smoothing of published base metrics.",
     interpretation:
-      "These windows help the user compare current raw values with shorter and longer rolling context.",
+      "These windows help the user compare the latest daily reading with shorter and longer rolling context. They are useful for distinguishing isolated daily moves from broader persistent changes.",
     notes:
-      "Rolling averages are descriptive support fields only and should not be presented as predictive indicators.",
+      "Rolling averages are descriptive support fields only. They should not be presented as predictive indicators or used as hidden trading rules.",
   },
 ];
 
@@ -137,10 +144,11 @@ export default async function ThresholdsPage() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Thresholds</h1>
             <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              This page explains the threshold-facing interpretation layer of the product. It is not
-              a trading signal page or forecast surface. It documents how threshold-like published
-              values should be read within a descriptive methodology, and includes a client-side
-              preview for exploratory threshold adjustments.
+              This page explains the threshold-facing interpretation layer of the product.
+              It is not a trading signal page or a forecast surface. Its job is to explain
+              how threshold-like published values should be read inside a descriptive
+              methodology, and to show a client-side preview for exploratory threshold
+              adjustments without replacing the canonical product output.
             </p>
           </div>
 
@@ -164,26 +172,42 @@ export default async function ThresholdsPage() {
       <div className="grid gap-6">
         <Section title="Interpretation boundary">
           <p>
-            Threshold-like values in TrendAnalytics are part of a descriptive product, not a signal
-            engine. They help users understand whether the currently published state is stable,
-            degraded, lagged, unusual, or confidence-limited within the context of published
-            methodology.
+            Threshold-like values in TrendAnalytics belong to a descriptive product, not
+            to a signal engine. They help the user judge whether the currently published
+            state looks normal, degraded, delayed, unusually strong, unusually weak, or
+            confidence-limited within the context of the published methodology.
           </p>
           <p>
-            Thresholds on this page should be interpreted as explanatory boundaries and context
-            markers rather than direct action triggers.
+            The correct mental model is: thresholds on this page are
+            <strong> explanatory boundaries</strong> and
+            <strong> reading aids</strong>, not direct action triggers.
+          </p>
+        </Section>
+
+        <Section title="How to read threshold-like values">
+          <p>
+            Start by asking three separate questions:
+          </p>
+          <ol className="list-decimal pl-5">
+            <li>Is the published row current enough to trust from a freshness point of view?</li>
+            <li>Is the published label supported strongly enough from a confidence point of view?</li>
+            <li>Which scorecard axes and drivers are actually making the state look notable?</li>
+          </ol>
+          <p>
+            This order matters because a number can be mathematically present but still
+            deserve caution for freshness reasons, confidence reasons, or both.
           </p>
         </Section>
 
         <Section title="What this page covers">
           <p>
-            The product exposes several published fields that function like interpretive thresholds or
-            threshold-aware context, including confidence, lag, driver unusualness, and rolling trend
-            comparisons.
+            The product exposes several published fields that function like interpretive
+            thresholds or threshold-aware context, including confidence, lag, driver
+            unusualness, percentile placement, and rolling trend comparisons.
           </p>
           <p>
-            These fields matter because they define how much descriptive weight a user should give to
-            the visible state of the product.
+            These fields matter because they determine how much interpretive weight a
+            user should give to the visible state of the product at a given moment.
           </p>
         </Section>
 
@@ -195,8 +219,9 @@ export default async function ThresholdsPage() {
             <KeyValue label="Data source" value={currentDataSource()} />
           </div>
           <p>
-            Threshold interpretation must remain version-aware. A threshold-facing explanation only
-            makes sense when read in the context of the currently published methodology version.
+            Threshold interpretation must remain version-aware. A threshold-facing
+            explanation only makes sense when read in the context of the currently
+            published methodology version and dataset state.
           </p>
         </Section>
 
@@ -204,12 +229,17 @@ export default async function ThresholdsPage() {
 
         <Section title="Why interactive preview is shown here">
           <p>
-            The controls and preview are included to demonstrate how a future custom-threshold
-            workflow can be exposed without overwriting the canonical public methodology.
+            The controls and preview are included to demonstrate how a future
+            custom-threshold workflow can be exposed without overwriting the canonical
+            public methodology.
           </p>
           <p>
-            This client-side exploration layer is separate from the default published regime layer
-            and should never silently replace canonical outputs.
+            This client-side exploration layer is separate from the default published
+            regime layer and should never silently replace canonical outputs.
+          </p>
+          <p>
+            In other words: the controls are for understanding and exploration, not for
+            redefining what the product officially published by default.
           </p>
         </Section>
 
@@ -249,12 +279,32 @@ export default async function ThresholdsPage() {
           </div>
         </section>
 
+        <Section title="The most important threshold on the site">
+          <p>
+            The most important threshold-facing number for interpretation is the
+            canonical confidence floor:
+            <strong> 0.40</strong>.
+          </p>
+          <p>
+            Values below that floor should be read as
+            <InlineCode> UNKNOWN/DEGRADED </InlineCode>
+            rather than as an ordinary published state. Values from roughly 0.40 to 0.70
+            still support a published label, but with more caution. Values above 0.70 mean
+            the visible state has stronger support from the published evidence.
+          </p>
+          <p>
+            This does <strong>not</strong> mean confidence is a probability forecast. It is
+            an evidence-strength score for the current daily state.
+          </p>
+        </Section>
+
         <Section title="How threshold-like values should be used">
           <ul className="list-disc pl-5">
             <li>Use them to judge interpretive caution, not to generate trades.</li>
             <li>Read them together with freshness, regime label, scorecard, and drivers.</li>
             <li>Prefer traceability and context over single-field interpretation.</li>
-            <li>Use chain history and track record for descriptive comparison across time.</li>
+            <li>Use chain history and Track Record for descriptive comparison across time.</li>
+            <li>Use thresholds to understand why a state deserves caution, not to pretend the model is giving advice.</li>
           </ul>
         </Section>
 
@@ -264,18 +314,21 @@ export default async function ThresholdsPage() {
             <li>Not as hidden portfolio rules.</li>
             <li>Not as predictive promises about future movement.</li>
             <li>Not as substitutes for published methodology context.</li>
+            <li>Not as standalone numbers divorced from chain-specific freshness and evidence conditions.</li>
           </ul>
         </Section>
 
         <Section title="Relation to custom or user-adjusted thresholds">
           <p>
-            The public thresholds page documents the product’s descriptive threshold interpretation
-            layer. Subscriber or experimental threshold controls, if exposed elsewhere in the product,
-            must remain clearly separate from the canonical published methodology.
+            The public thresholds page documents the product’s descriptive
+            threshold-interpretation layer. Subscriber or experimental threshold controls,
+            if exposed elsewhere in the product, must remain clearly separate from the
+            canonical published methodology.
           </p>
           <p>
-            User-adjusted or exploratory thresholds should never silently replace the default
-            published interpretation surface without being explicitly marked as custom.
+            User-adjusted or exploratory thresholds should never silently replace the
+            default published interpretation surface without being explicitly marked as
+            custom.
           </p>
         </Section>
 
@@ -317,9 +370,9 @@ export default async function ThresholdsPage() {
         <section className="rounded-xl border p-6 text-xs text-muted-foreground">
           <div className="font-medium text-foreground">Traceability</div>
           <p className="mt-2">
-            This page is documentation for threshold-aware interpretation, not a hidden rules engine.
-            It should remain aligned with the published methodology, status, chain surfaces, and API
-            contract.
+            This page is documentation for threshold-aware interpretation, not a hidden
+            rules engine. It should remain aligned with the published methodology,
+            status, chain surfaces, and API contract.
           </p>
           <p className="mt-2">
             Dataset context on this page is drawn from{" "}

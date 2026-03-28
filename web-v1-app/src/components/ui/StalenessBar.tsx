@@ -1,3 +1,4 @@
+// src/components/ui/StalenessBar.tsx
 "use client";
 
 export type ChainId = "bitcoin" | "ethereum" | "arbitrum" | "base";
@@ -161,30 +162,34 @@ function messageFor(props: {
   const p = POLICY[chain];
 
   if (state === "DEGRADED") {
-    return "Confidence is below the canonical 0.40 threshold. The latest published state remains visible for traceability, but it should be read as UNKNOWN/DEGRADED rather than treated as a normal-confidence output.";
+    return "Confidence is below the canonical 0.40 publish threshold. That means the latest row can still be shown for traceability, but the published state should be read as UNKNOWN/DEGRADED rather than as a normal-confidence output. This is an evidence-quality warning, not a claim that the raw files are missing.";
   }
 
   if (state === "FAIL") {
-    return "Updates appear significantly delayed relative to the expected schedule. The latest available day is still shown, but interpretation should be made with stronger caution until normal publication resumes.";
+    return "Observed lag is materially above the chain’s normal publication policy. The latest available row is still shown, but freshness is now outside the hard-fail boundary, so the user should read the current state as unusually delayed relative to normal publishing cadence.";
   }
 
   if (state === "WARN") {
-    return "Updates appear delayed beyond the expected schedule. The latest available day is still shown, but freshness should be read with caution until the next published update arrives.";
+    return "Observed lag is above the chain’s usual publication policy but not yet beyond the hard-fail boundary. The latest available row is still shown, but freshness should be read with more caution until the next expected publication arrives.";
   }
 
   if (state === "UNKNOWN") {
-    return "Freshness cannot be classified from the currently published lag fields. The latest available state is still shown, but freshness should be treated as unknown until the next published update.";
+    return "The currently published lag fields are not sufficient to classify freshness cleanly. The latest visible state is still rendered, but freshness should be treated as unknown rather than silently assumed to be current.";
   }
 
   if (chain === "arbitrum" || chain === "base") {
     const obs = typeof lagDays === "number" ? `${lagDays}d` : "—";
-    return `This chain is intentionally published with an expected delay of approximately ${p.expected_lag_days} days. The latest available day is shown. Observed lag: ${obs}.`;
+    return `This chain is intentionally published on a slower cadence than BTC and ETH. For ${chainShort(
+      chain
+    )}, an observed lag around ${p.expected_lag_days} days is part of the normal publication policy, not automatically a problem. Observed lag in the current row: ${obs}.`;
   }
 
   const obs = typeof lagDays === "number" ? `${lagDays}d` : "—";
-  return `Observed lag: ${obs}. Expected publish lag is approximately ${p.expected_lag_days} day(s).${
+  return `Observed lag is ${obs}. For ${chainShort(
+    chain
+  )}, normal publication policy is approximately ${p.expected_lag_days} day(s), so this row still sits inside expected schedule.${
     typeof confidenceScore === "number"
-      ? ` Confidence: ${confidenceScore.toFixed(3)}.`
+      ? ` Published confidence: ${confidenceScore.toFixed(3)}.`
       : ""
   }`;
 }
@@ -240,9 +245,28 @@ export default function StalenessBar({
           <p className={`mt-2 max-w-3xl text-sm leading-6 ${bodyClass(state)}`}>
             {messageFor({ chain, state, lagDays, confidenceScore })}
           </p>
+
+          <div className={`mt-3 text-xs leading-6 ${metaClass(state)}`}>
+            <div>
+              <span className="font-medium text-foreground dark:text-white">
+                How to read this:
+              </span>{" "}
+              freshness and confidence are related but different.
+            </div>
+            <div className="mt-1">
+              <span className={codeClass(state)}>lag_days</span> tells you how far the published row sits behind the
+              reference date. <span className={codeClass(state)}>confidence_score</span> tells you how much evidence
+              supports the current published label. A row can be on schedule but still degraded if confidence falls
+              below the canonical publish floor.
+            </div>
+          </div>
         </div>
 
-        <div className={`min-w-[220px] rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs ${metaClass(state)}`}>
+        <div
+          className={`min-w-[240px] rounded-xl border border-white/10 bg-black/10 px-3 py-3 text-xs ${metaClass(
+            state
+          )}`}
+        >
           <div>
             Data as of{" "}
             <span className="font-semibold text-foreground dark:text-white">
@@ -251,9 +275,7 @@ export default function StalenessBar({
           </div>
           <div className="mt-1">
             Observed lag{" "}
-            <span className="font-semibold text-foreground dark:text-white">
-              {obs}
-            </span>
+            <span className="font-semibold text-foreground dark:text-white">{obs}</span>
           </div>
           {typeof confidenceScore === "number" ? (
             <div className="mt-1">
@@ -263,13 +285,27 @@ export default function StalenessBar({
               </span>
             </div>
           ) : null}
+          <div className="mt-2 border-t border-white/10 pt-2">
+            <div>
+              <span className="font-medium text-foreground dark:text-white">
+                Expected:
+              </span>{" "}
+              ~{p.expected_lag_days}d
+            </div>
+            <div className="mt-1">
+              <span className="font-medium text-foreground dark:text-white">
+                Soft warning:
+              </span>{" "}
+              &gt; {p.soft_warn_lag_days}d
+            </div>
+            <div className="mt-1">
+              <span className="font-medium text-foreground dark:text-white">
+                Hard fail:
+              </span>{" "}
+              &gt; {p.hard_fail_lag_days}d
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div className={`mt-3 text-xs leading-5 ${metaClass(state)}`}>
-        Source: <code className={codeClass(state)}>meta.confidence.lag_days_vs_utc_today</code>,{" "}
-        <code className={codeClass(state)}>meta.updated_through</code>, and{" "}
-        <code className={codeClass(state)}>confidence.confidence_score</code>. This banner never hides data.
       </div>
     </section>
   );

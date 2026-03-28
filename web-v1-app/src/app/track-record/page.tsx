@@ -335,6 +335,45 @@ function buildOverallStackSummary(rows: TrackRow[]) {
   );
 }
 
+function sortRowsAscending(rows: TrackRow[]): TrackRow[] {
+  return [...rows].sort((a, b) => {
+    const da = a.date ?? "";
+    const db = b.date ?? "";
+    if (da !== db) return da.localeCompare(db);
+    return a.chain.localeCompare(b.chain);
+  });
+}
+
+function buildTransitionsByChain(
+  rows: TrackRow[]
+): Array<{ from: string; to: string }> {
+  const rowsByChain = new Map<ChainId, TrackRow[]>();
+
+  for (const row of rows) {
+    const existing = rowsByChain.get(row.chain);
+    if (existing) {
+      existing.push(row);
+    } else {
+      rowsByChain.set(row.chain, [row]);
+    }
+  }
+
+  const transitions: Array<{ from: string; to: string }> = [];
+
+  for (const chainRows of rowsByChain.values()) {
+    const orderedRows = sortRowsAscending(chainRows);
+
+    for (let i = 1; i < orderedRows.length; i += 1) {
+      transitions.push({
+        from: orderedRows[i - 1]?.regimeLabel ?? "UNKNOWN/DEGRADED",
+        to: orderedRows[i]?.regimeLabel ?? "UNKNOWN/DEGRADED",
+      });
+    }
+  }
+
+  return transitions;
+}
+
 function StackLegendItem({
   label,
   count,
@@ -386,6 +425,8 @@ export default async function TrackRecordPage({
     });
 
   const filteredRows = allRows.slice(0, selectedWindow * chainIds.length);
+  const visualRows = sortRowsAscending(filteredRows);
+  const transitions = buildTransitionsByChain(filteredRows);
   const csvHref = csvDownloadHref(filteredRows);
 
   const stableCount = filteredRows.filter((row) => row.regimeLabel === "STABLE").length;
@@ -403,8 +444,9 @@ export default async function TrackRecordPage({
       <header className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight">Track Record</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Public historical view of published regime labels over time. This page is descriptive only and does
-          not imply forecasting, backtested performance, or recommendations.
+          Public historical view of previously published regime labels and confidence scores over time. Read this
+          page as a record of what the product actually published on each day, not as a forecast, a backtest, or
+          an investment recommendation.
         </p>
 
         <div className="mt-4 rounded-xl border p-4 text-sm">
@@ -483,6 +525,10 @@ export default async function TrackRecordPage({
             </a>
             <span>·</span>
             <span>Displayed rows: {filteredRows.length}</span>
+            <span>·</span>
+            <span>
+              30d / 90d refers to published daily rows per visible chain, not calendar months of recomputed history.
+            </span>
           </div>
         </div>
 
@@ -504,14 +550,20 @@ export default async function TrackRecordPage({
             <div className="mt-2 text-2xl font-semibold">{degradedCount}</div>
           </div>
         </div>
+
+        <div className="mt-3 rounded-xl border bg-muted/10 p-4 text-sm leading-6 text-muted-foreground">
+          These counts tell you how many published rows inside the selected window fell into each regime bucket.
+          They do <strong>not</strong> tell you whether one regime is better or worse. They only describe how often
+          each published state appeared.
+        </div>
       </header>
 
       <section className="mb-8 rounded-xl border">
         <div className="border-b px-4 py-3">
           <h2 className="text-lg font-semibold">Cross-chain regime mix</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Stacked bars summarize the published regime composition inside the currently selected window.
-            This is a descriptive cross-chain view of canonical labels, not a recomputation.
+            Stacked bars summarize how often each published regime appeared inside the selected window.
+            This is a descriptive composition view of canonical labels, not a recomputation and not a prediction layer.
           </p>
         </div>
 
@@ -522,7 +574,7 @@ export default async function TrackRecordPage({
                 <div className="text-sm font-medium">Overall displayed window</div>
                 <div className="mt-1 text-xs text-muted-foreground">
                   Aggregate across {selectedChain === "all" ? "all visible chains" : "the selected chain"} for the last{" "}
-                  {selectedWindow} published days.
+                  {selectedWindow} published daily rows. Longer segments mean the same published regime persisted for more days.
                 </div>
               </div>
               <div className="text-sm text-muted-foreground">
@@ -701,11 +753,11 @@ export default async function TrackRecordPage({
       </section>
 
       {/* === Regime Timeline Visual === */}
-      {filteredRows.length > 0 && (
+      {visualRows.length > 0 && (
         <section className="mb-8 rounded-xl border p-5">
           <h2 className="mb-4 text-lg font-semibold">Regime Timeline</h2>
           <RegimeTimeline
-            entries={filteredRows.map((r) => ({
+            entries={visualRows.map((r) => ({
               date: r.date ?? "",
               regime: r.regimeLabel ?? "UNKNOWN/DEGRADED",
               confidence: r.confidence,
@@ -715,10 +767,10 @@ export default async function TrackRecordPage({
       )}
 
       {/* === Confidence History Chart === */}
-      {filteredRows.length > 1 && (
+      {visualRows.length > 1 && (
         <section className="mb-8">
           <ConfidenceHistory
-            points={filteredRows.map((r) => ({
+            points={visualRows.map((r) => ({
               date: r.date ?? "",
               confidence: r.confidence,
             }))}
@@ -727,14 +779,9 @@ export default async function TrackRecordPage({
       )}
 
       {/* === Transition Matrix === */}
-      {filteredRows.length > 1 && (
+      {transitions.length > 0 && (
         <section className="mb-8">
-          <TransitionMatrix
-            transitions={filteredRows.slice(1).map((r, i) => ({
-              from: filteredRows[i]?.regimeLabel ?? "UNKNOWN/DEGRADED",
-              to: r.regimeLabel ?? "UNKNOWN/DEGRADED",
-            }))}
-          />
+          <TransitionMatrix transitions={transitions} />
         </section>
       )}
 
@@ -742,8 +789,9 @@ export default async function TrackRecordPage({
         <div className="border-b px-4 py-3">
           <h2 className="text-lg font-semibold">Historical regime timeline</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            This table shows published daily regime labels from the canonical history bundles. It does not
-            recompute labels and does not infer missing values.
+            This table shows published daily regime labels from the canonical history bundles. Confidence should be
+            read as evidence for the current published label on that date, not as the probability that the label was
+            "correct" or that it would continue afterward.
           </p>
         </div>
 
@@ -817,24 +865,47 @@ export default async function TrackRecordPage({
       </section>
 
       <div className="mt-8 grid gap-6">
+        <Section title="How to read this page">
+          <p>
+            Start with the <strong>Cross-chain regime mix</strong> if you want a compact overview of how often each
+            published regime appeared in the selected window. Use the <strong>Regime Timeline</strong> to see whether
+            labels persisted in long stretches or flipped frequently. Use <strong>Confidence History</strong> to see
+            how much published evidence supported those labels through time. Use the <strong>Transition Matrix</strong>
+            when you want to understand which regime-to-regime switches were common versus rare.
+          </p>
+        </Section>
+
+        <Section title="What confidence means here">
+          <p>
+            Confidence on this page is an <strong>evidence score</strong> attached to the published daily label. It is
+            not a forecast and it is not the probability that a regime will continue. Higher values mean the daily label
+            was supported by more complete and clearer published evidence. Values below the canonical 0.40 publish floor
+            should be read as <InlineCode>UNKNOWN/DEGRADED</InlineCode>; values between 0.40 and 0.70 still support a
+            published label but with more caution; values above 0.70 indicate stronger support.
+          </p>
+        </Section>
+
         <Section title="Interpretation boundary">
           <ul className="list-disc pl-5">
             <li>No price data.</li>
             <li>No forecasts.</li>
             <li>No advisory language.</li>
             <li>Historical views remain descriptive and based on published artifacts.</li>
+            <li>Track Record shows what the product published, not a reconstructed trading signal.</li>
           </ul>
         </Section>
 
         <Section title="How this relates to the product">
-          Track Record gives users a way to inspect whether current conditions look transient or persistent in the
-          context of earlier published outputs. It complements chain pages, methodology, glossary, and status.
+          Track Record helps users judge whether a currently visible condition looks brief or persistent in the context
+          of earlier published outputs. It is therefore a history-and-context layer around the main chain pages, not a
+          separate predictive model.
         </Section>
 
         <Section title="Traceability">
-          Historical outputs should always be interpreted in the context of the currently published{" "}
-          <InlineCode>methodology_version</InlineCode> and revision-aware published artifacts. This route is
-          descriptive and should not imply backtested trading performance or predictive accuracy.
+          Historical outputs should always be interpreted in the context of the published{" "}
+          <InlineCode>methodology_version</InlineCode>, revision-aware artifacts, and the exact JSON bundles from which
+          the page was rendered. This route is descriptive and should not imply backtested trading performance or
+          predictive accuracy.
         </Section>
 
         <Section title="Related pages">

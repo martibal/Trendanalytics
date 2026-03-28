@@ -18,11 +18,19 @@ const REGIME_LABELS = ["STABLE", "HEATING", "CONGESTED", "CHEAP", "UNKNOWN/DEGRA
 
 function getColor(regime: string): string {
   const upper = regime?.trim().toUpperCase();
-  if (upper === "STABLE")   return getRegimeColorByLabel("STABLE");
-  if (upper === "HEATING")  return getRegimeColorByLabel("HEATING");
+  if (upper === "STABLE") return getRegimeColorByLabel("STABLE");
+  if (upper === "HEATING") return getRegimeColorByLabel("HEATING");
   if (upper === "CONGESTED") return getRegimeColorByLabel("CONGESTED");
-  if (upper === "CHEAP")    return getRegimeColorByLabel("CHEAP");
+  if (upper === "CHEAP") return getRegimeColorByLabel("CHEAP");
   return getRegimeColorByLabel("UNKNOWN/DEGRADED");
+}
+
+function regimeMeaning(label: string): string {
+  if (label === "STABLE") return "conditions are closer to the chain’s typical operating range";
+  if (label === "HEATING") return "usage pressure is rising relative to recent history";
+  if (label === "CONGESTED") return "demand/friction conditions are elevated versus the chain’s normal range";
+  if (label === "CHEAP") return "activity or pricing pressure is unusually soft relative to recent history";
+  return "published evidence is below the canonical confidence floor or otherwise degraded";
 }
 
 export default function RegimeTimeline({ entries, className }: RegimeTimelineProps) {
@@ -34,16 +42,21 @@ export default function RegimeTimeline({ entries, className }: RegimeTimelinePro
     );
   }
 
-  // Group consecutive same-regime runs for readability
   type Run = { regime: string; from: string; to: string; count: number; color: string };
   const runs: Run[] = [];
   for (const entry of entries) {
     const last = runs[runs.length - 1];
     if (last && last.regime === entry.regime) {
       last.to = entry.date;
-      last.count++;
+      last.count += 1;
     } else {
-      runs.push({ regime: entry.regime, from: entry.date, to: entry.date, count: 1, color: getColor(entry.regime) });
+      runs.push({
+        regime: entry.regime,
+        from: entry.date,
+        to: entry.date,
+        count: 1,
+        color: getColor(entry.regime),
+      });
     }
   }
 
@@ -51,10 +64,24 @@ export default function RegimeTimeline({ entries, className }: RegimeTimelinePro
 
   return (
     <div className={className}>
-      {/* Color legend */}
+      <div className="mb-4 rounded-xl border bg-muted/10 p-3 text-xs leading-6 text-muted-foreground">
+        <div>
+          This bar shows the sequence of <strong>published daily regime labels</strong> inside the selected window.
+          It is a descriptive timeline of what the product published on each date.
+        </div>
+        <div className="mt-1">
+          Read it as persistence and switching behavior over time: long same-color stretches indicate the same
+          published regime persisted across many days; short stretches indicate faster regime turnover.
+        </div>
+      </div>
+
       <div className="mb-4 flex flex-wrap gap-3">
         {REGIME_LABELS.map((label) => (
-          <span key={label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span
+            key={label}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            title={regimeMeaning(label)}
+          >
             <span
               className="h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: getColor(label) }}
@@ -65,7 +92,6 @@ export default function RegimeTimeline({ entries, className }: RegimeTimelinePro
         ))}
       </div>
 
-      {/* Proportional bar */}
       <div
         className="flex h-10 w-full overflow-hidden rounded-xl border"
         role="img"
@@ -84,14 +110,12 @@ export default function RegimeTimeline({ entries, className }: RegimeTimelinePro
         ))}
       </div>
 
-      {/* Date labels */}
       <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
         <span>{entries[0]?.date ?? "—"}</span>
         <span>{entries[entries.length - 1]?.date ?? "—"}</span>
       </div>
 
-      {/* Tabular run breakdown */}
-      <div className="mt-4 text-xs text-muted-foreground">
+      <div className="mt-2 text-xs text-muted-foreground">
         Rows correspond to published chronological entries in the current view.
       </div>
 
@@ -110,8 +134,14 @@ export default function RegimeTimeline({ entries, className }: RegimeTimelinePro
               <tr key={i} className="border-b last:border-0 hover:bg-muted/20">
                 <td className="px-4 py-2">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: run.color }} aria-hidden="true" />
-                    <span className="font-medium" style={{ color: run.color }}>{run.regime}</span>
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: run.color }}
+                      aria-hidden="true"
+                    />
+                    <span className="font-medium" style={{ color: run.color }}>
+                      {run.regime}
+                    </span>
                   </span>
                 </td>
                 <td className="px-4 py-2 text-muted-foreground">{run.from}</td>

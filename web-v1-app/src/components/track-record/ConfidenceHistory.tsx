@@ -14,41 +14,46 @@ export type ConfidenceHistoryProps = {
 };
 
 const W = 600;
-const H = 170;
-const PAD = { top: 14, right: 16, bottom: 28, left: 40 };
+const H = 200;
+const PAD = { top: 16, right: 16, bottom: 34, left: 40 };
 
 function formatDate(date: string) {
   try {
     return new Date(date).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
-      timeZone: "UTC",
     });
   } catch {
     return date;
   }
 }
 
-function uniqueTickIndices(length: number) {
-  const raw = [0, Math.floor(length * 0.25), Math.floor(length * 0.5), Math.floor(length * 0.75), length - 1];
-  return [...new Set(raw)].sort((a, b) => a - b);
+function bandLabel(value: number) {
+  if (value >= 0.7) return "strong support";
+  if (value >= 0.4) return "usable with caution";
+  return "degraded";
 }
 
-export default function ConfidenceHistory({ points, className }: ConfidenceHistoryProps) {
+export default function ConfidenceHistory({
+  points,
+  className,
+}: ConfidenceHistoryProps) {
   const valid = useMemo(
     () =>
-      [...points]
-        .filter(
-          (p): p is { date: string; confidence: number } =>
-            typeof p.confidence === "number" && !Number.isNaN(p.confidence)
-        )
-        .sort((a, b) => a.date.localeCompare(b.date)),
+      points.filter(
+        (p): p is { date: string; confidence: number } =>
+          typeof p.confidence === "number" && !Number.isNaN(p.confidence)
+      ),
     [points]
   );
 
   if (valid.length < 2) {
     return (
-      <div className={`rounded-2xl border border-border p-6 text-sm text-muted-foreground ${className ?? ""}`}>
+      <div
+        className={`rounded-xl border p-6 text-sm text-muted-foreground ${
+          className ?? ""
+        }`}
+      >
         Insufficient confidence history data for the selected range.
       </div>
     );
@@ -57,27 +62,67 @@ export default function ConfidenceHistory({ points, className }: ConfidenceHisto
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
-  const xScale = (i: number) => PAD.left + (i / Math.max(1, valid.length - 1)) * plotW;
+  const xScale = (i: number) => PAD.left + (i / (valid.length - 1)) * plotW;
   const yScale = (v: number) => PAD.top + plotH - v * plotH;
 
   const pathD = valid
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${xScale(i).toFixed(1)} ${yScale(p.confidence).toFixed(1)}`)
+    .map(
+      (p, i) =>
+        `${i === 0 ? "M" : "L"} ${xScale(i).toFixed(1)} ${yScale(
+          p.confidence
+        ).toFixed(1)}`
+    )
     .join(" ");
 
-  const areaD = `${pathD} L ${xScale(valid.length - 1).toFixed(1)} ${(PAD.top + plotH).toFixed(1)} L ${xScale(0).toFixed(1)} ${(PAD.top + plotH).toFixed(1)} Z`;
+  const areaD = `${pathD} L ${xScale(valid.length - 1).toFixed(1)} ${(
+    PAD.top + plotH
+  ).toFixed(1)} L ${xScale(0).toFixed(1)} ${(PAD.top + plotH).toFixed(
+    1
+  )} Z`;
 
   const yTicks = [0, 0.25, 0.5, 0.75, 1.0];
-  const xTickIndices = uniqueTickIndices(valid.length);
-  const avgConfidence = (valid.reduce((s, p) => s + p.confidence, 0) / valid.length).toFixed(2);
-  const asOf = valid[valid.length - 1]?.date ?? "—";
+  const xTickIndices = [
+    0,
+    Math.floor(valid.length * 0.25),
+    Math.floor(valid.length * 0.5),
+    Math.floor(valid.length * 0.75),
+    valid.length - 1,
+  ];
+
+  const avgConfidence = (
+    valid.reduce((s, p) => s + p.confidence, 0) / valid.length
+  ).toFixed(2);
+  const latest = valid[valid.length - 1];
+  const latestBand = bandLabel(latest.confidence);
 
   return (
-    <div className={`rounded-2xl border border-border bg-card/40 p-5 ${className ?? ""}`}>
+    <div className={`rounded-xl border p-5 ${className ?? ""}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-semibold text-foreground">Confidence History</div>
-        <div className="text-xs text-muted-foreground">
-          Avg: <span className="font-medium text-foreground">{avgConfidence}</span> · Scale: 0–1 · Units: dimensionless · As-of: {asOf}
+        <div>
+          <div className="text-sm font-medium text-foreground">
+            Confidence History
+          </div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            Evidence support for the published daily label over time.
+          </div>
         </div>
+
+        <div className="text-xs text-muted-foreground">
+          Avg: <span className="font-medium text-foreground">{avgConfidence}</span>
+          {" "}· Latest:{" "}
+          <span className="font-medium text-foreground">
+            {latest.confidence.toFixed(3)}
+          </span>
+          {" "}({latestBand}) · Scale: 0–1
+        </div>
+      </div>
+
+      <div className="mb-3 rounded-lg border bg-muted/10 p-3 text-xs leading-6 text-muted-foreground">
+        This chart does <strong>not</strong> show whether a past label later proved
+        “right” or “wrong.” It shows how much published evidence supported the label
+        on each published day. The dashed line at <strong>0.40</strong> is the
+        canonical floor below which the state should be read as{" "}
+        <code className="rounded bg-muted px-1 py-0.5">UNKNOWN/DEGRADED</code>.
       </div>
 
       <svg
@@ -90,27 +135,67 @@ export default function ConfidenceHistory({ points, className }: ConfidenceHisto
       >
         <defs>
           <linearGradient id="confGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0" />
+            <stop
+              offset="0%"
+              stopColor="var(--color-accent)"
+              stopOpacity="0.3"
+            />
+            <stop
+              offset="100%"
+              stopColor="var(--color-accent)"
+              stopOpacity="0"
+            />
           </linearGradient>
         </defs>
 
         <line
           x1={PAD.left}
           x2={PAD.left + plotW}
+          y1={yScale(0.7)}
+          y2={yScale(0.7)}
+          stroke="hsl(var(--border))"
+          strokeWidth="0.8"
+          strokeDasharray="3 3"
+          opacity="0.7"
+        />
+        <text
+          x={PAD.left + 4}
+          y={yScale(0.7) - 4}
+          fontSize="9"
+          fill="hsl(var(--muted-foreground))"
+          opacity="0.9"
+        >
+          0.70 stronger support
+        </text>
+
+        <line
+          x1={PAD.left}
+          x2={PAD.left + plotW}
           y1={yScale(0.4)}
           y2={yScale(0.4)}
-          stroke="var(--color-regime-heating)"
+          stroke="var(--color-warn)"
           strokeWidth="1"
           strokeDasharray="4 3"
-          opacity="0.65"
+          opacity="0.7"
         />
-        <text x={PAD.left + 4} y={yScale(0.4) - 4} fontSize="9" fill="var(--color-regime-heating)" opacity="0.9">
-          0.40 threshold
+        <text
+          x={PAD.left + 4}
+          y={yScale(0.4) - 4}
+          fontSize="9"
+          fill="var(--color-warn)"
+          opacity="0.9"
+        >
+          0.40 degraded floor
         </text>
 
         <path d={areaD} fill="url(#confGrad)" />
-        <path d={pathD} fill="none" stroke="var(--color-accent)" strokeWidth="1.75" strokeLinejoin="round" />
+        <path
+          d={pathD}
+          fill="none"
+          stroke="var(--color-accent)"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
 
         {yTicks.map((t) => (
           <g key={t}>
@@ -119,11 +204,16 @@ export default function ConfidenceHistory({ points, className }: ConfidenceHisto
               x2={PAD.left + plotW}
               y1={yScale(t)}
               y2={yScale(t)}
-              stroke="var(--color-border)"
-              strokeOpacity="0.55"
-              strokeWidth="0.75"
+              stroke="hsl(var(--border))"
+              strokeWidth="0.5"
             />
-            <text x={PAD.left - 6} y={yScale(t) + 3} textAnchor="end" fontSize="9" fill="var(--color-text-secondary)">
+            <text
+              x={PAD.left - 6}
+              y={yScale(t) + 3}
+              textAnchor="end"
+              fontSize="9"
+              fill="hsl(var(--muted-foreground))"
+            >
               {t.toFixed(2)}
             </text>
           </g>
@@ -140,11 +230,16 @@ export default function ConfidenceHistory({ points, className }: ConfidenceHisto
                 x2={x}
                 y1={PAD.top + plotH}
                 y2={PAD.top + plotH + 4}
-                stroke="var(--color-border)"
-                strokeOpacity="0.55"
-                strokeWidth="0.75"
+                stroke="hsl(var(--border))"
+                strokeWidth="0.5"
               />
-              <text x={x} y={PAD.top + plotH + 14} textAnchor="middle" fontSize="9" fill="var(--color-text-secondary)">
+              <text
+                x={x}
+                y={PAD.top + plotH + 14}
+                textAnchor="middle"
+                fontSize="9"
+                fill="hsl(var(--muted-foreground))"
+              >
                 {formatDate(pt.date)}
               </text>
             </g>
@@ -152,8 +247,19 @@ export default function ConfidenceHistory({ points, className }: ConfidenceHisto
         })}
       </svg>
 
-      <div className="mt-2 text-xs text-muted-foreground">
-        Source: <code className="rounded bg-muted px-1 py-0.5">meta.confidence.confidence_score</code>. Values below 0.40 indicate DEGRADED state.
+      <div className="mt-3 rounded-lg border bg-muted/10 p-3 text-xs leading-6 text-muted-foreground">
+        <div>
+          <strong>How to read the bands:</strong> above 0.70 means the current
+          label has stronger published support; 0.40–0.70 means the label is still
+          usable but should be read more cautiously; below 0.40 means evidence is
+          too weak for a normal-confidence published state.
+        </div>
+        <div className="mt-1">
+          Source:{" "}
+          <code className="rounded bg-muted px-1 py-0.5">
+            meta.confidence.confidence_score
+          </code>
+        </div>
       </div>
     </div>
   );

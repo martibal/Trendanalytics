@@ -1,105 +1,215 @@
 // src/components/glossary/GlossaryEntry.tsx
 "use client";
 
-import { useState } from "react";
-import type { GlossaryEntry as GlossaryEntryType } from "@/data/glossary";
+import { useMemo, useState } from "react";
 
-function InlineCode({ children }: { children: React.ReactNode }) {
-  return <code className="rounded bg-muted px-1 py-0.5 text-xs">{children}</code>;
-}
+type GlossaryCategory =
+  | "regime"
+  | "confidence"
+  | "scorecard"
+  | "drivers"
+  | "charts"
+  | "freshness"
+  | "metadata";
 
-function categoryLabel(category: GlossaryEntryType["category"]): string {
+type GlossaryEntryData = {
+  key: string;
+  label: string;
+  category: GlossaryCategory;
+  description: {
+    basic: string;
+    advanced: string;
+  };
+  units?: string;
+  sourcePath?: string;
+  fieldPath?: string;
+};
+
+function categoryLabel(category: GlossaryCategory): string {
   switch (category) {
-    case "regime":     return "Regime";
-    case "confidence": return "Confidence";
-    case "scorecard":  return "Scorecard";
-    case "drivers":    return "Drivers";
-    case "charts":     return "Charts";
-    case "freshness":  return "Freshness";
-    case "metadata":   return "Metadata";
-    default:           return category;
+    case "regime":
+      return "Regime";
+    case "confidence":
+      return "Confidence";
+    case "scorecard":
+      return "Scorecard";
+    case "drivers":
+      return "Drivers";
+    case "charts":
+      return "Charts";
+    case "freshness":
+      return "Freshness";
+    case "metadata":
+    default:
+      return "Metadata";
   }
 }
 
-export type GlossaryEntryProps = {
-  entry: GlossaryEntryType;
-};
+function categoryMeaning(category: GlossaryCategory): string {
+  switch (category) {
+    case "regime":
+      return "Terms that describe the current published state of a chain, such as STABLE, HEATING, CONGESTED, CHEAP, or UNKNOWN/DEGRADED.";
+    case "confidence":
+      return "Terms that explain how much published evidence supports the visible state and when that state should be read more cautiously.";
+    case "scorecard":
+      return "Terms related to axis-level summaries such as Demand, Friction, and Capacity and their role in the current interpretation layer.";
+    case "drivers":
+      return "Terms that help explain why the current regime looks notable, including unusualness, percentile position, and momentum context.";
+    case "charts":
+      return "Terms that explain how visualized history, windows, and plotted series should be interpreted on the site.";
+    case "freshness":
+      return "Terms related to lag, publication cadence, stale states, delayed rows, and what it means for a row to still be usable but less current.";
+    case "metadata":
+    default:
+      return "Terms that describe traceability, revision context, source paths, contract boundaries, and other supporting published fields.";
+  }
+}
 
-export default function GlossaryEntry({ entry }: GlossaryEntryProps) {
-  const [open, setOpen] = useState(false);
+function readingHint(category: GlossaryCategory): string {
+  switch (category) {
+    case "regime":
+      return "Read this term together with confidence, lag, and drivers rather than as a standalone conclusion.";
+    case "confidence":
+      return "Read confidence as evidence strength for the current published state, not as a forecast or a probability of future continuation.";
+    case "scorecard":
+      return "Read scorecard terms as descriptive decomposition of the current state, not as hidden ratings of chain quality.";
+    case "drivers":
+      return "Read driver terms as the “because” behind the visible regime, not as isolated trading indicators.";
+    case "charts":
+      return "Read chart terms as aids for context and comparison over time, not as predictive technical analysis.";
+    case "freshness":
+      return "Read freshness terms relative to chain-specific publication cadence; delayed does not automatically mean invalid.";
+    case "metadata":
+    default:
+      return "Read metadata terms as traceability context that helps you understand where a published value came from and how to interpret it safely.";
+  }
+}
+
+function InlineCode({ children }: { children: string }) {
+  return <code className="rounded bg-muted px-1 py-0.5">{children}</code>;
+}
+
+export default function GlossaryEntry({
+  entry,
+}: {
+  entry: GlossaryEntryData;
+}) {
+  const [mode, setMode] = useState<"basic" | "advanced">("basic");
+
+  const categoryText = useMemo(
+    () => categoryMeaning(entry.category),
+    [entry.category]
+  );
+
+  const hintText = useMemo(
+    () => readingHint(entry.category),
+    [entry.category]
+  );
+
+  const mainText =
+    mode === "basic" ? entry.description.basic : entry.description.advanced;
 
   return (
-    <div className="rounded-xl border transition-colors hover:border-border/80">
-      {/* Closed state: always visible — label, key, category */}
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
-      >
-        <div className="min-w-0">
+    <article className="rounded-xl border p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-foreground">{entry.label}</span>
-            <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+            <h3 className="text-base font-semibold text-foreground">
+              {entry.label}
+            </h3>
+            <span className="rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               {categoryLabel(entry.category)}
             </span>
+            {entry.units ? (
+              <span className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
+                Units: {entry.units}
+              </span>
+            ) : null}
           </div>
-          <div className="mt-0.5 text-xs text-muted-foreground">
+
+          <div className="mt-1 text-xs text-muted-foreground">
             Key: <InlineCode>{entry.key}</InlineCode>
           </div>
         </div>
 
-        <svg
-          className={`mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+        <div className="inline-flex rounded-xl border bg-muted/30 p-1">
+          <button
+            type="button"
+            onClick={() => setMode("basic")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+              mode === "basic"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground"
+            }`}
+            aria-pressed={mode === "basic"}
+          >
+            Basic
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("advanced")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+              mode === "advanced"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground"
+            }`}
+            aria-pressed={mode === "advanced"}
+          >
+            Advanced
+          </button>
+        </div>
+      </div>
 
-      {/* Open state: full detail */}
-      {open && (
-        <div className="border-t px-5 pb-5 pt-4">
-          <div className="grid gap-4 text-sm">
-            {/* Basic */}
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Basic</div>
-              <div className="mt-1 leading-6 text-muted-foreground">{entry.description.basic}</div>
-            </div>
+      <div className="mt-4 rounded-xl border bg-muted/10 p-4">
+        <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          {mode === "basic" ? "Plain-language reading" : "Methodological reading"}
+        </div>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{mainText}</p>
+      </div>
 
-            {/* Advanced */}
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Advanced</div>
-              <div className="mt-1 leading-6 text-muted-foreground">{entry.description.advanced}</div>
-            </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border p-4">
+          <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            Category context
+          </div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {categoryText}
+          </p>
+        </div>
 
-            {/* Traceability */}
-            {(entry.units || entry.sourcePath || entry.fieldPath) && (
-              <div className="rounded-lg border bg-muted/20 p-3 text-xs">
-                <div className="font-medium text-foreground">Traceability</div>
-                <ul className="mt-2 list-disc pl-5 text-muted-foreground space-y-1">
-                  {entry.units && (
-                    <li>Units: <InlineCode>{entry.units}</InlineCode></li>
-                  )}
-                  {entry.sourcePath && (
-                    <li>Source path: <InlineCode>{entry.sourcePath}</InlineCode></li>
-                  )}
-                  {entry.fieldPath && (
-                    <li>Field path: <InlineCode>{entry.fieldPath}</InlineCode></li>
-                  )}
-                </ul>
+        <div className="rounded-xl border p-4">
+          <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            How to use this definition
+          </div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {hintText}
+          </p>
+        </div>
+      </div>
+
+      {entry.sourcePath || entry.fieldPath ? (
+        <div className="mt-4 rounded-xl border p-4 text-sm">
+          <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            Traceability
+          </div>
+
+          <div className="mt-2 space-y-2 text-muted-foreground">
+            {entry.sourcePath ? (
+              <div>
+                <span className="font-medium text-foreground">Source path:</span>{" "}
+                <InlineCode>{entry.sourcePath}</InlineCode>
               </div>
-            )}
+            ) : null}
 
-            <div className="text-xs text-muted-foreground">
-              Governance note: this entry is descriptive only and does not modify, infer, or recommend any value.
-            </div>
+            {entry.fieldPath ? (
+              <div>
+                <span className="font-medium text-foreground">Field path:</span>{" "}
+                <InlineCode>{entry.fieldPath}</InlineCode>
+              </div>
+            ) : null}
           </div>
         </div>
-      )}
-    </div>
+      ) : null}
+    </article>
   );
 }

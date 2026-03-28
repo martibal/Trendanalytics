@@ -150,9 +150,10 @@ export default async function GlossaryPage({
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Glossary</h1>
             <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              Public definitions for the product’s published terminology, fields, and interpretation
-              boundaries. The glossary exists to make the product readable without turning it into an
-              advisory or predictive surface.
+              Public definitions for the product’s published terminology, fields, and
+              interpretation boundaries. The glossary exists to make the product readable
+              for both newer users and more technical users without turning the site into
+              an advisory or predictive surface.
             </p>
           </div>
 
@@ -176,8 +177,8 @@ export default async function GlossaryPage({
       <div className="grid gap-6">
         <Section title="How to use the glossary">
           <p>
-            The glossary explains what published fields and concepts mean inside the product’s
-            descriptive framework. It should be used together with{" "}
+            The glossary explains what published fields and concepts mean inside the
+            product’s descriptive framework. It should be used together with{" "}
             <Link href="/methodology" className="underline">
               Methodology
             </Link>
@@ -189,11 +190,35 @@ export default async function GlossaryPage({
             <Link href="/status" className="underline">
               Status
             </Link>
-            , and chain pages.
+            , Track Record, and chain pages.
           </p>
           <p>
-            Definitions are product-specific. They describe how the term is used in TrendAnalytics,
-            not how every other analytics product necessarily uses the same term.
+            Definitions are product-specific. They explain how a term is used in
+            TrendAnalytics, not how every analytics product in crypto or finance
+            necessarily uses the same word.
+          </p>
+          <p>
+            A practical reading order is: first understand the regime labels and
+            confidence terms, then the scorecard axes and driver metrics, and finally
+            freshness, lag, and metadata fields. That sequence usually matches the order
+            in which a user encounters the product’s reasoning on chain pages.
+          </p>
+        </Section>
+
+        <Section title="Basic vs Advanced">
+          <p>
+            <strong className="text-foreground">Basic</strong> explanations are meant to
+            answer the question, “What does this mean in plain English, and how should I
+            read it on the page?”
+          </p>
+          <p>
+            <strong className="text-foreground">Advanced</strong> explanations are meant to
+            answer the question, “What published object does this belong to, what is its
+            methodological role, and how does it relate to the rest of the model?”
+          </p>
+          <p>
+            The goal is not to give two different definitions, but two different depths
+            of the same definition: one intuitive and one more methodical.
           </p>
         </Section>
 
@@ -201,9 +226,52 @@ export default async function GlossaryPage({
           <ul className="list-disc pl-5">
             <li>No glossary entry should imply a recommendation.</li>
             <li>No glossary entry should imply future price direction.</li>
+            <li>No glossary entry should imply that the model can see hidden causes with certainty.</li>
             <li>Definitions should remain descriptive and traceable to published artifacts.</li>
             <li>
-              Terms should be read in the context of the currently published methodology version.
+              Terms should always be read in the context of the currently published
+              methodology version.
+            </li>
+          </ul>
+          <p>
+            In other words, the glossary should help the user understand what the product
+            is saying, without quietly pushing the user toward an action or pretending to
+            know the future.
+          </p>
+        </Section>
+
+        <Section title="What kinds of terms appear here">
+          <p>
+            The glossary includes several different classes of terms, and it helps to
+            know which kind of thing you are reading:
+          </p>
+          <ul className="list-disc pl-5">
+            <li>
+              <strong className="text-foreground">Regime terms</strong> such as
+              STABLE, HEATING, CONGESTED, CHEAP, and UNKNOWN/DEGRADED.
+            </li>
+            <li>
+              <strong className="text-foreground">Confidence terms</strong> that explain
+              evidence strength, data quality, label support, and degraded states.
+            </li>
+            <li>
+              <strong className="text-foreground">Scorecard terms</strong> that describe
+              axes like Demand, Friction, and Capacity and how their published scores
+              should be read.
+            </li>
+            <li>
+              <strong className="text-foreground">Driver terms</strong> that explain why
+              a current label looks notable, including fields such as robust z-score,
+              percentile, and momentum.
+            </li>
+            <li>
+              <strong className="text-foreground">Freshness terms</strong> that explain
+              lag, cadence, stale states, and why a row can be delayed without being
+              mathematically invalid.
+            </li>
+            <li>
+              <strong className="text-foreground">Metadata terms</strong> that explain
+              revision, source mode, path-level traceability, and contract boundaries.
             </li>
           </ul>
         </Section>
@@ -214,6 +282,11 @@ export default async function GlossaryPage({
             <p>
               Initial query:{" "}
               <InlineCode>{query.length > 0 ? query : "none"}</InlineCode>
+            </p>
+            <p className="mt-2">
+              Search works best when you enter the actual published term you saw on the
+              site or in JSON, for example a regime label, a confidence field, a
+              scorecard concept, or a lag-related term.
             </p>
             <p className="mt-2">
               Examples:{" "}
@@ -232,11 +305,43 @@ export default async function GlossaryPage({
               <Link href="/glossary?q=lag" className="underline">
                 lag
               </Link>
+              ,{" "}
+              <Link href="/glossary?q=driver" className="underline">
+                driver
+              </Link>
             </p>
           </div>
         </section>
 
         <GlossaryIndexClient entries={entries} initialQuery={query} />
+
+        <Section title="How this page relates to the rest of the site">
+          <p>
+            The glossary is the definitions layer. It is where the user should be able
+            to check, “What does this term mean exactly?”
+          </p>
+          <p>
+            The{" "}
+            <Link href="/methodology" className="underline">
+              Methodology
+            </Link>{" "}
+            page explains the broader logic of the product, the{" "}
+            <Link href="/thresholds" className="underline">
+              Thresholds
+            </Link>{" "}
+            page explains canonical cutoffs and threshold logic, the{" "}
+            <Link href="/status" className="underline">
+              Status
+            </Link>{" "}
+            page explains freshness and current published availability, and chain pages
+            show the current outputs in use.
+          </p>
+          <p>
+            Together, these pages should let a user move from “What is this term?” to
+            “How is this term used in the model?” to “What is the product currently
+            publishing for a specific chain?”
+          </p>
+        </Section>
 
         <Section title="Related pages">
           <ul className="list-disc pl-5">
@@ -266,6 +371,11 @@ export default async function GlossaryPage({
               </Link>
             </li>
             <li>
+              <Link href="/track-record" className="underline">
+                /track-record
+              </Link>
+            </li>
+            <li>
               <Link href="/api-docs" className="underline">
                 /api-docs
               </Link>
@@ -276,11 +386,17 @@ export default async function GlossaryPage({
         <section className="rounded-xl border p-6 text-xs text-muted-foreground">
           <div className="font-medium text-foreground">Traceability</div>
           <p className="mt-2">
-            This page is a public definitions surface and should remain aligned with methodology,
-            thresholds, status, API docs, and chain interpretation.
+            This page is a public definitions surface and should remain aligned with
+            methodology, thresholds, status, API docs, Track Record, and chain
+            interpretation.
           </p>
           <p className="mt-2">
             Source route: <InlineCode>/api/v1/glossary</InlineCode>
+          </p>
+          <p className="mt-2">
+            The page keeps the currently published glossary contract intact and should
+            not silently replace API-provided definitions with unrelated frontend-only
+            wording.
           </p>
         </section>
       </div>

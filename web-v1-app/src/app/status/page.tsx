@@ -111,7 +111,10 @@ function datasetNotes(dataset: DatasetManifest | null): string[] {
   const notes = dataset?.notes;
 
   if (Array.isArray(notes)) {
-    return notes.filter((note): note is string => typeof note === "string" && note.trim().length > 0);
+    return notes.filter(
+      (note): note is string =>
+        typeof note === "string" && note.trim().length > 0
+    );
   }
 
   if (typeof notes === "string" && notes.trim().length > 0) {
@@ -198,9 +201,11 @@ export default async function StatusPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-semibold">Status</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Freshness and health signals for published artifacts. This page reads the published dataset
-          manifest together with per-chain published meta latest files and renders the result
-          descriptively.
+          Freshness and health context for published artifacts. This page reads the
+          published dataset manifest together with each chain’s canonical Meta latest
+          file and shows the result descriptively. It is meant to answer “How current
+          and how usable are the published artifacts right now?” rather than “What
+          should I do?”
         </p>
 
         <div className="mt-4 rounded-xl border p-5 text-sm">
@@ -243,8 +248,8 @@ export default async function StatusPage() {
               {rows.length > 0
                 ? rows.map((r) => r.chain).join(", ")
                 : Array.isArray(dataset?.chains)
-                  ? dataset.chains.join(", ")
-                  : "—"}
+                ? dataset.chains.join(", ")
+                : "—"}
             </div>
 
             {notes.length > 0 ? (
@@ -265,6 +270,17 @@ export default async function StatusPage() {
           </div>
         </div>
 
+        <div className="mt-4 rounded-xl border bg-muted/10 p-4 text-sm leading-6 text-muted-foreground">
+          <div className="font-medium text-foreground">How to read this page</div>
+          <div className="mt-2">
+            <strong>Health</strong> is a freshness classification derived from lag
+            relative to each chain’s expected publish cadence. <strong>Confidence</strong>{" "}
+            is different: it tells you how much published evidence supports the
+            current state. A row can be on schedule but still degraded if confidence
+            is low, and a row can be delayed without being mathematically invalid.
+          </div>
+        </div>
+
         <div className="mt-6 grid gap-3">
           {rows.map((row) => (
             <div key={`stale-${row.chain}`} className="rounded-xl">
@@ -272,6 +288,7 @@ export default async function StatusPage() {
                 chain={row.chain}
                 lagDays={row.lag_days}
                 asOfDate={row.as_of ?? "—"}
+                confidenceScore={row.confidence_score}
                 showWhenOk={true}
               />
             </div>
@@ -302,8 +319,15 @@ export default async function StatusPage() {
                 return (
                   <tr key={row.chain} className="border-b last:border-b-0">
                     <td className="px-4 py-3 font-medium">
-                      <Link href={`/chains/${row.chain}`} className="inline-flex items-center gap-3 hover:underline">
-                        <ChainIcon chain={row.chain} className="h-7 w-7 text-xs" label={`${row.label} icon`} />
+                      <Link
+                        href={`/chains/${row.chain}`}
+                        className="inline-flex items-center gap-3 hover:underline"
+                      >
+                        <ChainIcon
+                          chain={row.chain}
+                          className="h-7 w-7 text-xs"
+                          label={`${row.label} icon`}
+                        />
                         <span>{row.label || row.name}</span>
                       </Link>
                     </td>
@@ -339,7 +363,19 @@ export default async function StatusPage() {
         </div>
 
         <div className="border-t px-4 py-3 text-xs text-muted-foreground">
-          Source contract: dataset manifest + canonical published meta latest per chain.
+          Source contract: dataset manifest + canonical published meta latest per
+          chain. Confidence band is evidence-strength context for the current row;
+          health is freshness context relative to expected cadence.
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border p-5 text-sm leading-6 text-muted-foreground">
+        <div className="font-medium text-foreground">Interpretation boundary</div>
+        <div className="mt-2">
+          Status is not a market outlook page. It does not forecast, rank chains by
+          attractiveness, or imply a recommendation. Its role is to tell the user
+          whether the published artifacts appear current, delayed, confidence-limited,
+          or degraded.
         </div>
       </section>
     </main>
