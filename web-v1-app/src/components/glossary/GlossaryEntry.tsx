@@ -1,7 +1,7 @@
 // src/components/glossary/GlossaryEntry.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 type GlossaryCategory =
   | "regime"
@@ -16,198 +16,173 @@ type GlossaryEntryData = {
   key: string;
   label: string;
   category: GlossaryCategory;
-  description: {
-    basic: string;
-    advanced: string;
-  };
+  description: { basic: string; advanced: string };
   units?: string;
   sourcePath?: string;
   fieldPath?: string;
 };
 
-function categoryLabel(category: GlossaryCategory): string {
-  switch (category) {
-    case "regime":
-      return "Regime";
-    case "confidence":
-      return "Confidence";
-    case "scorecard":
-      return "Scorecard";
-    case "drivers":
-      return "Drivers";
-    case "charts":
-      return "Charts";
-    case "freshness":
-      return "Freshness";
-    case "metadata":
-    default:
-      return "Metadata";
-  }
-}
+const CATEGORY_COLORS: Record<GlossaryCategory, string> = {
+  regime:     "border-purple-500/30 bg-purple-500/10 text-purple-300",
+  confidence: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+  scorecard:  "border-cyan-500/30 bg-cyan-500/10 text-cyan-300",
+  drivers:    "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+  charts:     "border-blue-500/30 bg-blue-500/10 text-blue-300",
+  freshness:  "border-orange-500/30 bg-orange-500/10 text-orange-300",
+  metadata:   "border-slate-500/30 bg-slate-500/10 text-slate-300",
+};
 
-function categoryMeaning(category: GlossaryCategory): string {
-  switch (category) {
-    case "regime":
-      return "Terms that describe the current published state of a chain, such as STABLE, HEATING, CONGESTED, CHEAP, or UNKNOWN/DEGRADED.";
-    case "confidence":
-      return "Terms that explain how much published evidence supports the visible state and when that state should be read more cautiously.";
-    case "scorecard":
-      return "Terms related to axis-level summaries such as Demand, Friction, and Capacity and their role in the current interpretation layer.";
-    case "drivers":
-      return "Terms that help explain why the current regime looks notable, including unusualness, percentile position, and momentum context.";
-    case "charts":
-      return "Terms that explain how visualized history, windows, and plotted series should be interpreted on the site.";
-    case "freshness":
-      return "Terms related to lag, publication cadence, stale states, delayed rows, and what it means for a row to still be usable but less current.";
-    case "metadata":
-    default:
-      return "Terms that describe traceability, revision context, source paths, contract boundaries, and other supporting published fields.";
-  }
-}
-
-function readingHint(category: GlossaryCategory): string {
-  switch (category) {
-    case "regime":
-      return "Read this term together with confidence, lag, and drivers rather than as a standalone conclusion.";
-    case "confidence":
-      return "Read confidence as evidence strength for the current published state, not as a forecast or a probability of future continuation.";
-    case "scorecard":
-      return "Read scorecard terms as descriptive decomposition of the current state, not as hidden ratings of chain quality.";
-    case "drivers":
-      return "Read driver terms as the “because” behind the visible regime, not as isolated trading indicators.";
-    case "charts":
-      return "Read chart terms as aids for context and comparison over time, not as predictive technical analysis.";
-    case "freshness":
-      return "Read freshness terms relative to chain-specific publication cadence; delayed does not automatically mean invalid.";
-    case "metadata":
-    default:
-      return "Read metadata terms as traceability context that helps you understand where a published value came from and how to interpret it safely.";
-  }
-}
+const CATEGORY_LABELS: Record<GlossaryCategory, string> = {
+  regime:     "Regime",
+  confidence: "Confidence",
+  scorecard:  "Scorecard",
+  drivers:    "Drivers",
+  charts:     "Charts",
+  freshness:  "Freshness",
+  metadata:   "Metadata",
+};
 
 function InlineCode({ children }: { children: string }) {
-  return <code className="rounded bg-muted px-1 py-0.5">{children}</code>;
+  return (
+    <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono">
+      {children}
+    </code>
+  );
 }
 
-export default function GlossaryEntry({
-  entry,
-}: {
-  entry: GlossaryEntryData;
-}) {
+export default function GlossaryEntry({ entry }: { entry: GlossaryEntryData }) {
+  const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"basic" | "advanced">("basic");
 
-  const categoryText = useMemo(
-    () => categoryMeaning(entry.category),
-    [entry.category]
-  );
-
-  const hintText = useMemo(
-    () => readingHint(entry.category),
-    [entry.category]
-  );
-
-  const mainText =
-    mode === "basic" ? entry.description.basic : entry.description.advanced;
+  const catColor = CATEGORY_COLORS[entry.category] ?? CATEGORY_COLORS.metadata;
+  const catLabel = CATEGORY_LABELS[entry.category] ?? entry.category;
+  const text = mode === "basic" ? entry.description.basic : entry.description.advanced;
+  const hasContent =
+    (entry.description.basic && entry.description.basic !== "No basic explanation provided yet.") ||
+    (entry.description.advanced && entry.description.advanced !== "No advanced explanation provided yet.");
 
   return (
-    <article className="rounded-xl border p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold text-foreground">
-              {entry.label}
-            </h3>
-            <span className="rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-              {categoryLabel(entry.category)}
-            </span>
-            {entry.units ? (
-              <span className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
-                Units: {entry.units}
-              </span>
-            ) : null}
-          </div>
+    <article className={`rounded-2xl border transition-colors ${open ? "border-white/15 bg-card" : "border-border bg-background/40 hover:border-white/10"}`}>
+      {/* ── Collapsed header — always visible ─────────────────────── */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left"
+        aria-expanded={open}
+      >
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          {/* Label */}
+          <span className="text-sm font-semibold text-white">{entry.label}</span>
 
-          <div className="mt-1 text-xs text-muted-foreground">
+          {/* Category pill */}
+          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${catColor}`}>
+            {catLabel}
+          </span>
+
+          {/* Units pill */}
+          {entry.units ? (
+            <span className="hidden rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground sm:inline-flex">
+              {entry.units}
+            </span>
+          ) : null}
+
+          {/* No content warning */}
+          {!hasContent ? (
+            <span className="rounded-full border border-rose-500/20 bg-rose-500/5 px-2 py-0.5 text-[10px] text-rose-400">
+              no description yet
+            </span>
+          ) : null}
+        </div>
+
+        {/* Key + chevron */}
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="hidden font-mono text-[10px] text-muted-foreground/60 sm:block">
+            {entry.key}
+          </span>
+          <svg
+            className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {/* ── Expanded body ──────────────────────────────────────────── */}
+      {open ? (
+        <div className="border-t border-white/8 px-5 pb-5 pt-4">
+          {/* Key line (mobile) */}
+          <div className="mb-3 font-mono text-[10px] text-muted-foreground sm:hidden">
             Key: <InlineCode>{entry.key}</InlineCode>
           </div>
-        </div>
 
-        <div className="inline-flex rounded-xl border bg-muted/30 p-1">
-          <button
-            type="button"
-            onClick={() => setMode("basic")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-              mode === "basic"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground"
-            }`}
-            aria-pressed={mode === "basic"}
-          >
-            Basic
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("advanced")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-              mode === "advanced"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground"
-            }`}
-            aria-pressed={mode === "advanced"}
-          >
-            Advanced
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-xl border bg-muted/10 p-4">
-        <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          {mode === "basic" ? "Plain-language reading" : "Methodological reading"}
-        </div>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{mainText}</p>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border p-4">
-          <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Category context
-          </div>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {categoryText}
-          </p>
-        </div>
-
-        <div className="rounded-xl border p-4">
-          <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            How to use this definition
-          </div>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {hintText}
-          </p>
-        </div>
-      </div>
-
-      {entry.sourcePath || entry.fieldPath ? (
-        <div className="mt-4 rounded-xl border p-4 text-sm">
-          <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Traceability
+          {/* Mode toggle */}
+          <div className="mb-4 flex items-center gap-2">
+            <div className="inline-flex rounded-xl border bg-muted/30 p-1">
+              <button
+                type="button"
+                onClick={() => setMode("basic")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  mode === "basic"
+                    ? "bg-emerald-500/15 text-emerald-200 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                aria-pressed={mode === "basic"}
+              >
+                Basic
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("advanced")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  mode === "advanced"
+                    ? "bg-cyan-500/15 text-cyan-200 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                aria-pressed={mode === "advanced"}
+              >
+                Advanced
+              </button>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {mode === "basic" ? "Plain language" : "Methodological depth"}
+            </span>
           </div>
 
-          <div className="mt-2 space-y-2 text-muted-foreground">
-            {entry.sourcePath ? (
-              <div>
-                <span className="font-medium text-foreground">Source path:</span>{" "}
-                <InlineCode>{entry.sourcePath}</InlineCode>
+          {/* Description */}
+          <div className={`rounded-2xl border p-4 ${mode === "basic" ? "border-emerald-500/20 bg-emerald-500/5" : "border-cyan-500/20 bg-cyan-500/5"}`}>
+            <p className="text-sm leading-7 text-slate-100">
+              {text || (
+                <span className="italic text-muted-foreground">
+                  No {mode} explanation provided yet.
+                </span>
+              )}
+            </p>
+          </div>
+
+          {/* Traceability */}
+          {(entry.sourcePath || entry.fieldPath) ? (
+            <div className="mt-3 rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-xs text-muted-foreground">
+              <span className="font-medium uppercase tracking-[0.1em] text-slate-400">
+                Traceability
+              </span>
+              <div className="mt-2 space-y-1">
+                {entry.fieldPath ? (
+                  <div>
+                    Field: <InlineCode>{entry.fieldPath}</InlineCode>
+                  </div>
+                ) : null}
+                {entry.sourcePath ? (
+                  <div>
+                    Source: <InlineCode>{entry.sourcePath}</InlineCode>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-
-            {entry.fieldPath ? (
-              <div>
-                <span className="font-medium text-foreground">Field path:</span>{" "}
-                <InlineCode>{entry.fieldPath}</InlineCode>
-              </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </article>
