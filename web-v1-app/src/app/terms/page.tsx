@@ -40,10 +40,10 @@ export default function TermsPage() {
               Status
             </div>
             <div className="mt-1 font-medium text-foreground">
-              Draft legal structure
+              Current terms version
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              Replace with final approved legal text before launch.
+              Applies to the current public site, dashboard, and authenticated delivery API.
             </div>
           </div>
         </div>
@@ -51,9 +51,7 @@ export default function TermsPage() {
         <div className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground">
           <div className="font-medium text-foreground">Important</div>
           <p className="mt-2">
-            This page is structured to match the product’s governance requirements. It is not a
-            substitute for final legal review. Product Owner or legal counsel must approve the final
-            Terms text before launch.
+            This page describes the service terms that apply to the current public website, subscriber dashboard, and authenticated JSON delivery API.
           </p>
         </div>
       </header>
@@ -273,8 +271,7 @@ export default function TermsPage() {
         <section className="rounded-xl border p-6 text-xs text-muted-foreground">
           <div className="font-medium text-foreground">Implementation note</div>
           <p className="mt-2">
-            This page satisfies the web structure requirement for Terms of Service, but final legal
-            content remains a Product Owner / legal deliverable before launch.
+            This page is intended to remain aligned with the live product surface, entitlement model, and authenticated delivery routes described throughout the application.
           </p>
           <p className="mt-2">
             Product-specific technical areas relevant to these Terms include{" "}

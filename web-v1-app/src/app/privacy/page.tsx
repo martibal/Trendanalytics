@@ -40,10 +40,10 @@ export default function PrivacyPage() {
               Status
             </div>
             <div className="mt-1 font-medium text-foreground">
-              Draft privacy structure
+              Current privacy policy
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              Replace with final approved legal text before launch.
+              Applies to the current public site, dashboard, billing workflows, and authenticated API.
             </div>
           </div>
         </div>
@@ -51,8 +51,7 @@ export default function PrivacyPage() {
         <div className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground">
           <div className="font-medium text-foreground">Important</div>
           <p className="mt-2">
-            This page is a product-aligned privacy structure, not final legal advice. Product Owner
-            or legal counsel must approve the final Privacy Policy before launch.
+            This page describes how account, billing, usage, and authenticated access data are handled across the current service.
           </p>
         </div>
       </header>
@@ -196,8 +195,7 @@ export default function PrivacyPage() {
             misuse, maintain business records, or comply with legal obligations.
           </p>
           <p>
-            Final retention schedules should be defined by Product Owner or legal review before
-            launch.
+            Retention periods may vary depending on operational, billing, security, and compliance requirements applicable to the service.
           </p>
         </Section>
 
@@ -218,8 +216,7 @@ export default function PrivacyPage() {
             deletion, restriction, or objection in relation to their personal data.
           </p>
           <p>
-            Final handling instructions for such requests should be completed before launch as part
-            of the final legal/privacy review.
+            Requests are handled according to the operator’s applicable legal obligations and the service records required to operate, secure, and support the platform.
           </p>
         </Section>
 
@@ -262,8 +259,7 @@ export default function PrivacyPage() {
         <section className="rounded-xl border p-6 text-xs text-muted-foreground">
           <div className="font-medium text-foreground">Implementation note</div>
           <p className="mt-2">
-            This page satisfies the web structure requirement for Privacy Policy, but final legal
-            wording remains a Product Owner / legal deliverable before launch.
+            This page is intended to remain aligned with the live authentication, billing, key-management, and authenticated delivery flows implemented by the application.
           </p>
           <p className="mt-2">
             Product-specific technical areas relevant to privacy include{" "}
