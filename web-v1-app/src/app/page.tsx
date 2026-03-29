@@ -17,6 +17,7 @@ import {
   siteOrganisationExplanation,
   crossChainNotablesExplanation,
   subscriberSurfaceExplanation,
+  valuePropositionExplanation,
 } from "@/lib/content/landingExplanations";
 
 import "server-only";
@@ -421,6 +422,7 @@ export default async function HomePage() {
   const siteOrgExplain = siteOrganisationExplanation();
   const notablesExplain = crossChainNotablesExplanation();
   const subscriberExplain = subscriberSurfaceExplanation();
+  const valueExplain = valuePropositionExplanation();
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-10">
@@ -438,8 +440,9 @@ export default async function HomePage() {
                 TrendAnalytics
               </h1>
               <p className="mt-4 text-lg leading-8 text-slate-300">
-                Deterministic, explainable regime context for Bitcoin, Ethereum, Arbitrum, and Base.
-                Published daily. No price data. No forecasts. No hidden guidance.
+                Every day, on-chain data changes. Most of it is noise. Some of it is a real shift
+                in how a network is operating. TrendAnalytics tells you which is which —
+                deterministically, transparently, and without price data or trading signals.
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
                 <MoreLink id="what-is-modal" label="What is this?" />
@@ -507,6 +510,135 @@ export default async function HomePage() {
           </div>
         </div>
       </header>
+
+      {/* ── Value proposition ─────────────────────────────────────────────── */}
+      <section className="mb-10 rounded-3xl border border-cyan-500/15 bg-[radial-gradient(ellipse_at_top_right,rgba(34,211,238,0.07),transparent_60%)] p-8 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="max-w-2xl">
+            <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
+              Is this for you?
+            </div>
+            <h2 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
+              Regime or noise — that is the only question this answers.
+            </h2>
+            <p className="mt-4 text-base leading-8 text-slate-300">
+              If you have ever looked at an on-chain metric spike and wondered whether it means
+              something or will revert in two days, this is built for you. TrendAnalytics
+              separates persistent network state changes from short-term noise — every day,
+              automatically, for four blockchain networks.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col gap-3">
+            <MoreLink id="value-modal" label="Is this right for me?" />
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+            >
+              Get started →
+            </Link>
+          </div>
+        </div>
+
+        {/* Three-column "for / not for" + what you get */}
+        <div className="mt-8 grid gap-4 lg:grid-cols-3">
+
+          {/* For whom */}
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-emerald-200">
+              This is for you if…
+            </div>
+            <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-100">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-emerald-400">✓</span>
+                You already follow on-chain data and want a documented, repeatable framework for
+                deciding whether a signal is structural or episodic.
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-emerald-400">✓</span>
+                You allocate capital or write research on crypto markets and need an auditable
+                context layer that you can cite and reproduce.
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-emerald-400">✓</span>
+                You are a developer or quant who wants clean daily JSON with regime, scorecard,
+                and driver data to feed into your own models or dashboards.
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-emerald-400">✓</span>
+                You want to understand DeFi network conditions before timing large transactions
+                on Ethereum, Arbitrum, or Base.
+              </li>
+            </ul>
+          </div>
+
+          {/* Not for whom */}
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-rose-200">
+              This is not for you if…
+            </div>
+            <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-100">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-rose-400">✗</span>
+                You are looking for price charts, price alerts, or buy and sell signals. This site
+                does not publish price data of any kind.
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-rose-400">✗</span>
+                You want a system that tells you what to do next. Every output here is descriptive —
+                what the network looks like right now, not what you should do about it.
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-rose-400">✗</span>
+                You need real-time tick-level data. This is a daily publication with a 1-day lag
+                for Bitcoin and Ethereum and a 7-day lag for Arbitrum and Base.
+              </li>
+            </ul>
+          </div>
+
+          {/* What you actually get */}
+          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+              What a subscription gives you
+            </div>
+            <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-100">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-cyan-400">→</span>
+                <span>
+                  <span className="font-medium text-white">Public pages, free.</span> All regime
+                  labels, scorecards, drivers, and charts — no login required, no paywall.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-cyan-400">→</span>
+                <span>
+                  <span className="font-medium text-white">Basic — $29/month.</span> API access to
+                  one chain of your choice. Gold, Meta, and Derived JSON files. Up to 90 days of
+                  history.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-cyan-400">→</span>
+                <span>
+                  <span className="font-medium text-white">Pro — $79/month.</span> All four chains,
+                  up to 365 days of history, and the ability to generate custom threshold outputs
+                  with identity hashing.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 shrink-0 text-cyan-400">→</span>
+                <span>
+                  <span className="font-medium text-white">History Add-on — $149 once.</span> Full
+                  available history (400+ days today, growing daily) for your entitled scope.
+                </span>
+              </li>
+            </ul>
+            <div className="mt-5">
+              <MoreLink id="value-modal" label="Full product explanation" />
+            </div>
+          </div>
+
+        </div>
+      </section>
 
       {/* ── Chain cards ───────────────────────────────────────────────────── */}
       <section className="mt-2">
@@ -613,6 +745,7 @@ export default async function HomePage() {
               <h2 className="mt-1 text-3xl font-semibold">Notables</h2>
               <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
                 Observations worth your attention across the full surface right now.
+                Generated automatically from published data — no editorial input.
               </p>
             </div>
             <MoreLink id="notables-modal" label="What are notables?" />
@@ -883,6 +1016,13 @@ export default async function HomePage() {
         subtitle={subscriberExplain.subtitle}
         pair={{ basic: subscriberExplain.basic, advanced: subscriberExplain.advanced }}
         traceability={subscriberExplain.traceability}
+      />
+      <ExplainModal
+        id="value-modal"
+        title={valueExplain.title}
+        subtitle={valueExplain.subtitle}
+        pair={{ basic: valueExplain.basic, advanced: valueExplain.advanced }}
+        traceability={valueExplain.traceability}
       />
     </main>
   );
