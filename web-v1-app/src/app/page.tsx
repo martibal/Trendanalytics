@@ -1,4 +1,4 @@
-// src/app/page.tsx
+
 import type { ReactNode } from "react";
 import Link from "next/link";
 
@@ -510,6 +510,107 @@ export default async function HomePage() {
           </div>
         </div>
       </header>
+
+      {/* ── Product summary sales pitch ───────────────────────────────────── */}
+      <section className="mb-10 rounded-3xl border border-cyan-500/15 bg-[radial-gradient(ellipse_at_top_left,rgba(34,211,238,0.07),transparent_60%)] p-8 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="max-w-4xl">
+            <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
+              What the product actually is
+            </div>
+            <h2 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
+              A daily model that separates short-lived on-chain noise from more durable structural change.
+            </h2>
+            <p className="mt-4 text-base leading-8 text-slate-300">
+              TrendAnalytics evaluates Bitcoin, Ethereum, Arbitrum, and Base every day and asks one
+              narrow but commercially useful question: is the latest movement still behaving like
+              ordinary fluctuation, or is it starting to persist enough to matter? The answer is not
+              based on price. It is based on transparent, chain-specific evidence across demand,
+              friction, capacity, freshness, and confidence. For a more in depth explanation of each JSON file, visit the API Docs
+              link on the top of the page
+            </p>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-3">
+            <MoreLink id="value-modal" label="Who this is for" />
+            <MoreLink id="data-layers-modal" label="How the JSON layers work" />
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-4 lg:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+              Core output
+            </div>
+            <h3 className="mt-2 text-lg font-semibold text-white">Noise or real change?</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              The model classifies whether current behaviour still fits normal recent variation or
+              whether it is persisting enough to justify a stronger regime label such as HEATING,
+              CONGESTED, or CHEAP.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+              What the decision is based on
+            </div>
+            <h3 className="mt-2 text-lg font-semibold text-white">
+              Demand, friction, capacity, confidence
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              It compares raw daily levels against rolling baselines and chain-specific publish
+              policies. Demand asks whether usage is broadening, friction asks whether the network
+              is becoming harder or costlier to use, capacity asks whether the chain is absorbing
+              activity cleanly, and confidence decides whether the evidence is strong enough to
+              publish normally.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-yellow-300">
+              Gold JSON
+            </div>
+            <h3 className="mt-2 text-lg font-semibold text-white">Raw measured daily data</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              The base layer with the direct daily observations: transaction count, median fee,
+              active addresses, gas utilization, block timing, and related chain activity. This is
+              the layer you use when you want the measured facts exactly as published.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-5">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-purple-300">
+              Meta JSON
+            </div>
+            <h3 className="mt-2 text-lg font-semibold text-white">The interpretation layer</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              This is the commercial heart of the product: regime label, confidence, scorecard, and
+              ranked drivers in one daily file. Instead of rebuilding your own gating and signal
+              ranking on top of raw metrics, you get the analytical layer already structured for you.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-300">
+              Derived JSON
+            </div>
+            <h3 className="mt-2 text-lg font-semibold text-white">Smoothed trend context</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              Moving-average and trend-context series built from Gold. This is the layer that helps
+              you see whether a move is fading, stabilising, or persisting relative to its own
+              baseline instead of reacting to isolated daily spikes.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-white/8 bg-white/3 p-4 text-sm leading-7 text-slate-300">
+          In short: the public site shows you the current state for free, while a subscription gives
+          you the three published JSON layers directly. Gold tells you what happened, Meta tells you
+          what it means in regime terms, and Derived tells you whether the latest move is fading or
+          persisting. If you want the fastest route from raw on-chain data to a documented daily
+          analytical read, the Meta layer is the part you would otherwise have to build yourself.
+        </div>
+      </section>
 
       {/* ── Value proposition ─────────────────────────────────────────────── */}
       <section className="mb-10 rounded-3xl border border-cyan-500/15 bg-[radial-gradient(ellipse_at_top_right,rgba(34,211,238,0.07),transparent_60%)] p-8 shadow-sm">
