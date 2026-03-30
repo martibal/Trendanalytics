@@ -1,30 +1,31 @@
-
 import type { ReactNode } from "react";
-import Link from "next/link";
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { currentDataSource, readStorageObject } from "@/lib/storage";
-import RegimeBadge from "@/components/RegimeBadge";
-
 import {
   whatIsTrendAnalyticsExplanation,
-  regimeLabelExplanation,
-  landingConfidenceExplanation,
-  landingFreshnessExplanation,
-  dataLayersExplanation,
   interpretationBoundaryExplanation,
-  siteOrganisationExplanation,
-  crossChainNotablesExplanation,
-  subscriberSurfaceExplanation,
-  valuePropositionExplanation,
 } from "@/lib/content/landingExplanations";
+import {
+  confidenceBand,
+  confidenceChipClass,
+  fmtConfidence,
+  fmtDate,
+  rowTakeaway,
+  statusChipClass,
+  type SurfaceRowDisplay,
+} from "@/lib/landingSurface";
+import Hero from "@/components/landing/Hero";
+import LiveChains from "@/components/landing/LiveChains";
+import Plans from "@/components/landing/Plans";
+import SurfaceStatus from "@/components/landing/SurfaceStatus";
+import TrustGrid from "@/components/landing/TrustGrid";
+import JsonLayers from "@/components/landing/JsonLayers";
+import ExploreGrid from "@/components/landing/ExploreGrid";
+import DataContractDetails from "@/components/landing/DataContractDetails";
 
 import "server-only";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 type LandingApiChain = {
   chain?: string;
@@ -78,10 +79,6 @@ type MetaLatest = {
   profile?: { label?: string };
 };
 
-// ---------------------------------------------------------------------------
-// Shared UI primitives — exact copies from chain page
-// ---------------------------------------------------------------------------
-
 function ModalStyles() {
   return (
     <style
@@ -95,35 +92,16 @@ function ModalStyles() {
   );
 }
 
-function InlineCode({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-muted px-1 py-0.5 text-xs">{children}</code>;
-}
-
-function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
-  return (
-    <a
-      href={`#${id}`}
-      className="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/5 px-3 py-1 text-xs font-medium text-cyan-200 hover:bg-cyan-500/10"
-    >
-      {label}
-    </a>
-  );
-}
-
-type ExplainPair = { basic: ReactNode; advanced: ReactNode };
-
 function ExplainModal({
   id,
   title,
   subtitle,
   pair,
-  traceability,
 }: {
   id: string;
   title: string;
   subtitle?: ReactNode;
-  pair: ExplainPair;
-  traceability?: ReactNode;
+  pair: { basic: ReactNode; advanced: ReactNode };
 }) {
   return (
     <div id={id} className="ta-modal fixed inset-0 z-[80] items-center justify-center p-4">
@@ -133,13 +111,10 @@ function ExplainModal({
         aria-label="Close dialog"
       />
       <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-cyan-500/20 bg-[#071322] shadow-2xl shadow-cyan-950/40">
-        {/* Sticky header */}
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/8 px-6 py-5">
           <div>
             <h3 className="text-2xl font-semibold text-white">{title}</h3>
-            {subtitle ? (
-              <div className="mt-2 text-sm leading-6 text-slate-300">{subtitle}</div>
-            ) : null}
+            {subtitle ? <div className="mt-2 text-sm leading-6 text-slate-300">{subtitle}</div> : null}
           </div>
           <a
             href="#"
@@ -150,7 +125,6 @@ function ExplainModal({
           </a>
         </div>
 
-        {/* Scrollable body */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
@@ -167,24 +141,11 @@ function ExplainModal({
               <div className="mt-3 text-sm leading-7 text-slate-100">{pair.advanced}</div>
             </details>
           </div>
-
-          {traceability ? (
-            <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-300">
-                Traceability
-              </div>
-              <div className="mt-3 text-sm leading-7 text-slate-200">{traceability}</div>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Data helpers
-// ---------------------------------------------------------------------------
 
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
   return new TextDecoder("utf-8").decode(new Uint8Array(buffer));
@@ -215,21 +176,6 @@ function extractLandingChains(payload: LandingApiResponse | null): LandingApiCha
     return (payload as { data?: LandingApiChain[] }).data ?? [];
   }
   return [];
-}
-
-function confidenceBand(value?: number | null) {
-  if (typeof value !== "number") return "Unknown";
-  if (value >= 0.7) return "Good";
-  if (value >= 0.4) return "Caution";
-  return "Degraded";
-}
-
-function fmtDate(value?: string | null) {
-  return value && value.trim().length > 0 ? value : "—";
-}
-
-function fmtConfidence(value?: number | null) {
-  return typeof value === "number" ? value.toFixed(3) : "—";
 }
 
 function parseIsoDayToUtcMs(date?: string): number | null {
@@ -296,7 +242,7 @@ async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
   );
 }
 
-function buildNotables(rows: StatusApiRow[]) {
+function buildSurfaceStatus(rows: StatusApiRow[]) {
   const items: { title: string; body: string }[] = [];
 
   const degraded = rows.filter(
@@ -304,7 +250,7 @@ function buildNotables(rows: StatusApiRow[]) {
   );
   if (degraded.length > 0) {
     items.push({
-      title: "Confidence is degraded on part of the surface",
+      title: "Confidence below publication threshold",
       body: `${degraded.map((r) => r.label).join(", ")} currently publish confidence below the canonical 0.40 threshold. These states remain visible for traceability, but should be read as UNKNOWN/DEGRADED.`,
     });
   }
@@ -312,7 +258,7 @@ function buildNotables(rows: StatusApiRow[]) {
   const delayed = rows.filter((r) => r.status === "warn" || r.status === "fail");
   if (delayed.length > 0) {
     items.push({
-      title: "Freshness requires attention",
+      title: "Freshness outside expected policy",
       body: `${delayed.map((r) => r.label).join(", ")} are currently outside their expected publish schedule. The latest publication is still shown with the correct freshness context.`,
     });
   }
@@ -320,7 +266,7 @@ function buildNotables(rows: StatusApiRow[]) {
   const l2s = rows.filter((r) => r.chain === "arbitrum" || r.chain === "base");
   if (l2s.length > 0) {
     items.push({
-      title: "L2 publication cadence is intentionally different",
+      title: "Layer-2 feeds use seven-day policy lag",
       body: "Arbitrum and Base are published with a roughly seven-day delay by design. A larger lag does not automatically imply a broken feed — it must be judged against the chain-specific policy.",
     });
   }
@@ -335,37 +281,28 @@ function buildNotables(rows: StatusApiRow[]) {
   return items.slice(0, 3);
 }
 
-// ---------------------------------------------------------------------------
-// Status and confidence chip helpers
-// ---------------------------------------------------------------------------
-
-function statusChipClass(status?: string | null) {
-  const base =
-    "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide";
-  if (status === "ok")
-    return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-300`;
-  if (status === "warn")
-    return `${base} border-amber-500/25 bg-amber-500/10 text-amber-300`;
-  if (status === "fail")
-    return `${base} border-red-500/25 bg-red-500/10 text-red-300`;
-  return `${base} border-border bg-muted text-muted-foreground`;
+function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
+  const band = confidenceBand(row.confidence_score);
+  return {
+    chain: row.chain,
+    href: `/chains/${row.chain}`,
+    label: row.label,
+    name: row.name,
+    status: row.status,
+    statusClass: statusChipClass(row.status),
+    publishedRegime: row.published_regime,
+    confidenceValue: fmtConfidence(row.confidence_score),
+    confidenceBand: band,
+    confidenceClass: confidenceChipClass(band),
+    asOf: fmtDate(row.as_of),
+    lagValue: row.lag_days !== null ? `${row.lag_days}d` : "—",
+    takeaway: rowTakeaway({
+      status: row.status,
+      publishedRegime: row.published_regime,
+      confidenceScore: row.confidence_score,
+    }),
+  };
 }
-
-function confidenceChipClass(band: string) {
-  const base =
-    "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium";
-  if (band === "Good")
-    return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-300`;
-  if (band === "Caution")
-    return `${base} border-amber-500/25 bg-amber-500/10 text-amber-300`;
-  if (band === "Degraded")
-    return `${base} border-red-500/25 bg-red-500/10 text-red-300`;
-  return `${base} border-border bg-muted text-muted-foreground`;
-}
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 
 export default async function HomePage() {
   const dataset: DatasetManifest | null = await readDatasetManifest();
@@ -382,7 +319,7 @@ export default async function HomePage() {
       ? statusPayload.chains
       : [];
 
-  const landingFallbackRows = CHAIN_LIST.map((chain) => {
+  const landingFallbackRows: StatusApiRow[] = CHAIN_LIST.map((chain) => {
     const landing = landingChains.find((r) => r.chain === chain.id);
     return {
       chain: chain.id,
@@ -390,7 +327,7 @@ export default async function HomePage() {
       label: landing?.label ?? chain.label,
       as_of: landing?.as_of ?? null,
       lag_days: landing?.lag_days ?? null,
-      status: "unknown" as const,
+      status: "unknown",
       published_regime: landing?.status_label ?? null,
       confidence_score: landing?.confidence_score ?? null,
       expected_delay_days: expectedDelayDays(chain.id),
@@ -401,863 +338,47 @@ export default async function HomePage() {
     statusRows.length > 0
       ? statusRows
       : metaFallbackRows.some(
-          (r) =>
-            r.published_regime !== null ||
-            r.confidence_score !== null ||
-            r.as_of !== null ||
-            r.lag_days !== null
-        )
-      ? metaFallbackRows
-      : landingFallbackRows;
+            (r) =>
+              r.published_regime !== null ||
+              r.confidence_score !== null ||
+              r.as_of !== null ||
+              r.lag_days !== null
+          )
+        ? metaFallbackRows
+        : landingFallbackRows;
 
-  const notables = buildNotables(rows);
-
-  // Pre-resolve all explanation content server-side
+  const displayRows = rows.map(toSurfaceRowDisplay);
+  const surfaceStatus = buildSurfaceStatus(rows);
   const whatIsExplain = whatIsTrendAnalyticsExplanation();
-  const regimeLabelExplain = regimeLabelExplanation();
-  const confidenceExplain = landingConfidenceExplanation();
-  const freshnessExplain = landingFreshnessExplanation();
-  const dataLayersExplain = dataLayersExplanation();
   const boundaryExplain = interpretationBoundaryExplanation();
-  const siteOrgExplain = siteOrganisationExplanation();
-  const notablesExplain = crossChainNotablesExplanation();
-  const subscriberExplain = subscriberSurfaceExplanation();
-  const valueExplain = valuePropositionExplanation();
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-10">
       <ModalStyles />
 
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <header className="mb-10">
-        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="max-w-3xl">
-              <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
-                On-chain regime intelligence
-              </div>
-              <h1 className="mt-3 text-4xl font-semibold leading-tight text-white sm:text-5xl">
-                TrendAnalytics
-              </h1>
-              <p className="mt-4 text-lg leading-8 text-slate-300">
-                Every day, on-chain data changes. Most of it is noise. Some of it is a real shift
-                in how a network is operating. TrendAnalytics tells you which is which —
-                deterministically, transparently, and without price data or trading signals.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <MoreLink id="what-is-modal" label="What is this?" />
-                <MoreLink id="boundary-modal" label="Interpretation boundary" />
-                <Link
-                  href="/methodology"
-                  className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200 hover:bg-white/10"
-                >
-                  Methodology
-                </Link>
-                <Link
-                  href="/glossary"
-                  className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200 hover:bg-white/10"
-                >
-                  Glossary
-                </Link>
-              </div>
-            </div>
-
-            {dataset ? (
-              <div className="min-w-[200px] rounded-2xl border border-white/10 bg-black/10 px-4 py-4 text-xs text-slate-300">
-                <div className="font-medium uppercase tracking-[0.12em] text-slate-400">
-                  Dataset
-                </div>
-                {dataset.version ? (
-                  <div className="mt-2">
-                    Revision{" "}
-                    <span className="font-semibold text-white">{dataset.version}</span>
-                  </div>
-                ) : null}
-                {dataset.published_at ? (
-                  <div className="mt-1">
-                    Published{" "}
-                    <span className="font-semibold text-white">
-                      {dataset.published_at.slice(0, 10)}
-                    </span>
-                  </div>
-                ) : null}
-                {dataset.methodology_version ? (
-                  <div className="mt-1">
-                    Methodology{" "}
-                    <InlineCode>{dataset.methodology_version}</InlineCode>
-                  </div>
-                ) : null}
-                <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Source: <InlineCode>{currentDataSource()}</InlineCode>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Fast interpretation map — mirrors chain page pattern */}
-          <div className="mt-6 rounded-2xl border border-white/8 bg-white/3 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                  How to read this page
-                </div>
-                <div className="mt-2 text-sm text-slate-100">
-                  Chain cards → Notables → Regime labels → Confidence → Freshness
-                </div>
-              </div>
-              <MoreLink id="site-org-modal" label="Site guide" />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Product summary sales pitch ───────────────────────────────────── */}
-      <section className="mb-10 rounded-3xl border border-cyan-500/15 bg-[radial-gradient(ellipse_at_top_left,rgba(34,211,238,0.07),transparent_60%)] p-8 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="max-w-4xl">
-            <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
-              What the product actually is
-            </div>
-            <h2 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
-              A daily model that separates short-lived on-chain noise from more durable structural change.
-            </h2>
-            <p className="mt-4 text-base leading-8 text-slate-300">
-              TrendAnalytics evaluates Bitcoin, Ethereum, Arbitrum, and Base every day and asks one
-              narrow but commercially useful question: is the latest movement still behaving like
-              ordinary fluctuation, or is it starting to persist enough to matter? The answer is not
-              based on price. It is based on transparent, chain-specific evidence across demand,
-              friction, capacity, freshness, and confidence. For a more in depth explanation of each JSON file, visit the API Docs
-              link on the top of the page
-            </p>
-          </div>
-
-          <div className="flex shrink-0 flex-col gap-3">
-            <MoreLink id="value-modal" label="Who this is for" />
-            <MoreLink id="data-layers-modal" label="How the JSON layers work" />
-          </div>
-        </div>
-
-        <div className="mt-8 grid gap-4 lg:grid-cols-2 xl:grid-cols-5">
-          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-              Core output
-            </div>
-            <h3 className="mt-2 text-lg font-semibold text-white">Noise or real change?</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              The model classifies whether current behaviour still fits normal recent variation or
-              whether it is persisting enough to justify a stronger regime label such as HEATING,
-              CONGESTED, or CHEAP.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-              What the decision is based on
-            </div>
-            <h3 className="mt-2 text-lg font-semibold text-white">
-              Demand, friction, capacity, confidence
-            </h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              It compares raw daily levels against rolling baselines and chain-specific publish
-              policies. Demand asks whether usage is broadening, friction asks whether the network
-              is becoming harder or costlier to use, capacity asks whether the chain is absorbing
-              activity cleanly, and confidence decides whether the evidence is strong enough to
-              publish normally.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-yellow-300">
-              Gold JSON
-            </div>
-            <h3 className="mt-2 text-lg font-semibold text-white">Raw measured daily data</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              The base layer with the direct daily observations: transaction count, median fee,
-              active addresses, gas utilization, block timing, and related chain activity. This is
-              the layer you use when you want the measured facts exactly as published.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-5">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-purple-300">
-              Meta JSON
-            </div>
-            <h3 className="mt-2 text-lg font-semibold text-white">The interpretation layer</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              This is the commercial heart of the product: regime label, confidence, scorecard, and
-              ranked drivers in one daily file. Instead of rebuilding your own gating and signal
-              ranking on top of raw metrics, you get the analytical layer already structured for you.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-300">
-              Derived JSON
-            </div>
-            <h3 className="mt-2 text-lg font-semibold text-white">Smoothed trend context</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              Moving-average and trend-context series built from Gold. This is the layer that helps
-              you see whether a move is fading, stabilising, or persisting relative to its own
-              baseline instead of reacting to isolated daily spikes.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-2xl border border-white/8 bg-white/3 p-4 text-sm leading-7 text-slate-300">
-          In short: the public site shows you the current state for free, while a subscription gives
-          you the three published JSON layers directly. Gold tells you what happened, Meta tells you
-          what it means in regime terms, and Derived tells you whether the latest move is fading or
-          persisting. If you want the fastest route from raw on-chain data to a documented daily
-          analytical read, the Meta layer is the part you would otherwise have to build yourself.
-        </div>
-      </section>
-
-      {/* ── Value proposition ─────────────────────────────────────────────── */}
-      <section className="mb-10 rounded-3xl border border-cyan-500/15 bg-[radial-gradient(ellipse_at_top_right,rgba(34,211,238,0.07),transparent_60%)] p-8 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="max-w-2xl">
-            <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
-              Is this for you?
-            </div>
-            <h2 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
-              Regime or noise — that is the only question this answers.
-            </h2>
-            <p className="mt-4 text-base leading-8 text-slate-300">
-              If you have ever looked at an on-chain metric spike and wondered whether it means
-              something or will revert in two days, this is built for you. TrendAnalytics
-              separates persistent network state changes from short-term noise — every day,
-              automatically, for four blockchain networks.
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-col gap-3">
-            <MoreLink id="value-modal" label="Is this right for me?" />
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
-            >
-              Get started →
-            </Link>
-          </div>
-        </div>
-
-        {/* Three-column "for / not for" + what you get */}
-        <div className="mt-8 grid gap-4 lg:grid-cols-3">
-
-          {/* For whom */}
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-emerald-200">
-              This is for you if…
-            </div>
-            <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-100">
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-emerald-400">✓</span>
-                You already follow on-chain data and want a documented, repeatable framework for
-                deciding whether a signal is structural or episodic.
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-emerald-400">✓</span>
-                You allocate capital or write research on crypto markets and need an auditable
-                context layer that you can cite and reproduce.
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-emerald-400">✓</span>
-                You are a developer or quant who wants clean daily JSON with regime, scorecard,
-                and driver data to feed into your own models or dashboards.
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-emerald-400">✓</span>
-                You want to understand DeFi network conditions before timing large transactions
-                on Ethereum, Arbitrum, or Base.
-              </li>
-            </ul>
-          </div>
-
-          {/* Not for whom */}
-          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-rose-200">
-              This is not for you if…
-            </div>
-            <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-100">
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-rose-400">✗</span>
-                You are looking for price charts, price alerts, or buy and sell signals. This site
-                does not publish price data of any kind.
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-rose-400">✗</span>
-                You want a system that tells you what to do next. Every output here is descriptive —
-                what the network looks like right now, not what you should do about it.
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-rose-400">✗</span>
-                You need real-time tick-level data. This is a daily publication with a 1-day lag
-                for Bitcoin and Ethereum and a 7-day lag for Arbitrum and Base.
-              </li>
-            </ul>
-          </div>
-
-          {/* What you actually get */}
-          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-              What a subscription gives you
-            </div>
-            <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-100">
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-cyan-400">→</span>
-                <span>
-                  <span className="font-medium text-white">Public pages, free.</span> All regime
-                  labels, scorecards, drivers, and charts — no login required, no paywall.
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-cyan-400">→</span>
-                <span>
-                  <span className="font-medium text-white">Basic — $29/month.</span> API access to
-                  one chain of your choice. Gold, Meta, and Derived JSON files. Up to 90 days of
-                  history.
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-cyan-400">→</span>
-                <span>
-                  <span className="font-medium text-white">Pro — $79/month.</span> All four chains,
-                  up to 365 days of history, and the ability to generate custom threshold outputs
-                  with identity hashing.
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 shrink-0 text-cyan-400">→</span>
-                <span>
-                  <span className="font-medium text-white">History Add-on — $149 once.</span> Full
-                  available history (400+ days today, growing daily) for your entitled scope.
-                </span>
-              </li>
-            </ul>
-            <div className="mt-5">
-              <MoreLink id="value-modal" label="Full product explanation" />
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── Chain cards ───────────────────────────────────────────────────── */}
-      <section className="mt-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-              Current snapshot
-            </div>
-            <h2 className="mt-1 text-3xl font-semibold">Supported chains</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
-              Current published regime, confidence, and freshness for each of the four supported
-              networks. Click any card to open the full chain analysis page.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <MoreLink id="regime-label-modal" label="What do the labels mean?" />
-            <MoreLink id="confidence-modal" label="What is confidence?" />
-            <MoreLink id="freshness-modal" label="What is lag?" />
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {rows.map((row) => {
-            const band = confidenceBand(row.confidence_score);
-            return (
-              <Link
-                key={row.chain}
-                href={`/chains/${row.chain}`}
-                className="group rounded-3xl border bg-card p-5 shadow-sm transition hover:border-cyan-500/30 hover:bg-card"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-2xl font-semibold tracking-tight text-white">
-                      {row.label}
-                    </div>
-                    <div className="mt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      {row.name}
-                    </div>
-                  </div>
-                  <span className={statusChipClass(row.status)}>{row.status}</span>
-                </div>
-
-                <div className="mt-5">
-                  <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                    Published regime
-                  </div>
-                  <div className="mt-3">
-                    {row.published_regime ? (
-                      <RegimeBadge label={row.published_regime} />
-                    ) : (
-                      <span className="text-sm text-muted-foreground">No published label</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-2xl border bg-background/50 p-3">
-                  <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                    Confidence
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <div className="text-2xl font-semibold text-white">
-                      {fmtConfidence(row.confidence_score)}
-                    </div>
-                    <span className={confidenceChipClass(band)}>{band}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border bg-background/40 p-3">
-                    <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      As of
-                    </div>
-                    <div className="mt-1 text-sm font-medium text-white">
-                      {fmtDate(row.as_of)}
-                    </div>
-                  </div>
-                  <div className="rounded-xl border bg-background/40 p-3">
-                    <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      Lag
-                    </div>
-                    <div className="mt-1 text-sm font-medium text-white">
-                      {row.lag_days !== null ? `${row.lag_days}d` : "—"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 text-xs text-muted-foreground transition group-hover:text-cyan-200">
-                  Open full analysis →
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ── Cross-chain notables ──────────────────────────────────────────── */}
-      {notables.length > 0 ? (
-        <section className="mt-10">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                Cross-chain
-              </div>
-              <h2 className="mt-1 text-3xl font-semibold">Notables</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
-                Observations worth your attention across the full surface right now.
-                Generated automatically from published data — no editorial input.
-              </p>
-            </div>
-            <MoreLink id="notables-modal" label="What are notables?" />
-          </div>
-
-          <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            {notables.map((item, i) => (
-              <div key={i} className="rounded-3xl border p-5 shadow-sm">
-                <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                  Notable {i + 1}
-                </div>
-                <h3 className="mt-2 text-base font-semibold text-white">{item.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-slate-300">{item.body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* ── Orientation grid ─────────────────────────────────────────────── */}
-      <section className="mt-10">
-        <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-          Orientation
-        </div>
-        <h2 className="mt-1 text-3xl font-semibold">Understand what you are looking at</h2>
-        <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
-          Each card below explains a core concept. Click More to open a full explanation with both
-          a plain-language and a technical version.
-        </p>
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-3">
-
-          {/* Regime labels */}
-          <div className="rounded-3xl border p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                Regime labels
-              </div>
-              <MoreLink id="regime-label-modal" />
-            </div>
-            <h3 className="mt-3 text-xl font-semibold">STABLE · HEATING · CONGESTED · CHEAP</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              Five possible states that describe the current operating condition of each chain
-              relative to its own recent history. Click More to understand what each label means
-              and exactly how it is derived.
-            </p>
-          </div>
-
-          {/* Confidence */}
-          <div className="rounded-3xl border p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                Confidence
-              </div>
-              <MoreLink id="confidence-modal" />
-            </div>
-            <h3 className="mt-3 text-xl font-semibold">Good · Caution · Degraded</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              Every label comes with an evidence-strength score. The three bands tell you how much
-              to trust what you are reading. Click More to understand the difference between
-              confidence and freshness.
-            </p>
-          </div>
-
-          {/* Freshness */}
-          <div className="rounded-3xl border p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                Freshness and lag
-              </div>
-              <MoreLink id="freshness-modal" />
-            </div>
-            <h3 className="mt-3 text-xl font-semibold">As-of date · Observed lag</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              Data is published daily with chain-specific delays. Bitcoin and Ethereum update with
-              roughly a 1-day lag. Arbitrum and Base update with roughly a 7-day lag by design.
-            </p>
-          </div>
-
-          {/* Data layers */}
-          <div className="rounded-3xl border p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                Data layers
-              </div>
-              <MoreLink id="data-layers-modal" />
-            </div>
-            <h3 className="mt-3 text-xl font-semibold">Gold · Meta · Derived</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              Three published JSON layers — raw observations, regime intelligence, and smoothed
-              trends. Each one builds on the previous and can be downloaded by subscribers.
-            </p>
-            <Link
-              href="/api-docs/schema"
-              className="mt-4 inline-flex items-center text-xs text-cyan-200 hover:underline"
-            >
-              See every field documented →
-            </Link>
-          </div>
-
-          {/* Interpretation boundary */}
-          <div className="rounded-3xl border p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                What we do not do
-              </div>
-              <MoreLink id="boundary-modal" />
-            </div>
-            <h3 className="mt-3 text-xl font-semibold">No price. No forecasts. No signals.</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              This is a deliberate design decision, not a limitation. Click More for the full
-              explanation of why the interpretation boundary is drawn where it is.
-            </p>
-          </div>
-
-          {/* Subscriber surface */}
-          <div className="rounded-3xl border p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                Subscriber access
-              </div>
-              <MoreLink id="subscriber-modal" />
-            </div>
-            <h3 className="mt-3 text-xl font-semibold">Data API and file downloads</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              The public pages are free and require no account. A subscription adds direct JSON
-              file access for analysts and developers who want to work with the raw data.
-            </p>
-            <div className="mt-4">
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/5 px-4 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-500/10"
-              >
-                Go to dashboard →
-              </Link>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── JSON data layers ─────────────────────────────────────────────── */}
-      <section className="mt-10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-              What subscribers receive
-            </div>
-            <h2 className="mt-1 text-3xl font-semibold">Three JSON files per chain, per day</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
-              Every subscription gives you direct API access to the published JSON artifacts.
-              Here is exactly what those files contain.
-            </p>
-          </div>
-          <Link
-            href="/api-docs/schema"
-            className="shrink-0 inline-flex items-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-1.5 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
-          >
-            Full field reference →
-          </Link>
-        </div>
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-3">
-
-          {/* Gold */}
-          <div className="rounded-3xl border border-yellow-500/15 bg-yellow-500/5 p-6 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-yellow-300">
-              Gold
-            </div>
-            <h3 className="mt-2 text-xl font-semibold text-white">Raw daily observations</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              Exactly what the blockchain did each day — in native units, unmodified. The
-              authoritative source that all other layers are built from.
-            </p>
-            <ul className="mt-4 space-y-1.5 text-xs text-slate-400">
-              {[
-                "tx_count_daily — daily transaction count",
-                "median_tx_fee_native — typical fee per tx",
-                "gas_utilization_pct — block fullness (ETH)",
-                "unique_active_addresses — breadth of use",
-                "avg_block_time_sec — block cadence",
-                "+ 5 more fields",
-              ].map((f) => (
-                <li key={f} className="flex items-start gap-2">
-                  <span className="mt-0.5 shrink-0 text-yellow-500/60">·</span>
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <Link href="/api-docs/schema#gold" className="mt-5 inline-flex items-center text-xs text-yellow-300 hover:underline">
-              See all Gold fields →
-            </Link>
-          </div>
-
-          {/* Meta */}
-          <div className="rounded-3xl border border-purple-500/15 bg-purple-500/5 p-6 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-purple-300">
-              Meta
-            </div>
-            <h3 className="mt-2 text-xl font-semibold text-white">Regime intelligence</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              The full analytical output — regime label, confidence score, three-axis
-              scorecard, and ranked driver set with z-scores and percentiles.
-            </p>
-            <ul className="mt-4 space-y-1.5 text-xs text-slate-400">
-              {[
-                "status.label — STABLE / HEATING / CONGESTED / CHEAP",
-                "confidence.confidence_score — evidence quality",
-                "scorecard.dimensions.demand/friction/capacity",
-                "regime.drivers[] — top signals with z-score",
-                "regime.determinism_hash — reproducibility proof",
-                "+ 20 more fields",
-              ].map((f) => (
-                <li key={f} className="flex items-start gap-2">
-                  <span className="mt-0.5 shrink-0 text-purple-500/60">·</span>
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <Link href="/api-docs/schema#meta" className="mt-5 inline-flex items-center text-xs text-purple-300 hover:underline">
-              See all Meta fields →
-            </Link>
-          </div>
-
-          {/* Derived */}
-          <div className="rounded-3xl border border-blue-500/15 bg-blue-500/5 p-6 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-300">
-              Derived
-            </div>
-            <h3 className="mt-2 text-xl font-semibold text-white">Smoothed trend series</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              7-day and 30-day moving averages for every Gold metric. Useful for
-              distinguishing brief spikes from sustained structural changes in your own analysis.
-            </p>
-            <ul className="mt-4 space-y-1.5 text-xs text-slate-400">
-              {[
-                "<metric>__ma7 — 7-day rolling mean",
-                "<metric>__ma30 — 30-day rolling mean",
-                "derived.meta_confidence — confidence overlay",
-                "Available for all numeric Gold fields",
-                "min_periods=1 — no gaps in the series",
-                "Independently verifiable from Gold",
-              ].map((f) => (
-                <li key={f} className="flex items-start gap-2">
-                  <span className="mt-0.5 shrink-0 text-blue-500/60">·</span>
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <Link href="/api-docs/schema#derived" className="mt-5 inline-flex items-center text-xs text-blue-300 hover:underline">
-              See all Derived fields →
-            </Link>
-          </div>
-
-        </div>
-
-        <div className="mt-4 rounded-2xl border border-white/8 bg-white/3 p-4 text-sm leading-7 text-slate-300">
-          All three layers are available via the authenticated file delivery API at{" "}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-            /api/v1/files/&lt;gold|meta|derived&gt;/&lt;chain&gt;/&lt;window&gt;.json
-          </code>
-          . Basic subscribers get one chain and up to 90 days of history. Pro subscribers
-          get all four chains and up to 365 days.{" "}
-          <Link href="/api-docs/schema" className="text-cyan-200 hover:underline">
-            Every field is documented in the schema reference.
-          </Link>
-        </div>
-      </section>
-
-      {/* ── Site navigation strip ─────────────────────────────────────────── */}
-      <section className="mt-10 rounded-3xl border p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-              Explore
-            </div>
-            <h2 className="mt-1 text-2xl font-semibold">Where to go next</h2>
-          </div>
-          <MoreLink id="site-org-modal" label="Full site guide" />
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { href: "/chains", label: "Chains", desc: "Full analysis for each network" },
-            { href: "/track-record", label: "Track Record", desc: "Historical regime log" },
-            { href: "/thresholds", label: "Thresholds", desc: "Simulate custom parameters" },
-            { href: "/glossary", label: "Glossary", desc: "Definitions for every term" },
-            { href: "/methodology", label: "Methodology", desc: "Full technical documentation" },
-            { href: "/status", label: "System Status", desc: "Pipeline and freshness health" },
-          ].map(({ href, label, desc }) => (
-            <Link
-              key={href}
-              href={href}
-              className="group flex items-center justify-between rounded-2xl border bg-background/40 px-4 py-3 transition hover:border-cyan-500/30 hover:bg-muted/30"
-            >
-              <div>
-                <div className="text-sm font-medium text-white">{label}</div>
-                <div className="mt-0.5 text-xs text-muted-foreground">{desc}</div>
-              </div>
-              <span className="text-xs text-muted-foreground transition group-hover:text-cyan-200">
-                →
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Data contract strip ───────────────────────────────────────────── */}
-      <details className="mt-10 rounded-2xl border p-5">
-        <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
-          Data contract and traceability
-        </summary>
-        <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>
-            Data source: <InlineCode>{currentDataSource()}</InlineCode>
-          </div>
-          <div>
-            Dataset manifest:{" "}
-            <InlineCode>data/published/v1/dataset.json</InlineCode>
-          </div>
-          <div>
-            Chain cards prefer published status index, then per-chain meta/latest.json, then landing
-            index as final fallback.
-          </div>
-          {dataset?.published_at ? (
-            <div>
-              Last published: <InlineCode>{dataset.published_at}</InlineCode>
-            </div>
-          ) : null}
-        </div>
-      </details>
-
-      {/* ── All modals ────────────────────────────────────────────────────── */}
+      <Hero rows={displayRows} />
+      <LiveChains rows={displayRows} />
+      <div className="mt-10">
+        <Plans />
+      </div>
+      <SurfaceStatus items={surfaceStatus} />
+      <TrustGrid />
+      <JsonLayers />
+      <ExploreGrid />
+      <DataContractDetails dataset={dataset} dataSource={currentDataSource()} />
 
       <ExplainModal
         id="what-is-modal"
-        title={whatIsExplain.title}
-        subtitle={whatIsExplain.subtitle}
-        pair={{ basic: whatIsExplain.basic, advanced: whatIsExplain.advanced }}
-        traceability={whatIsExplain.traceability}
-      />
-
-      <ExplainModal
-        id="regime-label-modal"
-        title={regimeLabelExplain.title}
-        subtitle={regimeLabelExplain.subtitle}
-        pair={{ basic: regimeLabelExplain.basic, advanced: regimeLabelExplain.advanced }}
-        traceability={regimeLabelExplain.traceability}
-      />
-
-      <ExplainModal
-        id="confidence-modal"
-        title={confidenceExplain.title}
-        subtitle={confidenceExplain.subtitle}
-        pair={{ basic: confidenceExplain.basic, advanced: confidenceExplain.advanced }}
-        traceability={confidenceExplain.traceability}
-      />
-
-      <ExplainModal
-        id="freshness-modal"
-        title={freshnessExplain.title}
-        subtitle={freshnessExplain.subtitle}
-        pair={{ basic: freshnessExplain.basic, advanced: freshnessExplain.advanced }}
-        traceability={freshnessExplain.traceability}
-      />
-
-      <ExplainModal
-        id="data-layers-modal"
-        title={dataLayersExplain.title}
-        subtitle={dataLayersExplain.subtitle}
-        pair={{ basic: dataLayersExplain.basic, advanced: dataLayersExplain.advanced }}
-        traceability={dataLayersExplain.traceability}
+        title="What TrendAnalytics is"
+        subtitle="A narrow product with a specific job: classify whether current on-chain change still looks like noise or has started to persist like a structural shift."
+        pair={whatIsExplain}
       />
 
       <ExplainModal
         id="boundary-modal"
-        title={boundaryExplain.title}
-        subtitle={boundaryExplain.subtitle}
-        pair={{ basic: boundaryExplain.basic, advanced: boundaryExplain.advanced }}
-        traceability={boundaryExplain.traceability}
-      />
-
-      <ExplainModal
-        id="site-org-modal"
-        title={siteOrgExplain.title}
-        subtitle={siteOrgExplain.subtitle}
-        pair={{ basic: siteOrgExplain.basic, advanced: siteOrgExplain.advanced }}
-        traceability={siteOrgExplain.traceability}
-      />
-
-      <ExplainModal
-        id="notables-modal"
-        title={notablesExplain.title}
-        subtitle={notablesExplain.subtitle}
-        pair={{ basic: notablesExplain.basic, advanced: notablesExplain.advanced }}
-        traceability={notablesExplain.traceability}
-      />
-
-      <ExplainModal
-        id="subscriber-modal"
-        title={subscriberExplain.title}
-        subtitle={subscriberExplain.subtitle}
-        pair={{ basic: subscriberExplain.basic, advanced: subscriberExplain.advanced }}
-        traceability={subscriberExplain.traceability}
-      />
-      <ExplainModal
-        id="value-modal"
-        title={valueExplain.title}
-        subtitle={valueExplain.subtitle}
-        pair={{ basic: valueExplain.basic, advanced: valueExplain.advanced }}
-        traceability={valueExplain.traceability}
+        title="Interpretation boundary"
+        subtitle="TrendAnalytics is intentionally descriptive. It explains current network state, but it does not tell you what to do."
+        pair={boundaryExplain}
       />
     </main>
   );
