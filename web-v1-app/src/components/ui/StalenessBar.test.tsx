@@ -1,3 +1,4 @@
+
 import React from "react";
 import { render, screen } from "@testing-library/react";
 
@@ -39,13 +40,18 @@ describe("StalenessBar logic", () => {
     });
   });
 
-  test("returns OK when lag is missing", () => {
-    expect(computeStalenessState("bitcoin", undefined)).toBe("OK");
-    expect(computeStalenessState("bitcoin", null)).toBe("OK");
+  test("returns UNKNOWN when lag is missing", () => {
+    expect(computeStalenessState("bitcoin", undefined)).toBe("UNKNOWN");
+    expect(computeStalenessState("bitcoin", null)).toBe("UNKNOWN");
   });
 
-  test("returns OK when lag is NaN", () => {
-    expect(computeStalenessState("bitcoin", Number.NaN)).toBe("OK");
+  test("returns UNKNOWN when lag is NaN", () => {
+    expect(computeStalenessState("bitcoin", Number.NaN)).toBe("UNKNOWN");
+  });
+
+  test("returns DEGRADED when confidence is below 0.40", () => {
+    expect(computeStalenessState("bitcoin", 1, 0.39)).toBe("DEGRADED");
+    expect(computeStalenessState("arbitrum", 7, 0.1)).toBe("DEGRADED");
   });
 
   test("returns OK at and below expected/soft threshold boundary", () => {
@@ -80,7 +86,7 @@ describe("StalenessBar rendering", () => {
   });
 
   test("renders for bitcoin when OK and showWhenOk is true", () => {
-    render(
+    const { container } = render(
       <StalenessBar
         chain="bitcoin"
         lagDays={1}
@@ -89,39 +95,37 @@ describe("StalenessBar rendering", () => {
       />
     );
 
-    expect(screen.getByText(/on schedule/i)).toBeInTheDocument();
+    expect(screen.getByText(/^On schedule$/i)).toBeInTheDocument();
     expect(
       screen.getByText(/btc policy:\s*expected 1d · soft 2d · hard 4d/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/data as of/i)).toBeInTheDocument();
-    expect(screen.getByText(/2026-03-22/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/observed lag:\s*1d\. expected publish lag is ~1 day\(s\)\./i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/meta\.confidence\.lag_days_vs_utc_today/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/meta\.updated_through/i)).toBeInTheDocument();
+
+    expect(container).toHaveTextContent(/data as of\s*2026-03-22/i);
+    expect(container).toHaveTextContent(/observed lag\s*1d/i);
+    expect(container).toHaveTextContent(
+      /observed lag is 1d\..*normal publication policy is approximately 1 day\(s\).*inside expected schedule/i
+    );
   });
 
   test("renders informational OK banner for arbitrum even when showWhenOk is false", () => {
-    render(
+    const { container } = render(
       <StalenessBar chain="arbitrum" lagDays={7} asOfDate="2026-03-22" />
     );
 
-    expect(screen.getByText(/on schedule/i)).toBeInTheDocument();
+    expect(screen.getByText(/^On schedule$/i)).toBeInTheDocument();
     expect(
       screen.getByText(/arb policy:\s*expected 7d · soft 10d · hard 15d/i)
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /this chain is published with an expected delay of approximately 7 days/i
-      )
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/meta\.confidence\.lag_days_vs_utc_today/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/meta\.updated_through/i)).toBeInTheDocument();
+
+    expect(container).toHaveTextContent(
+      /intentionally published on a slower cadence than btc and eth/i
+    );
+    expect(container).toHaveTextContent(
+      /observed lag around 7 days is part of the normal publication policy/i
+    );
+    expect(container).toHaveTextContent(/observed lag in the current row:\s*7d/i);
+    expect(container).toHaveTextContent(/data as of\s*2026-03-22/i);
+    expect(container).toHaveTextContent(/observed lag\s*7d/i);
   });
 
   test("renders WARN state for bitcoin soft staleness", () => {
@@ -129,16 +133,17 @@ describe("StalenessBar rendering", () => {
       <StalenessBar chain="bitcoin" lagDays={3} asOfDate="2026-03-22" />
     );
 
-    expect(screen.getByText(/soft staleness/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/updates appear delayed beyond the expected schedule/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/^Soft staleness$/i)).toBeInTheDocument();
+    expect(screen.getByText(/published data appears delayed/i)).toBeInTheDocument();
     expect(
       screen.getByText(/btc policy:\s*expected 1d · soft 2d · hard 4d/i)
     ).toBeInTheDocument();
 
     expect(container).toHaveTextContent(/data as of\s*2026-03-22/i);
-    expect(container).toHaveTextContent(/observed lag\s*3\s*d/i);
+    expect(container).toHaveTextContent(/observed lag\s*3d/i);
+    expect(container).toHaveTextContent(
+      /observed lag is above the chain.s usual publication policy but not yet beyond the hard-fail boundary/i
+    );
   });
 
   test("renders FAIL state for bitcoin hard staleness", () => {
@@ -146,19 +151,19 @@ describe("StalenessBar rendering", () => {
       <StalenessBar chain="bitcoin" lagDays={5} asOfDate="2026-03-22" />
     );
 
-    expect(screen.getByText(/hard staleness/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Hard staleness$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /updates appear significantly delayed relative to the expected schedule/i
-      )
+      screen.getByText(/published data appears materially delayed/i)
     ).toBeInTheDocument();
     expect(
       screen.getByText(/btc policy:\s*expected 1d · soft 2d · hard 4d/i)
     ).toBeInTheDocument();
 
     expect(container).toHaveTextContent(/data as of\s*2026-03-22/i);
-    expect(container).toHaveTextContent(/observed lag\s*5\s*d/i);
-    expect(screen.getByText(/this banner never hides data/i)).toBeInTheDocument();
+    expect(container).toHaveTextContent(/observed lag\s*5d/i);
+    expect(container).toHaveTextContent(
+      /freshness is now outside the hard-fail boundary/i
+    );
   });
 
   test("renders WARN state for arbitrum soft staleness", () => {
@@ -166,13 +171,13 @@ describe("StalenessBar rendering", () => {
       <StalenessBar chain="arbitrum" lagDays={11} asOfDate="2026-03-22" />
     );
 
-    expect(screen.getByText(/soft staleness/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Soft staleness$/i)).toBeInTheDocument();
     expect(
       screen.getByText(/arb policy:\s*expected 7d · soft 10d · hard 15d/i)
     ).toBeInTheDocument();
 
     expect(container).toHaveTextContent(/data as of\s*2026-03-22/i);
-    expect(container).toHaveTextContent(/observed lag\s*11\s*d/i);
+    expect(container).toHaveTextContent(/observed lag\s*11d/i);
   });
 
   test("renders FAIL state for base hard staleness", () => {
@@ -180,22 +185,49 @@ describe("StalenessBar rendering", () => {
       <StalenessBar chain="base" lagDays={16} asOfDate="2026-03-22" />
     );
 
-    expect(screen.getByText(/hard staleness/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Hard staleness$/i)).toBeInTheDocument();
     expect(
       screen.getByText(/base policy:\s*expected 7d · soft 10d · hard 15d/i)
     ).toBeInTheDocument();
 
     expect(container).toHaveTextContent(/data as of\s*2026-03-22/i);
-    expect(container).toHaveTextContent(/observed lag\s*16\s*d/i);
+    expect(container).toHaveTextContent(/observed lag\s*16d/i);
   });
 
-  test("renders placeholder lag text when lag is unavailable", () => {
-    render(
-      <StalenessBar chain="arbitrum" lagDays={undefined} asOfDate="2026-03-22" />
+  test("renders UNKNOWN state when lag is unavailable", () => {
+    const { container } = render(
+      <StalenessBar
+        chain="arbitrum"
+        lagDays={undefined}
+        asOfDate="2026-03-22"
+      />
     );
 
-    expect(screen.getByText(/on schedule/i)).toBeInTheDocument();
-    expect(screen.getByText(/data as of/i)).toBeInTheDocument();
-    expect(screen.getByText(/\(observed lag:\s*—\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Freshness unknown$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/freshness could not be classified/i)
+    ).toBeInTheDocument();
+    expect(container).toHaveTextContent(/data as of\s*2026-03-22/i);
+    expect(container).toHaveTextContent(/observed lag\s*—/i);
+  });
+
+  test("renders DEGRADED state when confidence is below threshold", () => {
+    const { container } = render(
+      <StalenessBar
+        chain="bitcoin"
+        lagDays={1}
+        asOfDate="2026-03-22"
+        confidenceScore={0.39}
+      />
+    );
+
+    expect(screen.getByText(/^Unknown \/ degraded$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/published state should be treated as degraded/i)
+    ).toBeInTheDocument();
+    expect(container).toHaveTextContent(
+      /confidence is below the canonical 0\.40 publish threshold/i
+    );
+    expect(container).toHaveTextContent(/confidence\s*0\.390/i);
   });
 });

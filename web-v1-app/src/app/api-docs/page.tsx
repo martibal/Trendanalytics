@@ -874,6 +874,35 @@ curl -H "X-API-Key: ta_live_xxxxxxxxx" \\
         subtitle="How anomaly signals are computed and how they differ from driver z-scores."
         pair={whnExplain}
       />
+
+      <section className="rounded-xl border p-6">
+        <h2 className="text-lg font-semibold">Related public routes</h2>
+        <div className="mt-3 space-y-3 text-sm leading-6 text-muted-foreground">
+          <p>
+            The public website also includes route-level surfaces that sit alongside the API and
+            support endpoints documented here.
+          </p>
+          <ul className="list-disc pl-5">
+            <li>
+              <code className="rounded bg-muted px-1 py-0.5">/chains/[chain]</code> — per-chain
+              current-state page
+            </li>
+            <li>
+              <code className="rounded bg-muted px-1 py-0.5">/chains/[chain]/history</code> — per-chain
+              historical view
+            </li>
+            <li>
+              <code className="rounded bg-muted px-1 py-0.5">/track-record</code> — historical track
+              record and review surface
+            </li>
+            <li>
+              <code className="rounded bg-muted px-1 py-0.5">/about</code> — product, methodology,
+              and data-source context
+            </li>
+          </ul>
+        </div>
+      </section>
+      
     </main>
   );
 }

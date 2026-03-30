@@ -1,4 +1,4 @@
-// src/components/MetricLineChart.test.tsx
+
 import { render, screen, waitFor } from "@testing-library/react";
 
 import MetricLineChart, { type MetricPoint } from "@/components/MetricLineChart";
@@ -73,7 +73,7 @@ describe("components/MetricLineChart", () => {
     }
   });
 
-  it("renders chart title, subtitle, units and series summary", async () => {
+  it("renders chart title, subtitle, units, legend, and current signal", async () => {
     const data: MetricPoint[] = [
       { date: "2026-03-18", value: 12, ma7: 11, ma30: 10 },
       { date: "2026-03-19", value: 13, ma7: 11.5, ma30: 10.2 },
@@ -90,14 +90,20 @@ describe("components/MetricLineChart", () => {
     );
 
     expect(screen.getByText("Transaction count")).toBeInTheDocument();
-    expect(screen.getByText("90d context")).toBeInTheDocument();
     expect(screen.getByText("Units: tx")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(container.querySelector("svg")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Showing: Value, MA7, MA30 · Units: tx. No reinterpretation applied.")).toBeInTheDocument();
+    expect(screen.getByText("Current signal")).toBeInTheDocument();
+    expect(screen.getByText("MA7 +15.4% above MA30")).toBeInTheDocument();
+
+    expect(screen.getByText("Daily raw value")).toBeInTheDocument();
+    expect(screen.getByText("MA7 — 7-day moving average")).toBeInTheDocument();
+    expect(screen.getByText("MA30 — 30-day trend baseline")).toBeInTheDocument();
+
+    expect(screen.getByText("90d context")).toBeInTheDocument();
   });
 
   it("renders preparing state before width is available", () => {
@@ -142,9 +148,10 @@ describe("components/MetricLineChart", () => {
       expect(container.querySelector("svg")).toBeInTheDocument();
     });
 
-    expect(
-      screen.getByText("Showing: MA7. No reinterpretation applied.")
-    ).toBeInTheDocument();
+    expect(screen.getByText("MA7 — 7-day moving average")).toBeInTheDocument();
+    expect(screen.queryByText("Daily raw value")).not.toBeInTheDocument();
+    expect(screen.queryByText("MA30 — 30-day trend baseline")).not.toBeInTheDocument();
+    expect(screen.queryByText("Current signal")).not.toBeInTheDocument();
   });
 
   it("uses the provided height on the chart container", () => {
@@ -172,8 +179,10 @@ describe("components/MetricLineChart", () => {
       expect(container.querySelector("svg")).toBeInTheDocument();
     });
 
-    expect(
-      screen.getByText("Showing: . No reinterpretation applied.")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Empty chart")).toBeInTheDocument();
+    expect(screen.queryByText("Daily raw value")).not.toBeInTheDocument();
+    expect(screen.queryByText("MA7 — 7-day moving average")).not.toBeInTheDocument();
+    expect(screen.queryByText("MA30 — 30-day trend baseline")).not.toBeInTheDocument();
+    expect(screen.queryByText("Current signal")).not.toBeInTheDocument();
   });
 });

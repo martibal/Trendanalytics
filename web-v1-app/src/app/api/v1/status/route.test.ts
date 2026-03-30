@@ -1,3 +1,4 @@
+
 /**
  * @jest-environment node
  */
@@ -18,19 +19,26 @@ jest.mock("@/lib/storage", () => ({
 describe("GET /api/v1/status", () => {
   let GET: () => Promise<Response>;
 
-  beforeAll(async () => {
-    const mod = (await import("./route")) as typeof import("./route");
-    GET = mod.GET;
-  });
-
-  beforeEach(() => {
+  beforeEach(async () => {
+    jest.resetModules();
     jest.clearAllMocks();
+
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-03-22T00:00:00Z"));
+
     mockCurrentDataSource.mockReturnValue("local");
     mockReadDatasetManifest.mockResolvedValue({
       version: "2026-03-19.204611",
       published_at: "2026-03-19T20:46:11Z",
       methodology_version: "v3.1",
     });
+
+    const mod = (await import("./route")) as typeof import("./route");
+    GET = mod.GET;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   function jsonBytes(value: unknown) {

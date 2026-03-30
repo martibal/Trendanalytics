@@ -1,22 +1,29 @@
-import { existsSync } from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const offenders = [
-  ".runtime-logs",
+
+const forbiddenPaths = [
+  "chain_depth_bundle",
   "playwright-report",
   "test-results",
-  "tsconfig.tsbuildinfo",
-  "MetricLineChart.tsx",
+  ".runtime-logs",
+  "coverage",
+  "dist",
+  "tmp",
   "chains_page.tsx",
+  "MetricLineChart.tsx",
+  "src/app/landing_page_v2.tsx",
+  "src/app/track-record/track_record_page.tsx",
+  "src/lib/chains/pageExplanations #U2013 Kopi.tsx",
 ];
 
-const present = offenders.filter((entry) => existsSync(path.join(root, entry)));
+const found = forbiddenPaths.filter((rel) => fs.existsSync(path.join(root, rel)));
 
-if (present.length > 0) {
-  console.error("Repository hygiene check failed. Remove committed generated or duplicate files:");
-  for (const entry of present) console.error(` - ${entry}`);
+if (found.length > 0) {
+  console.error("Repo hygiene check failed. Remove these paths before launch:");
+  for (const rel of found) console.error(` - ${rel}`);
   process.exit(1);
 }
 
-console.log("Repository hygiene check passed.");
+console.log("Repo hygiene check passed.");
