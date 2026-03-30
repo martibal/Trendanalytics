@@ -835,9 +835,15 @@ export default async function HomePage() {
             </div>
             <h3 className="mt-3 text-xl font-semibold">Gold · Meta · Derived</h3>
             <p className="mt-3 text-sm leading-7 text-slate-300">
-              Three published layers — raw observations, regime intelligence, and smoothed trends.
-              Each one builds on the previous and can be downloaded by subscribers.
+              Three published JSON layers — raw observations, regime intelligence, and smoothed
+              trends. Each one builds on the previous and can be downloaded by subscribers.
             </p>
+            <Link
+              href="/api-docs/schema"
+              className="mt-4 inline-flex items-center text-xs text-cyan-200 hover:underline"
+            >
+              See every field documented →
+            </Link>
           </div>
 
           {/* Interpretation boundary */}
@@ -878,6 +884,134 @@ export default async function HomePage() {
             </div>
           </div>
 
+        </div>
+      </section>
+
+      {/* ── JSON data layers ─────────────────────────────────────────────── */}
+      <section className="mt-10">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+              What subscribers receive
+            </div>
+            <h2 className="mt-1 text-3xl font-semibold">Three JSON files per chain, per day</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
+              Every subscription gives you direct API access to the published JSON artifacts.
+              Here is exactly what those files contain.
+            </p>
+          </div>
+          <Link
+            href="/api-docs/schema"
+            className="shrink-0 inline-flex items-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-1.5 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+          >
+            Full field reference →
+          </Link>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+
+          {/* Gold */}
+          <div className="rounded-3xl border border-yellow-500/15 bg-yellow-500/5 p-6 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-yellow-300">
+              Gold
+            </div>
+            <h3 className="mt-2 text-xl font-semibold text-white">Raw daily observations</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              Exactly what the blockchain did each day — in native units, unmodified. The
+              authoritative source that all other layers are built from.
+            </p>
+            <ul className="mt-4 space-y-1.5 text-xs text-slate-400">
+              {[
+                "tx_count_daily — daily transaction count",
+                "median_tx_fee_native — typical fee per tx",
+                "gas_utilization_pct — block fullness (ETH)",
+                "unique_active_addresses — breadth of use",
+                "avg_block_time_sec — block cadence",
+                "+ 5 more fields",
+              ].map((f) => (
+                <li key={f} className="flex items-start gap-2">
+                  <span className="mt-0.5 shrink-0 text-yellow-500/60">·</span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <Link href="/api-docs/schema#gold" className="mt-5 inline-flex items-center text-xs text-yellow-300 hover:underline">
+              See all Gold fields →
+            </Link>
+          </div>
+
+          {/* Meta */}
+          <div className="rounded-3xl border border-purple-500/15 bg-purple-500/5 p-6 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-purple-300">
+              Meta
+            </div>
+            <h3 className="mt-2 text-xl font-semibold text-white">Regime intelligence</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              The full analytical output — regime label, confidence score, three-axis
+              scorecard, and ranked driver set with z-scores and percentiles.
+            </p>
+            <ul className="mt-4 space-y-1.5 text-xs text-slate-400">
+              {[
+                "status.label — STABLE / HEATING / CONGESTED / CHEAP",
+                "confidence.confidence_score — evidence quality",
+                "scorecard.dimensions.demand/friction/capacity",
+                "regime.drivers[] — top signals with z-score",
+                "regime.determinism_hash — reproducibility proof",
+                "+ 20 more fields",
+              ].map((f) => (
+                <li key={f} className="flex items-start gap-2">
+                  <span className="mt-0.5 shrink-0 text-purple-500/60">·</span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <Link href="/api-docs/schema#meta" className="mt-5 inline-flex items-center text-xs text-purple-300 hover:underline">
+              See all Meta fields →
+            </Link>
+          </div>
+
+          {/* Derived */}
+          <div className="rounded-3xl border border-blue-500/15 bg-blue-500/5 p-6 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-300">
+              Derived
+            </div>
+            <h3 className="mt-2 text-xl font-semibold text-white">Smoothed trend series</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              7-day and 30-day moving averages for every Gold metric. Useful for
+              distinguishing brief spikes from sustained structural changes in your own analysis.
+            </p>
+            <ul className="mt-4 space-y-1.5 text-xs text-slate-400">
+              {[
+                "<metric>__ma7 — 7-day rolling mean",
+                "<metric>__ma30 — 30-day rolling mean",
+                "derived.meta_confidence — confidence overlay",
+                "Available for all numeric Gold fields",
+                "min_periods=1 — no gaps in the series",
+                "Independently verifiable from Gold",
+              ].map((f) => (
+                <li key={f} className="flex items-start gap-2">
+                  <span className="mt-0.5 shrink-0 text-blue-500/60">·</span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <Link href="/api-docs/schema#derived" className="mt-5 inline-flex items-center text-xs text-blue-300 hover:underline">
+              See all Derived fields →
+            </Link>
+          </div>
+
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-white/8 bg-white/3 p-4 text-sm leading-7 text-slate-300">
+          All three layers are available via the authenticated file delivery API at{" "}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+            /api/v1/files/&lt;gold|meta|derived&gt;/&lt;chain&gt;/&lt;window&gt;.json
+          </code>
+          . Basic subscribers get one chain and up to 90 days of history. Pro subscribers
+          get all four chains and up to 365 days.{" "}
+          <Link href="/api-docs/schema" className="text-cyan-200 hover:underline">
+            Every field is documented in the schema reference.
+          </Link>
         </div>
       </section>
 

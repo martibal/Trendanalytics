@@ -772,6 +772,32 @@ export default async function ApiDocsPage() {
         </div>
       </section>
 
+      {/* ── Schema reference call-out ─────────────────────────────────────── */}
+      <section className="mb-8 rounded-3xl border border-cyan-500/20 bg-cyan-500/5 p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+              Before you subscribe
+            </div>
+            <h2 className="mt-1 text-2xl font-semibold text-white">
+              See every field you will receive
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-300">
+              The JSON Schema Reference documents every field in every published file — Gold,
+              Meta, and Derived — with Basic and Advanced explanations derived directly from
+              the pipeline source code. Know exactly what a subscription delivers before you
+              subscribe.
+            </p>
+          </div>
+          <Link
+            href="/api-docs/schema"
+            className="shrink-0 inline-flex items-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+          >
+            JSON Schema Reference →
+          </Link>
+        </div>
+      </section>
+
       {/* ── Quick start ──────────────────────────────────────────────────── */}
       <section className="mb-8 rounded-3xl border p-6 shadow-sm">
         <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
@@ -874,35 +900,6 @@ curl -H "X-API-Key: ta_live_xxxxxxxxx" \\
         subtitle="How anomaly signals are computed and how they differ from driver z-scores."
         pair={whnExplain}
       />
-
-      <section className="rounded-xl border p-6">
-        <h2 className="text-lg font-semibold">Related public routes</h2>
-        <div className="mt-3 space-y-3 text-sm leading-6 text-muted-foreground">
-          <p>
-            The public website also includes route-level surfaces that sit alongside the API and
-            support endpoints documented here.
-          </p>
-          <ul className="list-disc pl-5">
-            <li>
-              <code className="rounded bg-muted px-1 py-0.5">/chains/[chain]</code> — per-chain
-              current-state page
-            </li>
-            <li>
-              <code className="rounded bg-muted px-1 py-0.5">/chains/[chain]/history</code> — per-chain
-              historical view
-            </li>
-            <li>
-              <code className="rounded bg-muted px-1 py-0.5">/track-record</code> — historical track
-              record and review surface
-            </li>
-            <li>
-              <code className="rounded bg-muted px-1 py-0.5">/about</code> — product, methodology,
-              and data-source context
-            </li>
-          </ul>
-        </div>
-      </section>
-      
     </main>
   );
 }
