@@ -361,9 +361,9 @@ export default async function HomePage() {
       <div className="mt-10">
         <Plans />
       </div>
+      <JsonLayers />
       <SurfaceStatus items={surfaceStatus} />
       <TrustGrid />
-      <JsonLayers />
       <ExploreGrid />
       <DataContractDetails dataset={dataset} dataSource={currentDataSource()} />
 
