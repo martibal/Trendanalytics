@@ -4,6 +4,7 @@ export type SurfaceRowDisplay = {
   label: string;
   name: string;
   status: string;
+  statusLabel: string;
   statusClass: string;
   publishedRegime: string | null;
   confidenceValue: string;
@@ -12,6 +13,11 @@ export type SurfaceRowDisplay = {
   asOf: string;
   lagValue: string;
   takeaway: string;
+  regimeTooltip: string;
+  confidenceTooltip: string;
+  asOfTooltip: string;
+  lagTooltip: string;
+  statusTooltip: string;
 };
 
 export function confidenceBand(value?: number | null) {

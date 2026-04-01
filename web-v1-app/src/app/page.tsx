@@ -198,7 +198,7 @@ function lagDaysFromIsoDay(date?: string): number | null {
 }
 
 function expectedDelayDays(chain: ChainId): number {
-  return chain === "arbitrum" || chain === "base" ? 7 : 0;
+  return chain === "arbitrum" || chain === "base" ? 7 : 1;
 }
 
 function classifyStatus(params: {
@@ -281,6 +281,72 @@ function buildSurfaceStatus(rows: StatusApiRow[]) {
   return items.slice(0, 3);
 }
 
+function buildRegimeTooltip(row: StatusApiRow): string {
+  if (!row.published_regime) {
+    return `No published regime label is currently visible for ${row.label}. Open the chain page for the latest available breakdown.`;
+  }
+
+  const base = `The latest published Meta row for ${row.label} currently labels the chain as ${row.published_regime}.`;
+
+  if (row.published_regime === "HEATING") {
+    return `${base} On the landing page this means the current published state is flagged as heating rather than neutral. Open the chain page for the scorecard and drivers behind the label.`;
+  }
+  if (row.published_regime === "CONGESTED") {
+    return `${base} On the landing page this means the current published state is flagged as congested rather than neutral. Open the chain page for the scorecard and drivers behind the label.`;
+  }
+  if (row.published_regime === "CHEAP") {
+    return `${base} On the landing page this means the current published state is flagged as cheap rather than neutral. Open the chain page for the scorecard and drivers behind the label.`;
+  }
+  if (row.published_regime === "STABLE") {
+    return `${base} On the landing page this means the current published state is stable relative to the model's current thresholds. Open the chain page for the full breakdown.`;
+  }
+  return `${base} Open the chain page for the scorecard and drivers behind the label.`;
+}
+
+function buildConfidenceTooltip(row: StatusApiRow, band: string): string {
+  if (typeof row.confidence_score !== "number") {
+    return `No published confidence score is currently visible for ${row.label}.`;
+  }
+
+  const value = row.confidence_score.toFixed(3);
+  if (band === "Good") {
+    return `The current published confidence for ${row.label} is ${value}. This sits in the Good band, meaning the visible label has comparatively stronger evidential support right now. Confidence measures support for the published label, not future direction.`;
+  }
+  if (band === "Caution") {
+    return `The current published confidence for ${row.label} is ${value}. This sits in the Caution band: still readable, but it should be interpreted more carefully than a stronger-support row. Confidence measures support for the published label, not future direction.`;
+  }
+  return `The current published confidence for ${row.label} is ${value}. This is below the normal publish floor, so the row should be treated as degraded or traceability-only context rather than a strong published state.`;
+}
+
+function buildAsOfTooltip(row: StatusApiRow): string {
+  if (!row.as_of) {
+    return `No published as-of date is currently visible for ${row.label}.`;
+  }
+  return `As of ${row.as_of} means this card reflects the latest published row dated ${row.as_of}. It is the date of the visible artifact, not a real-time timestamp.`;
+}
+
+function buildLagTooltip(row: StatusApiRow): string {
+  if (typeof row.lag_days !== "number") {
+    return `No published lag value is currently visible for ${row.label}.`;
+  }
+  const cadence = row.expected_delay_days === 7 ? "around 7 days" : "around 1 day";
+  return `Lag ${row.lag_days}d means the latest visible row for ${row.label} is ${row.lag_days} day(s) behind the current reference date. Normal publish cadence for ${row.label} is ${cadence}.`;
+}
+
+function buildStatusTooltip(row: StatusApiRow): string {
+  const cadence = row.expected_delay_days === 7 ? "around 7 days" : "around 1 day";
+  if (row.status === "ok") {
+    return `OK means the latest published row is inside ${row.label}'s expected cadence. Normal publish cadence for this chain is ${cadence}. This status refers to freshness only, not price action or a buy/sell signal.`;
+  }
+  if (row.status === "warn") {
+    return `WARN means the latest published row is outside ${row.label}'s normal cadence band, but still inside the softer warning range. This status refers to freshness only, not price action or a buy/sell signal.`;
+  }
+  if (row.status === "fail") {
+    return `FAIL means the latest published row is materially outside ${row.label}'s expected cadence. This status refers to freshness only, not price action or a buy/sell signal.`;
+  }
+  return `UNKNOWN means the landing page cannot classify freshness cleanly for ${row.label} from the latest published row.`;
+}
+
 function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
   const band = confidenceBand(row.confidence_score);
   return {
@@ -289,6 +355,7 @@ function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
     label: row.label,
     name: row.name,
     status: row.status,
+    statusLabel: row.status.toUpperCase(),
     statusClass: statusChipClass(row.status),
     publishedRegime: row.published_regime,
     confidenceValue: fmtConfidence(row.confidence_score),
@@ -301,6 +368,11 @@ function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
       publishedRegime: row.published_regime,
       confidenceScore: row.confidence_score,
     }),
+    regimeTooltip: buildRegimeTooltip(row),
+    confidenceTooltip: buildConfidenceTooltip(row, band),
+    asOfTooltip: buildAsOfTooltip(row),
+    lagTooltip: buildLagTooltip(row),
+    statusTooltip: buildStatusTooltip(row),
   };
 }
 
@@ -356,7 +428,7 @@ export default async function HomePage() {
     <main className="mx-auto max-w-7xl px-6 py-10">
       <ModalStyles />
 
-      <Hero rows={displayRows} />
+      <Hero />
       <LiveChains rows={displayRows} />
       <div className="mt-10">
         <Plans />

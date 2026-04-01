@@ -1,12 +1,7 @@
 import Link from "next/link";
-import type { SurfaceRowDisplay } from "@/lib/landingSurface";
 import { landingProofChips } from "@/lib/landing";
 
-type HeroProps = {
-  rows: SurfaceRowDisplay[];
-};
-
-export default function Hero({ rows }: HeroProps) {
+export default function Hero() {
   return (
     <header className="mb-10">
       <div className="grid gap-6 rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm lg:grid-cols-[minmax(0,1.25fr)_360px]">
@@ -27,22 +22,22 @@ export default function Hero({ rows }: HeroProps) {
 
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
-              href="/chains"
+              href="#plans"
               className="inline-flex items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
             >
-              View live chains →
+              See plans
             </Link>
             <Link
-              href="#plans"
+              href="#subscriber-files"
               className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
             >
-              See plans
+              Subscriber files
             </Link>
             <Link
               href="/api-docs/schema"
               className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
             >
-              API schema
+              Full field reference
             </Link>
           </div>
 
@@ -70,24 +65,31 @@ export default function Hero({ rows }: HeroProps) {
 
         <aside className="rounded-3xl border border-white/10 bg-black/10 p-5">
           <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-            Live right now
+            How to read the latest surface
           </div>
           <div className="mt-4 space-y-3">
-            {rows.map((row) => (
-              <Link
-                key={row.chain}
-                href={row.href}
-                className="block rounded-2xl border border-white/8 bg-white/4 p-4 hover:border-cyan-500/30"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-white">{row.label}</div>
-                  <span className={row.statusClass}>{row.status}</span>
-                </div>
-                <div className="mt-2 text-sm text-slate-300">
-                  {row.publishedRegime ?? "No published label"} · confidence {row.confidenceValue} · lag {row.lagValue}
-                </div>
-              </Link>
-            ))}
+            <div className="rounded-2xl border border-white/8 bg-white/4 p-4">
+              <div className="text-sm font-semibold text-white">Latest published, not real-time</div>
+              <div className="mt-2 text-sm leading-6 text-slate-300">
+                Every value on the landing page comes from the latest published daily artifact.
+                The surface is designed to filter out intraday chatter, not mirror it.
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/4 p-4">
+              <div className="text-sm font-semibold text-white">Regime + confidence + timing</div>
+              <div className="mt-2 text-sm leading-6 text-slate-300">
+                Regime tells you the current published state, confidence tells you how well
+                supported that label is, and lag tells you how old the latest row is relative
+                to expected cadence.
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/4 p-4">
+              <div className="text-sm font-semibold text-white">Paid tiers unlock JSON</div>
+              <div className="mt-2 text-sm leading-6 text-slate-300">
+                Subscribers get Gold, Meta, and Derived JSON files through API calls. The full
+                field-by-field structure is documented openly before purchase.
+              </div>
+            </div>
           </div>
         </aside>
       </div>

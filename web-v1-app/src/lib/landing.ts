@@ -29,10 +29,13 @@ export const landingPlans = [
     price: "$0",
     accent: "text-slate-300",
     border: "border-white/10 bg-white/5",
-    body: "Readable web surface for all supported chains.",
-    detail: "Public chain pages, labels, scorecards, drivers, and charts. No subscriber JSON access.",
-    href: "/chains",
-    cta: "Open live surface →",
+    body: "Readable published web surface for all four supported chains.",
+    detail:
+      "Public chain pages, labels, scorecards, drivers, and charts. No subscriber JSON access.",
+    href: "#latest-surface",
+    cta: "See latest published surface →",
+    subHref: "/api-docs/schema",
+    subCta: "Preview subscriber file structure →",
   },
   {
     name: "Basic",
@@ -40,9 +43,12 @@ export const landingPlans = [
     accent: "text-cyan-200",
     border: "border-cyan-500/25 bg-cyan-500/8",
     body: "One chain with subscriber JSON access and 90-day history.",
-    detail: "Gold, Meta, and Derived JSON for one chain. Built for focused monitoring, research, and downstream use.",
+    detail:
+      "Gold, Meta, and Derived JSON for one chain. Built for focused monitoring, research, and downstream use.",
     href: "/sign-up",
     cta: "Start Basic →",
+    subHref: "#subscriber-files",
+    subCta: "See included JSON files →",
   },
   {
     name: "Pro",
@@ -50,9 +56,12 @@ export const landingPlans = [
     accent: "text-purple-200",
     border: "border-purple-500/25 bg-purple-500/8",
     body: "All four chains with subscriber JSON access and 365-day history.",
-    detail: "Gold, Meta, and Derived JSON across Bitcoin, Ethereum, Arbitrum, and Base. Best fit for heavier API and research usage.",
+    detail:
+      "Gold, Meta, and Derived JSON across Bitcoin, Ethereum, Arbitrum, and Base. Best fit for heavier API and research usage.",
     href: "/sign-up",
     cta: "Start Pro →",
+    subHref: "#subscriber-files",
+    subCta: "See included JSON files →",
   },
 ] as const;
 
@@ -143,11 +152,6 @@ export const jsonLayers = [
 
 export const exploreCards = [
   {
-    title: "Chains",
-    body: "Open the live chain pages and inspect the current surface for each supported network.",
-    href: "/chains",
-  },
-  {
     title: "Track Record",
     body: "Review prior labels, transitions, and confidence history on the published surface.",
     href: "/track-record",
@@ -158,8 +162,13 @@ export const exploreCards = [
     href: "/methodology",
   },
   {
+    title: "JSON Schema",
+    body: "Browse every published key in Gold, Meta, and Derived before you subscribe.",
+    href: "/api-docs/schema",
+  },
+  {
     title: "API Docs",
-    body: "See schemas, files, and access structure for subscribers and downstream consumers.",
+    body: "See file paths, entitlement shape, and machine-readable access for subscriber outputs.",
     href: "/api-docs",
   },
 ] as const;
