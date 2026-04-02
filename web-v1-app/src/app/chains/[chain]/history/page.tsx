@@ -101,21 +101,40 @@ function confidenceBand(value?: number) {
 }
 
 function bandClass(band: string) {
-  const base = "rounded-full border px-2 py-1 text-xs";
-  if (band === "Good") return `${base} bg-green-50`;
-  if (band === "Caution") return `${base} bg-yellow-50`;
-  if (band === "Degraded") return `${base} bg-red-50`;
-  return `${base} bg-muted`;
+  const base =
+    "inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium";
+  if (band === "Good") {
+    return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-300`;
+  }
+  if (band === "Caution") {
+    return `${base} border-amber-500/25 bg-amber-500/10 text-amber-300`;
+  }
+  if (band === "Degraded") {
+    return `${base} border-red-500/25 bg-red-500/10 text-red-300`;
+  }
+  return `${base} border-border bg-muted text-muted-foreground`;
 }
 
 function regimeBadgeClass(label?: string | null) {
-  const base = "rounded-full border px-2 py-1 text-xs";
-  if (!label) return `${base} bg-muted`;
-  if (label === "CONGESTED") return `${base} bg-red-50`;
-  if (label === "HEATING") return `${base} bg-yellow-50`;
-  if (label === "CHEAP") return `${base} bg-blue-50`;
-  if (label === "STABLE") return `${base} bg-green-50`;
-  return `${base} bg-muted`;
+  const base =
+    "inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium";
+  if (!label) return `${base} border-border bg-muted text-muted-foreground`;
+  if (label === "CONGESTED") {
+    return `${base} border-red-500/25 bg-red-500/10 text-red-300`;
+  }
+  if (label === "HEATING") {
+    return `${base} border-amber-500/25 bg-amber-500/10 text-amber-300`;
+  }
+  if (label === "CHEAP") {
+    return `${base} border-blue-500/25 bg-blue-500/10 text-blue-300`;
+  }
+  if (label === "STABLE") {
+    return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-300`;
+  }
+  if (label === "UNKNOWN/DEGRADED") {
+    return `${base} border-slate-400/25 bg-slate-400/10 text-slate-300`;
+  }
+  return `${base} border-border bg-muted text-muted-foreground`;
 }
 
 export default async function ChainHistoryPage({
