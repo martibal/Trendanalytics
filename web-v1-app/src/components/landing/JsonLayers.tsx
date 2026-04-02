@@ -1,4 +1,5 @@
 import Link from "next/link";
+import JsonExampleViewer from "@/components/landing/JsonExampleViewer";
 import { jsonLayers } from "@/lib/landing";
 
 export default function JsonLayers() {
@@ -15,12 +16,15 @@ export default function JsonLayers() {
             Every field in every file is documented in the schema reference.
           </p>
         </div>
-        <Link
-          href="/api-docs/schema"
-          className="shrink-0 inline-flex items-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2.5 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
-        >
-          Full field reference →
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <JsonExampleViewer />
+          <Link
+            href="/api-docs/schema"
+            className="shrink-0 inline-flex items-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2.5 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+          >
+            Full field reference →
+          </Link>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">

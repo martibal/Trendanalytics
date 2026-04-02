@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { landingPlans, landingUseCases } from "@/lib/landing";
 
-export default function Plans() {
+type PlansProps = {
+  historyDepthDays?: number | null;
+};
+
+export default function Plans({ historyDepthDays }: PlansProps) {
   return (
     <section
       id="plans"
@@ -51,6 +55,12 @@ export default function Plans() {
               <div className="mt-5 text-sm leading-7 text-slate-200">{plan.body}</div>
               <div className="mt-4 text-sm leading-7 text-slate-400">{plan.detail}</div>
 
+              {plan.name === "Pro" && historyDepthDays ? (
+                <div className="mt-3 rounded-xl border border-purple-500/20 bg-purple-500/5 px-3 py-2 text-xs text-purple-200">
+                  History Add-on unlocks <span className="font-semibold text-white">{historyDepthDays} days</span> of published history - and growing daily.
+                </div>
+              ) : null}
+
               <Link
                 href={plan.href}
                 className={`mt-6 inline-flex items-center text-sm font-medium hover:underline ${plan.accent}`}
@@ -64,7 +74,7 @@ export default function Plans() {
 
       <div className="mt-6 rounded-2xl border border-white/8 bg-white/4 p-4 text-sm leading-7 text-slate-300">
         History Add-on: one-time unlock for the full available history in your entitled scope.
-        Not built for price charts, real-time execution, or prescriptive trading signals.
+        {historyDepthDays ? ` Currently ${historyDepthDays} days and growing daily.` : ""} Not built for price charts, real-time execution, or prescriptive trading signals.
       </div>
     </section>
   );

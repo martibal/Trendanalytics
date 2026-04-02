@@ -19,6 +19,7 @@ import {
 import Hero from "@/components/landing/Hero";
 import LiveChains from "@/components/landing/LiveChains";
 import Plans from "@/components/landing/Plans";
+import { computeHistoryDepthDays } from "@/lib/historyDepth";
 import JsonLayers from "@/components/landing/JsonLayers";
 import ExploreGrid from "@/components/landing/ExploreGrid";
 import DataContractDetails from "@/components/landing/DataContractDetails";
@@ -349,10 +350,11 @@ function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
 export default async function HomePage() {
   const dataset: DatasetManifest | null = await readDatasetManifest();
 
-  const [landingPayload, statusPayload, metaFallbackRows] = await Promise.all([
+  const [landingPayload, statusPayload, metaFallbackRows, historyDepthDays] = await Promise.all([
     readPublishedJson<LandingApiResponse>("data/published/v1/landing/index.json"),
     readPublishedJson<StatusApiResponse>("data/published/v1/status/index.json"),
     buildMetaFallbackRows(),
+    computeHistoryDepthDays().catch(() => null),
   ]);
 
   const landingChains = extractLandingChains(landingPayload);
@@ -400,7 +402,7 @@ export default async function HomePage() {
       <Hero />
       <LiveChains rows={displayRows} />
       <div className="mt-10">
-        <Plans />
+        <Plans historyDepthDays={historyDepthDays} />
       </div>
       <JsonLayers />
       <ExploreGrid />
