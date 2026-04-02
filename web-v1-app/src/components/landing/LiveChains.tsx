@@ -1,7 +1,7 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import RegimeBadge from "@/components/RegimeBadge";
 import type { SurfaceRowDisplay } from "@/lib/landingSurface";
-import type { ReactNode } from "react";
 
 type LiveChainsProps = {
   rows: SurfaceRowDisplay[];
@@ -22,7 +22,7 @@ function HoverInfo({
     <span className={`group/hover relative ${wrapperClassName} cursor-help`}>
       {children}
       <span
-        className={`pointer-events-none absolute top-full z-20 mt-2 hidden w-80 rounded-2xl border border-cyan-500/20 bg-[#071322] p-3 text-[11px] leading-5 text-slate-200 shadow-2xl group-hover/hover:block group-focus-within/hover:block ${panelClassName}`}
+        className={`pointer-events-none absolute top-full z-20 mt-2 hidden w-80 rounded-2xl border border-cyan-500/20 bg-[#071322] p-3 text-[11px] leading-5 text-slate-200 shadow-2xl shadow-cyan-950/40 group-hover/hover:block group-focus-within/hover:block ${panelClassName}`}
       >
         {tooltip}
       </span>
@@ -53,7 +53,7 @@ export default function LiveChains({ rows }: LiveChainsProps) {
           <Link
             key={row.chain}
             href={row.href}
-            className="group rounded-3xl border bg-card p-5 shadow-sm transition hover:border-cyan-500/30 hover:bg-card"
+            className="group/card rounded-3xl border bg-card p-5 shadow-sm transition hover:border-cyan-500/30 hover:bg-card"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -62,8 +62,9 @@ export default function LiveChains({ rows }: LiveChainsProps) {
                   {row.name}
                 </div>
               </div>
+
               <HoverInfo tooltip={row.statusTooltip} panelClassName="right-0 left-auto">
-                <span className={row.statusClass}>{row.statusLabel}</span>
+                <span className={row.statusClass}>{row.statusText}</span>
               </HoverInfo>
             </div>
 
@@ -73,7 +74,7 @@ export default function LiveChains({ rows }: LiveChainsProps) {
               </div>
               <div className="mt-3">
                 {row.publishedRegime ? (
-                  <HoverInfo tooltip={row.regimeTooltip}>
+                  <HoverInfo tooltip={row.publishedRegimeTooltip}>
                     <span className="inline-flex">
                       <RegimeBadge label={row.publishedRegime} />
                     </span>
@@ -85,7 +86,7 @@ export default function LiveChains({ rows }: LiveChainsProps) {
               <p className="mt-3 text-sm leading-7 text-slate-300">{row.takeaway}</p>
             </div>
 
-            <HoverInfo tooltip={row.confidenceTooltip} wrapperClassName="group/hover relative mt-5 block">
+            <HoverInfo tooltip={row.confidenceTooltip} wrapperClassName="mt-5 block">
               <div className="rounded-2xl border bg-background/50 p-3">
                 <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   Confidence
@@ -98,7 +99,7 @@ export default function LiveChains({ rows }: LiveChainsProps) {
             </HoverInfo>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <HoverInfo tooltip={row.asOfTooltip} wrapperClassName="group/hover relative block">
+              <HoverInfo tooltip={row.asOfTooltip} wrapperClassName="block">
                 <div className="rounded-xl border bg-background/40 p-3">
                   <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                     As of
@@ -106,7 +107,12 @@ export default function LiveChains({ rows }: LiveChainsProps) {
                   <div className="mt-1 text-sm font-medium text-white">{row.asOf}</div>
                 </div>
               </HoverInfo>
-              <HoverInfo tooltip={row.lagTooltip} wrapperClassName="group/hover relative block" panelClassName="right-0 left-auto">
+
+              <HoverInfo
+                tooltip={row.lagTooltip}
+                wrapperClassName="block"
+                panelClassName="right-0 left-auto"
+              >
                 <div className="rounded-xl border bg-background/40 p-3">
                   <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                     Lag
@@ -116,7 +122,7 @@ export default function LiveChains({ rows }: LiveChainsProps) {
               </HoverInfo>
             </div>
 
-            <div className="mt-4 text-xs text-muted-foreground transition group-hover:text-cyan-200">
+            <div className="mt-4 text-xs text-muted-foreground transition group-hover/card:text-cyan-200">
               Open chain detail →
             </div>
           </Link>

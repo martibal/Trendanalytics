@@ -13,11 +13,12 @@ export default function Plans() {
             This is for you if
           </div>
           <h2 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
-            You want durable context, documented data, and less dashboard noise.
+            You want the JSON product, not just the charts.
           </h2>
           <p className="mt-4 text-base leading-8 text-slate-300">
-            TrendAnalytics is for analysts, researchers, and developers who want a repeatable way
-            to judge whether on-chain movement is transient or persistent.
+            The public site is the inspection layer. The paid tiers unlock the documented Gold,
+            Meta, and Derived JSON artifacts that save you from building the full AWS-to-analysis
+            pipeline yourself.
           </p>
 
           <div className="mt-6 space-y-4">
@@ -28,31 +29,34 @@ export default function Plans() {
               </div>
             ))}
           </div>
-
-          <div className="mt-6 rounded-2xl border border-white/8 bg-white/4 p-4 text-sm leading-7 text-slate-300">
-            Paid tiers unlock documented Gold, Meta, and Derived JSON via API. The file structure is shown immediately below.{' '}
-            <a href="#subscriber-files" className="text-cyan-200 hover:underline">
-              Jump to subscriber files →
-            </a>
-          </div>
         </div>
 
-        <div className="grid w-full max-w-4xl gap-4 md:grid-cols-3">
+        <div className="grid w-full max-w-3xl gap-4 md:grid-cols-3">
           {landingPlans.map((plan) => (
-            <div key={plan.name} className={`flex min-h-[320px] flex-col rounded-3xl border p-6 shadow-sm ${plan.border}`}>
-              <div className={`text-sm font-semibold uppercase tracking-[0.16em] ${plan.accent}`}>{plan.name}</div>
-              <div className="mt-3 text-4xl font-semibold text-white">{plan.price}</div>
-              <div className="mt-5 text-sm leading-7 text-slate-100">{plan.body}</div>
-              <div className="mt-3 text-sm leading-7 text-slate-300">{plan.detail}</div>
-
-              <div className="mt-auto space-y-3 pt-6">
-                <Link href={plan.href} className={`inline-flex text-sm font-medium hover:underline ${plan.accent}`}>
-                  {plan.cta}
-                </Link>
-                <Link href={plan.subHref} className="inline-flex text-xs text-slate-300 hover:text-cyan-200 hover:underline">
-                  {plan.subCta}
-                </Link>
+            <div key={plan.name} className={`min-h-[320px] rounded-3xl border p-6 shadow-sm ${plan.border}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className={`text-sm font-semibold uppercase tracking-[0.16em] ${plan.accent}`}>
+                    {plan.name}
+                  </div>
+                  <div className="mt-3 text-3xl font-semibold text-white">{plan.price}</div>
+                </div>
+                <div
+                  className={`rounded-full border border-white/10 bg-black/10 px-3 py-1 text-[11px] font-medium ${plan.accent}`}
+                >
+                  {plan.tierTag}
+                </div>
               </div>
+
+              <div className="mt-5 text-sm leading-7 text-slate-200">{plan.body}</div>
+              <div className="mt-4 text-sm leading-7 text-slate-400">{plan.detail}</div>
+
+              <Link
+                href={plan.href}
+                className={`mt-6 inline-flex items-center text-sm font-medium hover:underline ${plan.accent}`}
+              >
+                {plan.cta}
+              </Link>
             </div>
           ))}
         </div>

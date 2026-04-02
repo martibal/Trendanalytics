@@ -1,10 +1,9 @@
-// src/components/landing/JsonLayers.tsx
 import Link from "next/link";
 import { jsonLayers } from "@/lib/landing";
 
 export default function JsonLayers() {
   return (
-    <section id="subscriber-files" className="mt-10 scroll-mt-24">
+    <section className="mt-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
@@ -13,12 +12,12 @@ export default function JsonLayers() {
           <h2 className="mt-1 text-3xl font-semibold">Three JSON files per chain, per day</h2>
           <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
             Every subscription gives you direct API access to the published artifacts below.
-            Click any file card for the full field list and definitions.
+            Every field in every file is documented in the schema reference.
           </p>
         </div>
         <Link
           href="/api-docs/schema"
-          className="shrink-0 inline-flex items-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+          className="shrink-0 inline-flex items-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2.5 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
         >
           Full field reference →
         </Link>
@@ -32,7 +31,7 @@ export default function JsonLayers() {
             <Link
               key={layer.eyebrow}
               href={layer.schemaHref}
-              className={`group block rounded-3xl border p-6 shadow-sm transition hover:border-cyan-500/30 ${layer.borderColor} ${layer.bgColor}`}
+              className={`block rounded-3xl border p-6 shadow-sm transition hover:border-cyan-500/30 ${layer.borderColor} ${layer.bgColor}`}
             >
               <div className={`text-xs font-semibold uppercase tracking-[0.14em] ${layer.accentColor}`}>
                 {layer.eyebrow}
@@ -54,9 +53,7 @@ export default function JsonLayers() {
                   </li>
                 ))}
                 {moreCount > 0 ? (
-                  <li className={`text-xs ${layer.accentColor} opacity-70`}>
-                    + {moreCount} more fields
-                  </li>
+                  <li className={`text-xs ${layer.accentColor} opacity-70`}>+ {moreCount} more fields</li>
                 ) : null}
               </ul>
 
@@ -64,7 +61,7 @@ export default function JsonLayers() {
                 {layer.bestFor}
               </div>
 
-              <div className={`mt-4 inline-flex items-center text-xs group-hover:underline ${layer.accentColor}`}>
+              <div className={`mt-4 inline-flex items-center text-xs hover:underline ${layer.accentColor}`}>
                 See all {layer.eyebrow} fields →
               </div>
             </Link>

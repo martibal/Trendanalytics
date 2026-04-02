@@ -19,8 +19,6 @@ import {
 import Hero from "@/components/landing/Hero";
 import LiveChains from "@/components/landing/LiveChains";
 import Plans from "@/components/landing/Plans";
-import SurfaceStatus from "@/components/landing/SurfaceStatus";
-import TrustGrid from "@/components/landing/TrustGrid";
 import JsonLayers from "@/components/landing/JsonLayers";
 import ExploreGrid from "@/components/landing/ExploreGrid";
 import DataContractDetails from "@/components/landing/DataContractDetails";
@@ -238,141 +236,113 @@ async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
             : null,
         expected_delay_days: expectedDelayDays(chain.id),
       };
-    })
+    }),
   );
 }
 
-function buildSurfaceStatus(rows: StatusApiRow[]) {
-  const items: { title: string; body: string }[] = [];
-
-  const degraded = rows.filter(
-    (r) => typeof r.confidence_score === "number" && r.confidence_score < 0.4
-  );
-  if (degraded.length > 0) {
-    items.push({
-      title: "Confidence below publication threshold",
-      body: `${degraded.map((r) => r.label).join(", ")} currently publish confidence below the canonical 0.40 threshold. These states remain visible for traceability, but should be read as UNKNOWN/DEGRADED.`,
-    });
-  }
-
-  const delayed = rows.filter((r) => r.status === "warn" || r.status === "fail");
-  if (delayed.length > 0) {
-    items.push({
-      title: "Freshness outside expected policy",
-      body: `${delayed.map((r) => r.label).join(", ")} are currently outside their expected publish schedule. The latest publication is still shown with the correct freshness context.`,
-    });
-  }
-
-  const l2s = rows.filter((r) => r.chain === "arbitrum" || r.chain === "base");
-  if (l2s.length > 0) {
-    items.push({
-      title: "Layer-2 feeds use seven-day policy lag",
-      body: "Arbitrum and Base are published with a roughly seven-day delay by design. A larger lag does not automatically imply a broken feed — it must be judged against the chain-specific policy.",
-    });
-  }
-
-  if (items.length === 0) {
-    items.push({
-      title: "All supported chains have current published context",
-      body: "The landing surface can show regime, confidence, and freshness context across all four supported chains using the latest published artifacts.",
-    });
-  }
-
-  return items.slice(0, 3);
+function statusText(status: StatusApiRow["status"]) {
+  if (status === "ok") return "OK";
+  if (status === "warn") return "WARN";
+  if (status === "fail") return "FAIL";
+  return "UNKNOWN";
 }
 
-function buildRegimeTooltip(row: StatusApiRow): string {
-  if (!row.published_regime) {
-    return `No published regime label is currently visible for ${row.label}. Open the chain page for the latest available breakdown.`;
+function statusTooltip(row: StatusApiRow) {
+  const expected = row.expected_delay_days;
+  const cadence = expected === 7 ? "about 7 days" : "about 1 day";
+
+  if (!row.as_of || typeof row.lag_days !== "number") {
+    return `${row.label} does not currently expose enough timing information on the landing surface to classify freshness confidently.`;
   }
 
-  const base = `The latest published Meta row for ${row.label} currently labels the chain as ${row.published_regime}.`;
-
-  if (row.published_regime === "HEATING") {
-    return `${base} On the landing page this means the current published state is flagged as heating rather than neutral. Open the chain page for the scorecard and drivers behind the label.`;
-  }
-  if (row.published_regime === "CONGESTED") {
-    return `${base} On the landing page this means the current published state is flagged as congested rather than neutral. Open the chain page for the scorecard and drivers behind the label.`;
-  }
-  if (row.published_regime === "CHEAP") {
-    return `${base} On the landing page this means the current published state is flagged as cheap rather than neutral. Open the chain page for the scorecard and drivers behind the label.`;
-  }
-  if (row.published_regime === "STABLE") {
-    return `${base} On the landing page this means the current published state is stable relative to the model's current thresholds. Open the chain page for the full breakdown.`;
-  }
-  return `${base} Open the chain page for the scorecard and drivers behind the label.`;
-}
-
-function buildConfidenceTooltip(row: StatusApiRow, band: string): string {
-  if (typeof row.confidence_score !== "number") {
-    return `No published confidence score is currently visible for ${row.label}.`;
-  }
-
-  const value = row.confidence_score.toFixed(3);
-  if (band === "Good") {
-    return `The current published confidence for ${row.label} is ${value}. This sits in the Good band, meaning the visible label has comparatively stronger evidential support right now. Confidence measures support for the published label, not future direction.`;
-  }
-  if (band === "Caution") {
-    return `The current published confidence for ${row.label} is ${value}. This sits in the Caution band: still readable, but it should be interpreted more carefully than a stronger-support row. Confidence measures support for the published label, not future direction.`;
-  }
-  return `The current published confidence for ${row.label} is ${value}. This is below the normal publish floor, so the row should be treated as degraded or traceability-only context rather than a strong published state.`;
-}
-
-function buildAsOfTooltip(row: StatusApiRow): string {
-  if (!row.as_of) {
-    return `No published as-of date is currently visible for ${row.label}.`;
-  }
-  return `As of ${row.as_of} means this card reflects the latest published row dated ${row.as_of}. It is the date of the visible artifact, not a real-time timestamp.`;
-}
-
-function buildLagTooltip(row: StatusApiRow): string {
-  if (typeof row.lag_days !== "number") {
-    return `No published lag value is currently visible for ${row.label}.`;
-  }
-  const cadence = row.expected_delay_days === 7 ? "around 7 days" : "around 1 day";
-  return `Lag ${row.lag_days}d means the latest visible row for ${row.label} is ${row.lag_days} day(s) behind the current reference date. Normal publish cadence for ${row.label} is ${cadence}.`;
-}
-
-function buildStatusTooltip(row: StatusApiRow): string {
-  const cadence = row.expected_delay_days === 7 ? "around 7 days" : "around 1 day";
   if (row.status === "ok") {
-    return `OK means the latest published row is inside ${row.label}'s expected cadence. Normal publish cadence for this chain is ${cadence}. This status refers to freshness only, not price action or a buy/sell signal.`;
+    return `${row.label} is currently within its expected publish cadence of ${cadence}. The latest published row is ${row.lag_days} day${row.lag_days === 1 ? "" : "s"} behind UTC today.`;
   }
   if (row.status === "warn") {
-    return `WARN means the latest published row is outside ${row.label}'s normal cadence band, but still inside the softer warning range. This status refers to freshness only, not price action or a buy/sell signal.`;
+    return `${row.label} is slightly outside its expected publish cadence of ${cadence}. The latest published row is still shown with freshness context rather than hidden.`;
   }
   if (row.status === "fail") {
-    return `FAIL means the latest published row is materially outside ${row.label}'s expected cadence. This status refers to freshness only, not price action or a buy/sell signal.`;
+    return `${row.label} is materially outside its expected publish cadence of ${cadence}. The latest published row remains visible, but the freshness state should be read cautiously.`;
   }
-  return `UNKNOWN means the landing page cannot classify freshness cleanly for ${row.label} from the latest published row.`;
+  return `${row.label} is visible on the landing surface, but its freshness state cannot be classified from the current published metadata.`;
+}
+
+function publishedRegimeTooltip(row: StatusApiRow) {
+  if (!row.published_regime) {
+    return `${row.label} does not currently expose a published regime label on the landing surface.`;
+  }
+
+  const takeaway = rowTakeaway({
+    status: row.status,
+    publishedRegime: row.published_regime,
+    confidenceScore: row.confidence_score,
+  });
+
+  return `${row.label} is currently published as ${row.published_regime}. ${takeaway}`;
+}
+
+function confidenceTooltip(row: StatusApiRow) {
+  if (typeof row.confidence_score !== "number") {
+    return `${row.label} does not currently expose a confidence score on the landing surface.`;
+  }
+
+  const band = confidenceBand(row.confidence_score);
+  const value = fmtConfidence(row.confidence_score);
+
+  if (band === "Good") {
+    return `${row.label} currently publishes confidence ${value}, which falls in the Good band. The latest label is supported by comparatively stronger evidence quality.`;
+  }
+  if (band === "Caution") {
+    return `${row.label} currently publishes confidence ${value}, which falls in the Caution band. The latest label is still visible, but should be read with more care than a high-confidence row.`;
+  }
+  if (band === "Degraded") {
+    return `${row.label} currently publishes confidence ${value}, which is below the canonical 0.40 publication threshold. The row remains visible for traceability, but should be read as degraded.`;
+  }
+  return `${row.label} does not currently have a classifiable confidence band on the landing surface.`;
+}
+
+function asOfTooltip(row: StatusApiRow) {
+  if (!row.as_of) {
+    return `${row.label} does not currently expose an as-of date on the landing surface.`;
+  }
+  return `${row.label} is currently showing the latest published row with as-of date ${row.as_of}. This is the date the displayed regime and confidence context refer to.`;
+}
+
+function lagTooltip(row: StatusApiRow) {
+  if (typeof row.lag_days !== "number") {
+    return `${row.label} does not currently expose a lag value on the landing surface.`;
+  }
+  const expected = row.expected_delay_days;
+  return `${row.label} is ${row.lag_days} day${row.lag_days === 1 ? "" : "s"} behind UTC today. Normal policy is about ${expected} day${expected === 1 ? "" : "s"} for this chain.`;
 }
 
 function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
   const band = confidenceBand(row.confidence_score);
+
   return {
     chain: row.chain,
     href: `/chains/${row.chain}`,
     label: row.label,
     name: row.name,
     status: row.status,
-    statusLabel: row.status.toUpperCase(),
+    statusText: statusText(row.status),
     statusClass: statusChipClass(row.status),
+    statusTooltip: statusTooltip(row),
     publishedRegime: row.published_regime,
+    publishedRegimeTooltip: publishedRegimeTooltip(row),
     confidenceValue: fmtConfidence(row.confidence_score),
     confidenceBand: band,
     confidenceClass: confidenceChipClass(band),
+    confidenceTooltip: confidenceTooltip(row),
     asOf: fmtDate(row.as_of),
+    asOfTooltip: asOfTooltip(row),
     lagValue: row.lag_days !== null ? `${row.lag_days}d` : "—",
+    lagTooltip: lagTooltip(row),
     takeaway: rowTakeaway({
       status: row.status,
       publishedRegime: row.published_regime,
       confidenceScore: row.confidence_score,
     }),
-    regimeTooltip: buildRegimeTooltip(row),
-    confidenceTooltip: buildConfidenceTooltip(row, band),
-    asOfTooltip: buildAsOfTooltip(row),
-    lagTooltip: buildLagTooltip(row),
-    statusTooltip: buildStatusTooltip(row),
   };
 }
 
@@ -414,13 +384,12 @@ export default async function HomePage() {
               r.published_regime !== null ||
               r.confidence_score !== null ||
               r.as_of !== null ||
-              r.lag_days !== null
+              r.lag_days !== null,
           )
         ? metaFallbackRows
         : landingFallbackRows;
 
   const displayRows = rows.map(toSurfaceRowDisplay);
-  const surfaceStatus = buildSurfaceStatus(rows);
   const whatIsExplain = whatIsTrendAnalyticsExplanation();
   const boundaryExplain = interpretationBoundaryExplanation();
 
@@ -434,8 +403,6 @@ export default async function HomePage() {
         <Plans />
       </div>
       <JsonLayers />
-      <SurfaceStatus items={surfaceStatus} />
-      <TrustGrid />
       <ExploreGrid />
       <DataContractDetails dataset={dataset} dataSource={currentDataSource()} />
 

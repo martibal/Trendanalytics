@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { landingProofChips } from "@/lib/landing";
+import {
+  heroBodyParagraphs,
+  heroPipelineBody,
+  heroPipelineEyebrow,
+  heroPipelinePoints,
+  heroPipelineTitle,
+  heroTagline,
+  landingProofChips,
+} from "@/lib/landing";
 
 export default function Hero() {
   return (
@@ -11,33 +19,33 @@ export default function Hero() {
           </div>
 
           <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-tight text-white sm:text-5xl">
-            See whether on-chain change is noise or structural shift.
+            {heroTagline}
           </h1>
 
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
-            TrendAnalytics publishes daily regime, confidence, and driver context for
-            Bitcoin, Ethereum, Arbitrum, and Base. No price, no forecasts, no
-            trading calls — just documented network-state change.
-          </p>
+          {heroBodyParagraphs.map((paragraph) => (
+            <p key={paragraph} className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
+              {paragraph}
+            </p>
+          ))}
 
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="#plans"
               className="inline-flex items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
             >
-              See plans
+              See plans →
             </Link>
             <Link
-              href="#subscriber-files"
+              href="#latest-surface"
               className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
             >
-              Subscriber files
+              Latest published surface →
             </Link>
             <Link
               href="/api-docs/schema"
               className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-slate-200 hover:bg-white/10"
             >
-              Full field reference
+              JSON schema →
             </Link>
           </div>
 
@@ -65,31 +73,27 @@ export default function Hero() {
 
         <aside className="rounded-3xl border border-white/10 bg-black/10 p-5">
           <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-            How to read the latest surface
+            {heroPipelineEyebrow}
           </div>
+          <h2 className="mt-3 text-2xl font-semibold text-white">{heroPipelineTitle}</h2>
+          <p className="mt-3 text-sm leading-7 text-slate-300">{heroPipelineBody}</p>
+
           <div className="mt-4 space-y-3">
-            <div className="rounded-2xl border border-white/8 bg-white/4 p-4">
-              <div className="text-sm font-semibold text-white">Latest published, not real-time</div>
-              <div className="mt-2 text-sm leading-6 text-slate-300">
-                Every value on the landing page comes from the latest published daily artifact.
-                The surface is designed to filter out intraday chatter, not mirror it.
+            {heroPipelinePoints.map((point) => (
+              <div key={point.title} className="rounded-2xl border border-white/8 bg-white/4 p-4">
+                <div className="text-sm font-semibold text-white">{point.title}</div>
+                <div className="mt-1 text-sm leading-6 text-slate-400">{point.body}</div>
               </div>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-white/4 p-4">
-              <div className="text-sm font-semibold text-white">Regime + confidence + timing</div>
-              <div className="mt-2 text-sm leading-6 text-slate-300">
-                Regime tells you the current published state, confidence tells you how well
-                supported that label is, and lag tells you how old the latest row is relative
-                to expected cadence.
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-white/4 p-4">
-              <div className="text-sm font-semibold text-white">Paid tiers unlock JSON</div>
-              <div className="mt-2 text-sm leading-6 text-slate-300">
-                Subscribers get Gold, Meta, and Derived JSON files through API calls. The full
-                field-by-field structure is documented openly before purchase.
-              </div>
-            </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-4 text-sm">
+            <Link href="#plans" className="text-cyan-200 hover:underline">
+              See plans →
+            </Link>
+            <Link href="/api-docs/schema" className="text-cyan-200 hover:underline">
+              Inspect every field →
+            </Link>
           </div>
         </aside>
       </div>
