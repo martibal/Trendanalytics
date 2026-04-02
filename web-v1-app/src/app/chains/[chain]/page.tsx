@@ -1054,40 +1054,416 @@ function scorecardAxisExplanation(axis: "demand" | "friction" | "capacity", dim?
 }
 
 
-function metricReasonExplanation(metric: string, axis?: string): ExplainPair {
+
+function metricReasonExplanation(
+  metric: string,
+  axis?: string,
+  chainId?: ChainId,
+  regimeLabel?: string | null
+): ExplainPair {
+
+  // ─── tx_count_daily ───────────────────────────────────────────────────────
+  if (metric === "tx_count_daily") {
+    if (chainId === "bitcoin") {
+      return {
+        basic: (
+          <>
+            <p>
+              Bitcoin&apos;s transaction count is the clearest available signal for how much demand
+              pressure block space is currently under. More confirmed transactions means more
+              competition for the limited ~1 MB of block space available per ~10 minutes.
+            </p>
+            <p className="mt-3">
+              {regimeLabel === "HEATING"
+                ? "It is shown now because the demand axis is elevated - tx_count_daily is one of the primary inputs driving the current HEATING reading."
+                : regimeLabel === "CONGESTED"
+                  ? "It is shown now because demand is pressing against capacity. Transaction count is one of the clearest signals of that pressure."
+                  : regimeLabel === "CHEAP"
+                    ? "It is shown now for context: even in a CHEAP state, knowing whether transaction activity is genuinely low or merely cheap-per-unit matters for reading persistence."
+                    : "It is shown because it is always the first metric to check on Bitcoin when judging whether the current state reflects genuine activity or background noise."}
+            </p>
+          </>
+        ),
+        advanced: (
+          <>
+            <p>
+              <InlineCode>tx_count_daily</InlineCode> is the primary demand-axis input for the BTC
+              profile. It is log-normalised before z-score computation to reduce scale sensitivity.
+              On Bitcoin, this field also serves as a partial capacity proxy because block space is
+              fixed - more transactions means more block-space demand, which directly connects demand
+              and capacity pressure.
+            </p>
+            <p className="mt-3">
+              Source: <InlineCode>gold/bitcoin/last{"{window}"}d.json -&gt; tx_count_daily</InlineCode>.
+              Regime axis: <InlineCode>demand</InlineCode>.
+            </p>
+          </>
+        ),
+      };
+    }
+    // ETH / ARB / BASE
+    return {
+      basic: (
+        <>
+          <p>
+            Transaction count shows how much real execution demand the chain is currently carrying.
+            On EVM chains it reflects not just transfers but smart contract interactions, which
+            means it is a broader activity signal than on Bitcoin.
+          </p>
+          <p className="mt-3">
+            {regimeLabel === "HEATING"
+              ? "It is shown now because demand is elevated - transaction volume is one of the inputs pulling the demand axis into its current HIGH band."
+              : regimeLabel === "CONGESTED"
+                ? "It is shown now because high demand is interacting with capacity constraints. Transaction count helps show the demand side of that congestion."
+                : regimeLabel === "CHEAP"
+                  ? "It is shown for context: the current CHEAP state is partly defined by whether demand is genuinely quiet, which transaction count helps confirm."
+                  : "It is shown because it is the most direct available signal of current network usage breadth."}
+          </p>
+        </>
+      ),
+      advanced: (
+        <>
+          <p>
+            <InlineCode>tx_count_daily</InlineCode> feeds the demand axis alongside
+            <InlineCode>unique_active_addresses</InlineCode>. It is log-normalised before
+            z-score computation. On EVM chains it should be read together with
+            <InlineCode>gas_utilization_pct</InlineCode> and <InlineCode>failed_tx_rate</InlineCode>
+            to distinguish high-volume-but-unconstrained from high-volume-plus-capacity-pressure.
+          </p>
+        </>
+      ),
+    };
+  }
+
+  // ─── unique_active_addresses ──────────────────────────────────────────────
+  if (metric === "unique_active_addresses") {
+    return {
+      basic: (
+        <>
+          <p>
+            Active addresses show whether current activity is broad or concentrated. A chain can
+            have high transaction count driven by a few heavy users, or the same count spread
+            across many participants - and those two situations have different implications for
+            how durable the current state looks.
+          </p>
+          <p className="mt-3">
+            {regimeLabel === "HEATING"
+              ? "It is shown now because broad participation is one of the signals supporting the current HEATING reading - demand looks both elevated and wide."
+              : regimeLabel === "CONGESTED"
+                ? "It is shown because widespread usage is part of what makes the current congestion genuine rather than a single-actor anomaly."
+                : "It is shown to give the participation-breadth context that raw transaction count alone cannot provide."}
+          </p>
+        </>
+      ),
+      advanced: (
+        <>
+          <p>
+            <InlineCode>unique_active_addresses</InlineCode> is a demand-axis complement to
+            <InlineCode>tx_count_daily</InlineCode>. The derived
+            <InlineCode>tx_per_user</InlineCode> ratio (tx_count / active_addresses) is also used
+            in the scorecard as a third demand component where available. The address field has
+            known limitations on Bitcoin (UTXO reuse) and is sometimes null on L2s.
+          </p>
+        </>
+      ),
+    };
+  }
+
+  // ─── median_tx_fee_native ─────────────────────────────────────────────────
+  if (metric === "median_tx_fee_native") {
+    return {
+      basic: (
+        <>
+          <p>
+            The median transaction fee shows what a typical user was paying to transact in the
+            chain&apos;s own native units. Fees are one of the most immediate ways users feel
+            changes in network pressure - they rise when demand competes with available
+            block space or gas.
+          </p>
+          <p className="mt-3">
+            {regimeLabel === "CONGESTED"
+              ? "It is shown now because elevated fees are part of the friction that defines the current CONGESTED state. This is one of the direct cost signals supporting that label."
+              : regimeLabel === "HEATING"
+                ? "It is shown now to show the cost side of the current HEATING state - whether demand pressure is already translating into fee elevation."
+                : regimeLabel === "CHEAP"
+                  ? "It is shown now because low fees are one of the defining features of the current CHEAP state. This metric is part of what qualifies the chain as cheap to use right now."
+                  : "It is shown because fee level is the most direct cost signal available for judging the current operating state."}
+          </p>
+        </>
+      ),
+      advanced: (
+        <>
+          <p>
+            <InlineCode>median_tx_fee_native</InlineCode> is a friction-axis input. On BTC it is
+            the primary friction anchor because there is no equivalent to gas-utilisation or
+            failed-tx rate. On EVM chains it feeds <InlineCode>fee_burden_proxy</InlineCode>
+            (median_fee / median_tx_value) alongside <InlineCode>failed_tx_rate</InlineCode>.
+            The median is used rather than mean to reduce outlier sensitivity.
+          </p>
+        </>
+      ),
+    };
+  }
+
+  // ─── gas_utilization_pct ──────────────────────────────────────────────────
+  if (metric === "gas_utilization_pct") {
+    return {
+      basic: (
+        <>
+          <p>
+            Gas utilisation shows how full EVM blocks are on average. A fully utilised block means
+            the chain is operating at its capacity ceiling - every unit of computational space is
+            being consumed. A partially utilised block means there is slack.
+          </p>
+          <p className="mt-3">
+            {regimeLabel === "CONGESTED"
+              ? "It is shown now because high gas utilisation is one of the central signals defining the current CONGESTED state. The chain is running near its capacity limit."
+              : regimeLabel === "HEATING"
+                ? "It is shown now to track whether rising demand is beginning to press against block capacity - the transition from HEATING to CONGESTED often shows up here first."
+                : regimeLabel === "CHEAP"
+                  ? "It is shown now because low utilisation is part of what defines the current CHEAP state. Spare capacity is what makes cheap conditions structurally stable."
+                  : "It is shown because block utilisation is the most direct observable measure of how full or empty the chain currently is."}
+          </p>
+        </>
+      ),
+      advanced: (
+        <>
+          <p>
+            <InlineCode>gas_utilization_pct</InlineCode> = mean(gas_used / gas_limit) across all
+            blocks for the day. It is the primary capacity-axis input for ETH L1. Under EIP-1559,
+            the protocol target is 50% - sustained utilisation above that signals base fee growth;
+            sustained near 100% signals a hard capacity ceiling. This field is not published for
+            BTC or L2 profiles where the semantics are not equivalent.
+          </p>
+        </>
+      ),
+    };
+  }
+
+  // ─── avg_block_time_sec ───────────────────────────────────────────────────
+  if (metric === "avg_block_time_sec") {
+    return {
+      basic: (
+        <>
+          <p>
+            Average block time shows how long the network is taking to produce blocks. Persistent
+            changes in block timing can signal changes in mining competition (Bitcoin) or validator
+            conditions - and erratic timing is often a sign of operating stress.
+          </p>
+          <p className="mt-3">
+            {chainId === "bitcoin"
+              ? "On Bitcoin this is especially important because there is no gas utilisation field. Block time is the closest available proxy for whether capacity looks tight or relaxed."
+              : "On this chain, block time supplements the gas and fee signals by showing whether block production itself is running smoothly or erratically."}
+          </p>
+        </>
+      ),
+      advanced: (
+        <>
+          <p>
+            <InlineCode>avg_block_time_sec</InlineCode> is used in the capacity axis. It is not
+            read as a simple &quot;higher is worse&quot; signal - instead the pipeline derives a
+            <InlineCode>blocktime_instability</InlineCode> proxy that measures deviation from the
+            chain&apos;s own rolling median. This makes it a stability signal rather than a raw
+            speed signal, which is more informative across different chain architectures.
+          </p>
+          {chainId === "bitcoin" && (
+            <p className="mt-3">
+              On BTC specifically, this is one of only two visible capacity signals (alongside
+              block_count_daily). It therefore carries more weight in the BTC capacity axis than
+              it would on an EVM chain with gas utilisation data.
+            </p>
+          )}
+        </>
+      ),
+    };
+  }
+
+  // ─── failed_tx_rate ───────────────────────────────────────────────────────
+  if (metric === "failed_tx_rate") {
+    return {
+      basic: (
+        <>
+          <p>
+            The failed transaction rate shows what share of transactions did not complete
+            successfully. A rising failure rate usually means the execution environment is more
+            competitive or congested - users are submitting transactions that are outcompeted or
+            run out of gas.
+          </p>
+          <p className="mt-3">
+            {regimeLabel === "CONGESTED"
+              ? "It is shown now because a higher failure rate is one of the friction signals contributing to the current CONGESTED reading. It shows the human cost of tight conditions."
+              : regimeLabel === "CHEAP"
+                ? "It is shown for confirmation: a genuinely CHEAP state should also show low failure rates, not just low fees. This metric helps verify that."
+                : "It is shown because it is one of the clearest signals of whether current conditions are practically difficult for users - not just expensive, but failure-prone."}
+          </p>
+        </>
+      ),
+      advanced: (
+        <>
+          <p>
+            <InlineCode>failed_tx_rate</InlineCode> is a friction-axis input on EVM chains
+            alongside <InlineCode>fee_burden_proxy</InlineCode>. It is not available for Bitcoin
+            (no equivalent concept under the UTXO model). On EVM chains, it reflects
+            out-of-gas failures, reverts, and other execution failures - all of which are
+            user-visible friction signals distinct from fee level alone.
+          </p>
+        </>
+      ),
+    };
+  }
+
+  // ─── block_count_daily ────────────────────────────────────────────────────
+  if (metric === "block_count_daily") {
+    return {
+      basic: (
+        <>
+          <p>
+            Block count shows how many blocks were produced on this day. For most chains this
+            should be stable - persistent changes from the expected rate are more informative
+            than the absolute number.
+          </p>
+          <p className="mt-3">
+            {chainId === "bitcoin"
+              ? "On Bitcoin the expected rate is roughly 144 blocks per day (~10 min average). Large deviations from this rate point to hash rate changes or difficulty adjustment effects."
+              : "On this chain, block count is a throughput-stability signal. Sustained deviation from the normal rate is what matters, not the absolute count."}
+          </p>
+        </>
+      ),
+      advanced: (
+        <>
+          <p>
+            <InlineCode>block_count_daily</InlineCode> feeds the capacity axis as a throughput
+            normaliser and as an input to the <InlineCode>blocktime_instability</InlineCode>
+            derived signal. It is one of the most stable Gold metrics under normal operating
+            conditions, which makes persistent deviations a meaningful signal of network-level
+            events.
+          </p>
+        </>
+      ),
+    };
+  }
+
+  // ─── median_tx_value_native ───────────────────────────────────────────────
+  if (metric === "median_tx_value_native") {
+    return {
+      basic: (
+        <>
+          <p>
+            Median transaction value shows what a typical transfer was worth in native units.
+            This matters because the same fee can feel very different depending on how much
+            value is being moved - a 0.001 ETH fee on a 0.01 ETH transfer is ten times more
+            burdensome than the same fee on a 1 ETH transfer.
+          </p>
+        </>
+      ),
+      advanced: (
+        <>
+          <p>
+            <InlineCode>median_tx_value_native</InlineCode> is used as the denominator in
+            <InlineCode>fee_burden_proxy = median_tx_fee_native / median_tx_value_native</InlineCode>.
+            This normalisation makes fee burden comparable across periods with different typical
+            transfer sizes. When median_tx_value is near zero (common when smart contract calls
+            dominate), the proxy may not be meaningful and the pipeline handles this via null fallback.
+          </p>
+        </>
+      ),
+    };
+  }
+
+  // ─── value_transferred_native ─────────────────────────────────────────────
+  if (metric === "value_transferred_native") {
+    return {
+      basic: (
+        <>
+          <p>
+            Total value transferred shows the aggregate economic activity in native units for
+            the day. It gives a rough sense of how much the network was being used as a
+            value-transfer layer, separate from pure transaction count.
+          </p>
+        </>
+      ),
+      advanced: (
+        <>
+          <p>
+            <InlineCode>value_transferred_native</InlineCode> has known interpretation
+            limitations: it includes protocol-level movements, contract interactions where
+            msg.value is not economically meaningful, and internal transfers. It is published
+            in Gold for transparency but is not a primary regime-classification input. Use it
+            for trend context rather than as a precise economic volume measure.
+          </p>
+        </>
+      ),
+    };
+  }
+
+  // ─── Generic fallback — axis-specific but not metric-specific ─────────────
+  const axisText: Record<string, string> = {
+    demand: "demand pressure - whether the chain is busier than usual relative to its own recent history",
+    friction: "operating cost and difficulty - whether using the chain is more costly or error-prone than usual",
+    capacity: "capacity tightness - whether the chain looks more constrained than usual relative to its own history",
+  };
+
+  const axisDescription = axis && axisText[axis]
+    ? axisText[axis]
+    : "the current descriptive reading";
+
   return {
     basic: (
       <>
         <p>
-          This metric is visible because it currently helps explain the page’s descriptive reading. A
-          metric being shown here means it is doing real explanatory work right now.
+          This metric is shown because it is currently contributing to {axisDescription}.
+          A metric appearing here means it is doing real explanatory work in the current
+          published row - not just present in the data, but standing out enough to surface.
         </p>
         <p className="mt-3">
-          That does not mean the whole model uses only this one metric. It means this row currently
-          stands out enough to deserve attention in the evidence layer.
+          {regimeLabel
+            ? `In the context of the current ${regimeLabel} label, this field is part of the evidence layer that supports or qualifies that classification.`
+            : "Read it together with the other drivers and scorecard axes rather than in isolation."}
         </p>
       </>
     ),
     advanced: (
       <>
         <p>
-          The UI surfaces drivers from the published <InlineCode>regime.drivers[]</InlineCode> array.
-          Those rows are already ranked upstream as the currently most informative or most unusual
-          explanatory metrics for the present state. When the chart layer supplements them with
-          chain-specific defaults, it is doing so for continuity of reading, not to overwrite the
-          driver ranking.
-        </p>
-        <p className="mt-3">
-          The advanced interpretation is therefore not “this is the only metric that matters”, but
-          “this metric currently has high explanatory salience under the product’s ranking rules”. It
-          is a state-explanation row, not a universal importance ranking for all time. Metric:{" "}
-          <InlineCode>{metric}</InlineCode>. Axis: <InlineCode>{axis ?? "—"}</InlineCode>.
+          Metric <InlineCode>{metric}</InlineCode> on axis <InlineCode>{axis ?? "—"}</InlineCode>.
+          The UI surfaces this from <InlineCode>regime.drivers[]</InlineCode> in the published
+          meta artifact. Driver ranking is deterministic - this metric currently ranks high enough
+          in the published driver set to be surfaced as a visible evidence row.
         </p>
       </>
     ),
   };
 }
 
+function chartWhyShownOneLiner(
+  metric: string,
+  axis?: string,
+  regimeLabel?: string | null
+): string {
+  if (metric === "tx_count_daily")
+    return "Primary demand signal - shows how much block-space usage the chain is currently carrying.";
+  if (metric === "unique_active_addresses")
+    return "Breadth signal - shows whether current activity is broad or concentrated.";
+  if (metric === "median_tx_fee_native") {
+    if (regimeLabel === "CHEAP") return "Core friction signal - low fees are part of what defines the current CHEAP state.";
+    if (regimeLabel === "CONGESTED") return "Core friction signal - elevated fees are part of what defines the current CONGESTED state.";
+    return "Core friction signal - the most direct cost indicator available for this chain.";
+  }
+  if (metric === "gas_utilization_pct") {
+    if (regimeLabel === "CONGESTED") return "Capacity signal - high utilisation is central to the current CONGESTED reading.";
+    return "Capacity signal - shows how full EVM blocks currently are relative to their limit.";
+  }
+  if (metric === "avg_block_time_sec")
+    return "Capacity proxy - block timing deviation signals whether production is smooth or erratic.";
+  if (metric === "failed_tx_rate")
+    return "Friction signal - shows whether the execution environment is currently failure-prone.";
+  if (metric === "block_count_daily")
+    return "Throughput signal - persistent deviation from expected rate points to network-level events.";
+  if (axis === "demand") return "Demand signal - contributes to the activity-pressure axis.";
+  if (axis === "friction") return "Friction signal - contributes to the cost and difficulty axis.";
+  if (axis === "capacity") return "Capacity signal - contributes to the tightness axis.";
+  return "This metric is currently doing explanatory work in the published driver set.";
+}
 
 function chartReadExplanation(metric: string, windowDays: number, unitLabel?: string): ExplainPair {
   return {
@@ -1752,7 +2128,7 @@ export default async function ChainPage({
                       <MoreLink id={`chart-why-${safeId(chainId)}-${safeId(c.metric)}`} />
                     </div>
                     <div className="mt-2 text-sm leading-7 text-slate-100">
-                      This metric is visible because it currently helps explain the descriptive reading.
+                      {chartWhyShownOneLiner(c.metric, c.axis, regimeLabel)}
                     </div>
                   </div>
                 </div>
@@ -1780,7 +2156,7 @@ export default async function ChainPage({
                   id={`chart-why-${safeId(chainId)}-${safeId(c.metric)}`}
                   title={`Why ${c.metric} is shown`}
                   subtitle={<>This popup explains why the chart is present on the page.</>}
-                  pair={metricReasonExplanation(c.metric, c.axis)}
+                  pair={metricReasonExplanation(c.metric, c.axis, chainId, regimeLabel)}
                   traceability={
                     <ul className="list-disc pl-5">
                       <li>Metric: <InlineCode>{c.metric}</InlineCode></li>
@@ -1996,7 +2372,7 @@ export default async function ChainPage({
                         Axis <InlineCode>{d.axis ?? "—"}</InlineCode> · Trend <InlineCode>{d.trend ?? "—"}</InlineCode>
                       </>
                     }
-                    pair={metricReasonExplanation(d.metric ?? "metric", d.axis)}
+                    pair={metricReasonExplanation(d.metric ?? "metric", d.axis, chainId, regimeLabel)}
                     traceability={
                       <ul className="list-disc pl-5">
                         <li>Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode></li>

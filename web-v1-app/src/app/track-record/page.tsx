@@ -485,6 +485,9 @@ export default async function TrackRecordPage({
     });
 
   const filteredRows = allRows.slice(0, selectedWindow * chainIds.length);
+  const hasAnyRevisionId = filteredRows.some(
+    (row) => row.revisionId !== null && row.revisionId !== undefined
+  );
   const visualRows = sortRowsAscending(filteredRows);
   const transitions = buildTransitionsByChain(filteredRows);
   const csvHref = csvDownloadHref(filteredRows);
@@ -924,7 +927,9 @@ export default async function TrackRecordPage({
                   <th className="px-4 py-3">Lag</th>
                   <th className="px-4 py-3">As of</th>
                   <th className="px-4 py-3">Methodology</th>
-                  <th className="px-4 py-3">Revision</th>
+                  {hasAnyRevisionId ? (
+                    <th className="px-4 py-3">Revision</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
@@ -965,9 +970,11 @@ export default async function TrackRecordPage({
                       <td className="px-4 py-3 font-mono text-xs">
                         {row.methodologyVersion ?? dataset?.methodology_version ?? "—"}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs">
-                        {row.revisionId ?? "—"}
-                      </td>
+                      {hasAnyRevisionId ? (
+                        <td className="px-4 py-3 font-mono text-xs">
+                          {row.revisionId ?? "—"}
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })}
