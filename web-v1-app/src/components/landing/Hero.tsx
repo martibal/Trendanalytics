@@ -1,10 +1,13 @@
 import Link from "next/link";
 import {
   heroBodyParagraphs,
+  heroDefinitionCards,
+  heroFaqPrompt,
   heroPipelineBody,
   heroPipelineEyebrow,
   heroPipelinePoints,
   heroPipelineTitle,
+  heroSalesPunch,
   heroTagline,
   landingProofChips,
 } from "@/lib/landing";
@@ -68,6 +71,33 @@ export default function Hero() {
                 <div className="mt-1 text-base font-semibold text-white">{chip.value}</div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-6 rounded-3xl border border-cyan-500/15 bg-[linear-gradient(135deg,rgba(34,211,238,0.08),rgba(255,255,255,0.02))] p-5">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+              What exactly are you buying?
+            </div>
+
+            <div className="mt-3 max-w-3xl space-y-2">
+              <p className="text-lg font-medium leading-8 text-white">{heroSalesPunch[0]}</p>
+              <p className="text-sm leading-7 text-slate-300">{heroSalesPunch[1]}</p>
+            </div>
+
+            <div className="mt-4 grid gap-3 xl:grid-cols-2">
+              {heroDefinitionCards.map((card) => (
+                <div key={card.title} className="rounded-2xl border border-white/8 bg-black/10 p-4">
+                  <div className="text-sm font-semibold text-white">{card.title}</div>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">{card.body}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-300">
+              <span>{heroFaqPrompt}</span>
+              <Link href="/faq" className="font-medium text-cyan-200 hover:underline">
+                Read the Q&amp;A →
+              </Link>
+            </div>
           </div>
         </div>
 

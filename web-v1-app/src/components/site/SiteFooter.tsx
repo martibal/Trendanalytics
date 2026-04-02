@@ -42,6 +42,9 @@ export default function SiteFooter() {
               <Link href="/about" className="transition hover:text-foreground">
                 About
               </Link>
+              <Link href="/faq" className="transition hover:text-foreground">
+                Q&A
+              </Link>
             </div>
           </section>
 
@@ -69,6 +72,10 @@ export default function SiteFooter() {
           <span>·</span>
           <Link href="/track-record" className="transition hover:text-foreground">
             Track Record
+          </Link>
+          <span>·</span>
+          <Link href="/faq" className="transition hover:text-foreground">
+            Q&A
           </Link>
           <span>·</span>
           <Link href="/terms" className="transition hover:text-foreground">

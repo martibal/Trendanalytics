@@ -589,6 +589,23 @@ export default async function AboutPage() {
       </section>
 
       {/* ── Data contract ─────────────────────────────────────────────────── */}
+
+
+      <section className="mt-10 rounded-3xl border p-6 shadow-sm">
+        <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">More questions?</div>
+        <h2 className="mt-2 text-2xl font-semibold text-white">Read the full Q&amp;A</h2>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
+          The dedicated Q&amp;A page answers skeptical user questions about noise, regime change,
+          confidence, baselines, JSON artifacts, and trust signals at both Basic and Advanced levels.
+        </p>
+        <Link
+          href="/faq"
+          className="mt-4 inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/5 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/10"
+        >
+          Open Q&amp;A →
+        </Link>
+      </section>
+
       <details className="mt-8 rounded-2xl border p-5">
         <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
           Data contract and traceability

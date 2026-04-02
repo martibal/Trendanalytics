@@ -13,6 +13,7 @@ const DESKTOP_ITEMS = [
   { href: "/thresholds", label: "Thresholds" },
   { href: "/api-docs", label: "API Docs" },
   { href: "/status", label: "Status" },
+  { href: "/faq", label: "Q&A" },
   { href: "/about", label: "About" },
 ] as const;
 

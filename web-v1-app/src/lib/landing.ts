@@ -6,6 +6,25 @@ export const heroBodyParagraphs = [
   "That pipeline - AWS ingestion, daily aggregation, z-score baselines, confidence gating, artifact publishing, and historical storage - takes weeks to build and needs ongoing maintenance across four chains with different data models. TrendAnalytics runs it daily and delivers the output as documented Gold, Meta, and Derived JSON you can pull directly into your own workflow.",
 ] as const;
 
+export const heroSalesPunch = [
+  "Separate on-chain noise from real regime change.",
+  "Subscribe to the documented Gold, Meta, and Derived JSON that turns raw chain activity into usable analytical context.",
+] as const;
+
+export const heroDefinitionCards = [
+  {
+    title: "How do we define noise?",
+    body: "Noise is short-lived on-chain movement that looks unusual briefly but does not persist or gather enough supporting evidence to count as a structural shift.",
+  },
+  {
+    title: "What counts as a real regime change?",
+    body: "A real regime change is a persistent, evidence-supported change in demand, friction, or capacity relative to the chain's own recent baseline.",
+  },
+] as const;
+
+export const heroFaqPrompt =
+  "Need the exact definitions, thresholds, and confidence rules?";
+
 export const heroPipelineEyebrow = "WHAT THE PIPELINE DOES";
 export const heroPipelineTitle = "What makes the numbers meaningful.";
 export const heroPipelineBody =

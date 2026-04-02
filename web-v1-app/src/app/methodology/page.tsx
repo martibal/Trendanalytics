@@ -384,6 +384,19 @@ export default async function MethodologyPage() {
             route contract.
           </p>
         </section>
+
+
+        <Section title="Questions and answers">
+          <p>
+            If you want a direct explanation of the most common skeptical questions about noise,
+            regime change, confidence, baselines, JSON artifacts, and traceability, use the dedicated
+            Q&amp;A page.
+          </p>
+          <p>
+            <Link href="/faq" className="underline">Open the full Q&amp;A</Link>
+          </p>
+        </Section>
+
       </div>
     </main>
   );
