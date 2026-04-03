@@ -5,7 +5,7 @@ import { qaEntries, qaCategories } from "@/lib/qa";
 export default function FaqPage() {
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
-      <header className="mb-8 rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
+      <header className="mb-8 rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-5 shadow-sm sm:p-8">
         <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
           Q&amp;A
         </div>

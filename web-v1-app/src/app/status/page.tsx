@@ -411,7 +411,7 @@ export default async function StatusPage() {
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <header className="mb-10">
-        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
+        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-5 shadow-sm sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="max-w-3xl">
               <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">

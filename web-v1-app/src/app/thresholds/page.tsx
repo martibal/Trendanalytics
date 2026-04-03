@@ -502,7 +502,7 @@ export default async function ThresholdsPage() {
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <header className="mb-10">
-        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
+        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-5 shadow-sm sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="max-w-3xl">
               <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
@@ -595,7 +595,7 @@ export default async function ThresholdsPage() {
               </div>
               <MoreLink id="confidence-modal" />
             </div>
-            <div className="mt-4 text-5xl font-semibold text-white">0.40</div>
+            <div className="mt-4 text-3xl font-semibold text-white sm:text-5xl">0.40</div>
             <p className="mt-3 text-sm leading-7 text-slate-300">
               Below this value, the regime label becomes UNKNOWN/DEGRADED regardless of
               axis structure. The most important single threshold on the site.
@@ -627,12 +627,12 @@ export default async function ThresholdsPage() {
             <div className="mt-4 flex items-end gap-3">
               <div>
                 <div className="text-xs text-muted-foreground">Percentile</div>
-                <div className="text-4xl font-semibold text-white">≥ 80</div>
+                <div className="text-2xl font-semibold text-white sm:text-4xl">≥ 80</div>
               </div>
               <div className="mb-1 text-muted-foreground">or</div>
               <div>
                 <div className="text-xs text-muted-foreground">Z-score</div>
-                <div className="text-4xl font-semibold text-white">≥ 1.5</div>
+                <div className="text-2xl font-semibold text-white sm:text-4xl">≥ 1.5</div>
               </div>
             </div>
             <p className="mt-3 text-sm leading-7 text-slate-300">

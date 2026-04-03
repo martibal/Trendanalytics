@@ -1968,7 +1968,7 @@ export default async function ChainPage({
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-5">
+        <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <div className="rounded-2xl border p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
@@ -1994,7 +1994,7 @@ export default async function ChainPage({
                 <MoreLink id={`confidence-${chainId}`} />
               </div>
             </div>
-            <div className="mt-4 text-5xl font-semibold">{typeof conf === "number" ? conf.toFixed(3) : "—"}</div>
+            <div className="mt-4 text-3xl font-semibold sm:text-5xl">{typeof conf === "number" ? conf.toFixed(3) : "—"}</div>
             <div className="mt-4 text-sm leading-7 text-slate-100">
               Data quality {fmtNum(meta.confidence?.data_quality_score, 3)} · Label support{" "}
               {fmtNum(meta.confidence?.label_confidence_score, 3)}
@@ -2008,7 +2008,7 @@ export default async function ChainPage({
               </div>
               <MoreLink id={`asof-${chainId}`} />
             </div>
-            <div className="mt-4 break-words text-5xl font-semibold leading-none">
+            <div className="mt-4 break-words text-3xl font-semibold leading-none sm:text-5xl">
               {fmtDate(asOf)}
             </div>
             <div className="mt-4 text-sm leading-7 text-slate-100">
@@ -2023,7 +2023,7 @@ export default async function ChainPage({
               </div>
               <MoreLink id={`lag-${chainId}`} />
             </div>
-            <div className="mt-4 text-5xl font-semibold">
+            <div className="mt-4 text-3xl font-semibold sm:text-5xl">
               {typeof meta.confidence?.lag_days_vs_utc_today === "number"
                 ? `${meta.confidence.lag_days_vs_utc_today}d`
                 : "—"}
