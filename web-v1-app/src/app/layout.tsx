@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fragment, type ReactNode } from "react";
 import "./globals.css";
@@ -9,6 +9,11 @@ import ThemeProvider from "@/components/site/ThemeProvider";
 export const metadata: Metadata = {
   title: "TrendAnalytics",
   description: "Descriptive on-chain regime context. No price. No forecasts. No recommendations.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 function AuthProvider({
