@@ -42,7 +42,7 @@ function hasAnySeries(data: MetricPoint[], key: "value" | "ma7" | "ma30") {
 
 function clampChartWidth(width: number): number {
   if (!Number.isFinite(width) || width <= 0) return 0;
-  return Math.max(260, Math.floor(width));
+  return Math.max(320, Math.floor(width));
 }
 
 // ─── Contextual interpretation ────────────────────────────────────────────────

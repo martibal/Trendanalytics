@@ -15,7 +15,7 @@ import {
 export default function Hero() {
   return (
     <header className="mb-10">
-      <div className="grid gap-6 rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-5 shadow-sm sm:p-8 lg:grid-cols-[minmax(0,1.25fr)_360px]">
+      <div className="grid gap-6 rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm lg:grid-cols-[minmax(0,1.25fr)_360px]">
         <div>
           <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
             Daily on-chain regime model

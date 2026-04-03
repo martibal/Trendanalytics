@@ -518,7 +518,7 @@ export default async function TrackRecordPage({
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <header className="mb-10">
-        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-5 shadow-sm sm:p-8">
+        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="max-w-3xl">
               <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
@@ -916,7 +916,7 @@ export default async function TrackRecordPage({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[640px] w-full text-sm">
+            <table className="w-full text-sm">
               <thead className="border-b bg-muted/40 text-left text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">Date</th>

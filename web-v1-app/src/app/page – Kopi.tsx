@@ -23,7 +23,6 @@ import { computeHistoryDepthDays } from "@/lib/historyDepth";
 import JsonLayers from "@/components/landing/JsonLayers";
 import ExploreGrid from "@/components/landing/ExploreGrid";
 import DataContractDetails from "@/components/landing/DataContractDetails";
-import MobileLanding from "@/components/mobile/MobileLanding";
 
 import "server-only";
 
@@ -397,35 +396,31 @@ export default async function HomePage() {
   const boundaryExplain = interpretationBoundaryExplanation();
 
   return (
-    <>
-      <MobileLanding rows={displayRows} historyDepthDays={historyDepthDays} />
+    <main className="mx-auto max-w-7xl px-6 py-10">
+      <ModalStyles />
 
-      <main className="mx-auto hidden max-w-7xl px-6 py-10 lg:block">
-        <ModalStyles />
+      <Hero />
+      <LiveChains rows={displayRows} />
+      <div className="mt-10">
+        <Plans historyDepthDays={historyDepthDays} />
+      </div>
+      <JsonLayers />
+      <ExploreGrid />
+      <DataContractDetails dataset={dataset} dataSource={currentDataSource()} />
 
-        <Hero />
-        <LiveChains rows={displayRows} />
-        <div className="mt-10">
-          <Plans historyDepthDays={historyDepthDays} />
-        </div>
-        <JsonLayers />
-        <ExploreGrid />
-        <DataContractDetails dataset={dataset} dataSource={currentDataSource()} />
+      <ExplainModal
+        id="what-is-modal"
+        title="What TrendAnalytics is"
+        subtitle="A narrow product with a specific job: classify whether current on-chain change still looks like noise or has started to persist like a structural shift."
+        pair={whatIsExplain}
+      />
 
-        <ExplainModal
-          id="what-is-modal"
-          title="What TrendAnalytics is"
-          subtitle="A narrow product with a specific job: classify whether current on-chain change still looks like noise or has started to persist like a structural shift."
-          pair={whatIsExplain}
-        />
-
-        <ExplainModal
-          id="boundary-modal"
-          title="Interpretation boundary"
-          subtitle="TrendAnalytics is intentionally descriptive. It explains current network state, but it does not tell you what to do."
-          pair={boundaryExplain}
-        />
-      </main>
-    </>
+      <ExplainModal
+        id="boundary-modal"
+        title="Interpretation boundary"
+        subtitle="TrendAnalytics is intentionally descriptive. It explains current network state, but it does not tell you what to do."
+        pair={boundaryExplain}
+      />
+    </main>
   );
 }

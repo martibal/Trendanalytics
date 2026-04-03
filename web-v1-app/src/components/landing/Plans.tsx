@@ -9,7 +9,7 @@ export default function Plans({ historyDepthDays }: PlansProps) {
   return (
     <section
       id="plans"
-      className="mb-10 rounded-3xl border border-cyan-500/15 bg-[radial-gradient(ellipse_at_top_right,rgba(34,211,238,0.07),transparent_60%)] p-5 shadow-sm sm:p-8"
+      className="mb-10 rounded-3xl border border-cyan-500/15 bg-[radial-gradient(ellipse_at_top_right,rgba(34,211,238,0.07),transparent_60%)] p-8 shadow-sm"
     >
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div className="max-w-2xl">
