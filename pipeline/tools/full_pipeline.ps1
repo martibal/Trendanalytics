@@ -1,8 +1,6 @@
 param(
   [ValidateSet('incremental','rebuild')]
-  [string]$Mode = 'incremental',
-
-  [switch]$SkipWebSync
+  [string]$Mode = 'incremental'
 )
 
 Set-StrictMode -Version Latest
@@ -21,6 +19,36 @@ function Ensure-Dir([string]$p) {
 
 function Parse-IsoDate([string]$s) { return [DateTime]::ParseExact($s, 'yyyy-MM-dd', $null) }
 function Format-IsoDate([DateTime]$d) { return $d.ToString('yyyy-MM-dd') }
+
+function Get-EnvOrDefault([string]$Name, [string]$DefaultValue) {
+  $value = [Environment]::GetEnvironmentVariable($Name)
+  if ([string]::IsNullOrWhiteSpace($value)) { return $DefaultValue }
+  return $value.Trim()
+}
+
+function Get-EnvIntOrDefault([string]$Name, [int]$DefaultValue) {
+  $raw = [Environment]::GetEnvironmentVariable($Name)
+  if ([string]::IsNullOrWhiteSpace($raw)) { return $DefaultValue }
+
+  $parsed = 0
+  if ([int]::TryParse($raw.Trim(), [ref]$parsed)) {
+    return $parsed
+  }
+
+  return $DefaultValue
+}
+
+function Is-FalseLike([string]$value) {
+  if ([string]::IsNullOrWhiteSpace($value)) { return $false }
+  $v = $value.Trim().ToLowerInvariant()
+  return $v -in @('0','false','no','off')
+}
+
+function Get-SyncWebEnabled() {
+  $raw = [Environment]::GetEnvironmentVariable('CSS_SYNC_WEB')
+  if ([string]::IsNullOrWhiteSpace($raw)) { return $true }
+  return -not (Is-FalseLike $raw)
+}
 
 function Get-LatestRawDay([string]$rawRoot) {
   $probe = Join-Path $rawRoot 'bitcoin\blocks'
@@ -83,6 +111,47 @@ function Get-MissingFeatureDays([string]$featuresRoot, [string]$chain, [string[]
   return @($missing.ToArray())
 }
 
+function Get-LatestPublishedDay([string]$publishedRoot, [string[]]$chains) {
+  if (-not (Test-Path $publishedRoot)) { return $null }
+
+  $candidates = New-Object System.Collections.Generic.List[string]
+
+  foreach ($genre in @('gold', 'derived')) {
+    foreach ($chain in $chains) {
+      $dir = Join-Path $publishedRoot (Join-Path $genre $chain)
+      if (-not (Test-Path $dir)) { continue }
+
+      $files = Get-ChildItem -Path $dir -File -Filter '*.json' -ErrorAction SilentlyContinue |
+        Where-Object { $_.BaseName -match '^\d{4}-\d{2}-\d{2}$' } |
+        Select-Object -ExpandProperty BaseName
+
+      foreach ($f in $files) {
+        [void]$candidates.Add($f)
+      }
+    }
+  }
+
+  if ($candidates.Count -eq 0) { return $null }
+
+  $sorted = @($candidates | Sort-Object -Unique)
+  return Parse-IsoDate($sorted[-1])
+}
+
+function Read-DownloadReport([string]$path) {
+  if (-not (Test-Path $path)) { return $null }
+
+  try {
+    $raw = Get-Content -LiteralPath $path -Raw -ErrorAction Stop
+    if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+    return $raw | ConvertFrom-Json -ErrorAction Stop
+  }
+  catch {
+    Write-Log "WARN: Could not parse download report: $path"
+    Write-Log "WARN: $($_.Exception.Message)"
+    return $null
+  }
+}
+
 try {
   Write-Log '=== PIPELINE START ==='
   Write-Log "Mode: $Mode"
@@ -91,11 +160,10 @@ try {
   $PIPELINE_ROOT = Resolve-Path (Join-Path $TOOLS_ROOT '..') | Select-Object -ExpandProperty Path
   $MAIN_ROOT = Resolve-Path (Join-Path $TOOLS_ROOT '..\..') | Select-Object -ExpandProperty Path
 
-  $PY = $env:CSS_PYTHON
-  if ([string]::IsNullOrWhiteSpace($PY)) { $PY = 'python' }
+  $PY = Get-EnvOrDefault -Name 'CSS_PYTHON' -DefaultValue 'python'
 
   $DATA_ROOT = Join-Path $MAIN_ROOT 'data'
-  $RAW_ROOT  = Join-Path $DATA_ROOT 'raw'
+  $RAW_ROOT  = Get-EnvOrDefault -Name 'CSS_RAW_ROOT' -DefaultValue (Join-Path $DATA_ROOT 'raw')
   $CALC_ROOT = Join-Path $DATA_ROOT 'calculated'
 
   $GOLD_PARQUET_ROOT = Join-Path $CALC_ROOT 'gold'
@@ -105,9 +173,10 @@ try {
   $META_JSON_ROOT = Join-Path $CALC_ROOT 'meta'
   $DERIVED_OUT_ROOT = Join-Path $CALC_ROOT 'derived'
 
-  $PUBLISHED_ROOT = Join-Path $DATA_ROOT 'published\v1'
+  $PUBLISHED_ROOT = Get-EnvOrDefault -Name 'CSS_PUBLISHED_ROOT' -DefaultValue (Join-Path $DATA_ROOT 'published\v1')
 
   $SYNC_WEB = Join-Path $TOOLS_ROOT 'sync_web_data.ps1'
+  $SYNC_WEB_ENABLED = Get-SyncWebEnabled
 
   $WORK_ROOT = Join-Path $PIPELINE_ROOT '_work'
   $PROD_ROOT = Join-Path $WORK_ROOT 'prod'
@@ -153,33 +222,52 @@ try {
 
   Push-Location $MAIN_ROOT
   try {
-    # ---------------------------
-    # STEP -1: Sync RAW from AWS
-    # ---------------------------
     if (Test-Path $PY_DOWNLOAD_RAW) {
-      Write-Log 'STEP -1: Download/sync RAW from AWS (minimal catch-up)'
-      # Small-but-safe lookback so we can catch missing days without full rebuild.
-      # If you want even tighter: set to (latestRaw - 14).
-      $rawLookbackDays = 60
-      if (-not [string]::IsNullOrWhiteSpace($env:CSS_RAW_LOOKBACK_DAYS)) {
-        $rawLookbackDays = [int]$env:CSS_RAW_LOOKBACK_DAYS
-      }
+      Write-Log 'STEP -1: Download/sync RAW from AWS (JSON-aware minimal catch-up)'
+      $rawLookbackDays = Get-EnvIntOrDefault -Name 'CSS_RAW_LOOKBACK_DAYS' -DefaultValue 60
       $startRaw = (Get-Date).ToUniversalTime().AddDays(-1 * $rawLookbackDays)
       $startRawIso = Format-IsoDate $startRaw
+      $downloadReportPath = Join-Path $MAIN_ROOT 'reports\download_up_to_date_minimal.json'
 
       Write-Log ("  raw sync start: " + $startRawIso + " (lookback " + $rawLookbackDays + "d)")
-      & $PY -u $PY_DOWNLOAD_RAW --root $MAIN_ROOT --raw-root $RAW_ROOT --start $startRawIso --chains $chainsCsv --lag-l1-days 1 --lag-l2-days 7
+      Write-Log ("  published state root: " + $PUBLISHED_ROOT)
+      & $PY -u $PY_DOWNLOAD_RAW --root $MAIN_ROOT --raw-root $RAW_ROOT --published-root $PUBLISHED_ROOT --start $startRawIso --chains $chainsCsv --lag-l1-days 1 --lag-l2-days 7
       if ($LASTEXITCODE -ne 0) {
         throw "download_up_to_date_minimal.py failed rc=$LASTEXITCODE"
       }
+
+      $downloadReport = Read-DownloadReport -path $downloadReportPath
     } else {
       Write-Log "STEP -1: Skipping RAW download (missing tool): $PY_DOWNLOAD_RAW"
+      $downloadReport = $null
     }
 
     Write-Log 'STEP 0: Probe latest raw day'
     $latestRaw = Get-LatestRawDay $RAW_ROOT
-    if (-not $latestRaw) { throw "No raw day folders found under $RAW_ROOT" }
+    $latestPublished = Get-LatestPublishedDay $PUBLISHED_ROOT $chains
+    $plannedDownloadCount = 0
+
+    if ($downloadReport -and $downloadReport.planned_downloads) {
+      $plannedDownloadCount = @($downloadReport.planned_downloads).Count
+    }
+
+    if (-not $latestRaw) {
+      if ($Mode -eq 'incremental' -and $latestPublished -and $plannedDownloadCount -eq 0) {
+        Write-Log ("Latest published day: " + (Format-IsoDate $latestPublished))
+        Write-Log "No unpublished missing days were detected for incremental mode."
+        Write-Log "No raw parquet was downloaded, so pipeline exits successfully as a no-op."
+        Write-Log '=== PIPELINE OK (NO-OP) ==='
+        return
+      }
+
+      throw "No raw day folders found under $RAW_ROOT"
+    }
+
     Write-Log ("Latest raw day: " + (Format-IsoDate $latestRaw))
+    if ($latestPublished) {
+      Write-Log ("Latest published day: " + (Format-IsoDate $latestPublished))
+    }
+    Write-Log ("Planned raw downloads from report: " + $plannedDownloadCount)
 
     $startDate = $latestRaw.AddDays(-30)
     if ($Mode -eq 'rebuild') { $startDate = $latestRaw.AddDays(-365) }
@@ -248,9 +336,7 @@ try {
     & $PY -u $PY_VALIDATE_PUBLISHED --published-root $PUBLISHED_ROOT --chains $chainsCsv --genres 'gold,meta,derived' --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) { throw "validate_published_dataset.py failed rc=$LASTEXITCODE" }
 
-    $shouldSyncWeb = (-not $SkipWebSync) -and ($env:CSS_SYNC_WEB -ne '0')
-
-    if ($shouldSyncWeb -and (Test-Path $SYNC_WEB)) {
+    if ($SYNC_WEB_ENABLED -and (Test-Path $SYNC_WEB)) {
       Write-Log 'STEP 9: Sync published dataset -> web public'
       try {
         & $SYNC_WEB -Root $MAIN_ROOT
@@ -259,9 +345,8 @@ try {
       catch {
         Write-Log "NOTE: sync_web_data.ps1 failed (non-fatal): $($_.Exception.Message)"
       }
-    }
-    else {
-      Write-Log 'STEP 9: Skipping web sync'
+    } elseif (-not $SYNC_WEB_ENABLED) {
+      Write-Log 'STEP 9: Skipping web sync because CSS_SYNC_WEB disables it'
     }
 
     Write-Log '=== PIPELINE OK ==='
@@ -270,11 +355,7 @@ try {
     Pop-Location
   }
 
-  Write-Log '=== PIPELINE DONE (OK) ==='
-  exit 0
-}
-catch {
-  Write-Log "PIPELINE FAILED: $($_.Exception.Message)"
-  Write-Error $_
-  exit 1
+} catch {
+  Write-Log ("FATAL: " + $_.Exception.Message)
+  throw
 }
