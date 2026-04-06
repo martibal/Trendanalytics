@@ -21,6 +21,9 @@ jobs:
       CSS_PYTHON: python
       CSS_SYNC_WEB: "0"
       CSS_CLEANUP_EPHEMERAL_RAW: "1"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
     steps:
       - name: Checkout repository
@@ -56,6 +59,12 @@ jobs:
         working-directory: .\web-v1-app
         run: |
           npm ci
+
+      - name: Generate Prisma client
+        shell: pwsh
+        working-directory: .\web-v1-app
+        run: |
+          npx prisma generate --schema .\prisma\schema.prisma
 
       - name: Configure git identity
         shell: pwsh
