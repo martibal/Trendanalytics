@@ -73,7 +73,7 @@ function lagDaysFromIsoDay(date?: string): number | null {
 }
 
 function expectedDelayDays(chain: ChainId): number {
-  return chain === "arbitrum" || chain === "base" ? 7 : 0;
+  return chain === "arbitrum" || chain === "base" ? 7 : 1;
 }
 
 function classifyStatus(params: {

@@ -51,7 +51,7 @@ function Section({
 }
 
 function expectedDelayDays(chain: ChainId): number {
-  return chain === "arbitrum" || chain === "base" ? 7 : 0;
+  return chain === "arbitrum" || chain === "base" ? 7 : 1;
 }
 
 function decodeBody(body: ArrayBuffer | Uint8Array): string {

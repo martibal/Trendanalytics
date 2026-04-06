@@ -2056,7 +2056,7 @@ export default async function ChainPage({
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
               Top of page
             </div>
-            <h2 className="mt-1 text-3xl font-semibold">Live signal view</h2>
+            <h2 className="mt-1 text-3xl font-semibold">Latest signal view</h2>
             <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
               The first visual layer should answer two questions fast: what state the chain is in right
               now, and what the recent metric shape looks like. Deeper explanation stays collapsed until

@@ -55,7 +55,7 @@ async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
 }
 
 function expectedDelayDays(chain: ChainId): number {
-  return chain === "arbitrum" || chain === "base" ? 7 : 0;
+  return chain === "arbitrum" || chain === "base" ? 7 : 1;
 }
 
 function confidenceBand(value?: number | null): "Good" | "Caution" | "Degraded" | "—" {

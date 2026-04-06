@@ -178,7 +178,7 @@ function datasetNotes(dataset: DatasetManifest | null): string[] {
 }
 
 function expectedDelayDays(chain: ChainId): number {
-  return chain === "arbitrum" || chain === "base" ? 7 : 0;
+  return chain === "arbitrum" || chain === "base" ? 7 : 1;
 }
 
 function deriveHealth(params: {

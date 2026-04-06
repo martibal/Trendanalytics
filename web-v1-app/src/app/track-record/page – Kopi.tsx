@@ -488,7 +488,6 @@ export default async function TrackRecordPage({
   const hasAnyRevisionId = filteredRows.some(
     (row) => row.revisionId !== null && row.revisionId !== undefined
   );
-  const timelineRows = [...filteredRows];
   const visualRows = sortRowsAscending(filteredRows);
   const transitions = buildTransitionsByChain(filteredRows);
   const csvHref = csvDownloadHref(filteredRows);
@@ -833,7 +832,7 @@ export default async function TrackRecordPage({
           </div>
           <div className="mt-6">
             <RegimeTimeline
-              entries={timelineRows.map((r) => ({
+              entries={visualRows.map((r) => ({
                 date: r.date ?? "",
                 regime: r.regimeLabel ?? "UNKNOWN/DEGRADED",
                 confidence: r.confidence,
