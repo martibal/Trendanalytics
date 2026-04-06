@@ -4,6 +4,8 @@ param(
     [string]$RepoRoot = "",
     [string]$WebAppRoot = "",
     [string]$SyncScriptPath = "",
+    [string]$SourceRoot = "",
+    [string]$TargetRoot = "",
     [string]$Branch = "main",
     [string]$CommitMessage = "",
     [switch]$SkipBuild,
@@ -68,15 +70,24 @@ if ([string]::IsNullOrWhiteSpace($WebAppRoot)) {
 if ([string]::IsNullOrWhiteSpace($SyncScriptPath)) {
     $SyncScriptPath = Join-Path $RepoRoot "sync-published-data.ps1"
 }
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+    $SourceRoot = Join-Path $RepoRoot "data\published\v1"
+}
+if ([string]::IsNullOrWhiteSpace($TargetRoot)) {
+    $TargetRoot = Join-Path $WebAppRoot "public\data\published\v1"
+}
 
 Ensure-PathExists -PathValue $RepoRoot -Label "Repo root"
 Ensure-PathExists -PathValue $WebAppRoot -Label "Web app root"
 Ensure-PathExists -PathValue $SyncScriptPath -Label "Sync script"
+Ensure-PathExists -PathValue $SourceRoot -Label "Published source root"
 
 Write-Step "Publish configuration"
 Write-Host "RepoRoot      : $RepoRoot"
 Write-Host "WebAppRoot    : $WebAppRoot"
 Write-Host "SyncScriptPath: $SyncScriptPath"
+Write-Host "SourceRoot    : $SourceRoot"
+Write-Host "TargetRoot    : $TargetRoot"
 Write-Host "Branch        : $Branch"
 Write-Host "SkipBuild     : $SkipBuild"
 Write-Host "SkipPush      : $SkipPush"
@@ -84,7 +95,7 @@ Write-Host "DryRun        : $DryRun"
 
 if ($DryRun) {
     Write-Step "Dry-run command preview"
-    Write-Host "powershell -ExecutionPolicy Bypass -File `"$SyncScriptPath`""
+    Write-Host "powershell -ExecutionPolicy Bypass -File `"$SyncScriptPath`" -SourceRoot `"$SourceRoot`" -TargetRoot `"$TargetRoot`""
     if (-not $SkipBuild) {
         Write-Host "cd `"$WebAppRoot`" ; npm run build"
     }
@@ -103,7 +114,9 @@ Write-Step "Running published-data sync"
 Invoke-Native -WorkingDirectory $RepoRoot -FilePath "powershell" -Arguments @(
     "-NoProfile",
     "-ExecutionPolicy", "Bypass",
-    "-File", $SyncScriptPath
+    "-File", $SyncScriptPath,
+    "-SourceRoot", $SourceRoot,
+    "-TargetRoot", $TargetRoot
 )
 
 if (-not $SkipBuild) {
