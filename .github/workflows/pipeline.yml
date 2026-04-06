@@ -1,67 +1,246 @@
-name: Pipeline Publish
+name: B1 Blank Runner Validation
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "15 6 * * *"
+
+concurrency:
+  group: b1-blank-runner-validation
+  cancel-in-progress: false
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
+  b1_blank_runner:
+    runs-on: windows-latest
+    timeout-minutes: 240
 
     permissions:
       contents: read
 
     env:
-      CSS_PYTHON: python3
-      CSS_SYNC_WEB: "0"
-      CSS_RAW_LOOKBACK_DAYS: "45"
-      METHODOLOGY_VERSION: "1.0"
-      PUBLISHED_S3_URI: s3://${{ secrets.PUBLISHED_S3_BUCKET }}/${{ secrets.PUBLISHED_S3_PREFIX }}
+      PYTHONUTF8: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      - name: Verify AWS CLI is available
+        shell: pwsh
+        run: |
+          $cmd = Get-Command aws -ErrorAction SilentlyContinue
+          if (-not $cmd) {
+            throw "AWS CLI was not found on the blank runner. This is a blocker for B1 because download_up_to_date_minimal.py calls aws s3 with --no-sign-request."
+          }
+
+          aws --version
+
       - name: Install Python dependencies
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          pip install -r pipeline/requirements.txt
 
-      - name: Install PowerShell
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y powershell
+          if (Test-Path "pipeline/requirements.txt") {
+            pip install -r pipeline/requirements.txt
+          }
+          else {
+            pip install pandas numpy polars pyarrow fastapi uvicorn
+          }
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Verify AWS access
-        run: aws sts get-caller-identity
-
-      - name: Run pipeline
+      - name: Create B1 publish helper (no build, no commit, no push)
         shell: pwsh
-        run: ./pipeline/tools/full_pipeline.ps1 -Mode incremental -SkipWebSync
+        run: |
+          $tempDir = Join-Path $env:GITHUB_WORKSPACE ".github\temp"
+          New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
-      - name: Upload published dataset to S3
-        run: aws s3 sync ./data/published/v1 "$PUBLISHED_S3_URI" --delete --only-show-errors
+          $helperPath = Join-Path $tempDir "b1-publish-helper.ps1"
 
-      - name: Upload reports artifact
+          @'
+          [CmdletBinding()]
+          param(
+              [switch]$SkipPush
+          )
+
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+
+          function Fail {
+              param([string]$Message)
+              throw $Message
+          }
+
+          $repoRoot = $env:GITHUB_WORKSPACE
+          if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+              Fail "GITHUB_WORKSPACE is not set."
+          }
+
+          $syncScript = Join-Path $repoRoot "sync-published-data.ps1"
+          $sourceRoot = Join-Path $repoRoot "data\published\v1"
+          $targetRoot = Join-Path $repoRoot "web-v1-app\public\data\published\v1"
+
+          if (-not (Test-Path -LiteralPath $syncScript)) {
+              Fail "sync-published-data.ps1 not found: $syncScript"
+          }
+
+          if (-not (Test-Path -LiteralPath $sourceRoot)) {
+              Fail "Published source root not found: $sourceRoot"
+          }
+
+          Write-Host ""
+          Write-Host "==> B1 helper publish: sync published JSON into web app public folder" -ForegroundColor Cyan
+
+          & powershell -NoProfile -ExecutionPolicy Bypass -File $syncScript `
+              -SourceRoot $sourceRoot `
+              -TargetRoot $targetRoot `
+              -SkipGitStatus
+
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+              Fail "sync-published-data.ps1 failed with exit code $exitCode"
+          }
+
+          Write-Host ""
+          Write-Host "==> B1 helper publish complete (build/commit/push intentionally skipped)" -ForegroundColor Green
+          '@ | Set-Content -Path $helperPath -Encoding UTF8
+
+          Write-Host "Created helper script: $helperPath"
+
+      - name: Run blank-runner validation against the real daily entrypoint
+        id: run_b1
+        shell: pwsh
+        run: |
+          $rootDir = $env:GITHUB_WORKSPACE
+          $publishHelper = Join-Path $rootDir ".github\temp\b1-publish-helper.ps1"
+          $logDir = Join-Path $rootDir "logs"
+          New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+          $scriptPath = Join-Path $rootDir "run-daily-pipeline.ps1"
+          if (-not (Test-Path -LiteralPath $scriptPath)) {
+            throw "run-daily-pipeline.ps1 not found: $scriptPath"
+          }
+
+          $sw = [System.Diagnostics.Stopwatch]::StartNew()
+
+          & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath `
+            -RootDir $rootDir `
+            -PublishScriptPath $publishHelper `
+            -LogDirectory $logDir `
+            -SkipPush
+
+          $exitCode = $LASTEXITCODE
+          $sw.Stop()
+
+          $elapsedSeconds = [int][Math]::Round($sw.Elapsed.TotalSeconds)
+          $elapsedMinutes = [Math]::Round($sw.Elapsed.TotalMinutes, 2)
+
+          "elapsed_seconds=$elapsedSeconds" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "elapsed_minutes=$elapsedMinutes" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+          Write-Host "Elapsed seconds: $elapsedSeconds"
+          Write-Host "Elapsed minutes: $elapsedMinutes"
+
+          if ($exitCode -ne 0) {
+            throw "B1 validation failed with exit code $exitCode"
+          }
+
+      - name: Build B1 validation summary
+        if: always()
+        shell: pwsh
+        run: |
+          function Get-DirStats {
+            param([string]$PathValue)
+
+            if (-not (Test-Path -LiteralPath $PathValue)) {
+              return @{
+                Exists = $false
+                JsonCount = 0
+                TotalBytes = 0
+              }
+            }
+
+            $files = Get-ChildItem -LiteralPath $PathValue -Recurse -File -ErrorAction SilentlyContinue
+            $jsonFiles = @($files | Where-Object { $_.Extension -ieq ".json" })
+            $totalBytes = 0
+            foreach ($f in $files) {
+              $totalBytes += $f.Length
+            }
+
+            return @{
+              Exists = $true
+              JsonCount = $jsonFiles.Count
+              TotalBytes = $totalBytes
+            }
+          }
+
+          function Format-MB {
+            param([double]$Bytes)
+            return [Math]::Round($Bytes / 1MB, 2)
+          }
+
+          $summaryPath = $env:GITHUB_STEP_SUMMARY
+
+          $publishedStats = Get-DirStats -PathValue (Join-Path $env:GITHUB_WORKSPACE "data\published\v1")
+          $webStats = Get-DirStats -PathValue (Join-Path $env:GITHUB_WORKSPACE "web-v1-app\public\data\published\v1")
+
+          $logFiles = Get-ChildItem -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "logs") -Filter "daily-pipeline-incremental-*.log" -Recurse -ErrorAction SilentlyContinue
+          $latestLog = $null
+          if ($logFiles) {
+            $latestLog = $logFiles | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+          }
+
+          Add-Content -Path $summaryPath -Value "# B1 Blank Runner Validation"
+          Add-Content -Path $summaryPath -Value ""
+          Add-Content -Path $summaryPath -Value "- Workflow purpose: verify how the real daily entrypoint behaves on a blank GitHub runner."
+          Add-Content -Path $summaryPath -Value "- Entry point tested: \`run-daily-pipeline.ps1\`"
+          Add-Content -Path $summaryPath -Value "- Build/commit/push: intentionally disabled for this B1 test"
+          Add-Content -Path $summaryPath -Value ""
+          Add-Content -Path $summaryPath -Value "## Runtime"
+          Add-Content -Path $summaryPath -Value ""
+          Add-Content -Path $summaryPath -Value "- Elapsed minutes: ${{ steps.run_b1.outputs.elapsed_minutes }}"
+          Add-Content -Path $summaryPath -Value "- Elapsed seconds: ${{ steps.run_b1.outputs.elapsed_seconds }}"
+          Add-Content -Path $summaryPath -Value ""
+          Add-Content -Path $summaryPath -Value "## Output directories"
+          Add-Content -Path $summaryPath -Value ""
+          Add-Content -Path $summaryPath -Value "- data/published/v1 exists: $($publishedStats.Exists)"
+          Add-Content -Path $summaryPath -Value "- data/published/v1 json count: $($publishedStats.JsonCount)"
+          Add-Content -Path $summaryPath -Value "- data/published/v1 total MB: $(Format-MB $publishedStats.TotalBytes)"
+          Add-Content -Path $summaryPath -Value "- web-v1-app/public/data/published/v1 exists: $($webStats.Exists)"
+          Add-Content -Path $summaryPath -Value "- web-v1-app/public/data/published/v1 json count: $($webStats.JsonCount)"
+          Add-Content -Path $summaryPath -Value "- web-v1-app/public/data/published/v1 total MB: $(Format-MB $webStats.TotalBytes)"
+          Add-Content -Path $summaryPath -Value ""
+
+          if ($latestLog) {
+            Add-Content -Path $summaryPath -Value "## Latest transcript log"
+            Add-Content -Path $summaryPath -Value ""
+            Add-Content -Path $summaryPath -Value "- Log file: \`$($latestLog.FullName)\`"
+            Add-Content -Path $summaryPath -Value ""
+
+            $matches = Select-String -Path $latestLog.FullName -Pattern "STEP -1|Latest raw day|Start date|FAILED|Incremental pipeline completed successfully|Incremental pipeline \+ publish complete" -SimpleMatch:$false
+            if ($matches) {
+              Add-Content -Path $summaryPath -Value "### Key log lines"
+              Add-Content -Path $summaryPath -Value ""
+              foreach ($m in $matches) {
+                Add-Content -Path $summaryPath -Value "- $($m.Line)"
+              }
+            }
+          }
+          else {
+            Add-Content -Path $summaryPath -Value "## Latest transcript log"
+            Add-Content -Path $summaryPath -Value ""
+            Add-Content -Path $summaryPath -Value "- No transcript log file was created."
+          }
+
+      - name: Upload B1 artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pipeline-reports
+          name: b1-blank-runner-artifacts
           path: |
+            logs
+            data/published/v1
+            web-v1-app/public/data/published/v1
             pipeline/_work/prod/reports
-            reports
           if-no-files-found: ignore
