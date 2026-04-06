@@ -16,6 +16,7 @@ Design goals:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import datetime as dt
 import json
@@ -31,6 +32,12 @@ METHODOLOGY_VERSION = os.environ.get("METHODOLOGY_VERSION", "1.0")
 
 def _parse_date(s: str) -> dt.date:
     return dt.date.fromisoformat(s)
+
+
+def _stable_revision_id(chain: str, date_str: str) -> int:
+    """Deterministic revision_id for historical rows."""
+    h = hashlib.sha256(f"{chain}:{date_str}".encode()).hexdigest()
+    return int(h[:8], 16) % 100_000_000
 
 
 def _normalize_daily_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -195,6 +202,7 @@ def main() -> None:
                 "chain": chain,
                 "missing": False,
                 "methodology_version": METHODOLOGY_VERSION,
+                "revision_id": _stable_revision_id(chain, asof_iso),
                 "profile": profile,
                 "gold_status": gs,
                 "confidence": confidence,

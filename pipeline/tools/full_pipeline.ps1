@@ -1,6 +1,8 @@
 param(
   [ValidateSet('incremental','rebuild')]
-  [string]$Mode = 'incremental'
+  [string]$Mode = 'incremental',
+
+  [switch]$SkipWebSync
 )
 
 Set-StrictMode -Version Latest
@@ -159,6 +161,9 @@ try {
       # Small-but-safe lookback so we can catch missing days without full rebuild.
       # If you want even tighter: set to (latestRaw - 14).
       $rawLookbackDays = 60
+      if (-not [string]::IsNullOrWhiteSpace($env:CSS_RAW_LOOKBACK_DAYS)) {
+        $rawLookbackDays = [int]$env:CSS_RAW_LOOKBACK_DAYS
+      }
       $startRaw = (Get-Date).ToUniversalTime().AddDays(-1 * $rawLookbackDays)
       $startRawIso = Format-IsoDate $startRaw
 
@@ -243,7 +248,9 @@ try {
     & $PY -u $PY_VALIDATE_PUBLISHED --published-root $PUBLISHED_ROOT --chains $chainsCsv --genres 'gold,meta,derived' --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) { throw "validate_published_dataset.py failed rc=$LASTEXITCODE" }
 
-    if (Test-Path $SYNC_WEB) {
+    $shouldSyncWeb = (-not $SkipWebSync) -and ($env:CSS_SYNC_WEB -ne '0')
+
+    if ($shouldSyncWeb -and (Test-Path $SYNC_WEB)) {
       Write-Log 'STEP 9: Sync published dataset -> web public'
       try {
         & $SYNC_WEB -Root $MAIN_ROOT
@@ -252,6 +259,9 @@ try {
       catch {
         Write-Log "NOTE: sync_web_data.ps1 failed (non-fatal): $($_.Exception.Message)"
       }
+    }
+    else {
+      Write-Log 'STEP 9: Skipping web sync'
     }
 
     Write-Log '=== PIPELINE OK ==='

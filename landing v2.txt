@@ -1,0 +1,133 @@
+
+## Fix 1 — Slå sammen Trust og ExploreGrid til én avslutningsseksjon
+
+**Problem:** To separate seksjoner med overlappende lenker (Methodology og Track Record vises i begge). Brukeren opplever repetisjon.
+
+**Løsning:** Fjern Trust-seksjonen som egen seksjon. Bruk overskriften som ExploreGrid-tittel. Legg Schema inn som femte kort, eller bytt ut "Status" med "Schema" siden Schema er mer relevant for kjøpsbeslutningen.
+
+**Konkret endring i `ExploreGrid.tsx` og `landing.ts`:**
+
+```ts
+// Ny tittel på seksjonen
+eyebrow: "READY TO EXPLORE?"
+title: "Check the method before you trust the output."
+
+// Fem kort — eller fire med Schema i stedet for Status
+{ title: "Track Record", href: "/track-record", body: "Inspect historical labels, transitions, and confidence over time." }
+{ title: "Methodology", href: "/methodology", body: "Read the full classification logic, thresholds, and interpretation boundaries." }
+{ title: "JSON Schema", href: "/api-docs/schema", body: "See every field in Gold, Meta, and Derived documented before you subscribe." }
+{ title: "API Docs", href: "/api-docs", body: "Endpoints, authentication, and file delivery contract for subscribers." }
+```
+
+**Resultat:** Siden avsluttes med én klar seksjon som kombinerer tillit og navigasjon.
+
+---
+
+## Fix 2 — Fjern duplikaten "Latest published surface" fra ExploreGrid
+
+**Problem:** Er allerede løst i siste iterasjon, men bekreft at lenken ikke dukker opp andre steder på siden som en navigasjonslenke som peker tilbake til seg selv.
+
+**Sjekkliste:**
+- [ ] Ingen lenker på forsiden peker til `#` eller scroller til toppen av samme side
+- [ ] Alle ExploreGrid-kort peker til distinkte undersider
+
+---
+
+## Fix 3 — Hero-venstre: legg til én konkret tidsreferanse
+
+**Problem:** "That pipeline takes weeks to build" er et uspesifikt påstand. For en kvant som har bygget noe lignende er det enten for lavt eller uleserlig.
+
+**Løsning:** Gjør det mer spesifikt uten å overdrive. Én setning legges til i andre avsnitt av hero-underteksten:
+
+**Nåværende andre avsnitt:**
+```
+That pipeline takes weeks to build and needs ongoing maintenance.
+TrendAnalytics runs it daily across Bitcoin, Ethereum, Arbitrum, and Base
+— and delivers the output as documented Gold, Meta, and Derived JSON you
+can pull directly into your own workflow.
+```
+
+**Nytt andre avsnitt:**
+```
+That pipeline — AWS ingestion, daily aggregation, z-score baselines,
+confidence gating, artifact publishing, and historical storage — takes
+weeks to build and needs ongoing maintenance across four chains with
+different data models. TrendAnalytics runs it daily and delivers the
+output as documented Gold, Meta, and Derived JSON you can pull directly
+into your own workflow.
+```
+
+**Resultat:** Påstanden er nå konkret og etterprøvbar. En kvant som kjenner AWS Public Blockchain Data vil nikke gjenkjennende til listen.
+
+---
+
+## Fix 4 — Priskortet: tydeliggjør hva Free faktisk inkluderer
+
+**Problem:** Free-kortet sier "Readable web surface across the published product" og lister opp en rekke ting. For en teknisk kjøper som vurderer Basic er det uklart om den frie flaten er nyttig eller bare en forhåndsvisning.
+
+**Løsning:** Én setning legges til under Free-kortets beskrivelse som setter grensen eksplisitt:
+
+```
+// Legg til under eksisterende Free-kortbeskrivelse
+"The public site reads the same published artifacts subscribers receive —
+ but without API access or raw file download."
+```
+
+**Resultat:** Kjøperen forstår at Free er genuint nyttig, ikke bare en teaser, men at abonnementet gir noe kvalitativt annerledes.
+
+---
+
+## Fix 5 — "You want the JSON product" — fjern det midterste use case-punktet
+
+**Problem:** De tre use case-punktene har ulik tyngde. "Transaction timing context" er vesentlig svakere enn de to andre og treffer ikke kvant-målgruppen på samme måte. Det senker den samlede troverdigheten til seksjonen.
+
+**Løsning:** Erstatt "Transaction timing context" med et punkt som treffer analytikeren direkte:
+
+**Nåværende:**
+```
+Transaction timing context
+Check whether network conditions look stable, heating, congested, or cheap
+before you route larger activity through a chain.
+```
+
+**Nytt:**
+```
+Regime-conditioned research without the baseline work
+Use the published z-scores, percentiles, confidence bands, and driver
+attribution as inputs to your own models — without computing the baselines
+yourself from raw chain data.
+```
+
+**Resultat:** Alle tre use case-punkter treffer nå den samme målgruppen med samme presisjonsnivå.
+
+---
+
+## Fix 6 — JSON Schema-lenken i JsonLayers — gjør den mer fremtredende
+
+**Problem:** "Full field reference →" knappen øverst til høyre i JsonLayers-seksjonen er liten og lett å overse. Det er den viktigste enkeltlenken for en kjøper som vurderer abonnement.
+
+**Løsning:** Bytt fra en liten rounded-full lenke til en tydeligere knapp med border i cyan:
+
+```tsx
+// Nåværende
+className="... rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm ..."
+
+// Ny
+className="... rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2.5
+           text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+```
+
+**Resultat:** Den viktigste kjøpsbeslutningslenken er synlig på linje med "See plans"-knappen i hero.
+
+---
+
+## Prioriteringsrekkefølge
+
+| Fix | Innsats | Effekt |
+|-----|---------|--------|
+| Fix 1 — Slå sammen Trust + Explore | Lav | Høy |
+| Fix 3 — Hero tidsreferanse | Svært lav | Middels |
+| Fix 5 — Use case punkt 3 | Svært lav | Middels |
+| Fix 6 — Schema-knapp synlighet | Svært lav | Middels |
+| Fix 4 — Free-kort beskrivelse | Svært lav | Lav |
+| Fix 2 — Duplikat-sjekk | Lav | Lav |
