@@ -26,6 +26,17 @@ type MetaLatest = {
   };
 };
 
+type LandingHero = {
+  display_asof?: string;
+  regime_asof?: string;
+  asof?: {
+    display?: string;
+    latest_available?: string;
+    regime?: string;
+    meta_actual?: string;
+  };
+};
+
 type StatusCode = "ok" | "warn" | "fail" | "unknown";
 
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
@@ -106,10 +117,17 @@ export async function GET() {
   const chains = await Promise.all(
     CHAIN_LIST.map(async (chain) => {
       const metaPath = `data/published/v1/meta/${chain.id}/latest.json`;
+      const heroPath = `data/published/v1/landing/${chain.id}/hero.json`;
 
-      const meta = await readPublishedJson<MetaLatest>(metaPath);
+      const [meta, hero] = await Promise.all([
+        readPublishedJson<MetaLatest>(metaPath),
+        readPublishedJson<LandingHero>(heroPath),
+      ]);
 
       const asOf =
+        hero?.display_asof ??
+        hero?.asof?.display ??
+        hero?.asof?.latest_available ??
         meta?.updated_through ??
         meta?.regime?.asof_date ??
         meta?.date ??
