@@ -336,7 +336,7 @@ function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
     confidenceBand: band,
     confidenceClass: confidenceChipClass(band),
     confidenceTooltip: confidenceTooltip(row),
-    asOf: fmtDate(row.as_of),
+    asOf: fmtDate((row as { display_asof?: string | null }).display_asof ?? row.as_of),
     asOfTooltip: asOfTooltip(row),
     lagValue: row.lag_days !== null ? `${row.lag_days}d` : "—",
     lagTooltip: lagTooltip(row),
