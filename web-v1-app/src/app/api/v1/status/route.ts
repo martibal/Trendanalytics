@@ -134,9 +134,11 @@ export async function GET() {
         undefined;
 
       const lagDays =
-        typeof meta?.confidence?.lag_days_vs_utc_today === "number"
-          ? meta.confidence.lag_days_vs_utc_today
-          : lagDaysFromIsoDay(asOf);
+        heroDisplayAsOf(hero) !== null
+          ? lagDaysFromIsoDay(asOf)
+          : typeof meta?.confidence?.lag_days_vs_utc_today === "number"
+            ? meta.confidence.lag_days_vs_utc_today
+            : lagDaysFromIsoDay(asOf);
 
       const status = classifyStatus({
         chain: chain.id,

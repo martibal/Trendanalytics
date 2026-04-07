@@ -36,19 +36,6 @@ type LandingApiChain = {
   confidence_score?: number | null;
   lag_days?: number | null;
   as_of?: string | null;
-  display_asof?: string | null;
-  regime_asof?: string | null;
-};
-
-type LandingHeroPayload = {
-  chain?: string;
-  display_asof?: string | null;
-  regime_asof?: string | null;
-  asof?: {
-    display?: string | null;
-    regime?: string | null;
-    latest_available?: string | null;
-  } | null;
 };
 
 type LandingApiResponse =
@@ -80,6 +67,18 @@ type StatusApiResponse = {
     methodology_version?: string | null;
   } | null;
   chains?: StatusApiRow[];
+};
+
+type LandingHero = {
+  chain?: string;
+  display_asof?: string;
+  regime_asof?: string;
+  asof?: {
+    display?: string;
+    latest_available?: string;
+    regime?: string;
+    meta_actual?: string;
+  };
 };
 
 type MetaLatest = {
@@ -212,28 +211,44 @@ function lagDaysFromIsoDay(date?: string): number | null {
   return Math.max(0, Math.floor(diff / 86400000));
 }
 
-type LandingHeroMap = Record<ChainId, { display_asof: string | null; regime_asof: string | null }>;
-
-async function readLandingHeroMap(): Promise<LandingHeroMap> {
-  const entries = await Promise.all(
-    CHAIN_LIST.map(async (chain) => {
-      const hero = await readPublishedJson<LandingHeroPayload>(
-        `data/published/v1/landing/${chain.id}/hero.json`,
-      );
-
-      const displayAsOf =
-        hero?.display_asof ?? hero?.asof?.display ?? hero?.asof?.latest_available ?? null;
-      const regimeAsOf = hero?.regime_asof ?? hero?.asof?.regime ?? null;
-
-      return [chain.id, { display_asof: displayAsOf, regime_asof: regimeAsOf }] as const;
-    }),
-  );
-
-  return Object.fromEntries(entries) as LandingHeroMap;
-}
-
 function expectedDelayDays(chain: ChainId): number {
   return chain === "arbitrum" || chain === "base" ? 7 : 1;
+}
+
+function heroDisplayAsOf(hero?: LandingHero | null): string | null {
+  return hero?.display_asof ?? hero?.asof?.display ?? hero?.asof?.latest_available ?? null;
+}
+
+function heroRegimeAsOf(hero?: LandingHero | null): string | null {
+  return hero?.regime_asof ?? hero?.asof?.regime ?? hero?.asof?.meta_actual ?? null;
+}
+
+async function buildLandingHeroMap(): Promise<Map<string, LandingHero>> {
+  const heroes = await Promise.all(
+    CHAIN_LIST.map(async (chain) => {
+      const hero = await readPublishedJson<LandingHero>(`data/published/v1/landing/${chain.id}/hero.json`);
+      return [chain.id, hero ?? {}] as const;
+    })
+  );
+
+  return new Map(heroes);
+}
+
+function withLandingHero(row: StatusApiRow, hero?: LandingHero | null): StatusApiRow {
+  const displayAsOf = heroDisplayAsOf(hero);
+  const regimeAsOf = heroRegimeAsOf(hero);
+  const asOf = displayAsOf ?? row.as_of;
+  const lagDays = displayAsOf ? lagDaysFromIsoDay(asOf ?? undefined) : typeof row.lag_days === "number" ? row.lag_days : lagDaysFromIsoDay(asOf ?? undefined);
+  const normalizedChain = row.chain as ChainId;
+
+  return {
+    ...row,
+    as_of: asOf,
+    display_asof: displayAsOf,
+    regime_asof: regimeAsOf,
+    lag_days: lagDays,
+    status: classifyStatus({ chain: normalizedChain, lagDays, asOf }),
+  };
 }
 
 function classifyStatus(params: {
@@ -264,6 +279,8 @@ async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
         name: meta?.profile?.label ?? chain.name,
         label: chain.label,
         as_of: asOf,
+        display_asof: null,
+        regime_asof: null,
         lag_days: lagDays,
         status: classifyStatus({ chain: chain.id, lagDays, asOf }),
         published_regime: meta?.status?.label ?? null,
@@ -339,11 +356,10 @@ function confidenceTooltip(row: StatusApiRow) {
 }
 
 function asOfTooltip(row: StatusApiRow) {
-  const displayAsOf = row.display_asof ?? row.as_of;
-  if (!displayAsOf) {
+  if (!row.as_of) {
     return `${row.label} does not currently expose an as-of date on the landing surface.`;
   }
-  return `${row.label} is currently showing the latest visible row with as-of date ${displayAsOf}. This is the date the displayed charts and freshness context refer to.`;
+  return `${row.label} is currently showing the latest published row with as-of date ${row.as_of}. This is the date the displayed regime and confidence context refer to.`;
 }
 
 function lagTooltip(row: StatusApiRow) {
@@ -384,65 +400,51 @@ function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
   };
 }
 
-function normalizeStatusRow(
-  row: StatusApiRow,
-  hero: { display_asof: string | null; regime_asof: string | null } | undefined,
-): StatusApiRow {
-  const chainId = row.chain as ChainId;
-  const displayAsOf = hero?.display_asof ?? row.display_asof ?? row.as_of ?? null;
-  const regimeAsOf = hero?.regime_asof ?? row.regime_asof ?? row.as_of ?? null;
-  const lagDays = displayAsOf ? lagDaysFromIsoDay(displayAsOf) : row.lag_days;
-
-  return {
-    ...row,
-    display_asof: displayAsOf,
-    regime_asof: regimeAsOf,
-    lag_days: lagDays,
-    status: classifyStatus({ chain: chainId, lagDays, asOf: displayAsOf }),
-  };
-}
-
 export default async function HomePage() {
   const dataset: DatasetManifest | null = await readDatasetManifest();
 
-  const [landingPayload, statusPayload, metaFallbackRows, landingHeroMap, historyDepthDays] = await Promise.all([
+  const [landingPayload, statusPayload, metaFallbackRows, historyDepthDays, landingHeroMap] = await Promise.all([
     readPublishedJson<LandingApiResponse>("data/published/v1/landing/index.json"),
     readPublishedJson<StatusApiResponse>("data/published/v1/status/index.json"),
     buildMetaFallbackRows(),
-    readLandingHeroMap(),
     computeHistoryDepthDays().catch(() => null),
+    buildLandingHeroMap(),
   ]);
 
   const landingChains = extractLandingChains(landingPayload);
   const statusRows =
     Array.isArray(statusPayload?.chains) && statusPayload.chains.length > 0
-      ? statusPayload.chains
+      ? statusPayload.chains.map((row) => withLandingHero(row, landingHeroMap.get(row.chain)))
       : [];
 
   const landingFallbackRows: StatusApiRow[] = CHAIN_LIST.map((chain) => {
     const landing = landingChains.find((r) => r.chain === chain.id);
-    const hero = landingHeroMap[chain.id];
-    const displayAsOf = hero?.display_asof ?? landing?.display_asof ?? landing?.as_of ?? null;
-    const lagDays = displayAsOf ? lagDaysFromIsoDay(displayAsOf) : landing?.lag_days ?? null;
+    const hero = landingHeroMap.get(chain.id);
+    const displayAsOf = heroDisplayAsOf(hero);
+    const asOf = displayAsOf ?? landing?.as_of ?? null;
+    const lagDays = displayAsOf ? lagDaysFromIsoDay(asOf ?? undefined) : landing?.lag_days ?? lagDaysFromIsoDay(asOf ?? undefined);
+
     return {
       chain: chain.id,
       name: landing?.name ?? chain.name,
       label: landing?.label ?? chain.label,
-      as_of: landing?.as_of ?? displayAsOf,
+      as_of: asOf,
       display_asof: displayAsOf,
-      regime_asof: hero?.regime_asof ?? landing?.regime_asof ?? landing?.as_of ?? null,
+      regime_asof: heroRegimeAsOf(hero),
       lag_days: lagDays,
-      status: classifyStatus({ chain: chain.id, lagDays, asOf: displayAsOf }),
+      status: classifyStatus({ chain: chain.id, lagDays, asOf }),
       published_regime: landing?.status_label ?? null,
       confidence_score: landing?.confidence_score ?? null,
       expected_delay_days: expectedDelayDays(chain.id),
     };
   });
 
+  const normalizedMetaFallbackRows = metaFallbackRows.map((row) => withLandingHero(row, landingHeroMap.get(row.chain)));
+
   const rows =
     statusRows.length > 0
       ? statusRows
-      : metaFallbackRows.some(
+      : normalizedMetaFallbackRows.some(
             (r) =>
               r.published_regime !== null ||
               r.confidence_score !== null ||
@@ -452,12 +454,7 @@ export default async function HomePage() {
         ? metaFallbackRows
         : landingFallbackRows;
 
-  const normalizedRows = rows.map((row) => {
-    const chainId = row.chain as ChainId;
-    return normalizeStatusRow(row, landingHeroMap[chainId]);
-  });
-
-  const displayRows = normalizedRows.map(toSurfaceRowDisplay);
+  const displayRows = rows.map(toSurfaceRowDisplay);
   const whatIsExplain = whatIsTrendAnalyticsExplanation();
   const boundaryExplain = interpretationBoundaryExplanation();
 

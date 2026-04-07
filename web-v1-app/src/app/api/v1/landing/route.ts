@@ -29,6 +29,17 @@ type MetaLatest = {
   };
 };
 
+type LandingHero = {
+  display_asof?: string;
+  regime_asof?: string;
+  asof?: {
+    display?: string;
+    latest_available?: string;
+    regime?: string;
+    meta_actual?: string;
+  };
+};
+
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
   return new TextDecoder("utf-8").decode(new Uint8Array(buffer));
 }
@@ -58,6 +69,29 @@ function expectedDelayDays(chain: ChainId): number {
   return chain === "arbitrum" || chain === "base" ? 7 : 1;
 }
 
+function parseIsoDayToUtcMs(date?: string | null): number | null {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const [y, m, d] = date.split("-").map(Number);
+  const ms = Date.UTC(y, m - 1, d);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function utcTodayMs(): number {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+}
+
+function lagDaysFromIsoDay(date?: string | null): number | null {
+  const asOfMs = parseIsoDayToUtcMs(date);
+  if (asOfMs === null) return null;
+  const diff = utcTodayMs() - asOfMs;
+  return Math.max(0, Math.floor(diff / 86400000));
+}
+
+function heroDisplayAsOf(hero?: LandingHero | null): string | null {
+  return hero?.display_asof ?? hero?.asof?.display ?? hero?.asof?.latest_available ?? null;
+}
+
 function confidenceBand(value?: number | null): "Good" | "Caution" | "Degraded" | "—" {
   if (typeof value !== "number") return "—";
   if (value >= 0.7) return "Good";
@@ -71,17 +105,24 @@ export async function GET() {
   const chains = await Promise.all(
     CHAIN_LIST.map(async (chain) => {
       const metaPath = `data/published/v1/meta/${chain.id}/latest.json`;
-      const meta = await readPublishedJson<MetaLatest>(metaPath);
+      const heroPath = `data/published/v1/landing/${chain.id}/hero.json`;
+      const [meta, hero] = await Promise.all([
+        readPublishedJson<MetaLatest>(metaPath),
+        readPublishedJson<LandingHero>(heroPath),
+      ]);
 
       const confidenceScore =
         typeof meta?.confidence?.confidence_score === "number"
           ? meta.confidence.confidence_score
           : null;
 
+      const asOf = heroDisplayAsOf(hero) ?? meta?.updated_through ?? meta?.regime?.asof_date ?? meta?.date ?? null;
       const lagDays =
-        typeof meta?.confidence?.lag_days_vs_utc_today === "number"
-          ? meta.confidence.lag_days_vs_utc_today
-          : null;
+        heroDisplayAsOf(hero) !== null
+          ? lagDaysFromIsoDay(asOf)
+          : typeof meta?.confidence?.lag_days_vs_utc_today === "number"
+            ? meta.confidence.lag_days_vs_utc_today
+            : lagDaysFromIsoDay(asOf);
 
       return {
         chain: chain.id,
@@ -93,11 +134,11 @@ export async function GET() {
         confidence_score: confidenceScore,
         confidence_band: confidenceBand(confidenceScore),
         lag_days: lagDays,
-        as_of: meta?.updated_through ?? meta?.regime?.asof_date ?? meta?.date ?? null,
+        as_of: asOf,
         expected_delay_days: expectedDelayDays(chain.id),
         traceability: {
-          source_path: metaPath,
-          source_field: "latest landing card fields derived from published meta latest",
+          source_path: `${metaPath} + ${heroPath}`,
+          source_field: "landing date uses hero.display_asof when available; regime/confidence remain from published meta latest",
         },
       };
     })
