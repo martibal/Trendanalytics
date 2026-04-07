@@ -119,6 +119,44 @@ def _collect_days(chain_dir: Path) -> List[str]:
     return sorted({p.stem for p in chain_dir.glob("????-??-??.json")})
 
 
+def _normalize_iso_day(value: Any) -> str:
+    s = str(value or "").strip()
+    if len(s) == 10 and s[4] == "-" and s[7] == "-":
+        return s
+    return ""
+
+
+def _latest_iso_day(values: List[str]) -> str:
+    valid = [_normalize_iso_day(v) for v in values]
+    valid = [v for v in valid if v]
+    return max(valid) if valid else ""
+
+
+def _build_landing_asof_payload(actual_asof: Dict[str, str]) -> Dict[str, Any]:
+    gold_asof = _normalize_iso_day(actual_asof.get("gold", ""))
+    meta_asof = _normalize_iso_day(actual_asof.get("meta", ""))
+    derived_asof = _normalize_iso_day(actual_asof.get("derived", ""))
+
+    latest_available = _latest_iso_day([gold_asof, derived_asof, meta_asof])
+
+    # IMPORTANT:
+    # The UI's "Data as of" should reflect the newest published dataset available for charts,
+    # while regime/lag can still be interpreted separately from META.
+    #
+    # For backward compatibility with existing clients that may already read asof.meta,
+    # we expose the display-oriented date there, and preserve the true META/regime date
+    # in dedicated fields below.
+    return {
+        "gold": gold_asof,
+        "derived": derived_asof,
+        "meta": latest_available,
+        "meta_actual": meta_asof,
+        "regime": meta_asof,
+        "display": latest_available,
+        "latest_available": latest_available,
+    }
+
+
 def _copy_chain_files(src_chain: Path, dst_chain: Path) -> Tuple[int, str]:
     """
     Copy (SANITIZED):
@@ -297,18 +335,18 @@ def _export_landing(
         _ensure_dir(chain_dir)
 
         files: Dict[str, Any] = {}
-        asof: Dict[str, str] = {}
+        asof_by_genre: Dict[str, str] = {}
 
         for genre in genres:
             gdir = published_root / genre / chain
             if not gdir.exists():
                 files[genre] = {"latest": None, "windows": {}, "manifest": None}
-                asof[genre] = ""
+                asof_by_genre[genre] = ""
                 continue
 
             manifest_path = gdir / "manifest.json"
             manifest = _read_json(manifest_path) if manifest_path.exists() else {}
-            asof[genre] = str(manifest.get("asof", "")) if isinstance(manifest, dict) else ""
+            asof_by_genre[genre] = str(manifest.get("asof", "")) if isinstance(manifest, dict) else ""
 
             latest_path = gdir / "latest.json"
             win_paths: Dict[int, str] = {}
@@ -322,6 +360,8 @@ def _export_landing(
                 "latest": _rel_from_published(published_root, latest_path) if latest_path.exists() else None,
                 "windows": {str(k): v for k, v in win_paths.items()},
             }
+
+        landing_asof = _build_landing_asof_payload(asof_by_genre)
 
         hero_charts = []
         for spec in _landing_chart_specs(chain):
@@ -338,7 +378,10 @@ def _export_landing(
             "computed_at_utc": computed_at_utc,
             "chain": chain,
             "windows_supported": windows,
-            "asof": asof,
+            "asof": landing_asof,
+            "asof_by_genre": asof_by_genre,
+            "display_asof": landing_asof["display"],
+            "regime_asof": landing_asof["regime"],
             "files": files,
             "hero": {
                 "headline": "Network activity & execution conditions",
@@ -346,6 +389,8 @@ def _export_landing(
                 "notes": [
                     "Landing hero is descriptive only (no prices, no forecasts).",
                     "Charts reference published window files; web renders interactive tooltips on hover.",
+                    "display_asof / asof.display is the newest published date across gold, derived, and meta for this chain.",
+                    "regime_asof / asof.regime is the actual META/regime date and may lag the chart date.",
                 ],
             },
         }
@@ -355,7 +400,10 @@ def _export_landing(
             {
                 "chain": chain,
                 "hero_file": _rel_from_published(published_root, chain_dir / "hero.json"),
-                "asof": asof,
+                "asof": landing_asof,
+                "asof_by_genre": asof_by_genre,
+                "display_asof": landing_asof["display"],
+                "regime_asof": landing_asof["regime"],
             }
         )
 
