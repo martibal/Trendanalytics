@@ -1728,11 +1728,13 @@ export default async function ChainPage({
   const effectiveWindowDays = requestedWindow;
 
   const metaPath = `meta/${chainId}/latest.json`;
+  const heroPath = `landing/${chainId}/hero.json`;
   const goldPath = `gold/${chainId}/last${effectiveWindowDays}d.json`;
   const derivedPath = `derived/${chainId}/last${effectiveWindowDays}d.json`;
 
-  const [meta, goldPayload, derivedPayload] = await Promise.all([
+  const [meta, landingHero, goldPayload, derivedPayload] = await Promise.all([
     readPublishedJson<MetaLatest>(metaPath),
+    readPublishedJson<LandingHero>(heroPath),
     readPublishedJson<GoldRow[] | { rows?: GoldRow[] }>(goldPath),
     readPublishedJson<DerivedRow[] | { rows?: DerivedRow[] }>(derivedPath),
   ]);
@@ -1793,6 +1795,9 @@ export default async function ChainPage({
 
   const displayName = meta.profile?.label ?? cfg.name;
   const asOf =
+    landingHero?.display_asof ??
+    landingHero?.asof?.display ??
+    landingHero?.asof?.latest_available ??
     meta.updated_through ??
     meta.regime?.asof_date ??
     meta.scorecard?.asof_date ??
