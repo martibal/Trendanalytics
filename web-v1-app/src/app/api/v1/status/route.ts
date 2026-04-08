@@ -83,6 +83,30 @@ function lagDaysFromIsoDay(date?: string): number | null {
   return Math.max(0, Math.floor(diff / 86400000));
 }
 
+function heroDisplayAsOf(hero?: LandingHero | null): string | null {
+  const direct =
+    typeof hero?.display_asof === "string" && hero.display_asof.trim().length > 0
+      ? hero.display_asof
+      : null;
+
+  if (direct) return direct;
+
+  const nestedDisplay =
+    typeof hero?.asof?.display === "string" && hero.asof.display.trim().length > 0
+      ? hero.asof.display
+      : null;
+
+  if (nestedDisplay) return nestedDisplay;
+
+  const latestAvailable =
+    typeof hero?.asof?.latest_available === "string" &&
+    hero.asof.latest_available.trim().length > 0
+      ? hero.asof.latest_available
+      : null;
+
+  return latestAvailable;
+}
+
 function expectedDelayDays(chain: ChainId): number {
   return chain === "arbitrum" || chain === "base" ? 7 : 1;
 }
@@ -124,18 +148,18 @@ export async function GET() {
         readPublishedJson<LandingHero>(heroPath),
       ]);
 
+      const heroAsOf = heroDisplayAsOf(hero);
+
       const asOf =
-        hero?.display_asof ??
-        hero?.asof?.display ??
-        hero?.asof?.latest_available ??
+        heroAsOf ??
         meta?.updated_through ??
         meta?.regime?.asof_date ??
         meta?.date ??
         undefined;
 
       const lagDays =
-        heroDisplayAsOf(hero) !== null
-          ? lagDaysFromIsoDay(asOf)
+        heroAsOf !== null
+          ? lagDaysFromIsoDay(heroAsOf)
           : typeof meta?.confidence?.lag_days_vs_utc_today === "number"
             ? meta.confidence.lag_days_vs_utc_today
             : lagDaysFromIsoDay(asOf);

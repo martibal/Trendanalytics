@@ -15,12 +15,17 @@ type S3BodyLike = {
   transformToString?: () => Promise<string>;
 };
 
+function getEnv(name: string): string | null {
+  const raw = process.env[name]?.trim();
+  return raw ? raw : null;
+}
+
 function getS3Region(): string | null {
-  return process.env.S3_REGION ?? null;
+  return getEnv("S3_REGION");
 }
 
 function getS3Bucket(): string | null {
-  return process.env.S3_BUCKET ?? null;
+  return getEnv("S3_BUCKET");
 }
 
 function getS3Prefix(): string {
@@ -28,22 +33,58 @@ function getS3Prefix(): string {
   return raw.replace(/^\/+|\/+$/g, "");
 }
 
+function getS3Endpoint(): string | null {
+  return getEnv("S3_ENDPOINT");
+}
+
+function getS3AccessKeyId(): string | null {
+  return getEnv("S3_ACCESS_KEY_ID");
+}
+
+function getS3SecretAccessKey(): string | null {
+  return getEnv("S3_SECRET_ACCESS_KEY");
+}
+
+function getS3ForcePathStyle(): boolean {
+  const raw = process.env.S3_FORCE_PATH_STYLE?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
 function getS3Client(): S3Client | null {
   const region = getS3Region();
-
   if (!region) {
     return null;
   }
 
-  return new S3Client({
+  const endpoint = getS3Endpoint();
+  const accessKeyId = getS3AccessKeyId();
+  const secretAccessKey = getS3SecretAccessKey();
+
+  const config: ConstructorParameters<typeof S3Client>[0] = {
     region,
-  });
+  };
+
+  if (endpoint) {
+    config.endpoint = endpoint;
+  }
+
+  if (accessKeyId && secretAccessKey) {
+    config.credentials = {
+      accessKeyId,
+      secretAccessKey,
+    };
+  }
+
+  if (endpoint) {
+    config.forcePathStyle = getS3ForcePathStyle();
+  }
+
+  return new S3Client(config);
 }
 
 function joinS3Key(storagePath: string): string {
   const cleanedPath = storagePath.replace(/^\/+/, "");
   const prefix = getS3Prefix();
-
   return prefix ? `${prefix}/${cleanedPath}` : cleanedPath;
 }
 
@@ -70,7 +111,9 @@ export async function readS3StorageObject(
   const bucket = getS3Bucket();
 
   if (!client || !bucket) {
-    throw new Error("S3 storage is not configured. Missing S3_REGION or S3_BUCKET.");
+    throw new Error(
+      "S3-compatible storage is not configured. Missing S3_REGION or S3_BUCKET."
+    );
   }
 
   const command = new GetObjectCommand({
