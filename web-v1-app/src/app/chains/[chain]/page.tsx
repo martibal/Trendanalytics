@@ -143,6 +143,8 @@ async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
   }
 }
 
+
+
 function landingDisplayAsOf(hero?: LandingHero | null): string | null {
   return hero?.display_asof ?? hero?.asof?.display ?? hero?.asof?.latest_available ?? null;
 }
@@ -383,14 +385,23 @@ function asRecord(v: unknown): Record<string, unknown> | null {
   return v as Record<string, unknown>;
 }
 
-function parseIsoDayToUtcMs(d: unknown): number | null {
-  if (typeof d !== "string") return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
-  const [y, m, day] = d.split("-").map((x) => Number(x));
-  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(day)) {
-    return null;
-  }
-  return Date.UTC(y, m - 1, day);
+function parseIsoDayToUtcMs(date?: string): number | null {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const [y, m, d] = date.split("-").map(Number);
+  const ms = Date.UTC(y, m - 1, d);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function utcTodayMs(): number {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+}
+
+function lagDaysFromIsoDay(date?: string): number | null {
+  const asOfMs = parseIsoDayToUtcMs(date);
+  if (asOfMs === null) return null;
+  const diff = utcTodayMs() - asOfMs;
+  return Math.max(0, Math.floor(diff / 86400000));
 }
 
 function utcMsToIsoDay(ms: number): string {
@@ -2507,7 +2518,7 @@ export default async function ChainPage({
       <ExplainModal
         id={`lag-${chainId}`}
         title="What observed lag means"
-        pair={lagExplanation(observedLagDays)}
+        pair={lagExplanation(observedLagDays ?? undefined)}
         traceability={
           <ul className="list-disc pl-5">
             <li>Field: <InlineCode>display_asof</InlineCode> (fallback: meta date fields)</li>
