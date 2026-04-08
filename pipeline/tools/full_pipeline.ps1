@@ -243,13 +243,22 @@ try {
     }
 
     Write-Log 'STEP 0: Probe latest raw day'
-    $latestRaw = Get-LatestRawDay $RAW_ROOT
     $latestPublished = Get-LatestPublishedDay $PUBLISHED_ROOT $chains
     $plannedDownloadCount = 0
 
     if ($downloadReport -and $downloadReport.planned_downloads) {
       $plannedDownloadCount = @($downloadReport.planned_downloads).Count
     }
+
+    if ($Mode -eq 'incremental' -and $latestPublished -and $plannedDownloadCount -eq 0) {
+      Write-Log ("Latest published day: " + (Format-IsoDate $latestPublished))
+      Write-Log "Planned raw downloads from report: 0"
+      Write-Log "No unpublished raw days to process. Published snapshot is already current."
+      Write-Log '=== PIPELINE OK (NO-OP) ==='
+      return
+    }
+
+    $latestRaw = Get-LatestRawDay $RAW_ROOT
 
     if (-not $latestRaw) {
       if ($Mode -eq 'incremental' -and $latestPublished -and $plannedDownloadCount -eq 0) {
