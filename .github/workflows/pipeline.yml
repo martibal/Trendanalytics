@@ -89,11 +89,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path $dst | Out-Null
 
           robocopy $src $dst /MIR /NFL /NDL /NJH /NJS /NP
-          if ($LASTEXITCODE -gt 7) {
-            throw "robocopy failed with exit code $LASTEXITCODE"
+          $rc = $LASTEXITCODE
+
+          if ($rc -gt 7) {
+            throw "robocopy failed with exit code $rc"
           }
 
-          Write-Host "Seeded published state from committed web snapshot."
+          Write-Host "Seeded published state from committed web snapshot. robocopy exit code: $rc"
+
+          $global:LASTEXITCODE = 0
+          exit 0
 
       - name: Run daily incremental pipeline
         shell: pwsh
