@@ -27,13 +27,16 @@ type MetaLatest = {
 };
 
 type LandingHero = {
-  display_asof?: string;
-  regime_asof?: string;
+  display_asof?: string | null;
+  regime_asof?: string | null;
   asof?: {
-    display?: string;
-    latest_available?: string;
-    regime?: string;
-    meta_actual?: string;
+    display?: string | null;
+    latest_available?: string | null;
+    gold?: string | null;
+    derived?: string | null;
+    meta?: string | null;
+    meta_actual?: string | null;
+    regime?: string | null;
   };
 };
 
@@ -84,27 +87,19 @@ function lagDaysFromIsoDay(date?: string): number | null {
 }
 
 function heroDisplayAsOf(hero?: LandingHero | null): string | null {
-  const direct =
-    typeof hero?.display_asof === "string" && hero.display_asof.trim().length > 0
-      ? hero.display_asof
-      : null;
+  return (
+    hero?.display_asof ??
+    hero?.asof?.display ??
+    hero?.asof?.latest_available ??
+    hero?.asof?.gold ??
+    hero?.asof?.derived ??
+    hero?.asof?.meta ??
+    null
+  );
+}
 
-  if (direct) return direct;
-
-  const nestedDisplay =
-    typeof hero?.asof?.display === "string" && hero.asof.display.trim().length > 0
-      ? hero.asof.display
-      : null;
-
-  if (nestedDisplay) return nestedDisplay;
-
-  const latestAvailable =
-    typeof hero?.asof?.latest_available === "string" &&
-    hero.asof.latest_available.trim().length > 0
-      ? hero.asof.latest_available
-      : null;
-
-  return latestAvailable;
+function heroRegimeAsOf(hero?: LandingHero | null): string | null {
+  return hero?.regime_asof ?? hero?.asof?.regime ?? hero?.asof?.meta_actual ?? null;
 }
 
 function expectedDelayDays(chain: ChainId): number {
@@ -148,18 +143,18 @@ export async function GET() {
         readPublishedJson<LandingHero>(heroPath),
       ]);
 
-      const heroAsOf = heroDisplayAsOf(hero);
-
+      const displayAsOf = heroDisplayAsOf(hero);
+      const regimeAsOf = heroRegimeAsOf(hero) ?? meta?.regime?.asof_date ?? null;
       const asOf =
-        heroAsOf ??
+        displayAsOf ??
         meta?.updated_through ??
         meta?.regime?.asof_date ??
         meta?.date ??
         undefined;
 
       const lagDays =
-        heroAsOf !== null
-          ? lagDaysFromIsoDay(heroAsOf)
+        displayAsOf !== null
+          ? lagDaysFromIsoDay(asOf)
           : typeof meta?.confidence?.lag_days_vs_utc_today === "number"
             ? meta.confidence.lag_days_vs_utc_today
             : lagDaysFromIsoDay(asOf);
@@ -172,9 +167,11 @@ export async function GET() {
 
       return {
         chain: chain.id,
-        name: chain.name,
+        name: meta?.profile?.label ?? chain.name,
         label: chain.label,
         as_of: asOf ?? null,
+        display_asof: displayAsOf,
+        regime_asof: regimeAsOf,
         lag_days: lagDays,
         status,
         published_regime: meta?.status?.label ?? null,
@@ -185,6 +182,7 @@ export async function GET() {
         expected_delay_days: expectedDelayDays(chain.id),
         traceability: {
           source_path: metaPath,
+          hero_path: heroPath,
           source_field: "latest.json",
         },
       };

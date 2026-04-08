@@ -97,8 +97,11 @@ type LandingHero = {
   asof?: {
     display?: string;
     latest_available?: string;
-    regime?: string;
+    gold?: string;
+    derived?: string;
+    meta?: string;
     meta_actual?: string;
+    regime?: string;
   };
 };
 
@@ -144,7 +147,6 @@ async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
 }
 
 
-
 function landingDisplayAsOf(hero?: LandingHero | null): string | null {
   return hero?.display_asof ?? hero?.asof?.display ?? hero?.asof?.latest_available ?? null;
 }
@@ -152,6 +154,7 @@ function landingDisplayAsOf(hero?: LandingHero | null): string | null {
 function landingRegimeAsOf(hero?: LandingHero | null): string | null {
   return hero?.regime_asof ?? hero?.asof?.regime ?? hero?.asof?.meta_actual ?? null;
 }
+
 
 function InlineCode({ children }: { children: React.ReactNode }) {
   return <code className="rounded bg-muted px-1 py-0.5">{children}</code>;
@@ -255,7 +258,7 @@ function ExplainModal({
   );
 }
 
-function fmtDate(d?: string) {
+function fmtDate(d?: string | null) {
   return d ?? "—";
 }
 
@@ -385,23 +388,22 @@ function asRecord(v: unknown): Record<string, unknown> | null {
   return v as Record<string, unknown>;
 }
 
-function parseIsoDayToUtcMs(date?: string): number | null {
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const [y, m, d] = date.split("-").map(Number);
-  const ms = Date.UTC(y, m - 1, d);
-  return Number.isFinite(ms) ? ms : null;
-}
-
-function utcTodayMs(): number {
-  const now = new Date();
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+function parseIsoDayToUtcMs(d: unknown): number | null {
+  if (typeof d !== "string") return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+  const [y, m, day] = d.split("-").map((x) => Number(x));
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(day)) {
+    return null;
+  }
+  return Date.UTC(y, m - 1, day);
 }
 
 function lagDaysFromIsoDay(date?: string): number | null {
-  const asOfMs = parseIsoDayToUtcMs(date);
-  if (asOfMs === null) return null;
-  const diff = utcTodayMs() - asOfMs;
-  return Math.max(0, Math.floor(diff / 86400000));
+  const ms = parseIsoDayToUtcMs(date);
+  if (ms === null) return null;
+  const now = new Date();
+  const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.max(0, Math.floor((todayMs - ms) / 86400000));
 }
 
 function utcMsToIsoDay(ms: number): string {
@@ -783,7 +785,7 @@ function confidenceExplanation(conf?: number, dataQuality?: number, labelSupport
 }
 
 
-function asOfExplanation(asOf?: string): ExplainPair {
+function asOfExplanation(asOf?: string | null): ExplainPair {
   return {
     basic: (
       <>
@@ -1824,22 +1826,26 @@ export default async function ChainPage({
   }
 
   const displayName = meta.profile?.label ?? cfg.name;
-  const displayAsOf =
-    landingDisplayAsOf(hero) ??
-    meta.updated_through ??
-    meta.regime?.asof_date ??
-    meta.scorecard?.asof_date ??
-    meta.date ??
-    meta.confidence?.date;
+  const displayAsOf = landingDisplayAsOf(hero);
   const regimeAsOf =
     landingRegimeAsOf(hero) ??
     meta.regime?.asof_date ??
     meta.scorecard?.asof_date ??
-    meta.updated_through ??
     meta.date ??
-    meta.confidence?.date;
-  const asOf = displayAsOf;
-  const observedLagDays = lagDaysFromIsoDay(displayAsOf);
+    meta.confidence?.date ??
+    null;
+  const asOf =
+    displayAsOf ??
+    meta.updated_through ??
+    meta.regime?.asof_date ??
+    meta.scorecard?.asof_date ??
+    meta.date ??
+    meta.confidence?.date ??
+    null;
+  const observedLagDays =
+    lagDaysFromIsoDay(asOf ?? undefined) ??
+    meta.confidence?.lag_days_vs_utc_today ??
+    null;
 
   const regimeLabel = meta.status?.label ?? meta.regime?.label ?? "UNKNOWN";
   const oneLiner = meta.status?.one_liner;
@@ -1898,7 +1904,7 @@ export default async function ChainPage({
       <StalenessBar
         chain={chainId}
         lagDays={observedLagDays}
-        asOfDate={asOf}
+        asOfDate={asOf ?? undefined}
         confidenceScore={conf}
       />
 
@@ -2066,7 +2072,9 @@ export default async function ChainPage({
               <MoreLink id={`lag-${chainId}`} />
             </div>
             <div className="mt-4 text-5xl font-semibold">
-              {typeof observedLagDays === "number" ? `${observedLagDays}d` : "—"}
+              {typeof meta.confidence?.lag_days_vs_utc_today === "number"
+                ? `${meta.confidence.lag_days_vs_utc_today}d`
+                : "—"}
             </div>
             <div className="mt-4 text-sm leading-7 text-slate-100">
               Freshness is shown separately from confidence.
@@ -2433,7 +2441,6 @@ export default async function ChainPage({
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
           <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
           <div>Meta path: <InlineCode>{metaPath}</InlineCode></div>
-          <div>Hero path: <InlineCode>{heroPath}</InlineCode></div>
           <div>Gold path: <InlineCode>{goldPath}</InlineCode></div>
           <div>Derived path: <InlineCode>{derivedPath}</InlineCode></div>
           <div>Runtime chart points use observed published dates inside the selected window.</div>
@@ -2463,7 +2470,7 @@ export default async function ChainPage({
         pair={readOrderExplanation()}
         traceability={
           <ul className="list-disc pl-5">
-            <li>Freshness source: <InlineCode>landing/&lt;chain&gt;/hero.json → display_asof</InlineCode> (fallback: meta dates)</li>
+            <li>Freshness source: <InlineCode>confidence.lag_days_vs_utc_today</InlineCode></li>
             <li>Confidence source: <InlineCode>confidence.confidence_score</InlineCode></li>
             <li>Regime source: <InlineCode>status.label</InlineCode></li>
             <li>Scorecard source: <InlineCode>scorecard.dimensions.*</InlineCode></li>
@@ -2508,8 +2515,8 @@ export default async function ChainPage({
         traceability={
           <ul className="list-disc pl-5">
             <li>Visible date: <InlineCode>{fmtDate(asOf)}</InlineCode></li>
-            <li>Display-date source: <InlineCode>{heroPath}</InlineCode></li>
-            <li>Regime/meta date: <InlineCode>{fmtDate(regimeAsOf)}</InlineCode></li>
+            <li>Regime date: <InlineCode>{fmtDate(regimeAsOf)}</InlineCode></li>
+            <li>Hero path: <InlineCode>{heroPath}</InlineCode></li>
             <li>Meta path: <InlineCode>{metaPath}</InlineCode></li>
           </ul>
         }
@@ -2518,11 +2525,11 @@ export default async function ChainPage({
       <ExplainModal
         id={`lag-${chainId}`}
         title="What observed lag means"
-        pair={lagExplanation(observedLagDays ?? undefined)}
+        pair={lagExplanation(meta.confidence?.lag_days_vs_utc_today)}
         traceability={
           <ul className="list-disc pl-5">
-            <li>Field: <InlineCode>display_asof</InlineCode> (fallback: meta date fields)</li>
-            <li>Current value: <InlineCode>{typeof observedLagDays === "number" ? `${observedLagDays}d` : "—"}</InlineCode></li>
+            <li>Field: <InlineCode>confidence.lag_days_vs_utc_today</InlineCode></li>
+            <li>Current value: <InlineCode>{typeof meta.confidence?.lag_days_vs_utc_today === "number" ? `${meta.confidence.lag_days_vs_utc_today}d` : "—"}</InlineCode></li>
           </ul>
         }
       />

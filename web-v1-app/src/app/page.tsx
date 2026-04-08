@@ -76,8 +76,11 @@ type LandingHero = {
   asof?: {
     display?: string;
     latest_available?: string;
-    regime?: string;
+    gold?: string;
+    derived?: string;
+    meta?: string;
     meta_actual?: string;
+    regime?: string;
   };
 };
 
@@ -216,7 +219,15 @@ function expectedDelayDays(chain: ChainId): number {
 }
 
 function heroDisplayAsOf(hero?: LandingHero | null): string | null {
-  return hero?.display_asof ?? hero?.asof?.display ?? hero?.asof?.latest_available ?? null;
+  return (
+    hero?.display_asof ??
+    hero?.asof?.display ??
+    hero?.asof?.latest_available ??
+    hero?.asof?.gold ??
+    hero?.asof?.derived ??
+    hero?.asof?.meta ??
+    null
+  );
 }
 
 function heroRegimeAsOf(hero?: LandingHero | null): string | null {
@@ -238,7 +249,12 @@ function withLandingHero(row: StatusApiRow, hero?: LandingHero | null): StatusAp
   const displayAsOf = heroDisplayAsOf(hero);
   const regimeAsOf = heroRegimeAsOf(hero);
   const asOf = displayAsOf ?? row.as_of;
-  const lagDays = displayAsOf ? lagDaysFromIsoDay(asOf ?? undefined) : typeof row.lag_days === "number" ? row.lag_days : lagDaysFromIsoDay(asOf ?? undefined);
+  const lagDays =
+    displayAsOf !== null
+      ? lagDaysFromIsoDay(asOf ?? undefined)
+      : typeof row.lag_days === "number"
+        ? row.lag_days
+        : lagDaysFromIsoDay(asOf ?? undefined);
   const normalizedChain = row.chain as ChainId;
 
   return {
@@ -279,8 +295,6 @@ async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
         name: meta?.profile?.label ?? chain.name,
         label: chain.label,
         as_of: asOf,
-        display_asof: null,
-        regime_asof: null,
         lag_days: lagDays,
         status: classifyStatus({ chain: chain.id, lagDays, asOf }),
         published_regime: meta?.status?.label ?? null,
@@ -422,7 +436,10 @@ export default async function HomePage() {
     const hero = landingHeroMap.get(chain.id);
     const displayAsOf = heroDisplayAsOf(hero);
     const asOf = displayAsOf ?? landing?.as_of ?? null;
-    const lagDays = displayAsOf ? lagDaysFromIsoDay(asOf ?? undefined) : landing?.lag_days ?? lagDaysFromIsoDay(asOf ?? undefined);
+    const lagDays =
+      displayAsOf !== null
+        ? lagDaysFromIsoDay(asOf ?? undefined)
+        : landing?.lag_days ?? lagDaysFromIsoDay(asOf ?? undefined);
 
     return {
       chain: chain.id,
@@ -439,19 +456,21 @@ export default async function HomePage() {
     };
   });
 
-  const normalizedMetaFallbackRows = metaFallbackRows.map((row) => withLandingHero(row, landingHeroMap.get(row.chain)));
+  const normalizedMetaFallbackRows = metaFallbackRows.map((row) =>
+    withLandingHero(row, landingHeroMap.get(row.chain))
+  );
 
   const rows =
     statusRows.length > 0
       ? statusRows
-      : normalizedMetaFallbackRows.some(
+      : metaFallbackRows.some(
             (r) =>
               r.published_regime !== null ||
               r.confidence_score !== null ||
               r.as_of !== null ||
               r.lag_days !== null,
           )
-        ? metaFallbackRows
+        ? normalizedMetaFallbackRows
         : landingFallbackRows;
 
   const displayRows = rows.map(toSurfaceRowDisplay);
