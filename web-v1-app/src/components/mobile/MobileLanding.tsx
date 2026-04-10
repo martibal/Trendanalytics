@@ -7,6 +7,25 @@ type MobileLandingProps = {
   historyDepthDays?: number | null;
 };
 
+const useCaseCards = [
+  {
+    title: "Monitor daily chain state",
+    body: "Check whether current conditions look stable, heating, congested, or cheap with confidence context attached.",
+  },
+  {
+    title: "Compare four chains consistently",
+    body: "Read BTC, ETH, ARB, and BASE through one shared regime framework instead of four incompatible dashboards.",
+  },
+  {
+    title: "Backtest published history",
+    body: "Use the archive to see how often similar states appeared before and how persistent they were.",
+  },
+  {
+    title: "Reuse JSON in your workflow",
+    body: "Pull Gold, Meta, and Derived files into notebooks, dashboards, or internal models without building the pipeline first.",
+  },
+] as const;
+
 const planCards = [
   {
     name: "Free",
@@ -89,42 +108,32 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
           Daily on-chain regime model
         </div>
         <h1 className="mt-3 text-3xl font-semibold leading-tight text-white">
-          Separate blockchain noise from real regime change.
+          Daily chain-state JSON for BTC, ETH, Arbitrum, and Base.
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-300">
-          TrendAnalytics publishes daily Gold, Meta, and Derived JSON so you can tell
-          whether current on-chain change is fading, persisting, or becoming a real state shift.
+          TrendAnalytics publishes Gold, Meta, and Derived JSON so you can monitor current chain conditions, compare four networks in one framework, backtest published history, and reuse structured regime data in your own workflow.
         </p>
         <p className="mt-3 text-sm leading-7 text-slate-300">
-          It is built first for desktop research and API use. This mobile version is a concise
-          overview so you can inspect the latest surface and decide whether to explore the full product.
+          The public site is the inspection layer. The paid product is the documented JSON output.
         </p>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-              Noise
+          {useCaseCards.map((card) => (
+            <div key={card.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+                {card.title}
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-300">{card.body}</p>
             </div>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Short-lived movement that looks unusual briefly but does not persist or gather enough support to count as structural.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-              Real regime change
-            </div>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              A persistent, evidence-supported shift in demand, friction, or capacity relative to the chain&apos;s own recent baseline.
-            </p>
-          </div>
+          ))}
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <Link
-            href="/faq"
+            href="/sign-up"
             className="inline-flex items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2.5 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
           >
-            Read the Q&amp;A
+            See plans
           </Link>
           <Link
             href="/api-docs/schema"

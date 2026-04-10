@@ -117,12 +117,16 @@ export default function Hero() {
             ))}
           </div>
 
+          <div className="mt-4 rounded-2xl border border-cyan-500/15 bg-cyan-500/5 p-4 text-sm leading-6 text-slate-300">
+            Every published row is still chain-relative, confidence-gated, descriptive-only, and versioned for auditability. Usefulness comes first, but traceability stays visible.
+          </div>
+
           <div className="mt-4 flex flex-wrap gap-4 text-sm">
             <Link href="#plans" className="text-cyan-200 hover:underline">
               See plans →
             </Link>
-            <Link href="/api-docs/schema" className="text-cyan-200 hover:underline">
-              Inspect every field →
+            <Link href="/methodology" className="text-cyan-200 hover:underline">
+              How it works →
             </Link>
           </div>
         </aside>

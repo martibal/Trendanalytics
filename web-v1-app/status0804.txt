@@ -1,0 +1,570 @@
+Her er et samlet statusdokument for prosjektet slik det står nå.
+
+# Prosjektstatus – samlet teknisk oppsummering
+
+## 1. Hvor prosjektet står nå
+
+Prosjektet har nå en fungerende skybasert publiseringsflyt der:
+
+* GitHub Actions kjører hele pipelineen
+* nye rådata hentes fra AWS/S3 når det faktisk finnes upubliserte dager
+* publiserte JSON-filer bygges og oppdateres
+* nettsiden bygges i samme workflow
+* oppdaterte publiserte filer committes tilbake til GitHub-repoet
+* Vercel deployer fra GitHub og viser korrekt oppdatert innhold
+
+Det viktigste gjennombruddet er at workflowen nå ikke lenger later som om alt mangler ved hver kjøring. Den kan nå starte fra sist publiserte snapshot i repoet, og dermed oppføre seg inkrementelt også i skyen.
+
+I praksis betyr det at du nå har en fungerende cloud-pipeline.
+
+---
+
+## 2. Overordnet arkitektur
+
+Arkitekturen består nå av fire hovedledd:
+
+### A. AWS / S3
+
+Dette er kilden for rådata som pipelineen henter fra.
+
+### B. GitHub Actions
+
+Dette er kjøringsmiljøet som utfører pipelineen, bygger publiserte artifacts, bygger webappen og committer resultatet tilbake til repoet.
+
+### C. GitHub-repoet
+
+Repoet er nå den vedvarende lagringsplassen for de publiserte JSON-filene som nettsiden bruker.
+
+### D. Vercel
+
+Vercel bygger og serverer Next.js-nettsiden basert på det som ligger i GitHub-repoet.
+
+---
+
+## 3. Den viktigste designbeslutningen som er tatt
+
+Det sentrale valget som nå er tatt er dette:
+
+## Publisert state lagres i repoet
+
+Den vedvarende published snapshoten ligger nå i:
+
+`web-v1-app/public/data/published/v1/`
+
+Det betyr at:
+
+* GitHub-repoet er sannhetskilden for publiserte JSON-filer
+* workflowen kan seede neste kjøring fra sist committede published snapshot
+* Vercel får alltid tilgang til de publiserte filene via repoet
+* runnerens lokale disk er ikke lenger en nødvendig varig lagringsplass
+
+Dette var avgjørende for å få pipelineen til å oppføre seg inkrementelt i skyen.
+
+---
+
+## 4. Hvordan workflowen kjører nå
+
+Når workflowen starter, skjer dette i praksis:
+
+### Trinn 1 – checkout av repo
+
+GitHub Actions sjekker ut repoet.
+
+### Trinn 2 – installasjon
+
+Node, Python, npm-avhengigheter og Python-avhengigheter installeres.
+
+### Trinn 3 – Prisma generate
+
+Prisma-klienten genereres slik at webappen kan bygges.
+
+### Trinn 4 – seed av published snapshot
+
+Workflowen kopierer dette:
+
+`web-v1-app/public/data/published/v1/`
+
+til dette:
+
+`data/published/v1/`
+
+Dette gjør at pipelineen starter med sist publiserte state, ikke fra tom disk.
+
+### Trinn 5 – run-daily-pipeline.ps1
+
+Hovedscriptet starter hele den daglige pipelineen.
+
+### Trinn 6 – pipeline vurderer om det finnes nye upubliserte dager
+
+Hvis nye dager finnes, lastes de ned og prosesseres.
+Hvis ikke, går pipelineen i praksis i no-op-modus.
+
+### Trinn 7 – publisering til webappen
+
+Nye publiserte filer synkes tilbake til:
+
+`web-v1-app/public/data/published/v1/`
+
+### Trinn 8 – build av webapp
+
+Next.js bygges for å bekrefte at webappen fortsatt kan deployes.
+
+### Trinn 9 – commit og push
+
+Hvis publiserte filer har endret seg, committer workflowen disse endringene og pusher til `main`.
+
+### Trinn 10 – Vercel deploy
+
+Vercel ser ny commit og lager ny deployment.
+
+---
+
+## 5. Hva som skjer når det finnes nye data
+
+Når nye data finnes på S3, gjør pipelineen i grove trekk dette:
+
+* laster ned manglende rådata
+* bygger daglige feature-filer
+* bygger gold timeseries
+* bygger weekly gold
+* eksporterer gold JSON
+* eksporterer derived JSON
+* eksporterer meta JSON
+* bygger published artifacts
+* oppdaterer landing- og statusfiler
+* syncer published data inn i webappen
+* bygger nettsiden
+* committer nye published-filer
+
+---
+
+## 6. Hva som skjer når det ikke finnes nye data
+
+Når workflowen nå kjører senere samme dag, og det ikke finnes noe nytt, ser flyten slik ut:
+
+* published snapshot seedes fra repoet
+* pipeline sjekker S3
+* den ser at det ikke finnes upubliserte dager
+* den avslutter pipeline-delen som en no-op
+* published data synkes fortsatt inn i webappen
+* webappen bygges fortsatt
+* hvis ingenting er endret, blir det ingen ny data-commit
+
+Dette er akkurat ønsket oppførsel.
+
+---
+
+## 7. Hvor JSON-filene faktisk lagres
+
+Det er viktig å skille mellom midlertidig og varig lagring.
+
+## Midlertidig under workflow-kjøring
+
+Under selve kjøringen brukes blant annet:
+
+* `data/raw/`
+* `pipeline/_work/prod/features_agg/`
+* `data/calculated/gold/`
+* `data/calculated/gold_weekly/`
+* `data/published/v1/`
+
+Dette er runnerens arbeidsområder og er midlertidige.
+
+## Varig lagring
+
+Den varige lagringen av publiserte filer er nå:
+
+`web-v1-app/public/data/published/v1/`
+
+Disse filene committes til GitHub-repoet og er dermed tilgjengelige for neste workflow og for Vercel.
+
+---
+
+## 8. Hvorfor pipelineen tidligere lastet ned de samme dagene igjen
+
+Det skjedde fordi GitHub Actions-runneren er ephemeral.
+
+Det betyr at:
+
+* hver kjøring starter på en ny, tom maskin
+* tidligere `data/published/v1` fantes ikke på runneren
+* pipelineen trodde derfor at siste publiserte dag var eldre enn den faktisk var
+* resultatet ble at samme dager ble lastet ned og prosessert igjen
+
+Løsningen ble å kopiere sist publiserte snapshot fra repoets public-mappe tilbake til `data/published/v1` før pipelineen starter.
+
+Det er denne seeding-mekanismen som løste problemet.
+
+---
+
+## 9. Filene som nå er sentrale i løsningen
+
+## GitHub workflow
+
+### `.github/workflows/pipeline.yml`
+
+Denne styrer hele cloud-jobben.
+
+Den gjør blant annet:
+
+* checkout
+* setup av Python og Node
+* installasjon av avhengigheter
+* Prisma generate
+* seed av published snapshot
+* kjøring av pipeline
+* opplasting av artifacts
+
+Dette er nå hovedinngangen for sky-pipelineen.
+
+---
+
+## Hovedscript for daglig kjøring
+
+### `run-daily-pipeline.ps1`
+
+Dette er orkestratoren for hele den daglige kjøringen.
+
+Den:
+
+* starter full pipeline
+* kaller publisering til webappen
+* bygger webappen
+* committer/pusher publiserte endringer
+* rydder opp midlertidige filer til slutt
+
+Dette er scriptet workflowen faktisk kjører.
+
+---
+
+## Full pipeline
+
+### `pipeline/tools/full_pipeline.ps1`
+
+Dette styrer den faktiske datajobben.
+
+Den gjør blant annet:
+
+* rådatasync fra S3
+* probing av latest raw / latest published
+* feature-bygging
+* gold-bygging
+* weekly gold
+* eksport av gold/derived/meta
+* publish artifacts
+* validering
+
+Dette er kjernen i databehandlingen.
+
+---
+
+## Publisering av artifacts
+
+### `pipeline/tools/publish_artifacts.py`
+
+Denne bygger publiserte JSON-artifacts under `data/published/v1`.
+
+Den er sentral for:
+
+* `dataset.json`
+* `index.json`
+* landing-filer
+* hero-filer
+* manifest-filer
+* as-of-relatert publisering
+
+Det var også her logikken for landing hero / display-asof ble justert.
+
+---
+
+## Publisering til webapp
+
+### `publish-web-data.ps1`
+
+Dette scriptet tar published snapshot fra `data/published/v1` og speiler det inn i webappen under public.
+
+Det sørger også for:
+
+* verifisering av output
+* build av webappen
+* staging/commit/push dersom filene har endret seg
+
+---
+
+## Sync-script
+
+### `sync-published-data.ps1`
+
+Dette scriptet står for selve kopieringen av published data til webappens public-mappe.
+
+---
+
+## 10. Viktige datamapper og hva de betyr
+
+## Rådata
+
+`data/raw/`
+
+Midlertidig rådata lastet ned fra S3 under kjøring.
+
+## Aggregerte features
+
+`pipeline/_work/prod/features_agg/`
+
+Midlertidige feature-filer bygget fra rådata.
+
+## Kalkulerte gold-filer
+
+`data/calculated/gold/`
+
+Midlertidige gold timeseries under kjøring.
+
+## Weekly gold
+
+`data/calculated/gold_weekly/`
+
+Midlertidige weekly gold-filer.
+
+## Publiserte artifacts
+
+`data/published/v1/`
+
+Midlertidig published arbeidskopi i runneren.
+
+## Vedvarende published snapshot
+
+`web-v1-app/public/data/published/v1/`
+
+Dette er den viktige, vedvarende kopien som committes til repoet og brukes av webappen.
+
+---
+
+## 11. Hvordan nettsiden henter data
+
+Nettsiden leser ikke direkte fra AWS eller fra pipelineens midlertidige mapper.
+
+Den leser fra published JSON-filer i webappen.
+
+Hovedkilden er:
+
+`web-v1-app/public/data/published/v1/...`
+
+Det betyr at når Vercel bygger appen, får den med seg disse filene som en del av prosjektet.
+
+---
+
+## 12. Hvordan forsiden og chain-sidene får data
+
+Det finnes to nivåer her:
+
+## A. Direkte lesing av published JSON
+
+Sider og route handlers leser published-filer fra storage/public-paths.
+
+Eksempler i prosjektet har vært:
+
+* `data/published/v1/status/index.json`
+* `data/published/v1/landing/.../hero.json`
+
+## B. API-ruter i Next.js
+
+Noen sider bruker interne API-ruter som igjen leser published-filer.
+
+Viktig eksempel:
+
+### `src/app/api/v1/status/route.ts`
+
+Denne bygger statusresponsen som forsiden bruker for “current published surface”.
+
+Det var her dato-feilen måtte rettes, slik at siden brukte riktig “display as of” i stedet for å vise den forsinkede meta/regime-datoen.
+
+---
+
+## 13. Hva datofeilen faktisk var
+
+Problemet var at nettsiden viste en dato som i praksis fulgte regime/meta-asof i stedet for siste publiserte tilgjengelige display-dato.
+
+Resultatet ble:
+
+* grafene viste data til f.eks. 06.04
+* men infobokser viste 04.04
+
+Løsningen var å skille mellom:
+
+* **display_asof** = nyeste publiserte dato brukeren faktisk ser data for
+* **regime_asof** = datoen meta/regime faktisk gjelder for
+
+Etter denne endringen viser nettsiden nå korrekt dato.
+
+---
+
+## 14. Rollen til Vercel
+
+Vercel er nå primært web-hosting- og build-laget.
+
+Vercel:
+
+* kloner repoet
+* bygger `web-v1-app`
+* serverer Next.js-applikasjonen
+* bruker JSON-filene som ligger i repoets public-mappe
+
+Vercel er altså ikke kilden til dataene.
+Vercel produserer ikke dataene.
+Vercel lagrer ikke pipeline-state som sannhetskilde.
+
+Vercels rolle er å:
+
+* deploye
+* bygge frontend
+* servere det som allerede er publisert til repoet
+
+---
+
+## 15. Rollen til GitHub Actions
+
+GitHub Actions er nå det operative kjøringsmiljøet for pipelineen.
+
+Det er her:
+
+* rådata sjekkes
+* nye dager hentes
+* data prosesseres
+* published artifacts bygges
+* webapp bygges
+* endringer pushes tilbake til repoet
+
+Hvis Vercel er “web delivery”, så er GitHub Actions “data production + publish orchestration”.
+
+---
+
+## 16. Hvorfor cleanup fortsatt er riktig
+
+På slutten av workflowen slettes blant annet:
+
+* `data/raw`
+* `pipeline/_work/prod/features_agg`
+* `data/calculated/gold`
+* `data/calculated/gold_weekly`
+
+Dette er riktig fordi disse er arbeidsfiler, ikke vedvarende state.
+
+Den vedvarende state-en du trenger mellom kjøringer er den publiserte snapshoten i repoet, ikke hele rå- og mellomlagene.
+
+---
+
+## 17. Hva som nå er sant om cloud-pipelineen
+
+Du kan nå si at prosjektet har:
+
+### En fungerende inkrementell cloud-pipeline
+
+Den henter bare nye data når det faktisk finnes noe nytt.
+
+### En fungerende publiseringsmodell
+
+Published JSON bygges, speiles til webapp, committes og pushes.
+
+### En fungerende deploymodell
+
+Vercel deployer fra GitHub og viser oppdaterte data korrekt.
+
+### En fungerende no-op-modus
+
+Når ingenting er nytt, kjører workflowen uten å produsere unødvendige nye data-commits.
+
+---
+
+## 18. Hva som fortsatt er viktig å være klar over
+
+Det finnes noen ting som fortsatt er verdt å være oppmerksom på:
+
+### 1. Repoet er nå datalager for published JSON
+
+Det er en bevisst løsning, men betyr at repoet vokser over tid.
+
+### 2. Runneren lagrer ikke langvarig state
+
+Alt som ikke pushes til repo eller annen ekstern lagring forsvinner etter workflowen.
+
+### 3. Workflowen bygger fortsatt webappen selv ved no-op
+
+Det er greit som sikkerhet, men koster tid.
+
+### 4. Warnings finnes fortsatt
+
+Du har fortsatt noen warnings som ikke stopper systemet, for eksempel:
+
+* `outputFileTracingRoot` vs `turbopack.root`
+* enkelte npm deprecation warnings
+* enkelte package vulnerabilities
+* Polars performance warning
+
+Disse er ikke showstoppere, men er teknisk gjeld.
+
+---
+
+## 19. Praktisk beskrivelse av nåværende sannhetskilde per lag
+
+## Rådata
+
+S3 / AWS er kilden.
+
+## Arbeidsfiler
+
+GitHub Actions-runneren er midlertidig arbeidsområde.
+
+## Publisert dataset
+
+GitHub-repoet er den vedvarende published snapshoten.
+
+## Nettsiden
+
+Vercel serverer det som ligger i repoet.
+
+---
+
+## 20. Kort oppsummert i én setning
+
+Prosjektet har nå en fungerende skyarkitektur der GitHub Actions henter og prosesserer nye chain-data, publiserer JSON-artifacts inn i repoets public-mappe, og Vercel bygger og serverer nettsiden direkte fra denne publiserte snapshoten.
+
+---
+
+## 21. Anbefalt mental modell fremover
+
+Tenk på systemet slik:
+
+### AWS/S3
+
+rå sannhet
+
+### GitHub Actions
+
+pipeline-motor
+
+### `web-v1-app/public/data/published/v1`
+
+publisert sannhet
+
+### GitHub repo
+
+vedvarende snapshotlager
+
+### Vercel
+
+frontend-distribusjon
+
+---
+
+## 22. Konkret statusvurdering
+
+Min vurdering nå er:
+
+* pipelineen fungerer i sky
+* inkrementell logikk fungerer
+* nettsiden viser korrekt dato
+* published state er vedvarende mellom runs
+* deploy-kjeden GitHub Actions → GitHub repo → Vercel fungerer
+* løsningen er reell og produksjonslignende, ikke bare en lokal prototyp
+
+
