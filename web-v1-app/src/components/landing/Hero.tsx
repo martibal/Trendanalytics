@@ -1,193 +1,286 @@
 import Link from "next/link";
-import { heroPipelinePoints, landingProofChips } from "@/lib/landing";
+import type { ReactNode } from "react";
+
+// ─── Static content — all copy lives here for easy editing ───────────────────
+
+const HEADLINE_TOP = "Daily chain-state data for";
+const HEADLINE_CHAINS = ["BTC", "ETH", "ARB", "BASE"];
+const HEADLINE_BOTTOM = "that tells you whether conditions are actually changing — or just spiking briefly.";
+
+const SUBLINE =
+  "Every day, the pipeline scores each chain's fee environment, block demand, and network friction against its own 180-day history — and publishes a structured regime label with a confidence score. Not a price feed. Not a chart. A documented, reproducible classification of network state.";
+
+// historyDepthDays comes from computeHistoryDepthDays() in page.tsx — reads the live Ethereum manifest.
+// No hardcoded fallback: if the manifest is unavailable the count shows as "—".
+
+const WHO_ITS_FOR = [
+  "On-chain researchers who need structured regime context — not raw explorer data",
+  "Quant teams who want to condition models on documented network state",
+  "Infrastructure operators tracking L2 cost environment across ARB and BASE",
+  "Anyone building dashboards or pipelines who doesn't want to rebuild ingestion from scratch",
+];
+
+const REGIME_LABELS = [
+  { label: "STABLE",    color: "text-emerald-400", bg: "bg-emerald-400",  desc: "All dimensions within 180-day norms" },
+  { label: "HEATING",   color: "text-yellow-300",  bg: "bg-yellow-300",   desc: "Demand trending structurally above baseline" },
+  { label: "CONGESTED", color: "text-red-400",     bg: "bg-red-400",      desc: "Sustained pressure across Capacity + Friction" },
+  { label: "CHEAP",     color: "text-blue-400",    bg: "bg-blue-400",     desc: "Fees + demand materially below chain norms" },
+];
+
+const JSON_LAYERS = [
+  {
+    name: "Gold",
+    accent: "#F6C347",
+    fields: "tx_count · median_fee · gas_utilization · active_addresses · block_time",
+    desc: "Raw daily observations in native units. Independently verifiable against any chain explorer.",
+  },
+  {
+    name: "Meta",
+    accent: "#A78BFA",
+    fields: "status.label · confidence_score · scorecard · regime.drivers · determinism_hash",
+    desc: "The regime output — label, confidence gate, three-axis scorecard, ranked drivers with z-scores.",
+  },
+  {
+    name: "Derived",
+    accent: "#60A5FA",
+    fields: "‹metric›__ma7 · ‹metric›__ma30 · meta_confidence",
+    desc: "7-day and 30-day rolling averages for every Gold field. Distinguishes structural shifts from spikes.",
+  },
+];
+
+// ─── Small primitives ─────────────────────────────────────────────────────────
+
+function Eyebrow({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-[9px] font-black uppercase tracking-[0.28em] text-cyan-500">
+      {children}
+    </div>
+  );
+}
+
+function Rule() {
+  return <div className="h-px w-full bg-white/8" />;
+}
+
+// ─── Hero component ───────────────────────────────────────────────────────────
 
 type HeroProps = {
   historyDepthDays?: number | null;
 };
 
 export default function Hero({ historyDepthDays }: HeroProps) {
-  const historyValue = historyDepthDays ? `${historyDepthDays}` : "—";
-
-  const featuredUses = heroPipelinePoints.slice(0, 2);
-  const remainingUses = heroPipelinePoints.slice(2);
+  const days = historyDepthDays;
 
   return (
-    <header className="mb-12">
-      <div className="overflow-hidden rounded-[2rem] border border-cyan-500/15 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_28%),radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.12),transparent_24%),linear-gradient(135deg,rgba(2,8,23,0.985),rgba(3,13,28,0.97))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_40px_120px_rgba(2,12,27,0.58)]">
-        <div className="grid gap-8 px-6 py-7 lg:grid-cols-[minmax(0,1.22fr)_360px] lg:px-10 lg:py-10 xl:grid-cols-[minmax(0,1.25fr)_390px] xl:px-12 xl:py-12">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200">
-              <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,0.85)]" />
-              Daily chain-state JSON product
-            </div>
+    <div className="mb-16">
 
-            <div className="mt-5 max-w-5xl">
-              <h1 className="text-4xl font-semibold leading-[1.02] tracking-[-0.045em] text-white sm:text-5xl xl:text-[4.25rem]">
-                Daily chain-state JSON that tells you whether current on-chain
-                conditions are{" "}
-                <span className="text-cyan-200">actually changing</span> or
-                just spiking briefly.
-              </h1>
+      {/* ════════════════════════════════════════════════════════════════
+          TOP STRIP — trust anchor, always the first thing eyes hit
+      ════════════════════════════════════════════════════════════════ */}
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3 border-b border-white/8 pb-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[11px] text-slate-500">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <span>Published daily since <span className="text-slate-300">December 2024</span></span>
+          </span>
+          <span className="hidden sm:inline text-white/15">|</span>
+          <span><span className="text-slate-300 font-semibold">{days ?? "—"}</span> days of published history</span>
+          <span className="hidden sm:inline text-white/15">|</span>
+          <span>Every label SHA-256 anchored to its inputs</span>
+          <span className="hidden sm:inline text-white/15">|</span>
+          <span>Confidence gate: no label published below 0.40</span>
+        </div>
+        <Link href="/track-record" className="text-[11px] text-cyan-500 hover:underline shrink-0">
+          Browse track record →
+        </Link>
+      </div>
 
-              <p className="mt-5 max-w-4xl text-lg leading-8 text-slate-200 sm:text-[1.18rem] sm:leading-9">
-                TrendAnalytics publishes reusable Gold, Meta, and Derived JSON
-                for BTC, ETH, Arbitrum, and Base so you can monitor current
-                conditions, compare networks in one framework, validate unusual
-                activity historically, and feed structured chain-state data into
-                dashboards, notebooks, or models.
-              </p>
-            </div>
+      {/* ════════════════════════════════════════════════════════════════
+          MAIN HERO — two-column editorial layout
+      ════════════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_380px]">
 
-            <div className="mt-7 grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-              <div className="overflow-hidden rounded-[1.7rem] border border-cyan-400/20 bg-[linear-gradient(135deg,rgba(14,116,144,0.26),rgba(255,255,255,0.03))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
-                  Archive depth
-                </div>
+        {/* LEFT — headline + core substance */}
+        <div>
 
-                <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2">
-                  <div className="text-6xl font-semibold leading-none tracking-[-0.06em] text-white sm:text-7xl">
-                    {historyValue}
-                  </div>
-                  <div className="pb-2 text-sm uppercase tracking-[0.2em] text-slate-300">
-                    published days
-                  </div>
-                </div>
+          {/* Headline */}
+          <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-500 mb-4">
+            On-chain regime classification
+          </div>
 
-                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-100 sm:text-[15px]">
-                  Today&apos;s label sits on top of a continuously published
-                  archive you can use to verify whether a condition is rare,
-                  persistent, or historically routine — and to backtest your own
-                  rules against a daily record instead of screenshots or
-                  one-off observations.
-                </p>
-              </div>
-
-              <div className="rounded-[1.7rem] border border-white/10 bg-white/[0.045] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
-                  Why people pay
-                </div>
-                <p className="mt-3 text-sm leading-7 text-slate-200">
-                  Subscribers are buying reusable daily files and archive
-                  access — not just charts. The product removes the ingestion,
-                  aggregation, baseline scoring, confidence logic, and
-                  publication work you would otherwise need to build and
-                  maintain yourself.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link
-                href="#plans"
-                className="inline-flex items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/14 px-5 py-2.5 text-sm font-semibold text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.16)] transition hover:bg-cyan-500/22"
-              >
-                See plans →
-              </Link>
-              <Link
-                href="#latest-surface"
-                className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/5 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/10"
-              >
-                Latest published surface →
-              </Link>
-              <Link
-                href="/api-docs/schema"
-                className="inline-flex items-center justify-center rounded-full border border-white/12 bg-transparent px-5 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
-              >
-                JSON schema →
-              </Link>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-300">
-              <a href="#what-is-modal" className="hover:text-cyan-200">
-                What this is
-              </a>
-              <span className="text-slate-500">•</span>
-              <a href="#boundary-modal" className="hover:text-cyan-200">
-                Interpretation boundary
-              </a>
-            </div>
-
-            <div className="mt-7 grid gap-3 sm:grid-cols-3 xl:grid-cols-3">
-              {landingProofChips.slice(0, 3).map((chip) => (
-                <div
-                  key={chip.label}
-                  className="rounded-2xl border border-white/8 bg-black/12 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
-                >
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                    {chip.label}
-                  </div>
-                  <div className="mt-1 text-lg font-semibold text-white">
-                    {chip.value}
-                  </div>
-                </div>
+          <h1 className="text-[2.6rem] font-black leading-[1.08] tracking-[-0.02em] text-white lg:text-[3.2rem]">
+            {HEADLINE_TOP}{" "}
+            <span className="inline-flex flex-wrap gap-x-3">
+              {HEADLINE_CHAINS.map((c, i) => (
+                <span key={c}>
+                  <span className="text-cyan-400">{c}</span>
+                  {i < HEADLINE_CHAINS.length - 1 && (
+                    <span className="text-white/20"> ·</span>
+                  )}
+                </span>
               ))}
+            </span>
+            <br />
+            <span className="text-slate-300 font-semibold text-[2rem] lg:text-[2.4rem] leading-[1.2] tracking-[-0.01em]">
+              {HEADLINE_BOTTOM}
+            </span>
+          </h1>
+
+          <p className="mt-6 text-[15px] leading-[1.85] text-slate-400 max-w-[52ch]">
+            {SUBLINE}
+          </p>
+
+          {/* CTAs */}
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="#plans"
+              className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-6 py-2.5 text-sm font-bold text-[#050b14] hover:bg-cyan-400 transition-colors"
+            >
+              See plans
+            </Link>
+            <Link
+              href="#latest-surface"
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 py-2.5 text-sm font-medium text-slate-200 hover:bg-white/10 transition-colors"
+            >
+              Latest published surface →
+            </Link>
+            <Link
+              href="/api-docs/schema"
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 px-6 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              JSON schema →
+            </Link>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-600">
+            <a href="#what-is-modal" className="hover:text-slate-400 transition-colors">What this is</a>
+            <span>·</span>
+            <a href="#boundary-modal" className="hover:text-slate-400 transition-colors">Interpretation boundary</a>
+            <span>·</span>
+            <Link href="/methodology" className="hover:text-slate-400 transition-colors">Full methodology</Link>
+          </div>
+
+          {/* ── Regime labels — shown as the actual vocabulary ── */}
+          <div className="mt-10">
+            <Rule />
+            <div className="mt-5">
+              <Eyebrow>The four regime labels — one published per chain, per day</Eyebrow>
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {REGIME_LABELS.map((r) => (
+                  <div key={r.label} className="flex items-start gap-3 rounded-xl border border-white/6 bg-white/[0.025] px-4 py-3">
+                    <span className={`mt-[3px] h-2 w-2 shrink-0 rounded-full ${r.bg}`} />
+                    <div className="min-w-0">
+                      <span className={`text-[11px] font-black tracking-[0.1em] ${r.color}`}>{r.label}</span>
+                      <p className="mt-0.5 text-[11px] leading-[1.5] text-slate-500">{r.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] text-slate-600 leading-5">
+                Labels are chain-relative. HEATING on Ethereum means Ethereum is hotter than Ethereum normally is — not hotter than Bitcoin.
+                Below confidence 0.40, the model publishes <span className="text-slate-500 font-mono">UNKNOWN/DEGRADED</span> rather than a weak label.
+              </p>
             </div>
           </div>
 
-          <aside className="rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.028))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:p-6">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
-              What subscribers use this for
+          {/* ── Who it's for ── */}
+          <div className="mt-8">
+            <Rule />
+            <div className="mt-5">
+              <Eyebrow>Who uses it</Eyebrow>
+              <ul className="mt-4 space-y-2">
+                {WHO_ITS_FOR.map((line, i) => (
+                  <li key={i} className="flex items-start gap-3 text-[13px] leading-[1.6] text-slate-400">
+                    <span className="mt-[5px] h-1 w-4 shrink-0 border-t border-cyan-600/60" />
+                    {line}
+                  </li>
+                ))}
+              </ul>
             </div>
+          </div>
 
-            <h2 className="mt-3 text-[1.9rem] font-semibold leading-tight text-white">
-              Four concrete uses, one reusable output.
-            </h2>
+        </div>
 
-            <p className="mt-3 text-sm leading-7 text-slate-200">
-              Reuse documented chain-state outputs immediately in monitoring,
-              comparison, validation, and workflow automation.
+        {/* RIGHT — JSON layers + archive depth */}
+        <div className="flex flex-col gap-5">
+
+          {/* Archive depth — number as the visual anchor */}
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-6">
+            <Eyebrow>Archive depth</Eyebrow>
+            <div className="mt-3 flex items-baseline gap-3">
+              <span className="text-[4rem] font-black leading-none tracking-tight text-white tabular-nums">
+                {days ?? "—"}
+              </span>
+              <span className="text-sm font-semibold uppercase tracking-widest text-slate-500">
+                published<br />days
+              </span>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              Published daily since December 2024. Pro subscribers get the full archive —
+              every label, confidence score, and driver attribution, back to day one.
+              Determinism hashes let you verify any past date against the methodology version active at the time.
             </p>
+            <Link href="/track-record" className="mt-3 inline-flex text-xs text-cyan-500 hover:underline">
+              Browse the track record →
+            </Link>
+          </div>
 
-            <div className="mt-5 space-y-4">
-              {featuredUses.map((point, index) => (
-                <div
-                  key={point.title}
-                  className="rounded-[1.4rem] border border-cyan-500/14 bg-[linear-gradient(135deg,rgba(8,47,73,0.18),rgba(255,255,255,0.02))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-400/22 bg-cyan-500/10 text-xs font-semibold text-cyan-200">
-                      0{index + 1}
-                    </div>
-                    <div>
-                      <div className="text-base font-semibold text-white">
-                        {point.title}
-                      </div>
-                      <div className="mt-1 text-sm leading-7 text-slate-300">
-                        {point.body}
-                      </div>
-                    </div>
+          {/* JSON layers */}
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-6">
+            <Eyebrow>Three JSON files per chain, per day</Eyebrow>
+            <p className="mt-2 text-xs leading-5 text-slate-500 mb-4">
+              Subscribers get API access to Gold, Meta, and Derived — structured, sanitized, ready to use downstream.
+            </p>
+            <div className="space-y-3">
+              {JSON_LAYERS.map((layer) => (
+                <div key={layer.name} className="rounded-xl border border-white/6 bg-black/20 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-black tracking-wide" style={{ color: layer.accent }}>
+                      {layer.name}
+                    </span>
+                    <Link href="/api-docs/schema" className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors">
+                      schema →
+                    </Link>
                   </div>
+                  <p className="mt-1.5 text-[10px] font-mono leading-[1.6] text-slate-500 break-all">
+                    {layer.fields}
+                  </p>
+                  <p className="mt-2 text-[11px] leading-[1.5] text-slate-400">
+                    {layer.desc}
+                  </p>
                 </div>
               ))}
             </div>
-
-            {remainingUses.length > 0 && (
-              <div className="mt-4 rounded-[1.4rem] border border-white/8 bg-black/10 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Also use it for
-                </div>
-                <div className="mt-3 space-y-3">
-                  {remainingUses.map((point) => (
-                    <div key={point.title}>
-                      <div className="text-sm font-semibold text-white">
-                        {point.title}
-                      </div>
-                      <div className="mt-1 text-sm leading-7 text-slate-300">
-                        {point.body}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-5 rounded-2xl border border-cyan-500/20 bg-cyan-500/6 p-4 text-sm leading-7 text-slate-200">
-              Public pages let you inspect the published surface. Paid plans
-              unlock reusable Gold, Meta, and Derived JSON with archive access.
+            <div className="mt-4 rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+              <div className="text-[9px] font-bold uppercase tracking-wider text-slate-600 mb-1">Endpoint</div>
+              <code className="text-[10px] font-mono text-slate-500">
+                GET /api/v1/files/&#123;gold|meta|derived&#125;/&#123;chain&#125;/&#123;window&#125;.json
+              </code>
             </div>
-          </aside>
+          </div>
+
+          {/* Quick nav chips */}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Methodology", href: "/methodology" },
+              { label: "Track Record", href: "/track-record" },
+              { label: "JSON Schema", href: "/api-docs/schema" },
+              { label: "API Docs", href: "/api-docs" },
+            ].map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="flex items-center justify-between rounded-xl border border-white/6 bg-white/[0.02] px-3 py-2.5 text-xs font-medium text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition-colors"
+              >
+                {item.label}
+                <span className="text-slate-700">→</span>
+              </Link>
+            ))}
+          </div>
+
         </div>
       </div>
-    </header>
+
+    </div>
   );
 }

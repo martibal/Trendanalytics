@@ -1,4 +1,5 @@
 import Link from "next/link";
+
 import RegimeBadge from "@/components/RegimeBadge";
 import type { SurfaceRowDisplay } from "@/lib/landingSurface";
 
@@ -9,20 +10,20 @@ type MobileLandingProps = {
 
 const useCaseCards = [
   {
-    title: "Monitor daily chain state",
-    body: "See whether BTC, ETH, ARB, or BASE looks stable, heating, congested, or cheap - with confidence context.",
+    title: "Monitor current chain state",
+    body: "Check whether current network conditions are actually changing or just fluctuating before treating a move as meaningful.",
   },
   {
     title: "Compare four chains consistently",
-    body: "Read all four networks through one published label system instead of four separate dashboards.",
+    body: "Read BTC, ETH, Arbitrum, and Base through the same published labels, confidence logic, and score structure.",
   },
   {
-    title: "Backtest unusual conditions",
-    body: "Use the published archive to check whether a current state is rare and whether similar periods persisted before.",
+    title: "Validate and backtest",
+    body: "Use the published archive to test how often similar conditions appeared before and how persistent they were.",
   },
   {
     title: "Pull JSON into your workflow",
-    body: "Use documented Gold, Meta, and Derived files in dashboards, notebooks, and internal models.",
+    body: "Use documented Gold, Meta, and Derived files in dashboards, notebooks, models, and internal reporting.",
   },
 ] as const;
 
@@ -30,8 +31,8 @@ const planCards = [
   {
     name: "Free",
     price: "$0",
-    note: "Inspect before subscribing.",
-    detail: "Public pages, track record, status, methodology, glossary, thresholds, and schema.",
+    note: "Inspect the public surface first.",
+    detail: "Track record, status, methodology, glossary, thresholds, and schema.",
     href: "/track-record",
     cta: "Open public surface",
     className: "border-white/10 bg-white/5",
@@ -103,41 +104,72 @@ const nextLinks = [
 export default function MobileLanding({ rows, historyDepthDays }: MobileLandingProps) {
   return (
     <main className="mx-auto max-w-7xl px-4 py-5 lg:hidden">
-      <section className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-5 shadow-sm">
-        <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-cyan-200">
+      <section className="overflow-hidden rounded-3xl border border-cyan-500/15 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_34%),linear-gradient(135deg,rgba(2,8,23,0.98),rgba(3,15,30,0.96))] p-5 shadow-[0_20px_60px_rgba(2,12,27,0.45)]">
+        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+          <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.8)]" />
           Daily chain-state JSON product
         </div>
-        <h1 className="mt-3 text-3xl font-semibold leading-tight text-white">
-          Daily chain-state JSON for monitoring, comparison, and backtesting.
+
+        <h1 className="mt-4 text-[2.35rem] font-semibold leading-[1.04] tracking-[-0.045em] text-white">
+          Daily chain-state JSON that tells you whether current on-chain conditions are actually changing — or just spiking briefly.
         </h1>
-        <p className="mt-3 text-sm leading-7 text-slate-300">
-          TrendAnalytics publishes Gold, Meta, and Derived JSON for BTC, ETH, Arbitrum, and Base so you can check whether current on-chain conditions are actually changing - or just moving briefly.
-        </p>
-        <p className="mt-3 text-sm leading-7 text-slate-300">
-          You are buying reusable outputs, not just charts: documented daily files for dashboards, notebooks, backtests, and internal models.
+
+        <p className="mt-4 text-[15px] leading-7 text-slate-200">
+          TrendAnalytics publishes Gold, Meta, and Derived JSON for BTC, ETH, Arbitrum, and Base so you can monitor current conditions, compare networks, validate unusual activity historically, and reuse structured outputs immediately.
         </p>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          {useCaseCards.map((card) => (
-            <div key={card.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-                {card.title}
+        <div className="mt-5 rounded-[1.6rem] border border-cyan-400/18 bg-[linear-gradient(135deg,rgba(8,47,73,0.34),rgba(255,255,255,0.03))] p-5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
+            Archive depth
+          </div>
+          <div className="mt-2 flex items-end gap-2">
+            <div className="text-5xl font-semibold leading-none tracking-[-0.05em] text-white">
+              {historyDepthDays ?? "—"}
+            </div>
+            <div className="pb-1 text-xs uppercase tracking-[0.18em] text-slate-300">
+              published days
+            </div>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-200">
+            Use the archive to verify today&apos;s label, inspect past transitions, and backtest your own rules against a daily published record.
+          </p>
+        </div>
+
+        <div className="mt-4 rounded-[1.6rem] border border-white/10 bg-white/[0.045] p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
+            Why people subscribe
+          </div>
+          <p className="mt-2 text-sm leading-7 text-slate-200">
+            Subscribers are buying reusable daily files and archive access — not just charts. The product removes the ingestion, aggregation, baseline scoring, confidence logic, and publication work you would otherwise need to build and maintain yourself.
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          {useCaseCards.map((card, index) => (
+            <div key={card.title} className="rounded-2xl border border-white/10 bg-black/10 p-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-500/10 text-xs font-semibold text-cyan-200">
+                  0{index + 1}
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-white">{card.title}</div>
+                  <p className="mt-1 text-sm leading-6 text-slate-300">{card.body}</p>
+                </div>
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-300">{card.body}</p>
             </div>
           ))}
         </div>
 
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
           <Link
-            href="/sign-up"
-            className="inline-flex items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2.5 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+            href="#plans"
+            className="inline-flex items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/12 px-5 py-2.5 text-sm font-semibold text-cyan-100"
           >
             See plans
           </Link>
           <Link
             href="/api-docs/schema"
-            className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-slate-200 hover:bg-white/10"
+            className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/5 px-5 py-2.5 text-sm font-medium text-slate-100"
           >
             Inspect the JSON schema
           </Link>
@@ -205,7 +237,7 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
         </div>
       </section>
 
-      <section className="mt-6 rounded-3xl border p-5 shadow-sm">
+      <section id="plans" className="mt-6 rounded-3xl border p-5 shadow-sm">
         <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-cyan-200">
           What you buy
         </div>
@@ -259,13 +291,10 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
         <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-cyan-200">
           Continue on desktop
         </div>
-        <h2 className="mt-1 text-2xl font-semibold text-white">Go deeper when you want the full surface</h2>
-        <p className="mt-2 text-sm leading-7 text-slate-300">
-          Mobile is the quick read. Desktop is where the product becomes fully useful for schema inspection, history work, and API-first research.
-        </p>
-        <div className="mt-4 grid gap-3">
+        <h2 className="mt-1 text-2xl font-semibold text-white">Go deeper before subscribing</h2>
+        <div className="mt-4 space-y-3">
           {nextLinks.map((item) => (
-            <Link key={item.href} href={item.href} className="rounded-2xl border bg-white/5 p-4">
+            <Link key={item.title} href={item.href} className="block rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-base font-semibold text-white">{item.title}</div>
               <p className="mt-2 text-sm leading-6 text-slate-300">{item.body}</p>
             </Link>
