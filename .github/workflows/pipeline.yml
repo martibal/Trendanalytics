@@ -118,10 +118,16 @@ jobs:
           powershell -ExecutionPolicy Bypass -File .\run-daily-pipeline.ps1 -SkipPush
 
       - name: Push local published-data commit with remote sync
+        id: push_data
         if: success()
         shell: pwsh
         run: |
+          "pushed=false" >> $env:GITHUB_OUTPUT
+
           git fetch origin main --prune
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to fetch origin/main before evaluating push state."
+          }
 
           $aheadRaw = git rev-list --count "origin/main..HEAD"
           if ($LASTEXITCODE -ne 0) {
@@ -131,7 +137,7 @@ jobs:
           $ahead = [int]$aheadRaw.Trim()
 
           if ($ahead -eq 0) {
-            Write-Host "No local commit to push. Nothing to do."
+            Write-Host "No local commit to push. Skipping push and Vercel deploy."
             exit 0
           }
 
@@ -151,9 +157,22 @@ jobs:
               throw "git pull --rebase failed on attempt $attempt"
             }
 
+            $aheadAfterRebaseRaw = git rev-list --count "origin/main..HEAD"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to recalculate local-ahead commit count after rebase."
+            }
+
+            $aheadAfterRebase = [int]$aheadAfterRebaseRaw.Trim()
+
+            if ($aheadAfterRebase -eq 0) {
+              Write-Host "No net new commit remains after rebase. Skipping push and Vercel deploy."
+              exit 0
+            }
+
             git push origin HEAD:main
             if ($LASTEXITCODE -eq 0) {
               Write-Host "Push succeeded on attempt $attempt"
+              "pushed=true" >> $env:GITHUB_OUTPUT
               exit 0
             }
 
@@ -164,6 +183,24 @@ jobs:
           }
 
           throw "git push failed after $maxAttempts attempts"
+
+      - name: Trigger Vercel production deployment
+        if: success() && steps.push_data.outputs.pushed == 'true'
+        shell: pwsh
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:VERCEL_DEPLOY_HOOK_URL)) {
+            throw "Missing required secret: VERCEL_DEPLOY_HOOK_URL"
+          }
+
+          Write-Host "New data commit was pushed. Triggering Vercel deploy hook..."
+          $response = Invoke-RestMethod `
+            -Method Post `
+            -Uri $env:VERCEL_DEPLOY_HOOK_URL `
+            -ContentType "application/json"
+
+          $response | ConvertTo-Json -Depth 10
 
       - name: Upload pipeline artifacts
         if: always()

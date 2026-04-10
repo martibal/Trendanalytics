@@ -111,18 +111,6 @@ function Get-MissingFeatureDays([string]$featuresRoot, [string]$chain, [string[]
   return @($missing.ToArray())
 }
 
-function Get-FeatureDaysForChain([string]$featuresRoot, [string]$chain) {
-  $dir = Join-Path $featuresRoot $chain
-  if (-not (Test-Path $dir)) { return @() }
-
-  return @(
-    Get-ChildItem -Path $dir -File -Filter '*.parquet' -ErrorAction SilentlyContinue |
-      Where-Object { $_.BaseName -match '^\d{4}-\d{2}-\d{2}$' } |
-      Select-Object -ExpandProperty BaseName |
-      Sort-Object -Unique
-  )
-}
-
 function Get-LatestPublishedDay([string]$publishedRoot, [string[]]$chains) {
   if (-not (Test-Path $publishedRoot)) { return $null }
 
@@ -266,8 +254,8 @@ try {
     if (-not $latestRaw) {
       if ($Mode -eq 'incremental' -and $latestPublished -and $plannedDownloadCount -eq 0) {
         Write-Log ("Latest published day: " + (Format-IsoDate $latestPublished))
-        Write-Log 'No unpublished missing days were detected for incremental mode.'
-        Write-Log 'No raw parquet was downloaded, so pipeline exits successfully as a no-op.'
+        Write-Log "No unpublished missing days were detected for incremental mode."
+        Write-Log "No raw parquet was downloaded, so pipeline exits successfully as a no-op."
         Write-Log '=== PIPELINE OK (NO-OP) ==='
         return
       }
@@ -314,64 +302,22 @@ try {
       }
     }
 
-    $chainsWithFeatureData = New-Object System.Collections.Generic.List[string]
+    Write-Log 'STEP 2: Build GOLD timeseries'
     foreach ($c in $chains) {
-      $featureDays = @(Get-FeatureDaysForChain $FEATURES_ROOT $c)
-      if ($featureDays.Length -gt 0) {
-        [void]$chainsWithFeatureData.Add($c)
-        Write-Log ("chain=$c feature parquet available for this run: " + ($featureDays -join ', '))
-      } else {
-        Write-Log "chain=$c has no feature parquet for this run"
-      }
-    }
-
-    if ($chainsWithFeatureData.Count -eq 0) {
-      if ($Mode -eq 'incremental') {
-        Write-Log 'No chains produced feature parquet for this incremental run.'
-        Write-Log 'Treating the pipeline as a no-op instead of failing on unchanged chains.'
-        Write-Log '=== PIPELINE OK (NO-OP) ==='
-        return
-      }
-
-      throw 'No feature parquet was produced for rebuild mode.'
-    }
-
-    Write-Log ('STEP 2: Build GOLD timeseries for chains with new feature parquet: ' + ($chainsWithFeatureData -join ', '))
-    $goldBuiltChains = New-Object System.Collections.Generic.List[string]
-
-    foreach ($c in $chainsWithFeatureData) {
       Write-Log ("  build gold timeseries: " + $c)
       & $PY -u $PY_BUILD_GOLD_TS --chain $c --features_root $FEATURES_ROOT --gold_root $GOLD_PARQUET_ROOT --status_root $STATUS_ROOT --reports_dir $REPORTS_DIR
-      if ($LASTEXITCODE -ne 0) {
-        throw "build_gold_timeseries.py failed chain=$c rc=$LASTEXITCODE"
-      }
-
-      $goldParquetPath = Join-Path $GOLD_PARQUET_ROOT ($c + '.parquet')
-      if (Test-Path $goldParquetPath) {
-        [void]$goldBuiltChains.Add($c)
-      } else {
-        throw "Expected gold parquet was not created for chain=$c at $goldParquetPath"
-      }
+      if ($LASTEXITCODE -ne 0) { throw "build_gold_timeseries.py failed chain=$c rc=$LASTEXITCODE" }
     }
 
-    if ($goldBuiltChains.Count -eq 0) {
-      throw 'No gold parquet was created for any chain after feature generation.'
-    }
-
-    Write-Log ('STEP 3: Build GOLD weekly for updated chains: ' + ($goldBuiltChains -join ', '))
-    foreach ($c in $goldBuiltChains) {
+    Write-Log 'STEP 3: Build GOLD weekly'
+    foreach ($c in $chains) {
       Write-Log ("  build gold weekly: " + $c)
       & $PY -u $PY_BUILD_GOLD_WEEKLY --chain $c --gold_root $GOLD_PARQUET_ROOT --gold_weekly_root $GOLD_WEEKLY_ROOT
       if ($LASTEXITCODE -ne 0) { throw "build_gold_weekly.py failed chain=$c rc=$LASTEXITCODE" }
     }
 
-    $chainsToSyncGoldCsv = $chainsCsv
-    if ($Mode -eq 'incremental') {
-      $chainsToSyncGoldCsv = ($goldBuiltChains -join ',')
-    }
-
-    Write-Log ('STEP 4: Sync GOLD json history + windows for chains: ' + $chainsToSyncGoldCsv)
-    & $PY -u $PY_SYNC_GOLD --repo-root $MAIN_ROOT --gold-root $GOLD_PARQUET_ROOT --out-root $GOLD_JSON_ROOT --chains $chainsToSyncGoldCsv --mode $syncModeGold --windows $windowsCsv
+    Write-Log 'STEP 4: Sync GOLD json history + windows'
+    & $PY -u $PY_SYNC_GOLD --repo-root $MAIN_ROOT --gold-root $GOLD_PARQUET_ROOT --out-root $GOLD_JSON_ROOT --chains $chainsCsv --mode $syncModeGold --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) { throw "sync_gold_json_history.py failed rc=$LASTEXITCODE" }
 
     Write-Log 'STEP 5: Export DERIVED json history + windows'
