@@ -302,26 +302,53 @@ try {
       }
     }
 
-    Write-Log 'STEP 2: Build GOLD timeseries'
+    $activeChains = New-Object System.Collections.Generic.List[string]
     foreach ($c in $chains) {
+      $chainFeaturesDir = Join-Path $FEATURES_ROOT $c
+      $chainFeatureFiles = @(
+        Get-ChildItem -Path $chainFeaturesDir -File -Filter '*.parquet' -ErrorAction SilentlyContinue
+      )
+
+      if ($chainFeatureFiles.Length -gt 0) {
+        [void]$activeChains.Add($c)
+      }
+    }
+
+    if ($activeChains.Count -eq 0) {
+      if ($Mode -eq 'incremental') {
+        Write-Log 'No feature parquet available for any chain in incremental mode.'
+        Write-Log 'Pipeline exits successfully as a no-op.'
+        Write-Log '=== PIPELINE OK (NO-OP) ==='
+        return
+      }
+
+      throw 'No feature parquet available for any chain after feature build step.'
+    }
+
+    $activeChainsArr = @($activeChains.ToArray())
+    $activeChainsCsv = [string]::Join(',', $activeChainsArr)
+    Write-Log ('Active chains for downstream build: ' + ([string]::Join(', ', $activeChainsArr)))
+
+    Write-Log 'STEP 2: Build GOLD timeseries'
+    foreach ($c in $activeChainsArr) {
       Write-Log ("  build gold timeseries: " + $c)
       & $PY -u $PY_BUILD_GOLD_TS --chain $c --features_root $FEATURES_ROOT --gold_root $GOLD_PARQUET_ROOT --status_root $STATUS_ROOT --reports_dir $REPORTS_DIR
       if ($LASTEXITCODE -ne 0) { throw "build_gold_timeseries.py failed chain=$c rc=$LASTEXITCODE" }
     }
 
     Write-Log 'STEP 3: Build GOLD weekly'
-    foreach ($c in $chains) {
+    foreach ($c in $activeChainsArr) {
       Write-Log ("  build gold weekly: " + $c)
       & $PY -u $PY_BUILD_GOLD_WEEKLY --chain $c --gold_root $GOLD_PARQUET_ROOT --gold_weekly_root $GOLD_WEEKLY_ROOT
       if ($LASTEXITCODE -ne 0) { throw "build_gold_weekly.py failed chain=$c rc=$LASTEXITCODE" }
     }
 
     Write-Log 'STEP 4: Sync GOLD json history + windows'
-    & $PY -u $PY_SYNC_GOLD --repo-root $MAIN_ROOT --gold-root $GOLD_PARQUET_ROOT --out-root $GOLD_JSON_ROOT --chains $chainsCsv --mode $syncModeGold --windows $windowsCsv
+    & $PY -u $PY_SYNC_GOLD --repo-root $MAIN_ROOT --gold-root $GOLD_PARQUET_ROOT --out-root $GOLD_JSON_ROOT --chains $activeChainsCsv --mode $syncModeGold --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) { throw "sync_gold_json_history.py failed rc=$LASTEXITCODE" }
 
     Write-Log 'STEP 5: Export DERIVED json history + windows'
-    & $PY -u $PY_EXPORT_DERIVED --root $MAIN_ROOT --gold-json-root $GOLD_JSON_ROOT --meta-json-root $META_JSON_ROOT --out-root $DERIVED_OUT_ROOT --chains $chainsCsv --mode $modeIncRebuild --windows $windowsCsv
+    & $PY -u $PY_EXPORT_DERIVED --root $MAIN_ROOT --gold-json-root $GOLD_JSON_ROOT --meta-json-root $META_JSON_ROOT --out-root $DERIVED_OUT_ROOT --chains $activeChainsCsv --mode $modeIncRebuild --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) { throw "export_derived_json_history.py failed rc=$LASTEXITCODE" }
 
     Write-Log 'STEP 6: Export META json history + windows'
