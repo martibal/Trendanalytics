@@ -2071,11 +2071,9 @@ export default async function ChainPage({
               </div>
               <MoreLink id={`lag-${chainId}`} />
             </div>
-            <div className="mt-4 text-5xl font-semibold">
-              {typeof meta.confidence?.lag_days_vs_utc_today === "number"
-                ? `${meta.confidence.lag_days_vs_utc_today}d`
-                : "—"}
-            </div>
+              <div className="mt-4 text-5xl font-semibold">
+                {typeof observedLagDays === "number" ? `${observedLagDays}d` : "—"}
+              </div>
             <div className="mt-4 text-sm leading-7 text-slate-100">
               Freshness is shown separately from confidence.
             </div>
