@@ -137,6 +137,82 @@ function Invoke-Native {
     }
 }
 
+function Invoke-Git {
+    param(
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [switch]$AllowNonZeroExitCode
+    )
+
+    Push-Location $WorkingDirectory
+    try {
+        & git @Arguments
+        $exitCode = $LASTEXITCODE
+        if (-not $AllowNonZeroExitCode -and $exitCode -ne 0) {
+            Fail "git command failed with exit code ${exitCode}: git $($Arguments -join ' ')"
+        }
+        return $exitCode
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Get-GitOutput {
+    param(
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string[]]$Arguments
+    )
+
+    Push-Location $WorkingDirectory
+    try {
+        $output = & git @Arguments
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            Fail "git command failed with exit code ${exitCode}: git $($Arguments -join ' ')"
+        }
+        return ($output | Out-String).Trim()
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Commit-PublishedSnapshotIfNeeded {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    $publishedPath = "web-v1-app/public/data/published/v1"
+
+    Write-Log "STEP 2B: SkipPush mode detected - ensure local commit exists for published snapshot"
+
+    Ensure-PathExists -PathValue (Join-Path $RepoRoot $publishedPath) -Label "Published snapshot path"
+
+    $aheadRaw = Get-GitOutput -WorkingDirectory $RepoRoot -Arguments @("rev-list", "--count", "origin/main..HEAD")
+    $ahead = 0
+    if (-not [int]::TryParse($aheadRaw, [ref]$ahead)) {
+        Fail "Unable to parse git ahead count: '$aheadRaw'"
+    }
+
+    if ($ahead -gt 0) {
+        Write-Log "Local branch is already ahead of origin/main by $ahead commit(s); no new local commit needed here"
+        return
+    }
+
+    Invoke-Git -WorkingDirectory $RepoRoot -Arguments @("add", "-A", "--", $publishedPath) | Out-Null
+
+    $diffExit = Invoke-Git -WorkingDirectory $RepoRoot -Arguments @("diff", "--cached", "--quiet", "--exit-code") -AllowNonZeroExitCode
+    if ($diffExit -eq 0) {
+        Write-Log "No published snapshot changes detected after publish step; no local commit created"
+        return
+    }
+
+    $commitMessage = "chore(data): update published snapshot"
+    Invoke-Git -WorkingDirectory $RepoRoot -Arguments @("commit", "-m", $commitMessage) | Out-Null
+    Write-Log "Created local git commit for updated published snapshot"
+}
+
 if ([string]::IsNullOrWhiteSpace($RootDir)) {
     $RootDir = (Resolve-Path (Join-Path $PSScriptRoot ".")).Path
 }
@@ -202,6 +278,10 @@ try {
     }
 
     Invoke-Native -WorkingDirectory $RootDir -FilePath "powershell" -Arguments $publishArgs
+
+    if ($SkipPush) {
+        Commit-PublishedSnapshotIfNeeded -RepoRoot $RootDir
+    }
 
     Write-Log "=== DAILY INCREMENTAL PIPELINE OK ==="
 }
