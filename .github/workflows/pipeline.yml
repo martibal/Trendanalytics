@@ -151,6 +151,23 @@ jobs:
               throw "git fetch failed before push attempt $attempt"
             }
 
+            $statusLines = git status --porcelain
+            if ($LASTEXITCODE -ne 0) {
+              throw "git status failed before rebase on attempt $attempt"
+            }
+
+            $statusText = ($statusLines | Out-String).Trim()
+
+            if (-not [string]::IsNullOrWhiteSpace($statusText)) {
+              Write-Host "Working tree is dirty before rebase. Autostashing remaining changes:"
+              $statusLines | ForEach-Object { Write-Host "  $_" }
+
+              git stash push --include-untracked -m "workflow-autostash-before-rebase"
+              if ($LASTEXITCODE -ne 0) {
+                throw "git stash failed on attempt $attempt"
+              }
+            }
+
             git pull --rebase origin main
             if ($LASTEXITCODE -ne 0) {
               git rebase --abort 2>$null
