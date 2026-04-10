@@ -10,19 +10,19 @@ type MobileLandingProps = {
 const useCaseCards = [
   {
     title: "Monitor daily chain state",
-    body: "Check whether current conditions look stable, heating, congested, or cheap with confidence context attached.",
+    body: "See whether BTC, ETH, ARB, or BASE looks stable, heating, congested, or cheap - with confidence context.",
   },
   {
     title: "Compare four chains consistently",
-    body: "Read BTC, ETH, ARB, and BASE through one shared regime framework instead of four incompatible dashboards.",
+    body: "Read all four networks through one published label system instead of four separate dashboards.",
   },
   {
-    title: "Backtest published history",
-    body: "Use the archive to see how often similar states appeared before and how persistent they were.",
+    title: "Backtest unusual conditions",
+    body: "Use the published archive to check whether a current state is rare and whether similar periods persisted before.",
   },
   {
-    title: "Reuse JSON in your workflow",
-    body: "Pull Gold, Meta, and Derived files into notebooks, dashboards, or internal models without building the pipeline first.",
+    title: "Pull JSON into your workflow",
+    body: "Use documented Gold, Meta, and Derived files in dashboards, notebooks, and internal models.",
   },
 ] as const;
 
@@ -30,7 +30,7 @@ const planCards = [
   {
     name: "Free",
     price: "$0",
-    note: "Read the surface on the web.",
+    note: "Inspect before subscribing.",
     detail: "Public pages, track record, status, methodology, glossary, thresholds, and schema.",
     href: "/track-record",
     cta: "Open public surface",
@@ -40,7 +40,7 @@ const planCards = [
     name: "Basic",
     price: "$29/mo",
     note: "One chain, 90-day JSON access.",
-    detail: "Gold, Meta, and Derived JSON for one chain via API.",
+    detail: "Best for focused single-chain monitoring, research, and downstream workflow use.",
     href: "/sign-up",
     cta: "Start Basic",
     className: "border-cyan-500/25 bg-cyan-500/8",
@@ -49,7 +49,7 @@ const planCards = [
     name: "Pro",
     price: "$79/mo",
     note: "Four chains, 365-day JSON access.",
-    detail: "Full Gold, Meta, and Derived access across Bitcoin, Ethereum, Arbitrum, and Base.",
+    detail: "Best for multi-chain monitoring, heavier API use, and broader research workflows.",
     href: "/sign-up",
     cta: "Start Pro",
     className: "border-purple-500/25 bg-purple-500/8",
@@ -105,16 +105,16 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
     <main className="mx-auto max-w-7xl px-4 py-5 lg:hidden">
       <section className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-5 shadow-sm">
         <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-cyan-200">
-          Daily on-chain regime model
+          Daily chain-state JSON product
         </div>
         <h1 className="mt-3 text-3xl font-semibold leading-tight text-white">
-          Daily chain-state JSON for BTC, ETH, Arbitrum, and Base.
+          Daily chain-state JSON for monitoring, comparison, and backtesting.
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-300">
-          TrendAnalytics publishes Gold, Meta, and Derived JSON so you can monitor current chain conditions, compare four networks in one framework, backtest published history, and reuse structured regime data in your own workflow.
+          TrendAnalytics publishes Gold, Meta, and Derived JSON for BTC, ETH, Arbitrum, and Base so you can check whether current on-chain conditions are actually changing - or just moving briefly.
         </p>
         <p className="mt-3 text-sm leading-7 text-slate-300">
-          The public site is the inspection layer. The paid product is the documented JSON output.
+          You are buying reusable outputs, not just charts: documented daily files for dashboards, notebooks, backtests, and internal models.
         </p>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -211,8 +211,7 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
         </div>
         <h2 className="mt-1 text-2xl font-semibold text-white">JSON-first subscription</h2>
         <p className="mt-2 text-sm leading-7 text-slate-300">
-          The website is the inspection layer. The paid product is the documented Gold, Meta,
-          and Derived JSON you can pull into your own workflow without building the full pipeline yourself.
+          Free lets you inspect the public surface. Paid tiers unlock the documented Gold, Meta, and Derived JSON you can pull into your own workflow without building the full pipeline yourself.
         </p>
         <div className="mt-4 space-y-3">
           {planCards.map((plan) => (
@@ -229,7 +228,7 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
               <p className="mt-3 text-sm leading-6 text-slate-300">{plan.detail}</p>
               {plan.name === "Pro" && historyDepthDays ? (
                 <div className="mt-3 rounded-xl border border-purple-500/20 bg-purple-500/5 px-3 py-2 text-xs text-purple-200">
-                  History Add-on unlocks <span className="font-semibold text-white">{historyDepthDays} days</span> of published history and growing daily.
+                  Full archive: <span className="font-semibold text-white">{historyDepthDays} days</span> and growing daily.
                 </div>
               ) : null}
               <div className="mt-3 text-sm font-medium text-cyan-200">{plan.cta} →</div>
@@ -244,7 +243,7 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
         </div>
         <h2 className="mt-1 text-2xl font-semibold text-white">Gold, Meta, Derived</h2>
         <p className="mt-2 text-sm leading-7 text-slate-300">
-          Meta is the core product. Gold lets you verify inputs. Derived gives you smoothed trend context.
+          Meta is the commercial heart of the product. Gold lets you verify inputs. Derived gives you smoothed trend context.
         </p>
         <div className="mt-4 space-y-3">
           {jsonCards.map((card) => (

@@ -1,29 +1,29 @@
 export const heroTagline =
-  "On-chain noise looks identical to structural shifts - until you run the numbers properly.";
+  "Daily chain-state JSON that tells you whether current on-chain conditions are actually changing - or just spiking briefly.";
 
 export const heroBodyParagraphs = [
-  "TrendAnalytics publishes daily Gold, Meta, and Derived JSON for BTC, ETH, Arbitrum, and Base. Use it to monitor current chain conditions, compare chains in one framework, validate whether unusual activity is persisting, and feed structured chain-state data into your own dashboards, notebooks, or models.",
+  "TrendAnalytics publishes Gold, Meta, and Derived JSON every day for BTC, ETH, Arbitrum, and Base. Use it to monitor current chain conditions, compare four networks in one framework, validate whether unusual activity is persisting, and feed structured chain-state data into your own dashboards, notebooks, or models.",
   "You are not subscribing for charts alone. You are subscribing for documented daily files that remove the AWS ingestion, aggregation, baseline scoring, confidence logic, and artifact publishing work you would otherwise need to build and maintain yourself.",
 ] as const;
 
 export const heroSalesPunch = [
   "Buy a daily chain-state data product - not just a chart surface.",
-  "Subscribers get documented Gold, Meta, and Derived JSON that can be used for monitoring, historical validation, backtesting, and internal research workflows across four chains.",
+  "Subscribers get documented Gold, Meta, and Derived JSON for monitoring, cross-chain comparison, historical validation, backtesting, and internal research workflows across four chains.",
 ] as const;
 
 export const heroDefinitionCards = [
   {
     title: "What lands in the files each day?",
-    body: "Gold gives the raw daily observations. Meta gives the regime label, confidence, scorecard, and drivers. Derived gives the MA7 and MA30 trend context for every Gold metric.",
+    body: "Gold gives the raw daily observations. Meta gives the regime label, confidence, scorecard, and drivers. Derived gives MA7 and MA30 trend context for every Gold metric.",
   },
   {
-    title: "What do subscribers actually use it for?",
-    body: "Monitoring current chain conditions, comparing BTC/ETH/ARB/BASE in one framework, backtesting historical states, and feeding structured chain-state context into internal dashboards, notebooks, or downstream models.",
+    title: "Why do subscribers pay for it?",
+    body: "Because the value is reusable output. You get documented daily files and a consistent archive instead of rebuilding the ingestion, baseline, confidence, and publication stack yourself.",
   },
 ] as const;
 
 export const heroFaqPrompt =
-  "Need the exact definitions, thresholds, confidence rules, and interpretation limits?";
+  "Need the exact field definitions, thresholds, confidence rules, and interpretation limits?";
 
 export const heroPipelineEyebrow = "WHAT SUBSCRIBERS USE THIS FOR";
 export const heroPipelineTitle = "What this helps you do, concretely.";
@@ -37,7 +37,7 @@ export const heroPipelinePoints = [
   },
   {
     title: "Cross-chain comparison in one framework",
-    body: "Compare four very different networks using the same published labels, score structure, confidence logic, and daily cadence.",
+    body: "Compare four different networks using the same published labels, score structure, confidence logic, and daily cadence.",
   },
   {
     title: "Historical validation and backtesting",
@@ -48,32 +48,6 @@ export const heroPipelinePoints = [
     body: "Pull Gold, Meta, and Derived files into dashboards, notebooks, internal models, or automated reporting without rebuilding the data pipeline first.",
   },
 ] as const;
-
-
-export const heroActionEyebrow = "HOW THIS BECOMES USEFUL";
-export const heroActionTitle = "From published files to practical workflow value.";
-export const heroActionItems = [
-  {
-    label: "Monitor current chain conditions",
-    detail: "Check whether today looks stable, heating, congested, or cheap before treating a move as meaningful in your own work.",
-  },
-  {
-    label: "Compare four chains consistently",
-    detail: "Read Bitcoin, Ethereum, Arbitrum, and Base through one published framework instead of stitching together separate dashboards and definitions.",
-  },
-  {
-    label: "Validate against history",
-    detail: "Test whether current conditions are rare, whether similar states appeared before, and how persistent those periods were across the archive.",
-  },
-  {
-    label: "Feed your own tools",
-    detail: "Pull documented Gold, Meta, and Derived JSON into notebooks, dashboards, automated reporting, or downstream models without rebuilding the ingestion stack.",
-  },
-] as const;
-
-export const trustAnchor = {
-  since: "2025",
-} as const;
 
 export const landingProofChips = [
   { label: "Coverage", value: "BTC · ETH · ARB · BASE" },
@@ -109,12 +83,13 @@ export const landingPlans = [
   {
     name: "Free",
     price: "$0",
-    tierTag: "Public site",
+    tierTag: "Inspect before subscribing",
     accent: "text-slate-300",
     border: "border-white/10 bg-white/5",
     body: "Readable web surface across the published product.",
     detail:
-      "Track record, status, methodology, glossary, thresholds, and schema reference. The public site reads the same published artifacts subscribers receive - but without API access or raw file download.",
+      "Track record, status, methodology, glossary, thresholds, and schema reference. Good when you want to inspect the public surface before buying JSON access.",
+    bestFor: "Best for: evaluating the model and inspecting the published surface.",
     href: "/track-record",
     cta: "Open public surface →",
   },
@@ -126,7 +101,8 @@ export const landingPlans = [
     border: "border-cyan-500/25 bg-cyan-500/8",
     body: "One chain with subscriber JSON access and 90-day history.",
     detail:
-      "Gold, Meta, and Derived JSON for one chain. Built for focused monitoring, research, backtesting, and downstream use.",
+      "Gold, Meta, and Derived JSON for one chain. Built for focused monitoring, single-chain research, backtesting, and downstream workflow use.",
+    bestFor: "Best for: focused single-chain monitoring and research.",
     href: "/sign-up",
     cta: "Start Basic →",
   },
@@ -138,7 +114,8 @@ export const landingPlans = [
     border: "border-purple-500/25 bg-purple-500/8",
     body: "All four chains with subscriber JSON access and 365-day history.",
     detail:
-      "Gold, Meta, and Derived JSON across Bitcoin, Ethereum, Arbitrum, and Base. Best fit for multi-chain monitoring, heavier API usage, and research workflows.",
+      "Gold, Meta, and Derived JSON across Bitcoin, Ethereum, Arbitrum, and Base. Best fit for multi-chain monitoring, heavier API usage, and broader research workflows.",
+    bestFor: "Best for: multi-chain monitoring and research workflows.",
     href: "/sign-up",
     cta: "Start Pro →",
   },
