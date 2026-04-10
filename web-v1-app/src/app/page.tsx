@@ -234,67 +234,70 @@ function heroRegimeAsOf(hero?: LandingHero | null): string | null {
   return hero?.regime_asof ?? hero?.asof?.regime ?? hero?.asof?.meta_actual ?? null;
 }
 
-async function buildLandingHeroMap(): Promise<Map<string, LandingHero>> {
+async function buildLandingHeroMap(): Promise<Map<string, LandingHero | null>> {
   const heroes = await Promise.all(
     CHAIN_LIST.map(async (chain) => {
       const hero = await readPublishedJson<LandingHero>(`data/published/v1/landing/${chain.id}/hero.json`);
-      return [chain.id, hero ?? {}] as const;
-    })
+      return [chain.id, hero] as const;
+    }),
   );
 
   return new Map(heroes);
 }
 
+function classifyStatus({
+  chain,
+  lagDays,
+  asOf,
+}: {
+  chain: ChainId;
+  lagDays: number | null;
+  asOf: string | null;
+}): StatusApiRow["status"] {
+  if (!asOf || lagDays === null) return "unknown";
+  const expected = expectedDelayDays(chain);
+  if (lagDays <= expected) return "ok";
+  if (lagDays <= expected + 2) return "warn";
+  return "fail";
+}
+
 function withLandingHero(row: StatusApiRow, hero?: LandingHero | null): StatusApiRow {
   const displayAsOf = heroDisplayAsOf(hero);
   const regimeAsOf = heroRegimeAsOf(hero);
-  const asOf = displayAsOf ?? row.as_of;
-  const lagDays =
-    displayAsOf !== null
-      ? lagDaysFromIsoDay(asOf ?? undefined)
-      : typeof row.lag_days === "number"
-        ? row.lag_days
-        : lagDaysFromIsoDay(asOf ?? undefined);
-  const normalizedChain = row.chain as ChainId;
+  const finalAsOf = displayAsOf ?? row.display_asof ?? row.as_of ?? null;
+  const finalLag = displayAsOf ? lagDaysFromIsoDay(displayAsOf) : row.lag_days;
 
   return {
     ...row,
-    as_of: asOf,
-    display_asof: displayAsOf,
-    regime_asof: regimeAsOf,
-    lag_days: lagDays,
-    status: classifyStatus({ chain: normalizedChain, lagDays, asOf }),
+    as_of: finalAsOf,
+    display_asof: displayAsOf ?? row.display_asof ?? null,
+    regime_asof: regimeAsOf ?? row.regime_asof ?? null,
+    lag_days: finalLag,
+    status: classifyStatus({
+      chain: row.chain as ChainId,
+      lagDays: finalLag,
+      asOf: finalAsOf,
+    }),
   };
-}
-
-function classifyStatus(params: {
-  chain: ChainId;
-  lagDays: number | null;
-  asOf?: string | null;
-}): "ok" | "warn" | "fail" | "unknown" {
-  const { chain, lagDays, asOf } = params;
-  if (!asOf || typeof lagDays !== "number") return "unknown";
-  const exp = expectedDelayDays(chain);
-  if (lagDays <= exp) return "ok";
-  if (lagDays <= exp + 2) return "warn";
-  return "fail";
 }
 
 async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
   return Promise.all(
     CHAIN_LIST.map(async (chain) => {
-      const metaPath = `data/published/v1/meta/${chain.id}/latest.json`;
-      const meta = await readPublishedJson<MetaLatest>(metaPath);
-      const asOf = meta?.updated_through ?? meta?.regime?.asof_date ?? meta?.date ?? null;
+      const meta = await readPublishedJson<MetaLatest>(`data/published/v1/meta/${chain.id}/latest.json`);
+      const asOf = meta?.date ?? meta?.updated_through ?? meta?.regime?.asof_date ?? null;
       const lagDays =
         typeof meta?.confidence?.lag_days_vs_utc_today === "number"
           ? meta.confidence.lag_days_vs_utc_today
           : lagDaysFromIsoDay(asOf ?? undefined);
+
       return {
         chain: chain.id,
-        name: meta?.profile?.label ?? chain.name,
+        name: chain.name,
         label: chain.label,
         as_of: asOf,
+        display_asof: null,
+        regime_asof: meta?.regime?.asof_date ?? null,
         lag_days: lagDays,
         status: classifyStatus({ chain: chain.id, lagDays, asOf }),
         published_regime: meta?.status?.label ?? null,
@@ -484,7 +487,7 @@ export default async function HomePage() {
       <main className="mx-auto hidden max-w-7xl px-6 py-10 lg:block">
         <ModalStyles />
 
-        <Hero />
+        <Hero historyDepthDays={historyDepthDays} />
         <LiveChains rows={displayRows} />
         <div className="mt-10">
           <Plans historyDepthDays={historyDepthDays} />
