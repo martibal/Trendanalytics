@@ -1,0 +1,84 @@
+Hva vi har oppnådd
+Landingsside — design og innhold
+
+Komplett redesign av hero-seksjonen fra bunnen av
+Trust-strip med publiseringsdato og historikk
+Regime-label definisjoner (STABLE/HEATING/CONGESTED/CHEAP) med presise tekniske forklaringer
+"How it works" — tre-stegs pipeline-forklaring
+JSON-produktkort med field-pills for Gold, Meta og Derived
+Archive depth-teller koblet til live manifest (ikke hardkodet)
+To-kolonne editorial layout med archive-tall som visuelt anker
+Juridisk ren tekst gjennomgående — ingen rådgivende språk
+
+Kommersialisering
+
+Plans-seksjon med Free/Basic/Pro + History Add-on
+CheckoutButton med chain-picker modal for Basic-plan
+Checkout-flyt: klikk → chain-valg → Stripe → betaling → dashboard
+History Add-on som separat one-time purchase
+
+Backend og autentisering
+
+Clerk autentisering fungerer
+Stripe checkout API koblet og testet
+Webhook mottar og prosesserer betalingshendelser
+Supabase database med alle tabeller migrert
+API-nøkkel-generering og validering fungerer
+Entitlement-system: Basic (1 chain, 90d), Pro (4 chains, 365d)
+proxy.ts konfigurert korrekt for beskyttede ruter
+
+End-to-end test bekreftet
+
+Brukeropprettelse via Clerk ✓
+Stripe checkout med testkort ✓
+Webhook → database → aktiv subscription ✓
+Dashboard viser korrekt plan, chain og historikk ✓
+API-kall med nøkkel returnerer full Meta JSON ✓
+
+
+Hva som gjenstår før launch
+Stripe — bytt til live-modus
+
+Bytt sk_test_ med sk_live_ i miljøvariabler
+Bytt pk_test_ med pk_live_
+Opprett nye live price IDs for Basic, Pro og History Add-on
+Opprett webhook i Stripe Dashboard mot https://dittdomene.com/api/v1/webhook (ikke localhost)
+
+Clerk — bytt til production
+
+Bytt development-nøkler med production-nøkler
+Sett riktige redirect-URLer i Clerk Dashboard til ditt domene
+
+Datakilde — bytt til S3
+
+Sett DATA_SOURCE=s3 i produksjonsmiljø
+Fyll inn S3_BUCKET, S3_REGION, S3_PREFIX, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+
+Upstash Redis — rate limiting
+
+Opprett database på upstash.com
+Fyll inn UPSTASH_REDIS_REST_URL og UPSTASH_REDIS_REST_TOKEN
+
+Deploy
+
+Sett NEXT_PUBLIC_APP_URL og APP_URL til ditt domene
+Deploy til Vercel eller annen hosting med alle produksjonsmiljøvariabler
+Kjør npx prisma migrate deploy mot produksjonsdatabasen
+
+Etter launch
+
+Koble Stripe CLI fra localhost og bekreft at live webhook fungerer
+Test én ekte betaling med ekte kort
+Brukersitat/testimonial til forsiden når første kunde er på plass
+
+
+
+
+
+/*
+git add -A
+git commit -m "stripe and clerk fix"
+git fetch origin
+git pull --rebase origin main
+git push origin
+*/
