@@ -28,7 +28,7 @@ export default function LandingHero(props: LandingHeroProps) {
             See whether recent on-chain change looks like noise or a more durable regime shift.
           </h1>
           <p className="mt-4 max-w-3xl text-base leading-8 text-muted-foreground">
-            TrendAnalytics is a publication-driven analytics surface for Bitcoin, Ethereum,
+            Urd Atlas is a publication-driven analytics surface for Bitcoin, Ethereum,
             Arbitrum, and Base. It shows the currently published regime, confidence, freshness, and
             supporting drivers without price, forecasts, or advisory language.
           </p>

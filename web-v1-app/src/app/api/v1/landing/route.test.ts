@@ -197,10 +197,10 @@ describe("GET /api/v1/landing", () => {
       confidence_band: "Good",
       lag_days: 0,
       as_of: "2026-03-20",
-      expected_delay_days: 0,
+      expected_delay_days: 1,
       traceability: {
-        source_path: "data/published/v1/meta/bitcoin/latest.json",
-        source_field: "latest landing card fields derived from published meta latest",
+        source_path: "data/published/v1/meta/bitcoin/latest.json + data/published/v1/landing/bitcoin/hero.json",
+        source_field: "landing date uses hero.display_asof when available; regime/confidence remain from published meta latest",
       },
     });
 
@@ -209,7 +209,7 @@ describe("GET /api/v1/landing", () => {
       status_label: "HEATING",
       confidence_band: "Caution",
       lag_days: 2,
-      expected_delay_days: 0,
+      expected_delay_days: 1,
     });
 
     expect(body.chains[2]).toMatchObject({

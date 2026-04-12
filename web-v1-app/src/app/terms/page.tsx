@@ -30,7 +30,7 @@ export default function TermsPage() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Terms of Service</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              These Terms govern access to the TrendAnalytics public website, subscriber dashboard,
+              These Terms govern access to the Urd Atlas public website, subscriber dashboard,
               and authenticated JSON delivery API.
             </p>
           </div>
@@ -59,7 +59,7 @@ export default function TermsPage() {
       <div className="grid gap-6">
         <Section title="1. Service Description">
           <p>
-            TrendAnalytics is a descriptive on-chain analytics product. It provides a public,
+            Urd Atlas is a descriptive on-chain analytics product. It provides a public,
             read-only website, a subscriber dashboard, and authenticated JSON file delivery for
             published data artifacts.
           </p>
@@ -71,7 +71,7 @@ export default function TermsPage() {
 
         <Section title="2. No Investment Advice">
           <p>
-            TrendAnalytics is strictly descriptive. It does not provide investment advice, trading
+            Urd Atlas is strictly descriptive. It does not provide investment advice, trading
             advice, portfolio advice, forecasts, or recommendations.
           </p>
           <p>
@@ -107,7 +107,7 @@ export default function TermsPage() {
             a key is revoked, or the service detects misuse or abuse of authenticated endpoints.
           </p>
           <p>
-            Stripe is used for payment processing. TrendAnalytics does not store or process card
+            Stripe is used for payment processing. Urd Atlas does not store or process card
             details directly.
           </p>
         </Section>
@@ -122,7 +122,7 @@ export default function TermsPage() {
             any activity performed with a valid key associated with your account.
           </p>
           <p>
-            TrendAnalytics may suspend or revoke keys for security, abuse prevention, entitlement
+            Urd Atlas may suspend or revoke keys for security, abuse prevention, entitlement
             enforcement, or account lifecycle reasons.
           </p>
         </Section>
@@ -147,7 +147,7 @@ export default function TermsPage() {
 
         <Section title="7. Published Artifacts and API Contract">
           <p>
-            TrendAnalytics is built around published artifacts and documented API contracts. Public
+            Urd Atlas is built around published artifacts and documented API contracts. Public
             routes and authenticated file delivery are intended to expose published outputs rather
             than hidden runtime model state.
           </p>
@@ -160,7 +160,7 @@ export default function TermsPage() {
 
         <Section title="8. Data Sources and Attribution">
           <p>
-            TrendAnalytics uses public blockchain-derived data and published internal transformations
+            Urd Atlas uses public blockchain-derived data and published internal transformations
             of those data artifacts.
           </p>
           <p>
@@ -187,7 +187,7 @@ export default function TermsPage() {
         <Section title="9. Intellectual Property and Usage Restrictions">
           <p>
             Unless otherwise stated, the site structure, explanatory text, UI presentation, and
-            compiled published artifacts presented through TrendAnalytics are protected and may not
+            compiled published artifacts presented through Urd Atlas are protected and may not
             be copied, redistributed, resold, mirrored, or framed except as permitted by applicable
             law or explicit written permission.
           </p>
@@ -199,7 +199,7 @@ export default function TermsPage() {
 
         <Section title="10. Disclaimer of Warranties">
           <p>
-            The service is provided on an “as is” and “as available” basis. TrendAnalytics makes no
+            The service is provided on an “as is” and “as available” basis. Urd Atlas makes no
             guarantee that the site or API will be uninterrupted, error-free, complete, timely, or
             suitable for any specific purpose.
           </p>
@@ -211,7 +211,7 @@ export default function TermsPage() {
 
         <Section title="11. Limitation of Liability">
           <p>
-            To the maximum extent permitted by applicable law, TrendAnalytics and its operators are
+            To the maximum extent permitted by applicable law, Urd Atlas and its operators are
             not liable for indirect, incidental, special, consequential, or business losses arising
             from use of the website, API, subscriber data, or published artifacts.
           </p>
@@ -223,7 +223,7 @@ export default function TermsPage() {
 
         <Section title="12. Changes to the Service or Terms">
           <p>
-            TrendAnalytics may update, revise, suspend, or discontinue parts of the service,
+            Urd Atlas may update, revise, suspend, or discontinue parts of the service,
             including plans, entitlements, features, or documentation.
           </p>
           <p>

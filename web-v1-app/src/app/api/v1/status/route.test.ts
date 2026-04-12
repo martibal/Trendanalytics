@@ -1,5 +1,4 @@
-
-/**
+﻿/**
  * @jest-environment node
  */
 
@@ -143,7 +142,7 @@ describe("GET /api/v1/status", () => {
       lag_days: 0,
       published_regime: "STABLE",
       confidence_score: 0.91,
-      expected_delay_days: 0,
+      expected_delay_days: 1,
       traceability: {
         source_path: "data/published/v1/meta/bitcoin/latest.json",
         source_field: "latest.json",
@@ -155,7 +154,7 @@ describe("GET /api/v1/status", () => {
       status: "warn",
       lag_days: 2,
       published_regime: "HEATING",
-      expected_delay_days: 0,
+      expected_delay_days: 1,
     });
 
     expect(body.chains[2]).toMatchObject({
@@ -227,7 +226,7 @@ describe("GET /api/v1/status", () => {
       chain: "bitcoin",
       as_of: "2026-03-19",
       lag_days: 3,
-      status: "fail",
+      status: "warn",
     });
   });
 

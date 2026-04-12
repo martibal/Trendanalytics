@@ -8,7 +8,7 @@ const CHAINS = ["BTC", "ETH", "ARB", "BASE"];
 const HOOK = "Is the current fee pressure a structural shift — or just noise?";
 
 const SUBLINE =
-  "TrendAnalytics publishes one regime label per chain per day — STABLE, HEATING, CONGESTED, or CHEAP — scored against each chain's own 180-day history, with a confidence score and full driver attribution. Not a price feed. A documented classification of network state.";
+  "Urd Atlas publishes one regime label per chain per day — STABLE, HEATING, CONGESTED, or CHEAP — scored against each chain's own 180-day history, with a confidence score and full driver attribution. Not a price feed. A documented classification of network state.";
 
 const REGIME_LABELS = [
   {

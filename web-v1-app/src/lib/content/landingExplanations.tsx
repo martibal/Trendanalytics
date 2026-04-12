@@ -17,12 +17,12 @@ function InlineCode({ children }: { children: ReactNode }) {
 }
 
 // ---------------------------------------------------------------------------
-// What is TrendAnalytics
+// What is Urd Atlas
 // ---------------------------------------------------------------------------
 
-export function whatIsTrendAnalyticsExplanation(): ExplainContent {
+export function whatIsUrdAtlasExplanation(): ExplainContent {
   return {
-    title: "What is TrendAnalytics?",
+    title: "What is Urd Atlas?",
     subtitle: "The product in plain language.",
     basic: (
       <>
@@ -32,7 +32,7 @@ export function whatIsTrendAnalyticsExplanation(): ExplainContent {
           Sometimes they are busy and expensive. Sometimes they are somewhere in between.
         </p>
         <p className="mt-3">
-          TrendAnalytics watches four blockchain networks — Bitcoin, Ethereum, Arbitrum, and Base —
+          Urd Atlas watches four blockchain networks — Bitcoin, Ethereum, Arbitrum, and Base —
           and publishes a daily description of what kind of condition each one is in. Not a
           prediction of what will happen next. Not a trading signal. Just a clear, documented answer
           to one question: <span className="font-medium text-white">is what I am seeing right now
@@ -49,7 +49,7 @@ export function whatIsTrendAnalyticsExplanation(): ExplainContent {
     advanced: (
       <>
         <p>
-          TrendAnalytics is a deterministic on-chain context layer. It produces daily regime
+          Urd Atlas is a deterministic on-chain context layer. It produces daily regime
           classifications for four chains (Bitcoin, Ethereum, Arbitrum, Base) using a
           reproducible pipeline over AWS Public Blockchain Data. The primary analytical deliverable
           is a published meta layer containing: a regime label drawn from a finite state vocabulary
@@ -422,7 +422,7 @@ export function interpretationBoundaryExplanation(): ExplainContent {
         </p>
         <p className="mt-3">
           There are plenty of sites that combine on-chain data with price charts and present the
-          result as a trading signal. TrendAnalytics does something different: it focuses only on
+          result as a trading signal. Urd Atlas does something different: it focuses only on
           the network itself — how busy it is, how expensive it is to use, whether it looks
           stretched or quiet — and describes that in plain, documented language.
         </p>
@@ -456,7 +456,7 @@ export function interpretationBoundaryExplanation(): ExplainContent {
           and market dependency that is incompatible with that traceability standard.
         </p>
         <p className="mt-3">
-          The practical implication is that TrendAnalytics outputs are appropriate as one input to
+          The practical implication is that Urd Atlas outputs are appropriate as one input to
           a broader analytical process, not as a standalone signal product. An analyst using this
           data is expected to combine regime context with their own price views, positioning data,
           and market structure analysis. The product explicitly does not do that synthesis on their
@@ -679,7 +679,7 @@ export function valuePropositionExplanation(): ExplainContent {
     basic: (
       <>
         <p>
-          The core question TrendAnalytics answers is: <span className="font-medium text-white">
+          The core question Urd Atlas answers is: <span className="font-medium text-white">
           is what I am seeing on this blockchain right now a real shift, or will it reverse in
           a few days?</span> That is it. Everything on this site is built around that one question.
         </p>
@@ -690,7 +690,7 @@ export function valuePropositionExplanation(): ExplainContent {
           low depending on what the network has looked like over the past few months.
         </p>
         <p className="mt-3">
-          TrendAnalytics takes that raw data, compares it to each network&apos;s own recent
+          Urd Atlas takes that raw data, compares it to each network&apos;s own recent
           history, and publishes a daily descriptive label — STABLE, HEATING, CONGESTED, or CHEAP
           — along with the full breakdown of why that label was assigned. Not an opinion. Not a
           prediction. A documented, reproducible description of the current network state.

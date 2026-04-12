@@ -1,0 +1,109 @@
+diff --git a/src/app/api/v1/landing/route.test.ts b/src/app/api/v1/landing/route.test.ts
+index 1111111..2222222 100644
+--- a/src/app/api/v1/landing/route.test.ts
++++ b/src/app/api/v1/landing/route.test.ts
+@@ -170,17 +170,17 @@ describe("GET /api/v1/landing", () => {
+       one_liner: "Conditions look stable.",
+       confidence_score: 0.91,
+       confidence_band: "Good",
+       lag_days: 0,
+       as_of: "2026-03-20",
+-      expected_delay_days: 0,
++      expected_delay_days: 1,
+       traceability: {
+-        source_path: "data/published/v1/meta/bitcoin/latest.json",
+-        source_field: "latest landing card fields derived from published meta latest",
++        source_path: "data/published/v1/meta/bitcoin/latest.json + data/published/v1/landing/bitcoin/hero.json",
++        source_field: "landing date uses hero.display_asof when available; regime/confidence remain from published meta latest",
+       },
+     });
+
+     expect(body.chains[1]).toMatchObject({
+       chain: "ethereum",
+       status_label: "HEATING",
+       confidence_band: "Caution",
+       lag_days: 2,
+-      expected_delay_days: 0,
++      expected_delay_days: 1,
+     });
+
+diff --git a/src/app/api/v1/status/route.test.ts b/src/app/api/v1/status/route.test.ts
+index 3333333..4444444 100644
+--- a/src/app/api/v1/status/route.test.ts
++++ b/src/app/api/v1/status/route.test.ts
+@@ -118,7 +118,7 @@ describe("GET /api/v1/status", () => {
+       as_of: "2026-03-20",
+       lag_days: 0,
+       published_regime: "STABLE",
+       confidence_score: 0.91,
+-      expected_delay_days: 0,
++      expected_delay_days: 1,
+       traceability: {
+         source_path: "data/published/v1/meta/bitcoin/latest.json",
+         source_field: "latest.json",
+@@ -130,7 +130,7 @@ describe("GET /api/v1/status", () => {
+     expect(body.chains[1]).toMatchObject({
+       chain: "ethereum",
+       status: "warn",
+       lag_days: 2,
+       published_regime: "HEATING",
+-      expected_delay_days: 0,
++      expected_delay_days: 1,
+     });
+
+     expect(body.chains[2]).toMatchObject({
+@@ -222,7 +222,7 @@ describe("GET /api/v1/status", () => {
+     expect(bitcoin).toMatchObject({
+       chain: "bitcoin",
+       as_of: "2026-03-19",
+       lag_days: 3,
+-      status: "fail",
++      status: "warn",
+     });
+   });
+
+diff --git a/src/app/track-record/page.test.tsx b/src/app/track-record/page.test.tsx
+index 5555555..6666666 100644
+--- a/src/app/track-record/page.test.tsx
++++ b/src/app/track-record/page.test.tsx
+@@ -69,7 +69,7 @@ describe("app/chains/[chain]/history/page", () => {
+     expect(
+       screen.getByText(/this page intentionally does not fall back to alternate files/i)
+     ).toBeInTheDocument();
+-    expect(screen.getByText(/expected delay:\s*0d/i)).toBeInTheDocument();
++    expect(screen.getByText(/expected delay:\s*1d/i)).toBeInTheDocument();
+   });
+
+   it("renders the canonical traceability shell for a valid chain path", async () => {
+@@ -89,7 +89,7 @@ describe("app/chains/[chain]/history/page", () => {
+     expect(
+       screen.getByText("data/published/v1/meta/ethereum/last90d.json")
+     ).toBeInTheDocument();
+-    expect(screen.getByText(/expected delay:\s*0d/i)).toBeInTheDocument();
++    expect(screen.getByText(/expected delay:\s*1d/i)).toBeInTheDocument();
+
+     expect(
+       screen.getByText(/this page reads one canonical published history bundle/i)
+
+diff --git a/src/app/chains/[chain]/history/page.test.tsx b/src/app/chains/[chain]/history/page.test.tsx
+index 7777777..8888888 100644
+--- a/src/app/chains/[chain]/history/page.test.tsx
++++ b/src/app/chains/[chain]/history/page.test.tsx
+@@ -62,7 +62,7 @@ describe("app/chains/[chain]/history/page", () => {
+     expect(
+       screen.getByText(/this page intentionally does not fall back to alternate files/i)
+     ).toBeInTheDocument();
+-    expect(screen.getByText(/expected delay:\s*0d/i)).toBeInTheDocument();
++    expect(screen.getByText(/expected delay:\s*1d/i)).toBeInTheDocument();
+   });
+
+   it("renders the canonical traceability shell for a valid chain path", async () => {
+@@ -82,7 +82,7 @@ describe("app/chains/[chain]/history/page", () => {
+     expect(
+       screen.getByText("data/published/v1/meta/ethereum/last90d.json")
+     ).toBeInTheDocument();
+-    expect(screen.getByText(/expected delay:\s*0d/i)).toBeInTheDocument();
++    expect(screen.getByText(/expected delay:\s*1d/i)).toBeInTheDocument();
+
+     expect(
+       screen.getByText(/this page reads one canonical published history bundle/i)

@@ -8,7 +8,7 @@ export default function SiteFooter() {
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid gap-8 md:grid-cols-4">
           <section>
-            <div className="text-sm font-semibold text-foreground">TrendAnalytics</div>
+            <div className="text-sm font-semibold text-foreground">Urd Atlas</div>
             <p className="mt-3 max-w-xs text-sm leading-6 text-muted-foreground">
               Descriptive on-chain regime context across Bitcoin, Ethereum, Arbitrum, and Base. No
               price. No forecasts. No recommendations.
@@ -52,7 +52,7 @@ export default function SiteFooter() {
             <div className="text-sm font-semibold text-foreground">Attribution</div>
             <div className="mt-3 flex flex-col gap-2 text-sm text-muted-foreground">
               <div>{ATTRIBUTION_TEXT}</div>
-              <a href="mailto:contact@trendanalytics.invalid" className="transition hover:text-foreground">
+              <a href="mailto:contact@urdatlas.com" className="transition hover:text-foreground">
                 Contact
               </a>
             </div>

@@ -89,7 +89,7 @@ export default async function MethodologyPage() {
       <div className="grid gap-6">
         <Section title="What this product is actually doing">
           <p>
-            TrendAnalytics is a <strong>descriptive on-chain interpretation layer</strong>.
+            Urd Atlas is a <strong>descriptive on-chain interpretation layer</strong>.
             It does not publish price targets, trade signals, or portfolio advice.
             Instead, it takes published chain metrics and turns them into a more
             readable view of current operating conditions.

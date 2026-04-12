@@ -506,7 +506,7 @@ export default async function ApiDocsPage() {
                 API Docs
               </h1>
               <p className="mt-4 text-lg leading-8 text-slate-300">
-                Machine-readable access to published TrendAnalytics data. Most endpoints are
+                Machine-readable access to published Urd Atlas data. Most endpoints are
                 public and require no key. Subscriber file delivery is authenticated and
                 enforces entitlement scope per your plan.
               </p>
@@ -810,19 +810,19 @@ export default async function ApiDocsPage() {
 
         <div className="mt-4 space-y-4">
           <CodeBlock>{`# Check current chain status (no key required)
-curl https://trendanalytics.io/api/v1/status
+curl https://urdatlas.com/api/v1/status
 
 # Download the latest Ethereum meta artifact (requires Pro key)
 curl -H "X-API-Key: ta_live_xxxxxxxxx" \\
-  https://trendanalytics.io/api/v1/files/meta/ethereum/latest.json
+  https://urdatlas.com/api/v1/files/meta/ethereum/latest.json
 
 # Download 90 days of Bitcoin gold data (requires Basic or Pro key)
 curl -H "X-API-Key: ta_live_xxxxxxxxx" \\
-  https://trendanalytics.io/api/v1/files/gold/bitcoin/last90d.json`}</CodeBlock>
+  https://urdatlas.com/api/v1/files/gold/bitcoin/last90d.json`}</CodeBlock>
 
           <div className="rounded-2xl border border-white/8 bg-white/3 p-4 text-sm leading-7 text-slate-300">
             <span className="font-medium text-white">Base URL:</span>{" "}
-            <InlineCode>https://trendanalytics.io</InlineCode> in production. Replace
+            <InlineCode>https://urdatlas.com</InlineCode> in production. Replace
             with <InlineCode>http://localhost:3000</InlineCode> for local development.
           </div>
         </div>

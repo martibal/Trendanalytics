@@ -1,4 +1,4 @@
-# Launch Checklist — TrendAnalytics
+# Launch Checklist — Urd Atlas
 
 Alle trinn må være på plass før `npm run build && deploy`.
 
@@ -77,7 +77,7 @@ npx prisma migrate deploy
 
 ```env
 DATA_SOURCE=s3
-S3_BUCKET=trendanalytics-data
+S3_BUCKET=urdatlas-data
 S3_REGION=eu-west-1
 S3_PREFIX=published/v1
 AWS_ACCESS_KEY_ID=...

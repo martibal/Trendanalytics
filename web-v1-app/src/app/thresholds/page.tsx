@@ -145,7 +145,7 @@ const whatAreThresholdsExplain: ExplainPair = {
         With the threshold, you have a classification.
       </p>
       <p className="mt-3">
-        TrendAnalytics publishes its thresholds openly so you can understand exactly how any
+        Urd Atlas publishes its thresholds openly so you can understand exactly how any
         label was produced. If you see CONGESTED on Ethereum, you can come here and trace
         exactly which thresholds were crossed to produce that label.
       </p>
@@ -160,7 +160,7 @@ const whatAreThresholdsExplain: ExplainPair = {
   advanced: (
     <>
       <p>
-        Thresholds in TrendAnalytics are deterministic classification boundaries applied to
+        Thresholds in Urd Atlas are deterministic classification boundaries applied to
         the output of the scoring pipeline. They operate at two stages. First, metric-level
         thresholds classify each input signal into band categories (LOW, NORMAL, HIGH,
         EXTREME_HIGH, EXTREME_LOW) based on percentile rank and robust z-score. Second,

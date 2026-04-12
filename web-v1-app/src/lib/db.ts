@@ -4,7 +4,7 @@ import "server-only";
 import { PrismaClient } from "@prisma/client";
 
 declare global {
-  var __trendanalytics_prisma__: PrismaClient | undefined;
+  var __urdatlas_prisma__: PrismaClient | undefined;
 }
 
 function createPrismaClient() {
@@ -13,10 +13,10 @@ function createPrismaClient() {
   });
 }
 
-export const db = globalThis.__trendanalytics_prisma__ ?? createPrismaClient();
+export const db = globalThis.__urdatlas_prisma__ ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
-  globalThis.__trendanalytics_prisma__ = db;
+  globalThis.__urdatlas_prisma__ = db;
 }
 
 export default db;

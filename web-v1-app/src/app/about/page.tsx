@@ -100,7 +100,7 @@ const whatItDoesExplain: ExplainPair = {
         fee increase a regime shift or just noise from a single application?
       </p>
       <p className="mt-3">
-        TrendAnalytics answers one question: <span className="font-medium text-white">is
+        Urd Atlas answers one question: <span className="font-medium text-white">is
         what I am seeing right now a real shift in network conditions, or will it revert
         in a few days?</span>
       </p>
@@ -120,7 +120,7 @@ const whatItDoesExplain: ExplainPair = {
   advanced: (
     <>
       <p>
-        TrendAnalytics is a deterministic on-chain context layer. It applies a
+        Urd Atlas is a deterministic on-chain context layer. It applies a
         reproducible regime classification pipeline to AWS Public Blockchain Data for four
         chains (Bitcoin, Ethereum, Arbitrum, Base), producing daily meta artifacts
         containing: a regime label from a five-state vocabulary, a three-axis scorecard
@@ -150,7 +150,7 @@ const whatItDoesNotExplain: ExplainPair = {
   basic: (
     <>
       <p>
-        TrendAnalytics deliberately does not do several things that might seem natural for
+        Urd Atlas deliberately does not do several things that might seem natural for
         a blockchain analytics product. This is not a limitation — it is a design decision.
       </p>
       <ul className="mt-3 list-disc space-y-2 pl-5">
@@ -195,7 +195,7 @@ const whatItDoesNotExplain: ExplainPair = {
         methodologically sound.
       </p>
       <p className="mt-3">
-        The practical implication is that TrendAnalytics outputs are appropriate as one
+        The practical implication is that Urd Atlas outputs are appropriate as one
         input to a broader analytical process. An analyst using this data is expected to
         combine regime context with their own price views, positioning data, and market
         structure analysis. The product deliberately does not do that synthesis.
@@ -320,11 +320,11 @@ const dataAttributionExplain: ExplainPair = {
         The underlying blockchain data comes from{" "}
         <span className="font-medium text-white">AWS Public Blockchain Data</span> — a
         publicly available dataset of on-chain transactions and blocks for multiple networks.
-        TrendAnalytics processes this data through its own analytical pipeline to produce
+        Urd Atlas processes this data through its own analytical pipeline to produce
         the regime labels, scorecards, and other outputs you see on this site.
       </p>
       <p className="mt-3">
-        The data itself is public. What TrendAnalytics adds is the analytical layer: the
+        The data itself is public. What Urd Atlas adds is the analytical layer: the
         model, the methodology, the confidence system, and the published outputs — all
         documented openly.
       </p>
@@ -334,7 +334,7 @@ const dataAttributionExplain: ExplainPair = {
     <>
       <p>
         AWS Public Blockchain Data provides parquet-format datasets of transactions and
-        blocks for supported chains. TrendAnalytics ingests these via a Python-based ETL
+        blocks for supported chains. Urd Atlas ingests these via a Python-based ETL
         pipeline that aggregates daily features (CANON_COLS), computes the statistical
         processing layer (regime engine, scorecard, confidence), and publishes the results
         as immutable JSON artifacts to an S3 bucket.
@@ -370,7 +370,7 @@ export default async function AboutPage() {
                 About this product
               </div>
               <h1 className="mt-3 text-4xl font-semibold leading-tight text-white sm:text-5xl">
-                TrendAnalytics
+                Urd Atlas
               </h1>
               <p className="mt-4 text-lg leading-8 text-slate-300">
                 Deterministic, explainable regime context for Bitcoin, Ethereum, Arbitrum,
@@ -544,7 +544,7 @@ export default async function AboutPage() {
         </div>
         <p className="mt-4 max-w-4xl text-sm leading-7 text-muted-foreground">
           The underlying blockchain data comes from AWS Public Blockchain Data — a publicly
-          available dataset of on-chain transactions and blocks. TrendAnalytics adds the
+          available dataset of on-chain transactions and blocks. Urd Atlas adds the
           analytical layer: the model, the methodology, the confidence system, and the
           published outputs.
         </p>
@@ -621,13 +621,13 @@ export default async function AboutPage() {
       {/* ── All modals ────────────────────────────────────────────────────── */}
       <ExplainModal
         id="what-it-does-modal"
-        title="What TrendAnalytics does"
+        title="What Urd Atlas does"
         subtitle="The core product question and how it is answered."
         pair={whatItDoesExplain}
       />
       <ExplainModal
         id="what-it-does-not-modal"
-        title="What TrendAnalytics does not do"
+        title="What Urd Atlas does not do"
         subtitle="The interpretation boundary and why it exists."
         pair={whatItDoesNotExplain}
       />

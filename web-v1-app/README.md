@@ -1,4 +1,4 @@
-# TrendAnalytics Web (web-v1-app)
+# Urd Atlas Web (web-v1-app)
 
 This repo contains a Next.js app under `web-v1-app/`.
 

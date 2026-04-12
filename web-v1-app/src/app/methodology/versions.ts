@@ -55,7 +55,7 @@ export const METHODOLOGY_VERSIONS: MethodologyVersion[] = [
     version: "v1.0.0",
     published_at: "2026-03-03",
     summary:
-      "Initial public contract for TrendAnalytics web consumption: read-only rendering of published meta/gold/derived artifacts with explicit traceability.",
+      "Initial public contract for Urd Atlas web consumption: read-only rendering of published meta/gold/derived artifacts with explicit traceability.",
     changes: [
       {
         area: "Governance",

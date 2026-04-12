@@ -5,9 +5,9 @@ test.describe("smoke", () => {
   test("home page renders core public shell", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page).toHaveTitle(/TrendAnalytics/i);
+    await expect(page).toHaveTitle(/Urd Atlas/i);
     await expect(
-      page.getByRole("link", { name: /^TrendAnalytics$/i }).first()
+      page.getByRole("link", { name: /^Urd Atlas$/i }).first()
     ).toBeVisible();
 
     const primaryNav = page.getByRole("navigation", { name: /primary/i }).first();

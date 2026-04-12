@@ -17,7 +17,7 @@ export default function DataContractDetails({ dataset, dataSource }: DataContrac
         <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div>
             <p className="text-sm leading-7 text-slate-300">
-              TrendAnalytics reads from published artifacts rather than recomputing the public surface in the UI.
+              Urd Atlas reads from published artifacts rather than recomputing the public surface in the UI.
               That keeps the website aligned with the same contract subscribers consume downstream.
             </p>
             <div className="mt-4 flex flex-wrap gap-3 text-sm">

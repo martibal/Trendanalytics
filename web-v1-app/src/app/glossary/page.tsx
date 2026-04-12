@@ -98,7 +98,7 @@ export default async function GlossaryPage({
             , and chain pages.
           </p>
           <p>
-            Definitions are product-specific. They describe how the term is used in TrendAnalytics,
+            Definitions are product-specific. They describe how the term is used in Urd Atlas,
             not how every other analytics product necessarily uses the same term.
           </p>
         </Section>

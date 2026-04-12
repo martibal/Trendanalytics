@@ -81,7 +81,7 @@ export default function MobileLanding({ rows }: MobileLandingProps) {
           On-chain regime intelligence
         </div>
         <h1 className="mt-3 text-3xl font-semibold leading-tight text-white">
-          TrendAnalytics
+          Urd Atlas
         </h1>
         <p className="mt-3 text-base leading-7 text-slate-200">
           Separate short-lived on-chain noise from more meaningful structural change.

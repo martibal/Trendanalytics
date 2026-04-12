@@ -7,7 +7,7 @@ import SiteFooter from "@/components/site/SiteFooter";
 import ThemeProvider from "@/components/site/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "TrendAnalytics",
+  title: "Urd Atlas",
   description: "Descriptive on-chain regime context. No price. No forecasts. No recommendations.",
 };
 

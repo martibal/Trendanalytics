@@ -652,7 +652,7 @@ export default async function TrackRecordPage({
 
           <a
             href={csvHref}
-            download={`trendanalytics-track-record-${selectedChain}-${selectedWindow}d.csv`}
+            download={`urdatlas-track-record-${selectedChain}-${selectedWindow}d.csv`}
             className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-slate-200 hover:bg-white/10"
           >
             Export CSV →

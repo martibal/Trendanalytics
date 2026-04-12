@@ -30,7 +30,7 @@ export default function PrivacyPage() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              This page describes how TrendAnalytics handles account, billing, usage, and
+              This page describes how Urd Atlas handles account, billing, usage, and
               authenticated access data across the public website, subscriber dashboard, and API.
             </p>
           </div>
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
       <div className="grid gap-6">
         <Section title="1. Scope">
           <p>
-            This Privacy Policy applies to TrendAnalytics public pages, subscriber account pages,
+            This Privacy Policy applies to Urd Atlas public pages, subscriber account pages,
             authenticated JSON delivery, and related support, billing, and operational workflows.
           </p>
           <p>
@@ -70,7 +70,7 @@ export default function PrivacyPage() {
 
         <Section title="2. Public Website vs Subscriber System">
           <p>
-            TrendAnalytics has two distinct product surfaces:
+            Urd Atlas has two distinct product surfaces:
           </p>
           <ul className="list-disc pl-5">
             <li>
@@ -88,7 +88,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="3. What Data May Be Processed">
-          <p>Depending on how you use the service, TrendAnalytics may process:</p>
+          <p>Depending on how you use the service, Urd Atlas may process:</p>
           <ul className="list-disc pl-5">
             <li>account identifiers and authentication-linked user IDs,</li>
             <li>email address and subscriber profile information,</li>
@@ -101,7 +101,7 @@ export default function PrivacyPage() {
 
         <Section title="4. Authentication and Identity">
           <p>
-            TrendAnalytics uses Clerk for authentication and account session handling. Authentication
+            Urd Atlas uses Clerk for authentication and account session handling. Authentication
             data is therefore also subject to Clerk’s own product and privacy terms.
           </p>
           <p>
@@ -113,10 +113,10 @@ export default function PrivacyPage() {
 
         <Section title="5. Billing and Payments">
           <p>
-            TrendAnalytics uses Stripe for billing, checkout, and subscription processing.
+            Urd Atlas uses Stripe for billing, checkout, and subscription processing.
           </p>
           <p>
-            Payment card details are not stored directly by TrendAnalytics. Billing-related metadata
+            Payment card details are not stored directly by Urd Atlas. Billing-related metadata
             such as customer identifiers, subscription identifiers, plan information, and webhook
             status may be processed to operate the subscriber service.
           </p>
@@ -124,7 +124,7 @@ export default function PrivacyPage() {
 
         <Section title="6. API Access, Keys, and Security Logging">
           <p>
-            Authenticated file delivery requires API keys. TrendAnalytics may process API key
+            Authenticated file delivery requires API keys. Urd Atlas may process API key
             metadata and request metadata needed for:
           </p>
           <ul className="list-disc pl-5">
@@ -142,7 +142,7 @@ export default function PrivacyPage() {
 
         <Section title="7. Public Website Analytics and Operational Data">
           <p>
-            TrendAnalytics may process limited operational and technical information necessary to
+            Urd Atlas may process limited operational and technical information necessary to
             operate the public website and API, such as route usage, availability signals, error
             states, freshness information, response timing, and delivery diagnostics.
           </p>
@@ -178,7 +178,7 @@ export default function PrivacyPage() {
 
         <Section title="10. Data Sharing">
           <p>
-            TrendAnalytics may rely on third-party processors and infrastructure providers, including
+            Urd Atlas may rely on third-party processors and infrastructure providers, including
             services used for authentication, billing, deployment, hosting, storage, and rate
             limiting.
           </p>
@@ -201,7 +201,7 @@ export default function PrivacyPage() {
 
         <Section title="12. Security">
           <p>
-            TrendAnalytics uses route protection, entitlement checks, key status enforcement, and
+            Urd Atlas uses route protection, entitlement checks, key status enforcement, and
             rate limiting as part of its security model.
           </p>
           <p>

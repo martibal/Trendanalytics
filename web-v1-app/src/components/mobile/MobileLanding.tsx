@@ -115,7 +115,7 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
         </h1>
 
         <p className="mt-4 text-[15px] leading-7 text-slate-200">
-          TrendAnalytics publishes Gold, Meta, and Derived JSON for BTC, ETH, Arbitrum, and Base so you can monitor current conditions, compare networks, validate unusual activity historically, and reuse structured outputs immediately.
+          Urd Atlas publishes Gold, Meta, and Derived JSON for BTC, ETH, Arbitrum, and Base so you can monitor current conditions, compare networks, validate unusual activity historically, and reuse structured outputs immediately.
         </p>
 
         <div className="mt-5 rounded-[1.6rem] border border-cyan-400/18 bg-[linear-gradient(135deg,rgba(8,47,73,0.34),rgba(255,255,255,0.03))] p-5">

@@ -32,7 +32,7 @@ export const qaEntries: QaEntry[] = [
     category: "Fundamentals",
     question: "What does this product actually do?",
     basic: [
-      "TrendAnalytics reads raw blockchain data every day, runs it through a calculation pipeline, and publishes an answer to one question: does this chain still look normal, or is something meaningfully changing?",
+      "Urd Atlas reads raw blockchain data every day, runs it through a calculation pipeline, and publishes an answer to one question: does this chain still look normal, or is something meaningfully changing?",
       "The answer is published as a regime label, a confidence score, and a short explanation of which metrics are doing the explanatory work. You can read the web surface for free or subscribe to the JSON artifacts for direct downstream use.",
     ],
     advanced: [
@@ -46,11 +46,11 @@ export const qaEntries: QaEntry[] = [
     question: "What do you know that is not already visible in raw data?",
     basic: [
       "Raw data gives you numbers. It does not tell you whether those numbers are high, low, normal, or important for that specific chain right now.",
-      "TrendAnalytics adds that context by comparing the latest data to the chain's own recent history and deciding whether the move is meaningful enough to count as regime context rather than noise.",
+      "Urd Atlas adds that context by comparing the latest data to the chain's own recent history and deciding whether the move is meaningful enough to count as regime context rather than noise.",
     ],
     advanced: [
       "The additional layer is chain-relative normalization, confidence gating, and deterministic classification. Absolute values alone do not tell you whether a move is unusual for Bitcoin, Ethereum, Arbitrum, or Base.",
-      "TrendAnalytics adds robust baseline comparison, evidence quality scoring, and a rule-based mapping from multidimensional on-chain signals into a stable published state variable.",
+      "Urd Atlas adds robust baseline comparison, evidence quality scoring, and a rule-based mapping from multidimensional on-chain signals into a stable published state variable.",
     ],
   },
   {
@@ -63,7 +63,7 @@ export const qaEntries: QaEntry[] = [
     ],
     advanced: [
       "The free alternative is to pull AWS Public Blockchain Data yourself, write the aggregation logic, normalize it correctly per chain, implement confidence gating, version the artifacts, and keep the whole pipeline maintained.",
-      "TrendAnalytics packages that work into documented Gold, Meta, and Derived outputs so the user consumes stateful, chain-relative analytical artifacts instead of rebuilding the full stack from public source data.",
+      "Urd Atlas packages that work into documented Gold, Meta, and Derived outputs so the user consumes stateful, chain-relative analytical artifacts instead of rebuilding the full stack from public source data.",
     ],
   },
   {
@@ -124,7 +124,7 @@ export const qaEntries: QaEntry[] = [
     question: "What does it mean that the label is a descriptive state?",
     basic: [
       "It means the product describes what is happening now rather than what will happen next. A state label tells you how the chain looks, not what price will do.",
-      "That matters because many analytics products blur description and prediction. TrendAnalytics does not.",
+      "That matters because many analytics products blur description and prediction. Urd Atlas does not.",
     ],
     advanced: [
       "Descriptive state is an explicit epistemic boundary. The system publishes current-state classification under the semantics of evidence sufficiency as of the observation date.",
@@ -213,7 +213,7 @@ export const qaEntries: QaEntry[] = [
     question: "What data do you use?",
     basic: [
       "The product uses public on-chain transaction and block data from AWS Public Blockchain Data for Bitcoin, Ethereum, Arbitrum, and Base.",
-      "TrendAnalytics does not claim to own the raw data. The value is in the aggregation, normalization, confidence gating, and artifact publishing layer built on top of it.",
+      "Urd Atlas does not claim to own the raw data. The value is in the aggregation, normalization, confidence gating, and artifact publishing layer built on top of it.",
     ],
     advanced: [
       "The core Gold layer is made from canonical daily aggregates such as tx_count_daily, block_count_daily, value_transferred_native, median_tx_value_native, median_tx_fee_native, failed_tx_rate, gas_utilization_pct, unique_active_addresses, and avg_block_time_sec.",

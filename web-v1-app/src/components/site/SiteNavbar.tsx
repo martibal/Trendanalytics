@@ -124,7 +124,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
             <span className="inline-flex size-7 items-center justify-center rounded-full border border-border bg-card text-xs font-bold text-primary">
               TA
             </span>
-            <span className="truncate">TrendAnalytics</span>
+            <span className="truncate">Urd Atlas</span>
           </Link>
 
           <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex">

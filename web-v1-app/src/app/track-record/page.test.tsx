@@ -1,4 +1,4 @@
-// src/app/chains/[chain]/history/page.test.tsx
+﻿// src/app/chains/[chain]/history/page.test.tsx
 /**
  * @jest-environment node
  */
@@ -69,7 +69,7 @@ describe("app/chains/[chain]/history/page", () => {
     expect(
       screen.getByText(/this page intentionally does not fall back to alternate files/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/expected delay:\s*0d/i)).toBeInTheDocument();
+    expect(screen.getByText(/expected delay:\s*1d/i)).toBeInTheDocument();
   });
 
   it("renders the canonical traceability shell for a valid chain path", async () => {
@@ -89,7 +89,7 @@ describe("app/chains/[chain]/history/page", () => {
     expect(
       screen.getByText("data/published/v1/meta/ethereum/last90d.json")
     ).toBeInTheDocument();
-    expect(screen.getByText(/expected delay:\s*0d/i)).toBeInTheDocument();
+    expect(screen.getByText(/expected delay:\s*1d/i)).toBeInTheDocument();
 
     expect(
       screen.getByText(/this page reads one canonical published history bundle/i)

@@ -4,7 +4,7 @@ import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { currentDataSource, readStorageObject } from "@/lib/storage";
 import {
-  whatIsTrendAnalyticsExplanation,
+  whatIsUrdAtlasExplanation,
   interpretationBoundaryExplanation,
 } from "@/lib/content/landingExplanations";
 import {
@@ -477,7 +477,7 @@ export default async function HomePage() {
         : landingFallbackRows;
 
   const displayRows = rows.map(toSurfaceRowDisplay);
-  const whatIsExplain = whatIsTrendAnalyticsExplanation();
+  const whatIsExplain = whatIsUrdAtlasExplanation();
   const boundaryExplain = interpretationBoundaryExplanation();
 
   return (
@@ -498,7 +498,7 @@ export default async function HomePage() {
 
         <ExplainModal
           id="what-is-modal"
-          title="What TrendAnalytics is"
+          title="What Urd Atlas is"
           subtitle="A narrow product with a specific job: classify whether current on-chain change still looks like noise or has started to persist like a structural shift."
           pair={whatIsExplain}
         />
@@ -506,7 +506,7 @@ export default async function HomePage() {
         <ExplainModal
           id="boundary-modal"
           title="Interpretation boundary"
-          subtitle="TrendAnalytics is intentionally descriptive. It explains current network state, but it does not tell you what to do."
+          subtitle="Urd Atlas is intentionally descriptive. It explains current network state, but it does not tell you what to do."
           pair={boundaryExplain}
         />
       </main>
