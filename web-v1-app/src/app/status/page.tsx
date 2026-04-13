@@ -312,6 +312,10 @@ const cadenceExplain: ExplainPair = {
         </li>
       </ul>
       <p className="mt-3">
+        The pipeline is generally scheduled to run twice daily, around 09:00 and 21:00
+        Europe/Oslo. These are expected publish windows, not guaranteed timestamps.
+      </p>
+      <p className="mt-3">
         When you see a persistent banner on an Arbitrum or Base chain page saying the
         data is 7 days old — that is expected behaviour, not a problem.
       </p>
@@ -327,6 +331,12 @@ const cadenceExplain: ExplainPair = {
         and anomalous for another.
       </p>
       <p className="mt-3">
+        The operational pipeline is generally scheduled to publish around 09:00 and 21:00
+        Europe/Oslo. In practice, visible availability can move slightly because of
+        upstream source delays, chain-specific lag characteristics, deployment timing, or
+        processing time.
+      </p>
+      <p className="mt-3">
         The staleness classification table is: for BTC/ETH, soft warn at lag &gt; 2d,
         hard fail at lag &gt; 4d; for ARB/BASE, soft warn at lag &gt; 10d, hard fail
         at lag &gt; 15d. These thresholds are also used by the{" "}
@@ -337,6 +347,7 @@ const cadenceExplain: ExplainPair = {
   ),
   traceability: (
     <ul className="list-disc pl-5">
+      <li>Expected publish windows: around 09:00 and 21:00 Europe/Oslo</li>
       <li>BTC/ETH: expected 1d · warn &gt;2d · fail &gt;4d</li>
       <li>ARB/BASE: expected 7d · warn &gt;10d · fail &gt;15d</li>
       <li>Source: <InlineCode>PUBLISH_LAG_DAYS_POLICY</InlineCode> in pipeline</li>
@@ -423,7 +434,8 @@ export default async function StatusPage() {
               <p className="mt-4 text-lg leading-8 text-slate-300">
                 Freshness and confidence for every published chain. This page answers
                 whether the published artifacts are current and usable right now — not
-                what to do about it.
+                what to do about it. Expected refresh windows are around 09:00 and 21:00
+                Europe/Oslo.
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
                 <MoreLink id="how-to-read-modal" label="How to read this page" />
@@ -470,6 +482,9 @@ export default async function StatusPage() {
                 {dataset?.methodology_version ? (
                   <div className="mt-1">Methodology <InlineCode>{dataset.methodology_version}</InlineCode></div>
                 ) : null}
+                <div className="mt-1">
+                  Expected windows <span className="font-semibold text-white">~09:00 / ~21:00 Europe/Oslo</span>
+                </div>
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
                   Source: <InlineCode>{currentDataSource()}</InlineCode>
                 </div>

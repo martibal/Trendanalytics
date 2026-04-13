@@ -237,7 +237,7 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
         </div>
       </section>
 
-      <section id="plans" className="mt-6 rounded-3xl border p-5 shadow-sm">
+      <section id="plans-mobile" className="mt-6 rounded-3xl border p-5 shadow-sm">
         <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-cyan-200">
           What you buy
         </div>

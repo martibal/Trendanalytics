@@ -51,7 +51,14 @@ export default function TermsPage() {
         <div className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground">
           <div className="font-medium text-foreground">Important</div>
           <p className="mt-2">
-            This page describes the service terms that apply to the current public website, subscriber dashboard, and authenticated JSON delivery API.
+            These Terms apply to the current public website, subscriber dashboard, and
+            authenticated JSON delivery API. By creating an account, purchasing a subscription,
+            generating or using an API key, or otherwise using authenticated features of the
+            service, you agree to be bound by these Terms.
+          </p>
+          <p className="mt-2">
+            Urd Atlas is descriptive only. It does not provide investment advice, trading advice,
+            forecasts, or recommendations.
           </p>
         </div>
       </header>
@@ -65,7 +72,8 @@ export default function TermsPage() {
           </p>
           <p>
             The service is designed to present regime context, confidence, drivers, rolling trend
-            views, and related explanatory material based on published blockchain data artifacts.
+            views, freshness context, and related explanatory material based on published
+            blockchain data artifacts.
           </p>
         </Section>
 
@@ -75,9 +83,9 @@ export default function TermsPage() {
             advice, portfolio advice, forecasts, or recommendations.
           </p>
           <p>
-            No page, API route, chart, glossary entry, methodology section, or downloadable file
-            should be interpreted as a suggestion to buy, sell, hold, rebalance, hedge, or take any
-            financial action.
+            No page, API route, chart, glossary entry, methodology section, downloadable file,
+            JSON response, score, label, or driver list should be interpreted as a suggestion to
+            buy, sell, hold, rebalance, hedge, or take any financial action.
           </p>
         </Section>
 
@@ -91,20 +99,22 @@ export default function TermsPage() {
             be accessible without forced login.
           </p>
           <p>
-            Subscriber-only features, including dashboard access, API keys, and authenticated file
-            downloads, require a valid account and an active entitlement.
+            Subscriber-only features, including dashboard access, API keys, authenticated file
+            downloads, and any data beyond the public surface, require a valid account and an
+            active entitlement.
           </p>
         </Section>
 
         <Section title="4. Account, Billing, and Access">
           <p>
-            Subscriber access is governed by the active subscription plan and associated entitlement
-            scope, including chain access, data genre, window depth, and historical depth where
-            applicable.
+            Subscriber access is governed by the active subscription plan and associated
+            entitlement scope, including chain access, data genre, window depth, and historical
+            depth where applicable.
           </p>
           <p>
-            Access may be suspended, limited, or revoked if a subscription expires, a payment fails,
-            a key is revoked, or the service detects misuse or abuse of authenticated endpoints.
+            Access may be suspended, limited, or revoked if a subscription expires, a payment
+            fails, an entitlement changes, a key is revoked, or the service detects misuse or
+            abuse of authenticated endpoints.
           </p>
           <p>
             Stripe is used for payment processing. Urd Atlas does not store or process card
@@ -112,29 +122,20 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="5. API Keys and Security">
+        <Section title="5. Publication Schedule and Availability">
           <p>
-            Authenticated file delivery requires a valid API key supplied via the documented request
-            header.
+            The service is generally scheduled to publish updated data artifacts around 09:00 and
+            21:00 Europe/Oslo.
           </p>
           <p>
-            API keys are confidential credentials. You are responsible for safeguarding them and for
-            any activity performed with a valid key associated with your account.
+            These are expected publication windows, not guaranteed timestamps. Published data may
+            arrive later than usual because of upstream source delays, chain-specific lags,
+            maintenance, deployment timing, or temporary processing issues.
           </p>
           <p>
-            Urd Atlas may suspend or revoke keys for security, abuse prevention, entitlement
-            enforcement, or account lifecycle reasons.
-          </p>
-        </Section>
-
-        <Section title="6. Service Limits and Availability">
-          <p>
-            The service may apply request limits, entitlement checks, maintenance windows, staleness
-            warnings, and temporary availability restrictions.
-          </p>
-          <p>
-            Published data may be delayed, incomplete, unavailable, or marked degraded. Arbitrum and
-            Base may have an expected publication delay relative to Bitcoin and Ethereum.
+            Published data may be delayed, incomplete, unavailable, revised, or marked degraded.
+            Arbitrum and Base may have an expected publication delay relative to Bitcoin and
+            Ethereum.
           </p>
           <p>
             System status information is published at{" "}
@@ -145,7 +146,70 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="7. Published Artifacts and API Contract">
+        <Section title="6. License Grant and Internal-Use Restriction">
+          <p>
+            Subject to these Terms and an active entitlement, Urd Atlas grants you a limited,
+            revocable, non-exclusive, non-transferable, and non-sublicensable license to access
+            and use the service and any subscriber JSON files made available to your account.
+          </p>
+          <p>
+            That license is granted solely for your own internal personal use or your own internal
+            business use. It is not a sale of the service, the data, the JSON artifacts, the
+            labels, the scores, or any associated intellectual property.
+          </p>
+          <p>
+            Except where explicit written permission is granted by Urd Atlas, subscriber data,
+            including numeric values, JSON files, labels, confidence scores, drivers, rolling
+            metrics, and substantial portions or derivatives of them, may not be commercialized,
+            redistributed, sublicensed, resold, repackaged, or made available to third parties.
+          </p>
+        </Section>
+
+        <Section title="7. Prohibited Uses">
+          <p>You may not, without explicit written permission from Urd Atlas:</p>
+          <p>
+            (a) resell, redistribute, sublicense, lease, lend, assign, transfer, or otherwise
+            commercially exploit subscriber data or authenticated outputs;
+          </p>
+          <p>
+            (b) use the service or its outputs to operate a competing or substitutive product,
+            dataset, alerting service, API, dashboard, research feed, broker product, managed
+            service, or white-labeled offering;
+          </p>
+          <p>
+            (c) publish, post, mirror, proxy, frame, or expose authenticated endpoints or
+            subscriber JSON files for third-party access;
+          </p>
+          <p>
+            (d) share accounts or API keys outside the authorized user or organization that
+            purchased access;
+          </p>
+          <p>
+            (e) remove attribution, provenance markers, metadata, contract context, or access
+            controls where present;
+          </p>
+          <p>
+            (f) attempt to bypass entitlement controls, rate limits, route protection, or scope
+            restrictions, or attempt to gain access to data outside your authorized scope.
+          </p>
+        </Section>
+
+        <Section title="8. API Keys and Security">
+          <p>
+            Authenticated file delivery requires a valid API key supplied via the documented
+            request header.
+          </p>
+          <p>
+            API keys are confidential credentials. You are responsible for safeguarding them and
+            for any activity performed with a valid key associated with your account.
+          </p>
+          <p>
+            Urd Atlas may suspend or revoke keys for security, abuse prevention, entitlement
+            enforcement, account lifecycle reasons, or breach of these Terms.
+          </p>
+        </Section>
+
+        <Section title="9. Published Artifacts and API Contract">
           <p>
             Urd Atlas is built around published artifacts and documented API contracts. Public
             routes and authenticated file delivery are intended to expose published outputs rather
@@ -158,14 +222,14 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="8. Data Sources and Attribution">
+        <Section title="10. Data Sources and Attribution">
           <p>
-            Urd Atlas uses public blockchain-derived data and published internal transformations
-            of those data artifacts.
+            Urd Atlas uses public blockchain-derived data and published internal transformations of
+            those data artifacts.
           </p>
           <p>
-            AWS Public Blockchain Data attribution must remain visible where required by the product
-            specification and related documentation.
+            AWS Public Blockchain Data attribution must remain visible where required by the
+            product specification and related documentation.
           </p>
           <p>
             Additional information about methodology and data presentation is available at{" "}
@@ -184,35 +248,35 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="9. Intellectual Property and Usage Restrictions">
+        <Section title="11. Intellectual Property">
           <p>
-            Unless otherwise stated, the site structure, explanatory text, UI presentation, and
-            compiled published artifacts presented through Urd Atlas are protected and may not
-            be copied, redistributed, resold, mirrored, or framed except as permitted by applicable
-            law or explicit written permission.
+            Unless otherwise stated, the site structure, explanatory text, UI presentation, brand
+            elements, compiled published artifacts, documentation, and authenticated outputs made
+            available through Urd Atlas are protected by applicable intellectual property and
+            contract rights.
           </p>
           <p>
-            You may not attempt to bypass entitlement controls, rate limits, or route protection, or
-            attempt to gain access to data outside your authorized scope.
-          </p>
-        </Section>
-
-        <Section title="10. Disclaimer of Warranties">
-          <p>
-            The service is provided on an “as is” and “as available” basis. Urd Atlas makes no
-            guarantee that the site or API will be uninterrupted, error-free, complete, timely, or
-            suitable for any specific purpose.
-          </p>
-          <p>
-            Published data may contain delays, missing values, degraded states, methodology changes,
-            or revisions that affect interpretation.
+            No ownership interest in the service or subscriber content is transferred to you by
+            purchasing access.
           </p>
         </Section>
 
-        <Section title="11. Limitation of Liability">
+        <Section title="12. Disclaimer of Warranties">
           <p>
-            To the maximum extent permitted by applicable law, Urd Atlas and its operators are
-            not liable for indirect, incidental, special, consequential, or business losses arising
+            The service is provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo;
+            basis. Urd Atlas makes no guarantee that the site or API will be uninterrupted,
+            error-free, complete, timely, or suitable for any specific purpose.
+          </p>
+          <p>
+            Published data may contain delays, missing values, degraded states, methodology
+            changes, corrections, or revisions that affect interpretation.
+          </p>
+        </Section>
+
+        <Section title="13. Limitation of Liability">
+          <p>
+            To the maximum extent permitted by applicable law, Urd Atlas and its operators are not
+            liable for indirect, incidental, special, consequential, or business losses arising
             from use of the website, API, subscriber data, or published artifacts.
           </p>
           <p>
@@ -221,10 +285,23 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="12. Changes to the Service or Terms">
+        <Section title="14. Suspension and Termination">
           <p>
-            Urd Atlas may update, revise, suspend, or discontinue parts of the service,
-            including plans, entitlements, features, or documentation.
+            Urd Atlas may suspend or terminate access, API keys, subscriptions, or authenticated
+            file delivery if it reasonably believes that these Terms have been breached, that the
+            service is being misused, or that continued access creates security, legal, billing, or
+            operational risk.
+          </p>
+          <p>
+            On suspension or termination, your right to access subscriber-only content ends
+            immediately unless otherwise required by applicable law.
+          </p>
+        </Section>
+
+        <Section title="15. Changes to the Service or Terms">
+          <p>
+            Urd Atlas may update, revise, suspend, or discontinue parts of the service, including
+            plans, entitlements, features, documentation, or publication schedules.
           </p>
           <p>
             These Terms may be updated from time to time. The latest published version on this page
@@ -232,7 +309,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="13. Contact and Related Documents">
+        <Section title="16. Contact and Related Documents">
           <p>
             For privacy-related information, see{" "}
             <Link href="/privacy" className="underline">
@@ -267,19 +344,6 @@ export default function TermsPage() {
             .
           </p>
         </Section>
-
-        <section className="rounded-xl border p-6 text-xs text-muted-foreground">
-          <div className="font-medium text-foreground">Implementation note</div>
-          <p className="mt-2">
-            This page is intended to remain aligned with the live product surface, entitlement model, and authenticated delivery routes described throughout the application.
-          </p>
-          <p className="mt-2">
-            Product-specific technical areas relevant to these Terms include{" "}
-            <InlineCode>/dashboard</InlineCode>, <InlineCode>/api/v1/files/[...path]</InlineCode>,{" "}
-            <InlineCode>/api/v1/checkout</InlineCode>, <InlineCode>/api/v1/webhook</InlineCode>, and
-            public API documentation at <InlineCode>/api-docs</InlineCode>.
-          </p>
-        </section>
       </div>
     </main>
   );

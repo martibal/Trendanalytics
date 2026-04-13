@@ -220,6 +220,22 @@ export const qaEntries: QaEntry[] = [
       "Chain-specific profiles determine which fields exist and which fields meaningfully participate in regime computation.",
     ],
   },
+
+    {
+    id: "when-does-data-update",
+    category: "JSON and Subscription",
+    question: "When does the data usually update?",
+    basic: [
+      "Urd Atlas is generally scheduled to publish updated artifacts around 09:00 and 21:00 Europe/Oslo.",
+      "These are expected refresh windows, not guaranteed timestamps. Actual availability can move slightly because of upstream source delays, chain-specific lag, or processing time.",
+    ],
+    advanced: [
+      "Operationally, the pipeline is scheduled to run twice daily, around 09:00 and 21:00 Europe/Oslo. Those windows describe the intended publication rhythm rather than a hard real-time guarantee.",
+      "Bitcoin and Ethereum are normally expected to update on a tighter cadence than Arbitrum and Base, which use a different lag policy by design. The Status page should be treated as the authoritative view of current freshness.",
+    ],
+  },
+
+
   {
     id: "what-is-baseline",
     category: "Data and Metrics",

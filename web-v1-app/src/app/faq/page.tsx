@@ -1,4 +1,3 @@
-
 import QaPageClient from "@/components/qa/QaPageClient";
 import { qaEntries, qaCategories } from "@/lib/qa";
 
@@ -22,6 +21,8 @@ export default function FaqPage() {
           <span>{qaCategories.length} categories</span>
           <span>·</span>
           <span>Basic and Advanced explanation levels</span>
+          <span>·</span>
+          <span>Expected refresh windows: around 09:00 and 21:00 Europe/Oslo</span>
         </div>
       </header>
 

@@ -122,7 +122,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
             className="inline-flex items-center gap-2 rounded-lg px-1 py-1 text-sm font-semibold tracking-wide text-foreground hover:opacity-85"
           >
             <span className="inline-flex size-7 items-center justify-center rounded-full border border-border bg-card text-xs font-bold text-primary">
-              TA
+              UA
             </span>
             <span className="truncate">Urd Atlas</span>
           </Link>
