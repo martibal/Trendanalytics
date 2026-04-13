@@ -130,7 +130,12 @@ export default function SignInPage() {
 
           {clerkConfigured ? (
             <div className="flex justify-center">
-              <SignIn />
+              <SignIn
+                routing="path"
+                path="/sign-in"
+                signUpUrl="/sign-up"
+                fallbackRedirectUrl="/dashboard"
+              />
             </div>
           ) : (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5">

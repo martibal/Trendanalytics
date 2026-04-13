@@ -6,11 +6,16 @@
 export {};
 
 const authMock = jest.fn();
+const cookiesMock = jest.fn();
 const dbFindUniqueMock = jest.fn();
 const dbCreateMock = jest.fn();
 
 jest.mock("@clerk/nextjs/server", () => ({
   auth: () => authMock(),
+}));
+
+jest.mock("next/headers", () => ({
+  cookies: () => cookiesMock(),
 }));
 
 jest.mock("@/lib/db", () => ({
@@ -24,6 +29,8 @@ jest.mock("@/lib/db", () => ({
 
 describe("lib/auth/account", () => {
   const originalEnv = process.env;
+  const TERMS_VERSION = "2026-04-13";
+  const TERMS_ACCEPTED_AT = "2026-04-13T19:45:00.000Z";
 
   beforeEach(() => {
     jest.resetModules();
@@ -31,6 +38,10 @@ describe("lib/auth/account", () => {
     process.env = { ...originalEnv };
     delete process.env.CLERK_SECRET_KEY;
     delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+    cookiesMock.mockResolvedValue({
+      get: jest.fn().mockReturnValue(undefined),
+    });
   });
 
   afterAll(() => {
@@ -104,11 +115,25 @@ describe("lib/auth/account", () => {
       },
     });
     dbFindUniqueMock.mockResolvedValue(null);
+
+    cookiesMock.mockResolvedValue({
+      get: jest.fn((name: string) => {
+        if (name === "ua_terms_acceptance_pending") {
+          return {
+            value: `${TERMS_VERSION}|${TERMS_ACCEPTED_AT}`,
+          };
+        }
+        return undefined;
+      }),
+    });
+
     dbCreateMock.mockResolvedValue({
       id: "acct_new",
       authProviderUserId: "user_123",
       email: "user@example.com",
       createdAt: new Date("2026-03-21T10:00:00.000Z"),
+      termsAcceptedAt: new Date(TERMS_ACCEPTED_AT),
+      termsVersion: TERMS_VERSION,
       subscriptions: [],
       apiKeys: [],
     });
@@ -133,6 +158,8 @@ describe("lib/auth/account", () => {
       data: {
         authProviderUserId: "user_123",
         email: "user@example.com",
+        termsAcceptedAt: new Date(TERMS_ACCEPTED_AT),
+        termsVersion: TERMS_VERSION,
       },
       include: {
         subscriptions: {
@@ -176,6 +203,30 @@ describe("lib/auth/account", () => {
     });
   });
 
+  it("throws when a new authenticated account is created without current terms acceptance", async () => {
+    process.env.CLERK_SECRET_KEY = "sk_test";
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "pk_test";
+    authMock.mockResolvedValue({
+      userId: "user_999",
+      sessionClaims: {
+        email: "missing-terms@example.com",
+      },
+    });
+    dbFindUniqueMock.mockResolvedValue(null);
+
+    cookiesMock.mockResolvedValue({
+      get: jest.fn().mockReturnValue(undefined),
+    });
+
+    const mod = await import("@/lib/auth/account");
+
+    await expect(mod.getCurrentAccountView()).rejects.toThrow(
+      "missing_current_terms_acceptance"
+    );
+
+    expect(dbCreateMock).not.toHaveBeenCalled();
+  });
+
   it("maps a basic subscription and api keys correctly", async () => {
     process.env.CLERK_SECRET_KEY = "sk_test";
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "pk_test";
@@ -186,6 +237,8 @@ describe("lib/auth/account", () => {
       authProviderUserId: "user_123",
       email: "user@example.com",
       createdAt: new Date("2026-03-01T10:00:00.000Z"),
+      termsAcceptedAt: new Date(TERMS_ACCEPTED_AT),
+      termsVersion: TERMS_VERSION,
       subscriptions: [
         {
           id: "sub_1",
@@ -276,6 +329,8 @@ describe("lib/auth/account", () => {
       authProviderUserId: "user_456",
       email: "pro@example.com",
       createdAt: new Date("2026-03-01T10:00:00.000Z"),
+      termsAcceptedAt: new Date(TERMS_ACCEPTED_AT),
+      termsVersion: TERMS_VERSION,
       subscriptions: [
         {
           id: "sub_2",

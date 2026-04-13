@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { SignOutButton, useAuth } from "@clerk/nextjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CHAIN_LIST } from "@/config/chains";
 import { useTheme } from "@/components/site/ThemeProvider";
@@ -43,7 +43,7 @@ function ThemeToggle() {
   );
 }
 
-function AuthAwareLink({
+function AuthAwareActions({
   mobile = false,
   onNavigate,
 }: {
@@ -52,22 +52,42 @@ function AuthAwareLink({
 }) {
   const { isLoaded, isSignedIn } = useAuth();
 
-  const baseClass = mobile
+  const linkClass = mobile
+    ? "rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+    : "inline-flex h-9 items-center rounded-lg border border-border bg-background px-3 text-sm text-foreground transition hover:bg-muted";
+
+  const logoutButtonClass = mobile
     ? "rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
     : "inline-flex h-9 items-center rounded-lg border border-border bg-background px-3 text-sm text-foreground transition hover:bg-muted";
 
   if (!isLoaded) {
-    return <span className={baseClass}>Account</span>;
+    return <span className={linkClass}>Account</span>;
+  }
+
+  if (!isSignedIn) {
+    return (
+      <Link href="/sign-in" className={linkClass} onClick={onNavigate}>
+        Sign In
+      </Link>
+    );
   }
 
   return (
-    <Link
-      href={isSignedIn ? "/dashboard" : "/sign-in"}
-      className={baseClass}
-      onClick={onNavigate}
-    >
-      {isSignedIn ? "Dashboard" : "Sign In"}
-    </Link>
+    <>
+      <Link href="/dashboard" className={linkClass} onClick={onNavigate}>
+        Dashboard
+      </Link>
+
+      <SignOutButton redirectUrl="/">
+        <button
+          type="button"
+          className={logoutButtonClass}
+          onClick={onNavigate}
+        >
+          Log out
+        </button>
+      </SignOutButton>
+    </>
   );
 }
 
@@ -200,7 +220,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
         <div className="hidden items-center gap-3 lg:flex">
           <ThemeToggle />
           {CLERK_CONFIGURED ? (
-            <AuthAwareLink />
+            <AuthAwareActions />
           ) : (
             <Link
               href="/sign-in"
@@ -265,7 +285,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <ThemeToggle />
               {CLERK_CONFIGURED ? (
-                <AuthAwareLink mobile onNavigate={closeMenus} />
+                <AuthAwareActions mobile onNavigate={closeMenus} />
               ) : (
                 <Link
                   href="/sign-in"

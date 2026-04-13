@@ -360,6 +360,7 @@
 // src/lib/auth/account.ts
 import "server-only";
 
+import { cookies } from "next/headers";
 import { auth } from "@clerk/nextjs/server";
 import { ApiKeyStatus, SubscriptionStatus, SubscriptionTier } from "@prisma/client";
 
@@ -371,6 +372,14 @@ import {
   type EntitlementInput,
 } from "@/lib/auth/entitlements";
 import { db } from "@/lib/db";
+
+const TERMS_VERSION = "2026-04-13";
+const TERMS_ACCEPTANCE_COOKIE = "ua_terms_acceptance_pending";
+
+type PendingTermsAcceptance = {
+  termsVersion: string;
+  termsAcceptedAt: Date;
+};
 
 export type AccountApiKeyView = {
   id: string;
@@ -575,6 +584,36 @@ function buildAccountRecordView(params: {
   };
 }
 
+function parsePendingTermsAcceptance(raw: string | null): PendingTermsAcceptance | null {
+  if (!raw || typeof raw !== "string") {
+    return null;
+  }
+
+  const parts = raw.split("|");
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  const [termsVersion, acceptedAtRaw] = parts;
+  if (!termsVersion || !acceptedAtRaw) {
+    return null;
+  }
+
+  if (termsVersion !== TERMS_VERSION) {
+    return null;
+  }
+
+  const termsAcceptedAt = new Date(acceptedAtRaw);
+  if (Number.isNaN(termsAcceptedAt.getTime())) {
+    return null;
+  }
+
+  return {
+    termsVersion,
+    termsAcceptedAt,
+  };
+}
+
 export async function getCurrentAccountView(): Promise<CurrentAccountView> {
   const authConfigured = isAuthConfigured();
 
@@ -658,15 +697,33 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
           ? sessionClaims.email_address
           : null;
 
+      const cookieStore = await cookies();
+      const pendingTermsAcceptance = parsePendingTermsAcceptance(
+        cookieStore.get(TERMS_ACCEPTANCE_COOKIE)?.value ?? null
+      );
+
+      if (!pendingTermsAcceptance) {
+        console.error("[account] missing current terms acceptance for new account", {
+          userId: authProviderUserId,
+          email,
+          expectedTermsVersion: TERMS_VERSION,
+        });
+        throw new Error("missing_current_terms_acceptance");
+      }
+
       console.info("[account] creating account row", {
         userId: authProviderUserId,
         email,
+        termsVersion: pendingTermsAcceptance.termsVersion,
+        termsAcceptedAt: pendingTermsAcceptance.termsAcceptedAt.toISOString(),
       });
 
       account = await db.account.create({
         data: {
           authProviderUserId,
           email,
+          termsAcceptedAt: pendingTermsAcceptance.termsAcceptedAt,
+          termsVersion: pendingTermsAcceptance.termsVersion,
         },
         include: {
           subscriptions: {
@@ -686,6 +743,8 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
       console.info("[account] account row created", {
         userId: authProviderUserId,
         accountId: account.id,
+        termsVersion: account.termsVersion ?? null,
+        termsAcceptedAt: account.termsAcceptedAt?.toISOString() ?? null,
       });
     }
 

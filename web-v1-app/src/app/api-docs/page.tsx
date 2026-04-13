@@ -270,8 +270,9 @@ const entitlementsExplain: ExplainPair = {
           all genres, up to 365 days of history, custom threshold outputs.
         </li>
         <li>
-          <span className="font-medium text-white">History Add-on ($149 once)</span> — full
-          available history (400+ days, growing daily) for your entitled scope.
+          <span className="font-medium text-white">Full History Add-on ($299 once)</span> — a
+          separate one-time product that requires a user account and unlocks full available history
+          for the buyer’s entitled scope.
         </li>
       </ul>
       <p className="mt-3">
@@ -511,6 +512,12 @@ export default async function ApiDocsPage() {
                 enforces entitlement scope per your plan.
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  href="/api-docs/getting-started"
+                  className="inline-flex items-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-500/20"
+                >
+                  Getting started with JSON API →
+                </Link>
                 <MoreLink id="auth-modal" label="How authentication works" />
                 <MoreLink id="entitlements-modal" label="Entitlements and plans" />
                 <MoreLink id="errors-modal" label="Error codes" />
@@ -702,10 +709,10 @@ export default async function ApiDocsPage() {
                   pro: "365 days",
                 },
                 {
-                  dim: "History Add-on",
-                  pub: "—",
-                  basic: "$149 once → full history",
-                  pro: "$149 once → full history",
+                  dim: "Full History Add-on",
+                  pub: "User account required",
+                  basic: "Separate one-time product",
+                  pro: "Separate one-time product",
                 },
                 {
                   dim: "Rate limit",
@@ -735,6 +742,14 @@ export default async function ApiDocsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="border-t px-6 py-4">
+          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-sm leading-7 text-slate-300">
+            <span className="font-medium text-white">Separate product:</span> Full History Add-on is
+            a one-time purchase priced at <InlineCode>$299</InlineCode>. It requires a user account
+            and can be purchased alongside Basic or Pro to extend history access for the buyer’s
+            entitled scope.
+          </div>
         </div>
       </section>
 
@@ -832,14 +847,19 @@ curl -H "X-API-Key: ta_live_xxxxxxxxx" \\
       <section className="mt-10 rounded-3xl border p-6 shadow-sm">
         <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">Related</div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { href: "/dashboard", label: "Dashboard", desc: "Create and manage API keys" },
-            { href: "/thresholds", label: "Thresholds", desc: "Custom threshold output reference" },
-            { href: "/methodology", label: "Methodology", desc: "What the published fields mean" },
-            { href: "/glossary", label: "Glossary", desc: "Field-level definitions" },
-            { href: "/status", label: "Status", desc: "Pipeline health and freshness" },
-            { href: "/terms", label: "Terms", desc: "Usage terms for API access" },
-          ].map(({ href, label, desc }) => (
+            {[
+              {
+                href: "/api-docs/getting-started",
+                label: "Getting Started",
+                desc: "Beginner guide to JSON API access, plans, files, and automation",
+              },
+              { href: "/dashboard", label: "Dashboard", desc: "Create and manage API keys" },
+              { href: "/thresholds", label: "Thresholds", desc: "Custom threshold output reference" },
+              { href: "/methodology", label: "Methodology", desc: "What the published fields mean" },
+              { href: "/glossary", label: "Glossary", desc: "Field-level definitions" },
+              { href: "/status", label: "Status", desc: "Pipeline health and freshness" },
+              { href: "/terms", label: "Terms", desc: "Usage terms for API access" },
+            ].map(({ href, label, desc }) => (
             <Link
               key={href}
               href={href}

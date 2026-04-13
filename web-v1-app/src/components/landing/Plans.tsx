@@ -61,13 +61,8 @@ export default function Plans({ historyDepthDays }: PlansProps) {
 
             {/* Best for */}
             {"bestFor" in plan && plan.bestFor ? (
-              <div className={`mt-3 text-xs leading-5 ${plan.accent} opacity-80`}>{plan.bestFor as string}</div>
-            ) : null}
-
-            {/* History callout for Pro */}
-            {plan.name === "Pro" && historyDepthDays ? (
-              <div className="mt-3 rounded-xl border border-purple-500/20 bg-purple-500/5 px-3 py-2 text-[11px] text-purple-300">
-                Full archive: <span className="font-bold text-white">{historyDepthDays} days</span> and growing daily.
+              <div className={`mt-3 text-xs leading-5 ${plan.accent} opacity-80`}>
+                {plan.bestFor as string}
               </div>
             ) : null}
 
@@ -109,7 +104,8 @@ export default function Plans({ historyDepthDays }: PlansProps) {
             </div>
             <p className="mt-1 text-xs leading-5 text-slate-500 max-w-xl">
               One-time unlock for the complete published history back to December 2024.
-              Every label, confidence score, and driver set — available within your entitled scope (1 chain for Basic, all 4 for Pro).
+              This extends access beyond the included subscription window. Available within your
+              entitled scope — one chain for Basic, all four chains for Pro.
               Delivered as structured JSON via the same API endpoint.
             </p>
           </div>
