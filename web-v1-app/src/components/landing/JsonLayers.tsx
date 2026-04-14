@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import JsonExampleViewer from "@/components/landing/JsonExampleViewer";
 import { jsonLayers } from "@/lib/landing";
@@ -76,7 +77,7 @@ export default function JsonLayers() {
       <div className="mt-4 rounded-2xl border border-white/8 bg-white/3 px-5 py-4 text-sm leading-7 text-slate-300">
         Delivered via{" "}
         <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-          GET /api/v1/files/&lt;gold|meta|derived&gt;/&lt;chain&gt;/&lt;window&gt;.json
+          GET /api/v1/files/&lt;genre&gt;/&lt;chain&gt;/&lt;window&gt;/latest.json
         </code>
         . Basic: one chain, up to 90 days. Pro: all four chains, up to 365 days.{" "}
         <Link href="/api-docs/schema" className="text-cyan-200 hover:underline">

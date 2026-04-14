@@ -632,7 +632,7 @@ export function subscriberSurfaceExplanation(): ExplainContent {
       <>
         <p>
           The subscriber API delivers authenticated access to the published artifact hierarchy via{" "}
-          <InlineCode>GET /api/v1/files/&lt;genre&gt;/&lt;chain&gt;/&lt;window&gt;.json</InlineCode>.
+          <InlineCode>GET /api/v1/files/&lt;genre&gt;/&lt;chain&gt;/&lt;window&gt;/latest.json</InlineCode>.
           Entitlement is enforced server-side across chain, genre, window, and date-range
           dimensions. Requests outside the entitled scope return 403 with a stable error code rather
           than 404, explicitly signalling entitlement enforcement rather than content absence.
@@ -655,7 +655,7 @@ export function subscriberSurfaceExplanation(): ExplainContent {
     traceability: (
       <ul className="list-disc pl-5">
         <li>
-          File delivery: <InlineCode>GET /api/v1/files/&lt;...path&gt;</InlineCode>
+          File delivery: <InlineCode>GET /api/v1/files/&lt;genre&gt;/&lt;chain&gt;/latest.json</InlineCode> or <InlineCode>GET /api/v1/files/&lt;genre&gt;/&lt;chain&gt;/&lt;window&gt;/latest.json</InlineCode>
         </li>
         <li>
           Auth: <InlineCode>X-API-Key</InlineCode> header
@@ -783,7 +783,7 @@ export function valuePropositionExplanation(): ExplainContent {
           Determinism: <InlineCode>regime.determinism_hash</InlineCode>
         </li>
         <li>
-          Subscriber API: <InlineCode>GET /api/v1/files/&lt;genre&gt;/&lt;chain&gt;/&lt;window&gt;.json</InlineCode>
+          Subscriber API: <InlineCode>GET /api/v1/files/&lt;genre&gt;/&lt;chain&gt;/&lt;window&gt;/latest.json</InlineCode>
         </li>
         <li>
           History depth: 400+ days, growing daily

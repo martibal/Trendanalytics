@@ -775,7 +775,7 @@ python3 fetch_urdatlas.py`}</CodeBlock>
               run one curl command → save the file. You can do this without writing any code.
             </QA>
             <QA question="What time does the new data arrive?">
-              The pipeline runs daily but not at a fixed clock time. Check{" "}
+              The pipeline runs twice daily at approximately 09:00 and 21:00 Europe/Oslo. Check{" "}
               <Link href="/status" className="text-cyan-200 underline">/status</Link>{" "}
               to see the latest published date. When the date changes, new files are available.
             </QA>

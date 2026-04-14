@@ -160,7 +160,7 @@ const PUBLIC_ROUTES = [
 const AUTHENTICATED_ROUTES = [
   {
     method: "GET",
-    path: "/api/v1/files/[genre]/[chain]/[window].json",
+    path: "/api/v1/files/[genre]/[chain]/[window]/latest.json",
     auth: true,
     description: "Authenticated file delivery. Returns the requested published JSON artifact.",
     fields: ["(raw published JSON artifact — gold, meta, or derived)"],
@@ -321,18 +321,19 @@ const fileDeliveryExplain: ExplainPair = {
     <>
       <p>
         The file delivery endpoint is the core of the subscriber API. You send a request
-        with your API key, specifying which chain, which data layer, and which time window
+        with your API key, specifying which chain, which data layer, and optionally which rolling window
         you want. You get back a JSON file exactly as it was published by the pipeline.
       </p>
       <p className="mt-3">
-        The URL structure is straightforward:
+        The public API format is:
       </p>
-      <CodeBlock>{`GET /api/v1/files/<genre>/<chain>/<window>.json
+      <CodeBlock>{`GET /api/v1/files/<genre>/<chain>/latest.json
+GET /api/v1/files/<genre>/<chain>/<window>/latest.json
 
 Examples:
   /api/v1/files/meta/bitcoin/latest.json
-  /api/v1/files/gold/ethereum/last90d.json
-  /api/v1/files/derived/arbitrum/last30d.json`}</CodeBlock>
+  /api/v1/files/gold/ethereum/90d/latest.json
+  /api/v1/files/derived/arbitrum/30d/latest.json`}</CodeBlock>
       <p className="mt-3">
         The three genres are: <span className="font-medium text-white">gold</span> (raw
         daily observations), <span className="font-medium text-white">meta</span> (regime
@@ -350,12 +351,8 @@ Examples:
         JSON without server-side transformation.
       </p>
       <p className="mt-3">
-        The storage path follows the canonical hierarchy:{" "}
-        <InlineCode>data/published/v1/{"<genre>"}/ {"<chain>"}/{"<window>"}.json</InlineCode>.
-        Window tokens map directly to file names: <InlineCode>latest.json</InlineCode>,{" "}
-        <InlineCode>last7d.json</InlineCode>, <InlineCode>last30d.json</InlineCode>, etc.
-        The <InlineCode>last90d.json</InlineCode> bundle contains an array of daily rows
-        ordered by date; <InlineCode>latest.json</InlineCode> contains a single row.
+        The public API contract uses two path shapes:{" "}
+        <InlineCode>/api/v1/files/{"<genre>"}/{"<chain>"}/latest.json</InlineCode> for the newest single published file, and <InlineCode>/api/v1/files/{"<genre>"}/{"<chain>"}/{"<window>"}/latest.json</InlineCode> for the newest rolling bundle. Window tokens are semantic labels in the public API: <InlineCode>7d</InlineCode>, <InlineCode>30d</InlineCode>, <InlineCode>90d</InlineCode>, <InlineCode>180d</InlineCode>, and <InlineCode>365d</InlineCode>. A request such as <InlineCode>/api/v1/files/meta/bitcoin/90d/latest.json</InlineCode> returns the newest published rolling bundle for that chain and genre. The bundle contains an array of daily rows ordered by date; <InlineCode>/api/v1/files/meta/bitcoin/latest.json</InlineCode> returns the newest single published row.
       </p>
       <p className="mt-3">
         Response headers include entitlement metadata:{" "}
@@ -370,8 +367,9 @@ Examples:
   ),
   traceability: (
     <ul className="list-disc pl-5">
-      <li>Storage layout: <InlineCode>data/published/v1/{"<genre>"}/{"<chain>"}/{"<window>"}.json</InlineCode></li>
-      <li>Window files: <InlineCode>latest · last7d · last30d · last90d · last180d · last365d</InlineCode></li>
+      <li>Latest file route: <InlineCode>/api/v1/files/{"<genre>"}/{"<chain>"}/latest.json</InlineCode></li>
+      <li>Window bundle route: <InlineCode>/api/v1/files/{"<genre>"}/{"<chain>"}/{"<window>"}/latest.json</InlineCode></li>
+      <li>Window tokens: <InlineCode>latest · 7d · 30d · 90d · 180d · 365d</InlineCode></li>
       <li>Genres: <InlineCode>gold · meta · derived</InlineCode></li>
       <li>Chains: <InlineCode>bitcoin · ethereum · arbitrum · base</InlineCode></li>
     </ul>
@@ -839,7 +837,7 @@ curl -H "X-API-Key: ta_live_xxxxxxxxx" \\
 
 # Download 90 days of Bitcoin gold data (requires Basic or Pro key)
 curl -H "X-API-Key: ta_live_xxxxxxxxx" \\
-  https://urdatlas.com/api/v1/files/gold/bitcoin/last90d.json`}</CodeBlock>
+  https://urdatlas.com/api/v1/files/gold/bitcoin/90d/latest.json`}</CodeBlock>
 
           <div className="rounded-2xl border border-white/8 bg-white/3 p-4 text-sm leading-7 text-slate-300">
             <span className="font-medium text-white">Base URL:</span>{" "}

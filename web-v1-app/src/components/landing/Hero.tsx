@@ -176,38 +176,58 @@ export default function Hero({ historyDepthDays }: HeroProps) {
           </div>
 
           {/* H1 */}
-          <div className="max-w-[58rem]">
-            <div className="text-[2.1rem] font-black uppercase leading-none tracking-[0.16em] text-cyan-400 sm:text-[2.6rem] lg:text-[3.2rem]">
-              {BRAND}
-            </div>
+            <div className="max-w-[58rem]">
+              <div className="relative inline-flex items-center">
+                <div className="pointer-events-none absolute inset-x-6 -bottom-3 h-10 rounded-full bg-cyan-400/18 blur-2xl" />
+                <div className="relative inline-flex items-center gap-4">
+                  <span className="text-[2.95rem] font-black uppercase leading-none tracking-[0.22em] text-transparent bg-clip-text bg-gradient-to-b from-cyan-200 via-cyan-300 to-cyan-500 [text-shadow:0_0_24px_rgba(34,211,238,0.22)] sm:text-[3.65rem] lg:text-[4.5rem]">
+                    {BRAND}
+                  </span>
+                  <span className="hidden h-px w-16 bg-gradient-to-r from-cyan-300/80 via-cyan-400/35 to-transparent sm:block" />
+                </div>
+              </div>
 
-            <h1 className="mt-5 max-w-[12.5ch] text-balance text-[2.85rem] font-black leading-[0.98] tracking-[-0.04em] text-white sm:text-[3.6rem] lg:text-[4.35rem]">
-              {HERO_TITLE}
-            </h1>
-          </div>
+              <div className="mt-5">
+                <h1 className="text-[2.35rem] font-black leading-[0.92] tracking-[-0.05em] text-white sm:text-[3rem] lg:text-[3.75rem] [text-shadow:0_1px_0_rgba(255,255,255,0.22),0_8px_22px_rgba(0,0,0,0.18)]">
+                  <span className="block">Separating blockchain noise</span>
+                  <span className="block">from structural change</span>
+                </h1>
+              </div>
+            </div>
 
           {/* Subline */}
           <p className="mt-7 max-w-[56ch] text-[15px] leading-[1.9] text-slate-400">
             {SUBLINE}
           </p>
 
-          {/* ── CTAs ── */}
-          <div className="mt-9 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => document.getElementById("plans")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              className="inline-flex items-center rounded-full bg-cyan-500 px-8 py-3 text-sm font-black text-[#040a12] shadow-[0_0_24px_rgba(6,182,212,0.35)] transition hover:bg-cyan-400 hover:shadow-[0_0_32px_rgba(6,182,212,0.5)]"
-            >
-              See plans
-            </button>
-            <button
-              type="button"
-              onClick={() => document.getElementById("latest-surface")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              className="inline-flex items-center rounded-full border border-white/12 bg-white/4 px-6 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/8 hover:text-white"
-            >
-              Latest published surface →
-            </button>
-          </div>
+            {/* ── CTAs ── */}
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  document.getElementById("plans")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  })
+                }
+                className="inline-flex items-center rounded-full bg-cyan-500 px-8 py-3 text-sm font-black text-[#040a12] shadow-[0_0_24px_rgba(6,182,212,0.35)] transition hover:bg-cyan-400 hover:shadow-[0_0_32px_rgba(6,182,212,0.5)]"
+              >
+                See plans
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  document.getElementById("latest-surface")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  })
+                }
+                className="inline-flex items-center rounded-full bg-cyan-500 px-8 py-3 text-sm font-black text-[#040a12] shadow-[0_0_24px_rgba(6,182,212,0.35)] transition hover:bg-cyan-400 hover:shadow-[0_0_32px_rgba(6,182,212,0.5)]"
+              >
+                Latest published surface →
+              </button>
+            </div>
 
           {/* Tertiary links */}
           <div className="mt-4 flex flex-wrap gap-5 text-[11px] text-slate-600">
@@ -411,9 +431,9 @@ export default function Hero({ historyDepthDays }: HeroProps) {
               <div className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600">
                 API endpoint
               </div>
-              <code className="break-all font-mono text-[10px] text-slate-500">
-                GET /api/v1/files/&#123;gold|meta|derived&#125;/&#123;chain&#125;/&#123;window&#125;/latest.json
-              </code>
+                <code className="break-all font-mono text-[10px] text-slate-500">
+                  GET /api/v1/files/&#123;genre&#125;/&#123;chain&#125;/&#123;window&#125;/latest.json
+                </code>
             </div>
           </div>
 
