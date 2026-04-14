@@ -160,9 +160,16 @@ const PUBLIC_ROUTES = [
 const AUTHENTICATED_ROUTES = [
   {
     method: "GET",
-    path: "/api/v1/files/[genre]/[chain]/[window].json",
+    path: "/api/v1/files/[genre]/[chain]/latest.json",
     auth: true,
-    description: "Authenticated file delivery. Returns the requested published JSON artifact.",
+    description: "Authenticated file delivery for the newest published artifact for a chain and genre.",
+    fields: ["(raw published JSON artifact — gold, meta, or derived)"],
+  },
+  {
+    method: "GET",
+    path: "/api/v1/files/[genre]/[chain]/[window]/latest.json",
+    auth: true,
+    description: "Authenticated file delivery for the newest published rolling window bundle.",
     fields: ["(raw published JSON artifact — gold, meta, or derived)"],
   },
   {
@@ -321,18 +328,20 @@ const fileDeliveryExplain: ExplainPair = {
     <>
       <p>
         The file delivery endpoint is the core of the subscriber API. You send a request
-        with your API key, specifying which chain, which data layer, and which time window
-        you want. You get back a JSON file exactly as it was published by the pipeline.
+        with your API key, specifying which chain, which data layer, and optionally which
+        rolling window you want. You get back a JSON file exactly as it was published by
+        the pipeline.
       </p>
       <p className="mt-3">
-        The URL structure is straightforward:
+        The public API format is:
       </p>
-      <CodeBlock>{`GET /api/v1/files/<genre>/<chain>/<window>.json
+      <CodeBlock>{`GET /api/v1/files/<genre>/<chain>/latest.json
+GET /api/v1/files/<genre>/<chain>/<window>/latest.json
 
 Examples:
   /api/v1/files/meta/bitcoin/latest.json
-  /api/v1/files/gold/ethereum/last90d.json
-  /api/v1/files/derived/arbitrum/last30d.json`}</CodeBlock>
+  /api/v1/files/gold/ethereum/90d/latest.json
+  /api/v1/files/derived/arbitrum/30d/latest.json`}</CodeBlock>
       <p className="mt-3">
         The three genres are: <span className="font-medium text-white">gold</span> (raw
         daily observations), <span className="font-medium text-white">meta</span> (regime
@@ -345,17 +354,30 @@ Examples:
     <>
       <p>
         File delivery is a proxy endpoint — the server validates authentication and
-        entitlements, then streams the requested artifact from the storage backend (S3 in
-        production, local filesystem in development). The client receives the raw published
-        JSON without server-side transformation.
+        entitlements, then streams the requested published artifact from the storage backend
+        (S3 in production, local filesystem in development). The client receives the raw
+        published JSON without server-side transformation.
       </p>
       <p className="mt-3">
-        The storage path follows the canonical hierarchy:{" "}
-        <InlineCode>data/published/v1/{"<genre>"}/ {"<chain>"}/{"<window>"}.json</InlineCode>.
-        Window tokens map directly to file names: <InlineCode>latest.json</InlineCode>,{" "}
-        <InlineCode>last7d.json</InlineCode>, <InlineCode>last30d.json</InlineCode>, etc.
-        The <InlineCode>last90d.json</InlineCode> bundle contains an array of daily rows
-        ordered by date; <InlineCode>latest.json</InlineCode> contains a single row.
+        The public API contract uses two path shapes:
+      </p>
+      <ul className="mt-3 list-disc pl-5">
+        <li>
+          <InlineCode>/api/v1/files/{"<genre>"}/{"<chain>"}/latest.json</InlineCode> for the
+          newest single published file
+        </li>
+        <li>
+          <InlineCode>/api/v1/files/{"<genre>"}/{"<chain>"}/{"<window>"}/latest.json</InlineCode> for
+          the newest rolling bundle
+        </li>
+      </ul>
+      <p className="mt-3">
+        Window tokens are semantic labels in the public API:{" "}
+        <InlineCode>7d</InlineCode>, <InlineCode>30d</InlineCode>,{" "}
+        <InlineCode>90d</InlineCode>, <InlineCode>180d</InlineCode>, and{" "}
+        <InlineCode>365d</InlineCode>. A request such as{" "}
+        <InlineCode>/api/v1/files/meta/bitcoin/90d/latest.json</InlineCode> returns the most
+        recently published 90-day rolling bundle for that chain and genre.
       </p>
       <p className="mt-3">
         Response headers include entitlement metadata:{" "}
@@ -370,8 +392,15 @@ Examples:
   ),
   traceability: (
     <ul className="list-disc pl-5">
-      <li>Storage layout: <InlineCode>data/published/v1/{"<genre>"}/{"<chain>"}/{"<window>"}.json</InlineCode></li>
-      <li>Window files: <InlineCode>latest · last7d · last30d · last90d · last180d · last365d</InlineCode></li>
+      <li>
+        Latest file route:{" "}
+        <InlineCode>/api/v1/files/{"<genre>"}/{"<chain>"}/latest.json</InlineCode>
+      </li>
+      <li>
+        Window bundle route:{" "}
+        <InlineCode>/api/v1/files/{"<genre>"}/{"<chain>"}/{"<window>"}/latest.json</InlineCode>
+      </li>
+      <li>Window tokens: <InlineCode>7d · 30d · 90d · 180d · 365d</InlineCode></li>
       <li>Genres: <InlineCode>gold · meta · derived</InlineCode></li>
       <li>Chains: <InlineCode>bitcoin · ethereum · arbitrum · base</InlineCode></li>
     </ul>
@@ -397,7 +426,7 @@ const errorCodesExplain: ExplainPair = {
         </li>
         <li>
           <span className="font-medium text-white">rate_limited</span> (429) — you have
-          exceeded your plan's request limit. Check the <InlineCode>Retry-After</InlineCode>{" "}
+          exceeded your plan&apos;s request limit. Check the <InlineCode>Retry-After</InlineCode>{" "}
           header and wait before retrying.
         </li>
         <li>
@@ -451,7 +480,7 @@ const whnExplain: ExplainPair = {
   basic: (
     <>
       <p>
-        The WHN (What's Happening Now) endpoint surfaces anomaly signals for a chain — the
+        The WHN (What&apos;s Happening Now) endpoint surfaces anomaly signals for a chain — the
         metrics that are currently behaving most unusually relative to their 30-day baseline.
         Up to five signals are returned, ranked by how unusual they are.
       </p>
@@ -468,7 +497,7 @@ const whnExplain: ExplainPair = {
       <p>
         WHN uses standard z-score (not MAD-based) against a 30-day lookback:{" "}
         <InlineCode>z = (x − mean_30d) / std_30d</InlineCode>. This is intentionally
-        different from the regime engine's robust z-score. WHN is a fast anomaly surface,
+        different from the regime engine&apos;s robust z-score. WHN is a fast anomaly surface,
         not a classification input — it uses a simpler statistic because it is optimised
         for responsiveness to short-term deviations, not distributional robustness.
       </p>
@@ -839,7 +868,7 @@ curl -H "X-API-Key: ta_live_xxxxxxxxx" \\
 
 # Download 90 days of Bitcoin gold data (requires Basic or Pro key)
 curl -H "X-API-Key: ta_live_xxxxxxxxx" \\
-  https://urdatlas.com/api/v1/files/gold/bitcoin/last90d.json`}</CodeBlock>
+  https://urdatlas.com/api/v1/files/gold/bitcoin/90d/latest.json`}</CodeBlock>
 
           <div className="rounded-2xl border border-white/8 bg-white/3 p-4 text-sm leading-7 text-slate-300">
             <span className="font-medium text-white">Base URL:</span>{" "}
@@ -917,7 +946,7 @@ curl -H "X-API-Key: ta_live_xxxxxxxxx" \\
       />
       <ExplainModal
         id="whn-modal"
-        title="What's Happening Now (WHN)"
+        title="What&apos;s Happening Now (WHN)"
         subtitle="How anomaly signals are computed and how they differ from driver z-scores."
         pair={whnExplain}
       />

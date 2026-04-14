@@ -412,7 +412,7 @@ export default function Hero({ historyDepthDays }: HeroProps) {
                 API endpoint
               </div>
               <code className="break-all font-mono text-[10px] text-slate-500">
-                GET /api/v1/files/&#123;gold|meta|derived&#125;/&#123;chain&#125;/&#123;window&#125;.json
+                GET /api/v1/files/&#123;gold|meta|derived&#125;/&#123;chain&#125;/&#123;window&#125;/latest.json
               </code>
             </div>
           </div>
