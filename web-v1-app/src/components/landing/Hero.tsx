@@ -17,7 +17,7 @@ const BRAND = "Urd Atlas";
 const HERO_TITLE = "Separating blockchain noise from structural change";
 
 const SUBLINE =
-  "Daily published Gold, Meta, and Derived JSON for Bitcoin, Ethereum, Arbitrum, and Base — with regime labels, confidence scores, and full driver attribution. Descriptive only. No price, no forecasts, no recommendations.";
+  " Most on-chain signals look significant until they do not. Urd Atlas publishes a daily structural reading for four major chains — with confidence scores and driver attribution to show what the classification is based on. Descriptive only. Delivered as ready-to-use JSON via API.";
 
 const REGIME_LABELS = [
   {
@@ -196,7 +196,7 @@ export default function Hero({ historyDepthDays }: HeroProps) {
             </div>
 
           {/* Subline */}
-          <p className="mt-7 max-w-[56ch] text-[15px] leading-[1.9] text-slate-400">
+          <p className="mt-7 max-w-[56ch] text-[18px] leading-[1.8] text-slate-400 sm:text-[22px]">
             {SUBLINE}
           </p>
 
