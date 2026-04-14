@@ -114,7 +114,19 @@ describe("lib/auth/account", () => {
         email: "user@example.com",
       },
     });
-    dbFindUniqueMock.mockResolvedValue(null);
+
+    dbFindUniqueMock
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "acct_new",
+        authProviderUserId: "user_123",
+        email: "user@example.com",
+        createdAt: new Date("2026-03-21T10:00:00.000Z"),
+        termsAcceptedAt: new Date(TERMS_ACCEPTED_AT),
+        termsVersion: TERMS_VERSION,
+        subscriptions: [],
+        apiKeys: [],
+      });
 
     cookiesMock.mockResolvedValue({
       get: jest.fn((name: string) => {
@@ -134,14 +146,12 @@ describe("lib/auth/account", () => {
       createdAt: new Date("2026-03-21T10:00:00.000Z"),
       termsAcceptedAt: new Date(TERMS_ACCEPTED_AT),
       termsVersion: TERMS_VERSION,
-      subscriptions: [],
-      apiKeys: [],
     });
 
     const mod = await import("@/lib/auth/account");
     const result = await mod.getCurrentAccountView();
 
-    expect(dbFindUniqueMock).toHaveBeenCalledWith({
+    expect(dbFindUniqueMock).toHaveBeenNthCalledWith(1, {
       where: { authProviderUserId: "user_123" },
       include: {
         subscriptions: {
@@ -161,6 +171,10 @@ describe("lib/auth/account", () => {
         termsAcceptedAt: new Date(TERMS_ACCEPTED_AT),
         termsVersion: TERMS_VERSION,
       },
+    });
+
+    expect(dbFindUniqueMock).toHaveBeenNthCalledWith(2, {
+      where: { authProviderUserId: "user_123" },
       include: {
         subscriptions: {
           orderBy: { updatedAt: "desc" },
