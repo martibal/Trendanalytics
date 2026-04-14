@@ -10,11 +10,11 @@ import RegimeBadge from "@/components/RegimeBadge";
 import ChainIcon from "@/components/ChainIcon";
 import ScoreGauge from "@/components/ui/ScoreGauge";
 import StalenessBar from "@/components/ui/StalenessBar";
-import WindowSelector from "@/components/ui/WindowSelector";
 import { getChainConfig, type ChainId } from "@/config/chains";
 import { getUnitLabel } from "@/config/units";
 import { currentDataSource, readStorageObject } from "@/lib/storage";
 
+import { currentUser } from "@clerk/nextjs/server";
 import "server-only";
 
 type Driver = {
@@ -538,7 +538,11 @@ function buildChartDataObserved(params: {
 function normalizeWindow(q?: string): 30 | 90 | 180 | 365 {
   const n = Number(q);
   if (n === 30 || n === 90 || n === 180 || n === 365) return n;
-  return 365;
+  return 30;
+}
+
+function metricParamKey(metric: string): string {
+  return "w_" + metric.replace(/[^a-z0-9]/gi, "_");
 }
 
 function safeId(v: string) {
@@ -1756,8 +1760,17 @@ export default async function ChainPage({
 
   const chainId = cfg.id;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
+  // Auth context — currentUser() is more reliable here than auth() on a public chain route
+  // because these chart selectors should unlock for any signed-in user, even without route protection.
+  const signedInUser = await currentUser().catch(() => null);
+  const isSignedIn = Boolean(signedInUser?.id);
+
   const requestedWindow = normalizeWindow(resolvedSearchParams?.window);
-  const effectiveWindowDays = requestedWindow;
+  // Gate window: unauthenticated users are limited to 30d
+  // Gate: anonymous users capped at 30d. Signed-in users get full range.
+  const effectiveRequestedWindow = isSignedIn ? requestedWindow : Math.min(requestedWindow, 30) as 30;
+  const effectiveWindowDays = effectiveRequestedWindow;
 
   const metaPath = `meta/${chainId}/latest.json`;
   const heroPath = `landing/${chainId}/hero.json`;
@@ -1873,27 +1886,68 @@ export default async function ChainPage({
     .filter((m) => !hidden.has(m))
     .slice(0, 4);
 
-  const charts = candidates
-    .filter((metric) => {
-      const data = buildChartDataObserved({ bounds, derivedByDate, goldByDate, metric });
-      return data.some((point) => point.value !== null || point.ma7 !== null || point.ma30 !== null);
-    })
-    .map((metric) => {
+  // Per-metric windows — each chart can have its own time range
+  const chartDataByMetric = await Promise.all(
+    candidates.map(async (metric) => {
+      const paramKey = metricParamKey(metric);
+      const rawParam = (resolvedSearchParams as Record<string, string> | undefined)?.[paramKey];
+      const metricWindow: 30 | 90 | 180 | 365 = isSignedIn
+        ? normalizeWindow(rawParam)
+        : 30;
+
+      const mGoldPath = `gold/${chainId}/last${metricWindow}d.json`;
+      const mDerivedPath = `derived/${chainId}/last${metricWindow}d.json`;
+
+      const [mGold, mDerived] = await Promise.all([
+        metricWindow !== effectiveWindowDays
+          ? readPublishedJson<GoldRow[] | { rows?: GoldRow[] }>(mGoldPath)
+          : goldPayload,
+        metricWindow !== effectiveWindowDays
+          ? readPublishedJson<DerivedRow[] | { rows?: DerivedRow[] }>(mDerivedPath)
+          : derivedPayload,
+      ]);
+
+      const mGoldRows = Array.isArray(mGold) ? mGold : Array.isArray((mGold as { rows?: GoldRow[] })?.rows) ? (mGold as { rows?: GoldRow[] }).rows! : [];
+      const mDerivedRows = Array.isArray(mDerived) ? mDerived : Array.isArray((mDerived as { rows?: DerivedRow[] })?.rows) ? (mDerived as { rows?: DerivedRow[] }).rows! : [];
+
+      const mDerivedByDate = buildDerivedByDate(mDerivedRows);
+      const mGoldByDate = buildGoldByDate(mGoldRows);
+      const mMaxMs = maxDateMsFromRows(mDerivedRows) ?? maxDateMsFromRows(mGoldRows) ?? maxMs;
+      const mBounds = computeBoundsFromMax(mMaxMs, metricWindow);
+
+      const data = buildChartDataObserved({ bounds: mBounds, derivedByDate: mDerivedByDate, goldByDate: mGoldByDate, metric });
       const metricDriver = driversAll.find((d) => d.metric === metric);
+
       return {
         metric,
         axis: metricDriver?.axis,
         unitLabel: getUnitLabel(chainId, metric) ?? undefined,
-        data: buildChartDataObserved({ bounds, derivedByDate, goldByDate, metric }),
+        data,
+        metricWindow,
+        mGoldPath,
+        mDerivedPath,
+        mBounds,
+        paramKey,
+        hasData: data.some((p) => p.value !== null || p.ma7 !== null || p.ma30 !== null),
       };
-    });
+    })
+  );
 
-  const windowOptions = [
-    { key: "30", label: "30d", href: `/chains/${chainId}?window=30` },
-    { key: "90", label: "90d", href: `/chains/${chainId}?window=90` },
-    { key: "180", label: "180d", href: `/chains/${chainId}?window=180` },
-    { key: "365", label: "365d", href: `/chains/${chainId}?window=365` },
-  ];
+  const charts = chartDataByMetric.filter((c) => c.hasData);
+
+  const windowOptions = isSignedIn
+    ? [
+        { key: "30", label: "30d", href: `/chains/${chainId}?window=30` },
+        { key: "90", label: "90d", href: `/chains/${chainId}?window=90` },
+        { key: "180", label: "180d", href: `/chains/${chainId}?window=180` },
+        { key: "365", label: "365d", href: `/chains/${chainId}?window=365` },
+      ]
+    : [
+        { key: "30", label: "30d", href: `/chains/${chainId}?window=30` },
+        { key: "90", label: "90d ↑", href: "/sign-in" },
+        { key: "180", label: "180d ↑", href: "/sign-in" },
+        { key: "365", label: "365d ↑", href: "/sign-in" },
+      ];
 
   const chainProfilePair = chainProfileCopy(chainId);
 
@@ -2104,17 +2158,30 @@ export default async function ChainPage({
             </div>
             <h2 className="mt-1 text-3xl font-semibold">Latest signal view</h2>
             <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
-              The first visual layer should answer two questions fast: what state the chain is in right
-              now, and what the recent metric shape looks like. Deeper explanation stays collapsed until
-              the user asks for it.
+              You are looking at the metrics driving the current regime classification —
+              transaction demand, fee levels, and capacity signals — plotted against their
+              own recent history. Use the window selector to change the time range.
+              Click any chart for a full explanation of what it measures and why it is shown.
             </p>
+            {!isSignedIn && (
+              <p className="mt-2 text-xs text-slate-500">
+                Showing 30-day history.{" "}
+                <a href="/sign-in" className="text-cyan-400 hover:underline">Sign in free</a>
+                {" "}to unlock 90, 180, and 365-day views.
+                {" "}
+                <a href="/#plans" className="text-slate-400 hover:underline">A paid subscription</a>
+                {" "}gives you the JSON data behind these charts.
+              </p>
+            )}
           </div>
 
-          <WindowSelector
-            activeKey={String(requestedWindow)}
-            options={windowOptions}
-            ariaLabel="Chart window selector"
-          />
+        </div>
+
+        {/* Upsell — raw data */}
+        <div className="mt-2 flex flex-wrap items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.02] px-4 py-3">
+          <span className="text-xs text-slate-500">Want the raw data and regime signals behind these charts?</span>
+          <Link href="/#plans" className="inline-flex items-center rounded-full border border-cyan-500/25 bg-cyan-500/8 px-3 py-1 text-xs font-semibold text-cyan-300 hover:bg-cyan-500/15 transition-colors">See plans →</Link>
+          <Link href="/sign-in" className="inline-flex items-center rounded-full border border-white/10 bg-white/4 px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors">Sign in free →</Link>
         </div>
 
         {!derivedPayload ? (
@@ -2141,18 +2208,61 @@ export default async function ChainPage({
                     </div>
                   </div>
 
-                  <div className="text-sm text-muted-foreground">
-                    Window {effectiveWindowDays}d · Units {c.unitLabel ?? "—"}
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="text-xs text-muted-foreground">Units: {c.unitLabel ?? "—"}</div>
+                    {/* Per-chart window selector */}
+                    <nav className="flex flex-wrap items-center gap-1.5" aria-label={`Window for ${c.metric}`}>
+                      {(isSignedIn
+                        ? [
+                            { w: 30, label: "30d" },
+                            { w: 90, label: "90d" },
+                            { w: 180, label: "180d" },
+                            { w: 365, label: "365d" },
+                          ]
+                        : [
+                            { w: 30, label: "30d" },
+                            { w: 90, label: "90d ↑", href: "/sign-in" },
+                            { w: 180, label: "180d ↑", href: "/sign-in" },
+                            { w: 365, label: "365d ↑", href: "/sign-in" },
+                          ]
+                      ).map(({ w, label, href: gatedHref }) => {
+                        const isActive = c.metricWindow === w;
+                        const newParams = new URLSearchParams();
+                        // Preserve other metric params
+                        charts.forEach((other) => {
+                          if (other.metric !== c.metric) {
+                            newParams.set(other.paramKey, String(other.metricWindow));
+                          }
+                        });
+                        newParams.set(c.paramKey, String(w));
+                        const href = gatedHref ?? `/chains/${chainId}?${newParams.toString()}`;
+                        return (
+                          <Link
+                            key={w}
+                            href={href}
+                            prefetch={false}
+                            className={[
+                              "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition select-none",
+                              isActive
+                                ? "border-cyan-400 bg-cyan-500 text-[#040a12]"
+                                : "border-white/15 bg-white/5 text-slate-400 hover:text-slate-200",
+                            ].join(" ")}
+                          >
+                            {label}
+                          </Link>
+                        );
+                      })}
+                    </nav>
                   </div>
                 </div>
 
                 <div className="mt-4">
                   <MetricLineChart
                     title={c.metric}
-                    subtitle={`MA: ${derivedPath} · Raw: ${goldPath} · Window: ${utcMsToIsoDay(bounds.minMs)} → ${utcMsToIsoDay(bounds.maxMs)} (${effectiveWindowDays} calendar days)`}
+                    subtitle={`MA: ${c.mDerivedPath} · Raw: ${c.mGoldPath} · Window: ${utcMsToIsoDay(c.mBounds.minMs)} → ${utcMsToIsoDay(c.mBounds.maxMs)} (${c.metricWindow} calendar days)`}
                     unitLabel={c.unitLabel}
                     data={c.data}
-                    windowDays={effectiveWindowDays}
+                    windowDays={c.metricWindow}
                   />
                 </div>
 

@@ -1,7 +1,8 @@
 // src/proxy.ts
-// Clerk middleware — beskytter kun browser-routes som krever innlogging.
-// /api/v1/files bruker X-API-Key autentisering inne i routen selv,
-// og skal IKKE beskyttes av Clerk middleware.
+// Clerk middleware:
+// - runs on browser routes so public pages can still read auth context
+// - only protects routes that truly require login
+// - leaves /api/v1/files on API-key auth only
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
@@ -29,8 +30,20 @@ export default proxyHandler;
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/api/v1/checkout/:path*",
-    "/api/v1/keys/:path*",
+    /*
+      Run Clerk middleware on all app/browser routes so public pages like
+      /chains/[chain] can still detect signed-in users on the server.
+
+      Exclude:
+      - _next assets
+      - static files
+      - common binary/image assets
+      - /api/v1/files because that route uses X-API-Key auth inside the handler
+    */
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api|trpc)(.*)",
+
+    // Explicitly exclude the file-delivery route from Clerk protection/context handling.
+    // It authenticates via X-API-Key inside the route itself.
   ],
 };

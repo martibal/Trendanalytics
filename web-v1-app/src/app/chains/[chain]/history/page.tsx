@@ -424,6 +424,30 @@ export default async function ChainHistoryPage({
           </ul>
         </Section>
       </div>
+
+      {/* ── Upsell ── */}
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cyan-500/15 bg-cyan-500/5 px-5 py-4">
+        <div>
+          <div className="text-sm font-semibold text-white">
+            Want the JSON behind this track record?
+          </div>
+          <p className="mt-1 text-xs leading-5 text-slate-400">
+            Every label here is backed by a determinism hash and a full confidence score.
+            A Basic or Pro subscription gives you API access to the complete Meta JSON —
+            the data you see here, structured and ready to use in your own tools.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Link href="/sign-up"
+            className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10 transition-colors">
+            Sign up free →
+          </Link>
+          <Link href="/#plans"
+            className="inline-flex items-center rounded-full bg-cyan-500 px-4 py-2 text-xs font-black text-[#040a12] hover:bg-cyan-400 transition-colors">
+            See plans
+          </Link>
+        </div>
+      </div>
     </main>
   );
 }
