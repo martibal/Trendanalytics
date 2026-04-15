@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 const ATTRIBUTION_TEXT = "AWS Public Blockchain Data";
+const SUPPORT_EMAIL = "support@urdatlas.com";
+const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`;
 
 export default function SiteFooter() {
   return (
@@ -52,7 +54,11 @@ export default function SiteFooter() {
             <div className="text-sm font-semibold text-foreground">Attribution</div>
             <div className="mt-3 flex flex-col gap-2 text-sm text-muted-foreground">
               <div>{ATTRIBUTION_TEXT}</div>
-              <a href="mailto:contact@urdatlas.com" className="transition hover:text-foreground">
+              <a
+                href={SUPPORT_MAILTO}
+                className="transition hover:text-foreground"
+                aria-label={`Email ${SUPPORT_EMAIL}`}
+              >
                 Contact
               </a>
             </div>
