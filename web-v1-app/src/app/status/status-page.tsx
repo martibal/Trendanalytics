@@ -199,21 +199,16 @@ async function buildStatusRows(): Promise<StatusRow[]> {
       const meta = await readPublishedJson<MetaLatest>(
         `data/published/v1/meta/${chain.id}/latest.json`
       );
-      // Use meta.date as primary — this matches the date chain pages display
-      // updated_through can be one day behind meta.date causing lag to read one too many
-      const asOf = meta?.date ?? meta?.updated_through ?? meta?.regime?.asof_date ?? null;
-      // Compute lag dynamically at render time.
-      // Convention: data from yesterday = 1d lag (one publish cycle behind).
-      // Count days from as_of_date to yesterday (not today), so that data published
-      // yesterday shows as 1d and data from today shows as 0d.
+      const asOf = meta?.updated_through ?? meta?.regime?.asof_date ?? meta?.date ?? null;
+      // Compute lag dynamically at render time from as_of date vs UTC today
+      // This avoids using the stale lag_days_vs_utc_today field from JSON
+      // which was computed at publish time and becomes outdated as days pass.
       const lagDays = (() => {
         if (!asOf) return null;
         const asOfMs = new Date(asOf + "T00:00:00Z").getTime();
-        const now = new Date();
-        // Use yesterday as the reference point
-        const yesterdayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1);
-        const diff = Math.round((yesterdayMs - asOfMs) / 86400000);
-        return diff >= 0 ? diff : 0;
+        const todayMs = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z").getTime();
+        const diff = Math.round((todayMs - asOfMs) / 86400000);
+        return diff >= 0 ? diff : null;
       })();
       const delay = expectedDelayDays(chain.id);
       return {
