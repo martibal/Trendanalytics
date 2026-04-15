@@ -106,6 +106,9 @@ describe("app/dashboard/page", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: /billing management/i })
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/payments are temporarily disabled while business registration and production billing setup are being completed/i)
+    ).toBeInTheDocument();
 
     const client = screen.getByTestId("api-key-manager-client");
     expect(client).toBeInTheDocument();
@@ -186,7 +189,7 @@ describe("app/dashboard/page", () => {
 
     expect(
       screen.getByText(
-        /billing portal becomes available once the stripe customer and subscription linkage has been synced/i
+        /payments will be re-enabled once business registration, bank account setup, and live stripe configuration are complete/i
       )
     ).toBeInTheDocument();
   });

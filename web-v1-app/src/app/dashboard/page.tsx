@@ -1,7 +1,5 @@
 // src/app/dashboard/page.tsx
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import Stripe from "stripe";
 import { CHAIN_LIST } from "@/config/chains";
 import { getCurrentAccountView } from "@/lib/auth/account";
 import { getPersistedApiKeyDisplayRows } from "@/lib/auth/apiKeys";
@@ -102,25 +100,6 @@ function deriveLifecycleState(params: {
   };
 }
 
-function getStripeClient(): Stripe | null {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-
-  if (!secretKey) {
-    return null;
-  }
-
-  return new Stripe(secretKey);
-}
-
-function getAppOrigin(): string | null {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? null;
-
-  if (!appUrl) {
-    return null;
-  }
-
-  return appUrl.replace(/\/$/, "");
-}
 
 function boolPill(value: boolean, yes = "yes", no = "no") {
   return value ? (
@@ -135,29 +114,6 @@ function boolPill(value: boolean, yes = "yes", no = "no") {
 }
 
 export default async function DashboardPage() {
-  async function openBillingPortalAction() {
-    "use server";
-
-    const stripe = getStripeClient();
-    const accountView = await getCurrentAccountView();
-    const origin = getAppOrigin();
-
-    if (!stripe || !origin) {
-      redirect("/dashboard");
-    }
-
-    if (!accountView.isAuthenticated || !accountView.account?.stripeCustomerId) {
-      redirect("/dashboard");
-    }
-
-    const session = await stripe.billingPortal.sessions.create({
-      customer: accountView.account.stripeCustomerId,
-      return_url: `${origin}/dashboard?portal=return`,
-    });
-
-    redirect(session.url);
-  }
-
   const accountView = await getCurrentAccountView();
   const apiKeys = await getPersistedApiKeyDisplayRows(accountView.account?.accountId ?? null);
 
@@ -188,12 +144,7 @@ export default async function DashboardPage() {
       ? `${accountView.snapshot.maxWindowDays}d`
       : "Not set";
 
-  const billingReady =
-    accountView.authConfigured &&
-    accountView.isAuthenticated &&
-    !!accountView.account?.accountId &&
-    !!accountView.account?.stripeCustomerId &&
-    !!accountView.account?.stripeSubscriptionId;
+  const billingTemporarilyDisabled = true;
 
   const allowedWindows = [
     accountView.snapshot.maxWindowDays >= 0 ? "latest" : null,
@@ -514,36 +465,25 @@ export default async function DashboardPage() {
               <div>
                 <h2 className="text-lg font-semibold">Billing management</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Open Stripe Customer Portal to manage the active subscription, payment method, and invoices.
+                  Payments are temporarily disabled while business registration and production billing
+                  setup are being completed.
                 </p>
               </div>
-              <span className={statusBadgeClass(billingReady ? "active" : "inactive")}>
-                {billingReady ? "active" : "inactive"}
+              <span className={statusBadgeClass(billingTemporarilyDisabled ? "inactive" : "active")}>
+                inactive
               </span>
             </div>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <p>
-                Portal availability requires an authenticated user, a linked account record, and both{" "}
-                <code className="rounded bg-muted px-1.5 py-0.5 text-[12px]">stripeCustomerId</code> and{" "}
-                <code className="rounded bg-muted px-1.5 py-0.5 text-[12px]">stripeSubscriptionId</code>.
+                Billing links, Stripe checkout, and the customer portal are intentionally unavailable
+                in this pre-launch state.
               </p>
 
-              {billingReady ? (
-                <form action={openBillingPortalAction}>
-                  <button
-                    type="submit"
-                    className="inline-flex items-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/15"
-                  >
-                    Open billing portal
-                  </button>
-                </form>
-              ) : (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100/90">
-                  Billing portal becomes available once the Stripe customer and subscription linkage has
-                  been synced onto the authenticated account record.
-                </div>
-              )}
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100/90">
+                Payments will be re-enabled once business registration, bank account setup, and live
+                Stripe configuration are complete.
+              </div>
             </div>
           </section>
 

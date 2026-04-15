@@ -1,10 +1,12 @@
 // src/components/landing/Plans.tsx
 import { landingPlans, landingUseCases } from "@/lib/landing";
-import CheckoutButton from "@/components/landing/CheckoutButton";
 
 type PlansProps = {
   historyDepthDays?: number | null;
 };
+
+const inactiveCtaClass =
+  "inline-flex items-center rounded-full border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-black text-slate-500 opacity-70 cursor-not-allowed";
 
 export default function Plans({ historyDepthDays }: PlansProps) {
   return (
@@ -24,6 +26,10 @@ export default function Plans({ historyDepthDays }: PlansProps) {
           The public site lets you inspect the published surface. Paid plans unlock direct API
           access to Gold, Meta, and Derived JSON — structured and delivered daily.
         </p>
+        <div className="mt-4 inline-flex max-w-xl rounded-2xl border border-amber-500/20 bg-amber-500/8 px-4 py-3 text-xs leading-6 text-amber-100/85">
+          Payments are temporarily inactive while business registration is being finalized. You can
+          explore the full public site and documentation now, but checkout is not yet enabled.
+        </div>
       </div>
 
       {/* Use cases */}
@@ -76,16 +82,14 @@ export default function Plans({ historyDepthDays }: PlansProps) {
                   {plan.cta}
                 </a>
               ) : (
-                <CheckoutButton
-                  plan={plan.name.toLowerCase() as "basic" | "pro"}
-                  className={`inline-flex items-center rounded-full border px-6 py-2.5 text-sm font-black transition ${
-                    plan.name === "Pro"
-                      ? "border-purple-500/40 bg-purple-500/15 text-purple-200 hover:bg-purple-500/25"
-                      : "border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25"
-                  }`}
-                >
-                  {plan.cta}
-                </CheckoutButton>
+                <div>
+                  <button type="button" disabled aria-disabled="true" className={inactiveCtaClass}>
+                    Payments open soon
+                  </button>
+                  <div className="mt-2 text-[11px] leading-5 text-slate-500">
+                    Checkout is temporarily disabled for launch preparation.
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -109,12 +113,19 @@ export default function Plans({ historyDepthDays }: PlansProps) {
               Delivered as structured JSON via the same API endpoint.
             </p>
           </div>
-          <CheckoutButton
-            plan="history_addon"
-            className="shrink-0 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-semibold text-slate-300 hover:bg-white/10 transition"
-          >
-            Add full history →
-          </CheckoutButton>
+          <div className="shrink-0">
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-semibold text-slate-500 opacity-70 cursor-not-allowed"
+            >
+              Payments open soon
+            </button>
+            <div className="mt-2 text-right text-[11px] leading-5 text-slate-500">
+              History checkout is temporarily inactive.
+            </div>
+          </div>
         </div>
       </div>
 
