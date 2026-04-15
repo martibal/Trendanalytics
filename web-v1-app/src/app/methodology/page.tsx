@@ -1,42 +1,155 @@
 // src/app/methodology/page.tsx
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { currentDataSource } from "@/lib/storage";
+import "server-only";
+
+// ─── Primitives ───────────────────────────────────────────────────────────────
+
+function InlineCode({ children }: { children: ReactNode }) {
+  return (
+    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-slate-200">
+      {children}
+    </code>
+  );
+}
 
 function Section({
+  id,
+  eyebrow,
   title,
+  subtitle,
   children,
 }: {
+  id?: string;
+  eyebrow?: string;
   title: string;
-  children: React.ReactNode;
+  subtitle?: string;
+  children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border p-6">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="mt-3 space-y-3 text-sm leading-6 text-muted-foreground">
-        {children}
-      </div>
+    <section id={id} className="scroll-mt-24 rounded-3xl border p-6 shadow-sm">
+      {eyebrow && (
+        <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+          {eyebrow}
+        </div>
+      )}
+      <h2 className="mt-1 text-2xl font-semibold text-white">{title}</h2>
+      {subtitle && (
+        <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-400">{subtitle}</p>
+      )}
+      <div className="mt-5 space-y-4 text-sm leading-7 text-slate-300">{children}</div>
     </section>
   );
 }
 
-function InlineCode({ children }: { children: string }) {
-  return <code className="rounded bg-muted px-1 py-0.5">{children}</code>;
-}
-
-function KeyValue({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function Callout({ children, color = "cyan" }: { children: ReactNode; color?: "cyan" | "amber" | "emerald" }) {
+  const s = {
+    cyan: "border-cyan-500/20 bg-cyan-500/5",
+    amber: "border-amber-500/20 bg-amber-500/5",
+    emerald: "border-emerald-500/20 bg-emerald-500/5",
+  };
   return (
-    <div>
-      <span className="font-medium text-foreground">{label}:</span> {value}
+    <div className={`rounded-2xl border p-4 text-sm leading-7 text-slate-200 ${s[color]}`}>
+      {children}
     </div>
   );
 }
+
+function ThresholdTable() {
+  const rows = [
+    { band: "Extreme high", pct: "≥ 95th percentile", z: "≥ +2.5", color: "text-red-400" },
+    { band: "High", pct: "≥ 80th percentile", z: "≥ +1.5", color: "text-orange-300" },
+    { band: "Normal", pct: "20th – 80th percentile", z: "−1.5 to +1.5", color: "text-slate-300" },
+    { band: "Low", pct: "≤ 20th percentile", z: "≤ −1.5", color: "text-blue-300" },
+    { band: "Extreme low", pct: "≤ 5th percentile", z: "≤ −2.5", color: "text-blue-400" },
+  ];
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="border-b border-white/10">
+            <th className="text-left py-2 pr-6 text-xs font-bold uppercase tracking-wider text-slate-500">Band</th>
+            <th className="text-left py-2 pr-6 text-xs font-bold uppercase tracking-wider text-slate-500">Percentile (90d)</th>
+            <th className="text-left py-2 text-xs font-bold uppercase tracking-wider text-slate-500">Robust z-score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.band} className="border-b border-white/5">
+              <td className={`py-2 pr-6 font-semibold ${r.color}`}>{r.band}</td>
+              <td className="py-2 pr-6 text-slate-300">{r.pct}</td>
+              <td className="py-2 font-mono text-slate-300">{r.z}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function RegimeTable() {
+  const rows = [
+    {
+      label: "STABLE",
+      color: "text-emerald-400",
+      border: "border-emerald-500/20 bg-emerald-500/5",
+      plain: "Conditions look broadly normal relative to recent history. No axis shows sustained unusual pressure.",
+      technical: "Demand, Friction, and Capacity axes all within Normal bands, or mixed signals that do not meet HEATING, CONGESTED, or CHEAP thresholds. Confidence ≥ 0.40.",
+    },
+    {
+      label: "HEATING",
+      color: "text-yellow-300",
+      border: "border-yellow-400/20 bg-yellow-400/5",
+      plain: "Demand looks stronger than usual and the recent direction still points upward — activity appears to be building, not just spiking.",
+      technical: "Demand axis in High band AND at least one relevant axis trend is HEATING (MA7 running ahead of MA30). Level alone is insufficient — requires directional persistence.",
+    },
+    {
+      label: "CONGESTED",
+      color: "text-red-400",
+      border: "border-red-500/20 bg-red-500/5",
+      plain: "The chain appears to be under real capacity pressure. Fees are elevated and blocks are filling up relative to this chain's own recent range.",
+      technical: "Capacity or Friction axis in Extreme High band, OR combined pressure across multiple axes. Strongest evidence state. Typically coincides with high z-scores on fee and utilization metrics.",
+    },
+    {
+      label: "CHEAP",
+      color: "text-blue-400",
+      border: "border-blue-500/20 bg-blue-500/5",
+      plain: "Fees and demand are materially below this chain's recent norms. The network looks lightly loaded.",
+      technical: "Demand and Friction axes both in Low or Extreme Low bands. Capacity looks unconstrained. MA7 running below MA30 on primary signals.",
+    },
+    {
+      label: "UNKNOWN / DEGRADED",
+      color: "text-slate-400",
+      border: "border-white/10 bg-white/5",
+      plain: "The published evidence is not strong enough to support a named label. This is shown instead of guessing.",
+      technical: "Confidence score < 0.40. Triggered by missing data, coverage gaps, or insufficient signal quality. Never silently promoted to a named regime.",
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      {rows.map((r) => (
+        <div key={r.label} className={`rounded-2xl border p-4 ${r.border}`}>
+          <div className={`text-sm font-black uppercase tracking-wider ${r.color}`}>{r.label}</div>
+          <div className="mt-2 grid gap-3 lg:grid-cols-2">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">In plain language</div>
+              <p className="text-xs leading-5 text-slate-300">{r.plain}</p>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Technical condition</div>
+              <p className="text-xs leading-5 text-slate-400">{r.technical}</p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function MethodologyPage() {
   const dataset: DatasetManifest | null = await readDatasetManifest();
@@ -47,354 +160,582 @@ export default async function MethodologyPage() {
       ? dataset.supported_chains
       : [];
 
-  const supportedGenres = Array.isArray(dataset?.supported_genres)
-    ? dataset.supported_genres
-    : [];
-
-  const supportedWindows = Array.isArray(dataset?.windows_supported)
-    ? dataset.windows_supported
-    : [];
-
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
-      <header className="mb-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Methodology</h1>
-            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              This page explains what the product publishes, how those published
-              outputs are intended to be read, and where the main descriptive
-              labels come from. It is a methodology and interpretation page, not a
-              strategy page.
-            </p>
+
+      {/* Header */}
+      <header className="mb-10">
+        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8">
+          <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">Methodology</div>
+          <h1 className="mt-3 text-4xl font-semibold leading-tight text-white sm:text-5xl">
+            How the classification works
+          </h1>
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
+            A complete explanation of the pipeline — from raw blockchain data to published
+            regime label. Written for both first-time readers and technical reviewers.
+          </p>
+
+          {/* Table of contents */}
+          <div className="mt-6 rounded-2xl border border-white/10 bg-black/10 p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Contents</div>
+            <div className="grid gap-1 sm:grid-cols-2 text-sm">
+              {[
+                ["#what-it-does", "1. What this product does"],
+                ["#data-inputs", "2. Data inputs and sources"],
+                ["#baseline", "3. The 180-day chain-relative baseline"],
+                ["#z-score", "4. Robust z-score normalization"],
+                ["#thresholds", "5. Banding thresholds"],
+                ["#persistence", "6. Persistence filter"],
+                ["#axes", "7. The three axes — Demand, Friction, Capacity"],
+                ["#labels", "8. Regime labels — all five explained"],
+                ["#confidence", "9. Confidence scoring and the publish gate"],
+                ["#determinism", "10. Determinism hash and reproducibility"],
+                ["#boundary", "11. Interpretation boundary"],
+                ["#traceability", "12. Versioning and traceability"],
+              ].map(([href, label]) => (
+                <a key={href} href={href} className="text-cyan-200 hover:underline py-0.5">{label}</a>
+              ))}
+            </div>
           </div>
 
-          <div className="rounded-xl border px-4 py-3 text-sm">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Published context
-            </div>
-            <div className="mt-1 font-medium text-foreground">
-              Dataset: {dataset?.version ?? "—"}
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Methodology: {dataset?.methodology_version ?? "—"}
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Data source: {currentDataSource()}
-            </div>
+          {/* Dataset context */}
+          <div className="mt-5 flex flex-wrap gap-4 text-xs text-slate-500">
+            <span>Methodology version: <span className="text-slate-300">{dataset?.methodology_version ?? "v1.0"}</span></span>
+            <span>Dataset: <span className="text-slate-300">{dataset?.version ?? "—"}</span></span>
+            <span>Chains: <span className="text-slate-300">{supportedChains.length > 0 ? supportedChains.join(", ") : "bitcoin, ethereum, arbitrum, base"}</span></span>
           </div>
         </div>
       </header>
 
-      <div className="grid gap-6">
-        <Section title="What this product is actually doing">
-          <p>
-            Urd Atlas is a <strong>descriptive on-chain interpretation layer</strong>.
-            It does not publish price targets, trade signals, or portfolio advice.
-            Instead, it takes published chain metrics and turns them into a more
-            readable view of current operating conditions.
-          </p>
-          <p>
-            In practice, the product tries to answer questions like:
-          </p>
-          <ul className="list-disc pl-5">
-            <li>Does the chain currently look closer to normal conditions or a more unusual state?</li>
-            <li>Do current readings look more like rising pressure, congestion, cheap conditions, or a stable baseline?</li>
-            <li>How much published evidence supports the current label?</li>
-            <li>Is the latest row current, delayed, or degraded?</li>
-          </ul>
-        </Section>
+      <div className="grid gap-8">
 
-        <Section title="Interpretation boundary">
+        {/* 1. What it does */}
+        <Section
+          id="what-it-does"
+          eyebrow="Chapter 1"
+          title="What this product does"
+          subtitle="The single question the pipeline tries to answer every day."
+        >
           <p>
-            The entire product is meant to remain descriptive. That means it may
-            describe persistence, unusual values, regime context, degraded states,
-            confidence, lag, and historical comparison — but it should not imply
-            buy, sell, hold, rebalance, hedge, forecasting, or portfolio guidance.
+            Urd Atlas reads raw blockchain data every day and publishes an answer to one descriptive
+            question: <strong className="text-white">does this chain currently look normal, or is something
+            meaningfully changing relative to its own recent history?</strong>
           </p>
           <p>
-            A useful way to think about the boundary is: the product explains what
-            the published data currently looks like and how that compares with recent
-            history. It does not tell the user what to do about it.
+            The answer is published as a regime label (STABLE, HEATING, CONGESTED, CHEAP, or
+            UNKNOWN/DEGRADED), a confidence score, a three-axis scorecard, and a ranked set of driver
+            signals showing which metrics are doing the explanatory work.
           </p>
-        </Section>
-
-        <Section title="Published artifact model">
+          <Callout color="amber">
+            <span className="font-semibold text-white">What this product is not:</span> it does not
+            publish price data, forecasts, trade signals, or portfolio advice. Every output is
+            strictly descriptive — it describes current on-chain network state relative to recent
+            history. It does not tell you what to do about it.
+          </Callout>
           <p>
-            The website reads canonical published artifacts from{" "}
-            <InlineCode>/public/data/published/v1</InlineCode>. The public site is
-            a presentation layer on top of those artifacts and should not silently
-            recompute hidden model state in the browser.
-          </p>
-          <p>Core published layers are:</p>
-          <ul className="list-disc pl-5">
-            <li>
-              <span className="font-medium text-foreground">Gold</span>: the base
-              descriptive published metric layer, such as activity, fees, block
-              behavior, and other raw chain measurements.
-            </li>
-            <li>
-              <span className="font-medium text-foreground">Derived</span>: published
-              trend-support fields such as rolling averages that help place the latest
-              daily reading in short-term and medium-term context.
-            </li>
-            <li>
-              <span className="font-medium text-foreground">Meta</span>: the interpretive
-              layer containing status, confidence, scorecard, drivers, freshness context,
-              and explanatory structure.
-            </li>
-          </ul>
-          <p>
-            The product’s most readable “what does this mean?” surfaces usually come
-            from the <InlineCode>meta</InlineCode> layer, but they remain traceable to
-            the underlying published Gold and Derived layers.
+            The classification is <strong className="text-white">chain-relative</strong>. HEATING on
+            Ethereum means Ethereum is running hotter than Ethereum normally does — not hotter than
+            Bitcoin. Each chain is evaluated against its own historical baseline, so labels are
+            comparable within a chain over time, but not directly comparable across chains.
           </p>
         </Section>
 
-        <Section title="Versioning and traceability">
+        {/* 2. Data inputs */}
+        <Section
+          id="data-inputs"
+          eyebrow="Chapter 2"
+          title="Data inputs and sources"
+          subtitle="What the pipeline reads, where it comes from, and what gets published as Gold JSON."
+        >
           <p>
-            Published output should always be interpreted in the context of the
-            currently published methodology version and the relevant dataset revision
-            state.
+            The pipeline reads from <strong className="text-white">AWS Public Blockchain Data</strong> —
+            a publicly available dataset of daily aggregated chain metrics. Every input is independently
+            verifiable against any blockchain explorer.
           </p>
-          <div className="grid gap-2">
-            <KeyValue label="Dataset version" value={dataset?.version ?? "—"} />
-            <KeyValue label="Published at" value={dataset?.published_at ?? "—"} />
-            <KeyValue label="Methodology version" value={dataset?.methodology_version ?? "—"} />
-            <KeyValue
-              label="Supported chains"
-              value={supportedChains.length > 0 ? supportedChains.join(", ") : "—"}
-            />
-            <KeyValue
-              label="Supported genres"
-              value={supportedGenres.length > 0 ? supportedGenres.join(", ") : "—"}
-            />
-            <KeyValue
-              label="Supported windows"
-              value={
-                supportedWindows.length > 0
-                  ? supportedWindows.map((value) => `${value}d`).join(", ")
-                  : "—"
-              }
-            />
+
+          <div className="rounded-2xl border bg-white/[0.02] p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Gold JSON fields — published daily per chain</div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                { field: "tx_count_daily", desc: "Total confirmed transactions per day" },
+                { field: "median_tx_fee_native", desc: "Typical cost per transaction in native units" },
+                { field: "gas_utilization_pct", desc: "Block fullness as % of capacity (EVM chains only)" },
+                { field: "unique_active_addresses", desc: "Count of addresses active on the given day" },
+                { field: "avg_block_time_sec", desc: "Average time between blocks in seconds" },
+                { field: "failed_tx_rate", desc: "Share of transactions that failed (EVM chains)" },
+                { field: "avg_gas_per_tx", desc: "Average gas units consumed per transaction" },
+                { field: "median_gas_price", desc: "Typical gas price in native units" },
+              ].map(({ field, desc }) => (
+                <div key={field} className="flex gap-2">
+                  <InlineCode>{field}</InlineCode>
+                  <span className="text-xs text-slate-400">{desc}</span>
+                </div>
+              ))}
+            </div>
           </div>
+
           <p>
-            Historical changes to methodology should be visible through revision-aware
-            surfaces such as Track Record and <Link href="/methodology/previously" className="underline">/methodology/previously</Link>,
-            rather than being silently blended away.
+            Not every field is published for every chain. Bitcoin does not use EVM gas semantics, so
+            <InlineCode>gas_utilization_pct</InlineCode>, <InlineCode>failed_tx_rate</InlineCode>,
+            and related fields are intentionally suppressed for BTC. Each chain has a profile that
+            defines which metrics are active and which are hidden. This is documented in the
+            chain-specific profile inside each Meta JSON artifact.
+          </p>
+
+          <Callout>
+            <span className="font-semibold text-white">Gold JSON is the canonical source.</span>{" "}
+            Meta and Derived are always built from Gold. If you want to verify any published
+            classification, you can trace it back to the corresponding Gold artifact.
+          </Callout>
+        </Section>
+
+        {/* 3. Baseline */}
+        <Section
+          id="baseline"
+          eyebrow="Chapter 3"
+          title="The 180-day chain-relative baseline"
+          subtitle="Why the comparison window is 180 days and why it uses the chain's own history."
+        >
+          <p>
+            Every metric is scored relative to a <strong className="text-white">rolling 180-day
+            baseline</strong> — the 180 most recently published daily values for that metric on that
+            chain. This window is long enough to capture meaningful seasonal and structural variation,
+            but short enough that the baseline adapts as chain conditions evolve over months.
+          </p>
+          <p>
+            The baseline is <strong className="text-white">chain-specific</strong>. Bitcoin's baseline
+            is computed from Bitcoin's own 180-day history. Ethereum's baseline is computed from
+            Ethereum's own 180-day history. There is no universal cross-chain benchmark.
+            This is deliberate — it means a label of HEATING on Arbitrum reflects whether Arbitrum
+            is unusually active for Arbitrum, not whether it is as busy as Ethereum.
+          </p>
+
+          <div className="rounded-2xl border bg-white/[0.02] p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Why 180 days specifically</div>
+            <div className="grid gap-3 lg:grid-cols-3">
+              {[
+                { title: "Captures real cycles", desc: "180 days covers roughly two quarters — enough to include multiple network usage cycles without anchoring to a single event." },
+                { title: "Adapts over time", desc: "A rolling window means the baseline shifts forward every day. A market event from 7 months ago gradually leaves the window." },
+                { title: "Not too short", desc: "A 30-day baseline would be dominated by recent conditions and would produce excessively volatile regime changes." },
+              ].map((item) => (
+                <div key={item.title} className="rounded-xl border border-white/6 bg-white/[0.02] p-4">
+                  <div className="text-xs font-bold text-white mb-1">{item.title}</div>
+                  <p className="text-xs leading-5 text-slate-400">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Section>
+
+        {/* 4. Z-score */}
+        <Section
+          id="z-score"
+          eyebrow="Chapter 4"
+          title="Robust z-score normalization"
+          subtitle="How each metric is converted from a raw number into a comparable signal."
+        >
+          <p>
+            Raw values are not directly comparable across metrics or chains. A transaction count of
+            500,000 might be high for one chain and low for another. To make signals comparable,
+            every metric is normalized using a <strong className="text-white">robust z-score</strong>
+            based on the 180-day baseline.
+          </p>
+
+          <div className="rounded-2xl border bg-black/30 p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">The formula</div>
+            <div className="font-mono text-sm text-cyan-300">
+              z_robust = (x − median) / (MAD × 1.4826)
+            </div>
+            <div className="mt-4 grid gap-3 text-xs">
+              {[
+                { term: "x", def: "Today's observed value for the metric" },
+                { term: "median", def: "The median of the 180-day baseline for this metric on this chain" },
+                { term: "MAD", def: "Median Absolute Deviation — the median of |x − median| over the 180-day baseline" },
+                { term: "1.4826", def: "Scaling constant that makes MAD comparable to standard deviation for normally distributed data" },
+              ].map(({ term, def }) => (
+                <div key={term} className="flex gap-3">
+                  <code className="shrink-0 text-amber-300 w-20">{term}</code>
+                  <span className="text-slate-400">{def}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p>
+            The use of <strong className="text-white">median and MAD</strong> instead of mean and
+            standard deviation makes the normalization resistant to outliers. A single extreme day
+            in the 180-day window will not distort the baseline significantly, because median and MAD
+            are both robust to individual extreme values.
+          </p>
+
+          <p>
+            The resulting z-score tells you: <em>how many scaled standard deviations is today's reading
+            above or below the chain's own recent median?</em> A z-score of +2.0 means today's value is
+            unusually high for this chain. A z-score of −1.5 means it is unusually low. Zero means it
+            is exactly at the 180-day median.
+          </p>
+
+          <Callout>
+            <span className="font-semibold text-white">A tanh compression is applied.</span>{" "}
+            The raw z-score is compressed through a hyperbolic tangent function before being used in
+            the scorecard. This keeps extreme outliers from dominating the composite score while
+            preserving the sign and relative magnitude of signals.
+          </Callout>
+        </Section>
+
+        {/* 5. Thresholds */}
+        <Section
+          id="thresholds"
+          eyebrow="Chapter 5"
+          title="Banding thresholds"
+          subtitle="The canonical published values that define when a signal is considered High, Normal, or Low."
+        >
+          <p>
+            After z-score normalization, each signal is assigned to a band based on two criteria:
+            its <strong className="text-white">90-day percentile rank</strong> and its
+            <strong className="text-white"> robust z-score</strong>. Both thresholds must be met
+            for a band assignment.
+          </p>
+
+          <ThresholdTable />
+
+          <p className="text-xs text-slate-500">
+            These are the canonical default thresholds. They are published at{" "}
+            <Link href="/thresholds" className="text-cyan-400 hover:underline">/thresholds</Link>{" "}
+            and versioned in the methodology archive.
+          </p>
+
+          <Callout color="amber">
+            <span className="font-semibold text-white">Both conditions must hold.</span>{" "}
+            A metric must meet both the percentile threshold AND the z-score threshold to enter a
+            band. Meeting only one is insufficient. This dual-gate reduces false band assignments
+            caused by a single outlier in either measure.
+          </Callout>
+        </Section>
+
+        {/* 6. Persistence filter */}
+        <Section
+          id="persistence"
+          eyebrow="Chapter 6"
+          title="The persistence filter"
+          subtitle="Why a single-day spike does not become a regime change."
+        >
+          <p>
+            Band assignments from a single day are not sufficient for a regime label. The pipeline
+            applies a <strong className="text-white">persistence filter</strong> that requires a
+            signal to persist across a minimum number of days before it contributes to a regime change.
+          </p>
+
+          <div className="rounded-2xl border bg-white/[0.02] p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">How persistence is measured</div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div>
+                <div className="text-xs font-bold text-white mb-2">Minimum persistence days</div>
+                <p className="text-xs leading-5 text-slate-400">
+                  The canonical default is <strong className="text-white">3 days</strong>. A signal
+                  must appear in the elevated band for at least 3 consecutive published days before
+                  it is treated as a persistent condition.
+                </p>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-white mb-2">MA7 vs MA30 momentum</div>
+                <p className="text-xs leading-5 text-slate-400">
+                  The 7-day moving average is compared to the 30-day moving average. When MA7 is
+                  running ahead of MA30, the signal is directionally confirmed. This is the
+                  "momentum" field in the published driver rows.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <p>
+            This means a single-day event — a flash spike in fees, an unusual block — will not
+            by itself change the regime label. The model waits for the signal to appear consistently
+            across multiple days and across the MA7/MA30 comparison before treating it as structural.
+          </p>
+          <p>
+            The practical implication is that Urd Atlas regime labels are <strong className="text-white">
+            deliberately lagging</strong>. They do not react to the first sign of change. They confirm
+            that a change looks persistent before publishing it as a named regime. This is a feature,
+            not a bug — it reduces false positives at the cost of some responsiveness.
           </p>
         </Section>
 
-        <Section title="How to read a chain page">
+        {/* 7. Axes */}
+        <Section
+          id="axes"
+          eyebrow="Chapter 7"
+          title="The three axes — Demand, Friction, Capacity"
+          subtitle="How individual metrics are grouped into dimensions before producing a regime label."
+        >
           <p>
-            Each chain page combines the latest published Meta artifact with canonical
-            Gold and Derived bundles. The intended reading order is:
+            Individual metric z-scores are grouped into three axes. Each axis aggregates the evidence
+            from its assigned metrics into a composite score (0–100, where 50 is neutral) and an
+            evidence band (Normal, High, Low, etc.).
           </p>
-          <ol className="list-decimal pl-5">
-            <li>Check freshness and the as-of date.</li>
-            <li>Read the published regime label and one-line summary.</li>
-            <li>Check confidence and lag context.</li>
-            <li>Inspect scorecard axes and driver rows to see what supports the label.</li>
-            <li>Use history and Track Record to compare the present state with earlier published states.</li>
-          </ol>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            {[
+              {
+                axis: "Demand",
+                color: "text-cyan-300",
+                border: "border-cyan-500/20 bg-cyan-500/5",
+                question: "How much usage pressure is the chain carrying?",
+                metrics: ["tx_count_daily", "unique_active_addresses"],
+                plain: "Demand is high when the chain is being used more than usual. It reflects how much activity the network is absorbing.",
+                tech: "Primarily driven by tx_count_daily and unique_active_addresses. Both metrics must show elevated z-scores and percentiles for Demand to reach a high band.",
+              },
+              {
+                axis: "Friction",
+                color: "text-orange-300",
+                border: "border-orange-500/20 bg-orange-500/5",
+                question: "How costly or difficult is it to use the chain right now?",
+                metrics: ["median_tx_fee_native", "failed_tx_rate"],
+                plain: "Friction is high when it is expensive or unreliable to transact. Elevated fees and high failure rates both contribute.",
+                tech: "Driven by median_tx_fee_native and failed_tx_rate (where published). For Bitcoin, fee burden is proxied differently since failed_tx_rate is not applicable.",
+              },
+              {
+                axis: "Capacity",
+                color: "text-purple-300",
+                border: "border-purple-500/20 bg-purple-500/5",
+                question: "How constrained is the chain relative to its own range?",
+                metrics: ["gas_utilization_pct", "avg_block_time_sec"],
+                plain: "Capacity is tight when blocks are nearly full or block production is becoming irregular. It reflects how close the chain is to its throughput ceiling.",
+                tech: "For EVM chains, gas_utilization_pct is the primary signal. For Bitcoin, blocktime instability is used as a capacity proxy since gas utilization is not applicable.",
+              },
+            ].map((a) => (
+              <div key={a.axis} className={`rounded-2xl border p-5 ${a.border}`}>
+                <div className={`text-base font-bold ${a.color}`}>{a.axis}</div>
+                <p className="mt-2 text-xs leading-5 text-slate-400 italic">{a.question}</p>
+                <div className="mt-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Primary metrics</div>
+                  <div className="flex flex-wrap gap-1">
+                    {a.metrics.map((m) => <InlineCode key={m}>{m}</InlineCode>)}
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Plain language</div>
+                  <p className="text-xs leading-5 text-slate-300">{a.plain}</p>
+                </div>
+                <div className="mt-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Technical</div>
+                  <p className="text-xs leading-5 text-slate-400">{a.tech}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <p>
-            This order matters because confidence, lag, and drivers explain how much
-            weight the user should put on the visible label and what kinds of signals
-            are currently doing the explanatory work.
+            The scorecard score for each axis is normalized to 0–100 with 50 as neutral. A score
+            above 50 means the axis looks more pressured or elevated than usual; below 50 means
+            it looks softer. The score is pulled toward 50 when confidence is low — weak evidence
+            should not produce extreme scorecard numbers.
           </p>
         </Section>
 
-        <Section title="Regime labels">
+        {/* 8. Labels */}
+        <Section
+          id="labels"
+          eyebrow="Chapter 8"
+          title="Regime labels — all five explained"
+          subtitle="What each label means, in plain language and in technical terms."
+        >
+          <RegimeTable />
+
+          <Callout color="amber">
+            <span className="font-semibold text-white">Labels are chain-relative and descriptive.</span>{" "}
+            HEATING on Bitcoin means Bitcoin is running hotter than Bitcoin normally does. It says
+            nothing about what Bitcoin's price will do. It is not a signal to buy, sell, or act.
+            It is a description of the current network state relative to recent history.
+          </Callout>
+        </Section>
+
+        {/* 9. Confidence */}
+        <Section
+          id="confidence"
+          eyebrow="Chapter 9"
+          title="Confidence scoring and the publish gate"
+          subtitle="How the model decides whether the evidence is strong enough to publish a named label."
+        >
           <p>
-            The regime label is the product’s compact description of the chain’s
-            current published state. It is not a prediction of what happens next.
+            Before any named regime label is published, the pipeline calculates a
+            <strong className="text-white"> confidence score</strong> (0–1) that reflects the quality
+            and sufficiency of the available evidence. If confidence falls below the publish gate,
+            the model publishes <InlineCode>UNKNOWN/DEGRADED</InlineCode> instead of a named label.
           </p>
-          <ul className="list-disc pl-5">
-            <li><strong className="text-foreground">STABLE</strong>: conditions look closer to the chain’s usual recent operating range.</li>
-            <li><strong className="text-foreground">HEATING</strong>: pressure appears to be building relative to recent history.</li>
-            <li><strong className="text-foreground">CONGESTED</strong>: conditions look materially tighter or more pressured than usual.</li>
-            <li><strong className="text-foreground">CHEAP</strong>: conditions look softer, looser, or lower-pressure relative to recent history.</li>
-            <li><strong className="text-foreground">UNKNOWN/DEGRADED</strong>: the currently published evidence is not strong enough to support a normal-confidence regime label.</li>
-          </ul>
+
+          <div className="rounded-2xl border bg-white/[0.02] p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Confidence components</div>
+            <div className="space-y-2">
+              {[
+                { field: "current_row_coverage", desc: "What fraction of expected metrics are present in today's Gold row" },
+                { field: "recent_metric_coverage", desc: "Coverage quality over the recent window, not just today" },
+                { field: "history_depth", desc: "Whether the 180-day baseline has enough data to be reliable" },
+                { field: "recent_density", desc: "How many of the recent days have published data (gaps reduce this)" },
+                { field: "freshness_asof", desc: "How current the data is relative to the expected publication cadence" },
+              ].map(({ field, desc }) => (
+                <div key={field} className="flex gap-3 items-start">
+                  <InlineCode>{field}</InlineCode>
+                  <span className="text-xs leading-5 text-slate-400">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border bg-white/[0.02] p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Confidence bands</div>
+            <div className="space-y-2">
+              {[
+                { range: "≥ 0.70", label: "Good", color: "text-emerald-400", desc: "Strong evidence. Label is well-supported." },
+                { range: "0.40 – 0.70", label: "Caution", color: "text-amber-300", desc: "Sufficient to publish, but read with more care. Some components are weaker." },
+                { range: "< 0.40", label: "UNKNOWN/DEGRADED", color: "text-slate-400", desc: "Below the publish gate. No named label is published. This is shown instead." },
+              ].map(({ range, label, color, desc }) => (
+                <div key={range} className="flex items-start gap-4">
+                  <span className="shrink-0 font-mono text-xs text-slate-400 w-20">{range}</span>
+                  <span className={`shrink-0 text-xs font-bold w-36 ${color}`}>{label}</span>
+                  <span className="text-xs text-slate-400">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <p>
-            These labels are meant to help a user read the present state more quickly.
-            They are descriptive summaries of the current published evidence, not
-            hidden forecasts.
+            The confidence gate is one of the most important design decisions in the product. It means
+            the model would rather say "I don't know" than publish a weak label as if it were strong
+            evidence. A low-confidence state is informative in itself — it tells you that the current
+            data does not support a firm classification.
           </p>
         </Section>
 
-        <Section title="Confidence, lag, and degraded states">
+        {/* 10. Determinism hash */}
+        <Section
+          id="determinism"
+          eyebrow="Chapter 10"
+          title="Determinism hash and reproducibility"
+          subtitle="How every published label is anchored to its exact inputs."
+        >
           <p>
-            Confidence and lag are related, but they are not the same thing.
+            Every published Meta artifact includes a <strong className="text-white">determinism
+            hash</strong> — a SHA-256 fingerprint computed from the exact inputs that produced that
+            day's classification. The hash is included in the JSON as{" "}
+            <InlineCode>regime.determinism_hash</InlineCode>.
           </p>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border bg-white/[0.02] p-4">
+              <div className="text-xs font-bold text-white mb-2">What the hash covers</div>
+              <ul className="text-xs leading-6 text-slate-400 list-disc pl-4">
+                <li>The Gold input values used for that day</li>
+                <li>The 180-day baseline used for normalization</li>
+                <li>The threshold parameters in effect</li>
+                <li>The methodology version</li>
+              </ul>
+            </div>
+            <div className="rounded-2xl border bg-white/[0.02] p-4">
+              <div className="text-xs font-bold text-white mb-2">What the hash enables</div>
+              <ul className="text-xs leading-6 text-slate-400 list-disc pl-4">
+                <li>Verify that a past label was not retroactively changed</li>
+                <li>Confirm that two systems received the same published artifact</li>
+                <li>Audit any past classification against the original inputs</li>
+              </ul>
+            </div>
+          </div>
+
           <p>
-            <strong className="text-foreground">Confidence</strong> is an evidence score for
-            the current published label. It should be read as “how much published data
-            and internal signal structure support this label right now?” It is not a
-            prediction score and not the probability that a label will persist.
+            The Track Record page displays historical labels alongside their determinism hashes.
+            Every past date in the archive can be checked — the label shown is what the pipeline
+            actually published on that day, not a reconstruction.
           </p>
-          <p>
-            <strong className="text-foreground">Lag</strong> is a freshness measure. It tells
-            the user how far the published row sits behind the current reference point.
-            A row can be on schedule but still low-confidence, and a row can be delayed
-            without being mathematically invalid.
-          </p>
-          <p>
-            In the current reading model:
-          </p>
-          <ul className="list-disc pl-5">
-            <li>Values below the canonical 0.40 publish floor should be treated as <InlineCode>UNKNOWN/DEGRADED</InlineCode>.</li>
-            <li>Values from 0.40 to 0.70 still support a published label, but with more caution.</li>
-            <li>Values above 0.70 indicate stronger support from the published evidence.</li>
-          </ul>
-          <p>
-            Some chains, especially L2s, may also carry an expected publication lag
-            relative to BTC and ETH. Slower cadence does not automatically mean broken data.
-          </p>
+          <div className="mt-2">
+            <Link href="/track-record" className="text-cyan-400 hover:underline text-sm">
+              Browse the track record →
+            </Link>
+          </div>
         </Section>
 
-        <Section title="Scorecard and drivers">
+        {/* 11. Boundary */}
+        <Section
+          id="boundary"
+          eyebrow="Chapter 11"
+          title="Interpretation boundary"
+          subtitle="What the product is, and what it deliberately is not."
+        >
           <p>
-            The scorecard is a descriptive decomposition of the current published state
-            into axes such as Demand, Friction, and Capacity.
+            Every output from Urd Atlas is <strong className="text-white">descriptive</strong>. The
+            product describes current on-chain network state relative to recent history. It does not
+            tell you what those conditions imply for prices, returns, or any other financial outcome.
           </p>
-          <p>
-            A practical interpretation is:
-          </p>
-          <ul className="list-disc pl-5">
-            <li><strong className="text-foreground">Demand</strong>: how much usage pressure the chain appears to be carrying.</li>
-            <li><strong className="text-foreground">Friction</strong>: how costly, tight, or execution-difficult the current state appears to be.</li>
-            <li><strong className="text-foreground">Capacity</strong>: how constrained or unconstrained the chain appears relative to its recent operating range.</li>
-          </ul>
-          <p>
-            Drivers are the “because” layer under the scorecard and regime label. They
-            highlight which specific published metrics currently stand out most strongly
-            relative to recent history, so the user can see what is pushing the current state.
-          </p>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+              <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">What this product does</div>
+              <ul className="text-xs leading-6 text-slate-300 list-disc pl-4">
+                <li>Describes current network conditions relative to recent history</li>
+                <li>Classifies conditions into a stable regime vocabulary</li>
+                <li>Quantifies evidence quality through confidence scoring</li>
+                <li>Shows which metrics are driving the current classification</li>
+                <li>Maintains a verifiable historical record of published labels</li>
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+              <div className="text-xs font-bold text-red-400 uppercase tracking-wider mb-2">What this product does not do</div>
+              <ul className="text-xs leading-6 text-slate-300 list-disc pl-4">
+                <li>Publish price data or price targets</li>
+                <li>Forecast what conditions will look like tomorrow</li>
+                <li>Recommend buying, selling, or any portfolio action</li>
+                <li>Imply that a regime label predicts asset returns</li>
+                <li>Recompute or adjust published outputs after the fact</li>
+              </ul>
+            </div>
+          </div>
+
+          <Callout>
+            <span className="font-semibold text-white">The causal relationship between on-chain network state and asset price is contested.</span>{" "}
+            HEATING on Ethereum does not imply a positive ETH return. Analysts who want to use
+            regime context alongside price views are expected to do that synthesis themselves.
+            This product does not do it on their behalf.
+          </Callout>
         </Section>
 
-        <Section title="Derived fields">
+        {/* 12. Traceability */}
+        <Section
+          id="traceability"
+          eyebrow="Chapter 12"
+          title="Versioning and traceability"
+          subtitle="How methodology changes are documented and where to find historical definitions."
+        >
           <p>
-            Derived fields are published trend-support artifacts rather than advisory
-            indicators. They help the user compare the latest daily reading with
-            recent smoothed context such as 7-day and 30-day behavior.
+            When the methodology changes, the change is documented in the methodology version archive.
+            Older definitions are preserved — they are never silently overwritten. If you are working
+            with historical data, you can always find what the product's definitions were at the time
+            of publication.
           </p>
-          <p>
-            This is useful because a single day can move sharply without representing
-            a persistent change. Derived windows help the user see whether the latest
-            reading is isolated or part of a broader move.
-          </p>
-          <p>
-            The public site should therefore use canonical published bundles for the
-            selected window rather than searching alternative files or repairing missing
-            rows at runtime.
-          </p>
-        </Section>
 
-        <Section title="Freshness and publication model">
-          <p>
-            The product is publication-driven. Public status, chain pages, Track Record,
-            and related surfaces should present what has actually been published, along
-            with freshness and lag context where relevant.
-          </p>
-          <p>
-            Runtime behavior should not fabricate unpublished values, backfill missing
-            bundles on the fly, or hide staleness from the user. A visible stale or
-            degraded state is often more trustworthy than a silently normalized one.
-          </p>
-        </Section>
-
-        <Section title="Public API and canonical contracts">
-          <p>
-            The public API exists to expose descriptive support surfaces for the website
-            and for machine-readable inspection of published context. Routes such as{" "}
-            <InlineCode>/api/v1/landing</InlineCode>,{" "}
-            <InlineCode>/api/v1/status</InlineCode>,{" "}
-            <InlineCode>/api/v1/summary/[chain]</InlineCode>,{" "}
-            <InlineCode>/api/v1/whn/[chain]</InlineCode>,{" "}
-            <InlineCode>/api/v1/glossary</InlineCode>,{" "}
-            <InlineCode>/api/v1/units</InlineCode>, and{" "}
-            <InlineCode>/api/v1/thresholds/defaults</InlineCode> are part of that
-            descriptive layer.
-          </p>
-          <p>
-            Where relevant, these routes expose traceability metadata such as dataset
-            version, data source, source mode, and canonical contract boundaries so
-            users and integrators can see what the route is actually representing.
-          </p>
-        </Section>
-
-        <Section title="Interpretation limits">
-          <ul className="list-disc pl-5">
-            <li>No price data should be introduced.</li>
-            <li>No forecasting language should be introduced.</li>
-            <li>No normative conclusions should be introduced.</li>
-            <li>No unexplained model outputs should be introduced.</li>
-          </ul>
-          <p>
-            Descriptive analytics, historical context, published artifacts, and
-            methodological traceability are the core boundaries of the product.
-          </p>
-        </Section>
-
-        <Section title="Related pages">
-          <ul className="list-disc pl-5">
-            <li>
-              <Link href="/methodology/previously" className="underline">
-                /methodology/previously
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { href: "/methodology/previously", label: "Version archive", desc: "All past methodology versions and what changed" },
+              { href: "/thresholds", label: "Threshold defaults", desc: "Current canonical threshold parameters" },
+              { href: "/track-record", label: "Track record", desc: "Historical published labels with determinism hashes" },
+              { href: "/glossary", label: "Glossary", desc: "Field-by-field definitions for every published term" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-2xl border bg-white/[0.02] p-4 transition hover:border-cyan-500/30 hover:bg-white/[0.04]"
+              >
+                <div className="text-sm font-semibold text-white">{item.label}</div>
+                <div className="mt-1.5 text-xs leading-5 text-slate-400">{item.desc}</div>
               </Link>
-            </li>
-            <li>
-              <Link href="/glossary" className="underline">
-                /glossary
-              </Link>
-            </li>
-            <li>
-              <Link href="/status" className="underline">
-                /status
-              </Link>
-            </li>
-            <li>
-              <Link href="/chains" className="underline">
-                /chains
-              </Link>
-            </li>
-            <li>
-              <Link href="/track-record" className="underline">
-                /track-record
-              </Link>
-            </li>
-            <li>
-              <Link href="/api-docs" className="underline">
-                /api-docs
-              </Link>
-            </li>
-          </ul>
-        </Section>
+            ))}
+          </div>
 
-        <section className="rounded-xl border p-6 text-xs text-muted-foreground">
-          <div className="font-medium text-foreground">Traceability</div>
-          <p className="mt-2">
-            Dataset context on this page is drawn from{" "}
-            <InlineCode>/public/data/published/v1/dataset.json</InlineCode>.
-          </p>
-          <p className="mt-2">
-            This page is intended to remain aligned with glossary definitions, status
-            behavior, Track Record presentation, chain pages, API docs, and the public
-            route contract.
-          </p>
-        </section>
-
-
-        <Section title="Questions and answers">
-          <p>
-            If you want a direct explanation of the most common skeptical questions about noise,
-            regime change, confidence, baselines, JSON artifacts, and traceability, use the dedicated
-            Q&amp;A page.
-          </p>
-          <p>
-            <Link href="/faq" className="underline">Open the full Q&amp;A</Link>
-          </p>
+          <div className="rounded-xl border border-white/5 bg-white/[0.015] px-5 py-3 text-xs leading-6 text-slate-500">
+            Dataset version: <span className="text-slate-300">{dataset?.version ?? "—"}</span>
+            {" · "}
+            Methodology: <span className="text-slate-300">{dataset?.methodology_version ?? "v1.0"}</span>
+            {" · "}
+            Source: <span className="text-slate-300">{currentDataSource()}</span>
+          </div>
         </Section>
 
       </div>

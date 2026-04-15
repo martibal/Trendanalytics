@@ -60,20 +60,20 @@ export function HeroSidePanels() {
         <h2 className="mt-2 text-sm font-semibold leading-snug text-white">
           {heroPipelineTitle}
         </h2>
-        <p className="mt-2 text-[11px] leading-[1.65] text-slate-500">{heroPipelineBody}</p>
+        <p className="mt-2 text-[11px] leading-[1.65] text-slate-300">{heroPipelineBody}</p>
 
         <div className="mt-4 space-y-2">
           {heroPipelinePoints.map((point) => (
             <div key={point.title} className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
               <div className="text-[11px] font-semibold text-white">{point.title}</div>
-              <div className="mt-1 text-[10px] leading-[1.55] text-slate-500">{point.body}</div>
+              <div className="mt-1 text-[10px] leading-[1.55] text-slate-300">{point.body}</div>
             </div>
           ))}
         </div>
 
         <div className="mt-4 border-t border-white/6 pt-4 flex flex-wrap gap-3 text-xs">
           <Link href="#plans" className="text-cyan-400 hover:underline">See plans →</Link>
-          <Link href="/methodology" className="text-slate-500 hover:text-cyan-400 transition-colors">Methodology →</Link>
+          <Link href="/methodology" className="text-slate-300 hover:text-cyan-400 transition-colors">Methodology →</Link>
         </div>
       </div>
 
@@ -97,13 +97,13 @@ export function HeroSidePanels() {
               </span>
               <div className="min-w-0">
                 <div className="text-[11px] font-semibold text-white">{item.label}</div>
-                <div className="mt-0.5 text-[10px] leading-[1.55] text-slate-500">{item.detail}</div>
+                <div className="mt-0.5 text-[10px] leading-[1.55] text-slate-300">{item.detail}</div>
               </div>
             </li>
           ))}
         </ul>
 
-        <div className="mt-3 border-t border-white/6 pt-3 text-[10px] text-slate-600 leading-[1.6]">
+        <div className="mt-3 border-t border-white/6 pt-3 text-[10px] text-slate-400 leading-[1.6]">
           {heroFaqPrompt}{" "}
           <Link href="/faq" className="text-cyan-400 hover:underline">
             Read the Q&A →

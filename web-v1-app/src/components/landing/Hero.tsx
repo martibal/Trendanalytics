@@ -127,7 +127,7 @@ export default function Hero({ historyDepthDays }: HeroProps) {
     <div className="mb-16">
       {/* ── Trust strip ── */}
       <div className="mb-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/6 pb-5">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] text-slate-500">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] text-slate-300">
           <span className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]" />
             <span>
@@ -161,7 +161,7 @@ export default function Hero({ historyDepthDays }: HeroProps) {
         <div className="flex flex-col">
           {/* Chain badges + eyebrow */}
           <div className="mb-6 flex flex-wrap items-center gap-2.5">
-            <span className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-600">
+            <span className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
               On-chain regime classification
             </span>
             <span className="text-white/10">·</span>
@@ -230,7 +230,7 @@ export default function Hero({ historyDepthDays }: HeroProps) {
             </div>
 
           {/* Tertiary links */}
-          <div className="mt-4 flex flex-wrap gap-5 text-[11px] text-slate-600">
+          <div className="mt-4 flex flex-wrap gap-5 text-[11px] text-slate-400">
             <Link
               href="/api-docs/schema"
               className="transition-colors hover:text-slate-400"
@@ -290,11 +290,11 @@ export default function Hero({ historyDepthDays }: HeroProps) {
             ))}
           </div>
 
-          <p className="mt-4 text-[11px] leading-[1.75] text-slate-600">
+          <p className="mt-4 text-[11px] leading-[1.75] text-slate-400">
             All labels are chain-relative — HEATING on Ethereum means Ethereum is
             running hotter than Ethereum normally does, not hotter than Bitcoin.
             Below confidence 0.40, the model publishes{" "}
-            <code className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+            <code className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
               UNKNOWN/DEGRADED
             </code>{" "}
             rather than a weak label presented as strong.
@@ -334,7 +334,7 @@ export default function Hero({ historyDepthDays }: HeroProps) {
                   <div className="text-[12px] font-bold text-white">
                     {step.title}
                   </div>
-                  <p className="mt-1 text-[11px] leading-[1.65] text-slate-500">
+                  <p className="mt-1 text-[11px] leading-[1.65] text-slate-300">
                     {step.body}
                   </p>
                 </div>
@@ -352,13 +352,13 @@ export default function Hero({ historyDepthDays }: HeroProps) {
               <span className="text-[5.5rem] font-black leading-none tracking-[-0.04em] tabular-nums text-white">
                 {days ?? "—"}
               </span>
-              <div className="mb-1.5 text-[10px] font-bold uppercase leading-[1.5] tracking-[0.2em] text-slate-500">
+              <div className="mb-1.5 text-[10px] font-bold uppercase leading-[1.5] tracking-[0.2em] text-slate-300">
                 published
                 <br />
                 days
               </div>
             </div>
-            <p className="mt-4 text-[12px] leading-[1.75] text-slate-500">
+            <p className="mt-4 text-[12px] leading-[1.75] text-slate-300">
               Published daily since December 2024. Pro subscribers get the full
               archive — every label, confidence score, and driver set, back to
               day one. Every past date is verifiable via its determinism hash.
@@ -374,7 +374,7 @@ export default function Hero({ historyDepthDays }: HeroProps) {
           {/* JSON layers */}
           <div className="rounded-2xl border border-white/8 bg-gradient-to-b from-white/[0.04] to-white/[0.02] p-6">
             <SectionLabel>Three JSON files · per chain · per day</SectionLabel>
-            <p className="mb-5 text-[12px] leading-[1.65] text-slate-500">
+            <p className="mb-5 text-[12px] leading-[1.65] text-slate-300">
               Subscribers get API access to all three. Every field is documented
               in the schema reference before you subscribe.
             </p>
@@ -403,7 +403,7 @@ export default function Hero({ historyDepthDays }: HeroProps) {
                     </span>
                     <Link
                       href="/api-docs/schema"
-                      className="ml-auto text-[10px] text-slate-600 transition-colors hover:text-slate-400"
+                      className="ml-auto text-[10px] text-slate-400 transition-colors hover:text-slate-400"
                     >
                       schema →
                     </Link>
@@ -420,7 +420,7 @@ export default function Hero({ historyDepthDays }: HeroProps) {
                     ))}
                   </div>
 
-                  <p className="text-[11px] leading-[1.6] text-slate-500">
+                  <p className="text-[11px] leading-[1.6] text-slate-300">
                     {layer.desc}
                   </p>
                 </div>
@@ -428,10 +428,10 @@ export default function Hero({ historyDepthDays }: HeroProps) {
             </div>
 
             <div className="mt-4 rounded-xl border border-white/5 bg-black/30 px-4 py-3">
-              <div className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600">
+              <div className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
                 API endpoint
               </div>
-                <code className="break-all font-mono text-[10px] text-slate-500">
+                <code className="break-all font-mono text-[10px] text-slate-300">
                   GET /api/v1/files/&#123;genre&#125;/&#123;chain&#125;/&#123;window&#125;/latest.json
                 </code>
             </div>
@@ -451,7 +451,7 @@ export default function Hero({ historyDepthDays }: HeroProps) {
                 className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-[12px] font-medium text-slate-400 transition hover:border-cyan-500/25 hover:text-cyan-400"
               >
                 {item.label}
-                <span className="text-xs text-slate-700">→</span>
+                <span className="text-xs text-slate-300">→</span>
               </Link>
             ))}
           </div>

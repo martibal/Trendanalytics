@@ -6,7 +6,7 @@ type PlansProps = {
 };
 
 const inactiveCtaClass =
-  "inline-flex items-center rounded-full border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-black text-slate-500 opacity-70 cursor-not-allowed";
+  "inline-flex items-center rounded-full border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-black text-slate-300 opacity-70 cursor-not-allowed";
 
 export default function Plans({ historyDepthDays }: PlansProps) {
   return (
@@ -37,7 +37,7 @@ export default function Plans({ historyDepthDays }: PlansProps) {
         {landingUseCases.map((item) => (
           <div key={item.title} className="rounded-xl border border-white/6 bg-white/[0.02] p-4">
             <div className="text-xs font-bold text-white">{item.title}</div>
-            <div className="mt-1.5 text-xs leading-5 text-slate-500">{item.body}</div>
+            <div className="mt-1.5 text-xs leading-5 text-slate-300">{item.body}</div>
           </div>
         ))}
       </div>
@@ -63,7 +63,7 @@ export default function Plans({ historyDepthDays }: PlansProps) {
             </div>
 
             <div className="mt-4 text-sm font-semibold text-white">{plan.body}</div>
-            <div className="mt-2 text-xs leading-5 text-slate-500 flex-1">{plan.detail}</div>
+            <div className="mt-2 text-xs leading-5 text-slate-300 flex-1">{plan.detail}</div>
 
             {/* Best for */}
             {"bestFor" in plan && plan.bestFor ? (
@@ -86,7 +86,7 @@ export default function Plans({ historyDepthDays }: PlansProps) {
                   <button type="button" disabled aria-disabled="true" className={inactiveCtaClass}>
                     Payments open soon
                   </button>
-                  <div className="mt-2 text-[11px] leading-5 text-slate-500">
+                  <div className="mt-2 text-[11px] leading-5 text-slate-300">
                     Checkout is temporarily disabled for launch preparation.
                   </div>
                 </div>
@@ -100,13 +100,13 @@ export default function Plans({ historyDepthDays }: PlansProps) {
       <div className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-500">
+            <div className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-300">
               History Add-on
             </div>
             <div className="mt-1.5 text-sm font-bold text-white">
               Full archive — {historyDepthDays ?? "496"}+ days
             </div>
-            <p className="mt-1 text-xs leading-5 text-slate-500 max-w-xl">
+            <p className="mt-1 text-xs leading-5 text-slate-300 max-w-xl">
               One-time unlock for the complete published history back to December 2024.
               This extends access beyond the included subscription window. Available within your
               entitled scope — one chain for Basic, all four chains for Pro.
@@ -118,11 +118,11 @@ export default function Plans({ historyDepthDays }: PlansProps) {
               type="button"
               disabled
               aria-disabled="true"
-              className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-semibold text-slate-500 opacity-70 cursor-not-allowed"
+              className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-semibold text-slate-300 opacity-70 cursor-not-allowed"
             >
               Payments open soon
             </button>
-            <div className="mt-2 text-right text-[11px] leading-5 text-slate-500">
+            <div className="mt-2 text-right text-[11px] leading-5 text-slate-300">
               History checkout is temporarily inactive.
             </div>
           </div>
@@ -130,8 +130,8 @@ export default function Plans({ historyDepthDays }: PlansProps) {
       </div>
 
       {/* Scope note */}
-      <div className="mt-4 rounded-xl border border-white/5 bg-white/[0.015] px-5 py-3 text-xs leading-6 text-slate-600">
-        <span className="font-semibold text-slate-500">Scope: </span>
+      <div className="mt-4 rounded-xl border border-white/5 bg-white/[0.015] px-5 py-3 text-xs leading-6 text-slate-400">
+        <span className="font-semibold text-slate-300">Scope: </span>
         This product publishes on-chain network state data only — no price data, no forecasts, no prescriptive signals.
         Subscriptions renew monthly and can be cancelled at any time from your dashboard.
       </div>
