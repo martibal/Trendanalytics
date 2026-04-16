@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource, readStorageObject } from "@/lib/storage";
+import { readStorageObject } from "@/lib/storage";
 import {
   whatIsUrdAtlasExplanation,
   interpretationBoundaryExplanation,
@@ -23,7 +23,6 @@ import { computeHistoryDepthDays } from "@/lib/historyDepth";
 import JsonLayers from "@/components/landing/JsonLayers";
 import ExploreGrid from "@/components/landing/ExploreGrid";
 import UseCases from "@/components/landing/UseCases";
-import DataContractDetails from "@/components/landing/DataContractDetails";
 import MobileLanding from "@/components/mobile/MobileLanding";
 
 import "server-only";
@@ -468,14 +467,14 @@ export default async function HomePage() {
     statusRows.length > 0
       ? statusRows
       : metaFallbackRows.some(
-            (r) =>
-              r.published_regime !== null ||
-              r.confidence_score !== null ||
-              r.as_of !== null ||
-              r.lag_days !== null,
-          )
-        ? normalizedMetaFallbackRows
-        : landingFallbackRows;
+          (r) =>
+            r.published_regime !== null ||
+            r.confidence_score !== null ||
+            r.as_of !== null ||
+            r.lag_days !== null,
+        )
+      ? normalizedMetaFallbackRows
+      : landingFallbackRows;
 
   const displayRows = rows.map(toSurfaceRowDisplay);
   const whatIsExplain = whatIsUrdAtlasExplanation();

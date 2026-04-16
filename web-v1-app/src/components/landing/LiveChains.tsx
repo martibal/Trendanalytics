@@ -41,7 +41,7 @@ export default function LiveChains({ rows }: LiveChainsProps) {
           <h2 className="mt-1 text-3xl font-semibold text-white">
             The current published regime, per chain.
           </h2>
-          <p className="mt-2 text-sm leading-7 text-slate-400 max-w-3xl">
+          <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-400">
             This is what the pipeline published most recently — the regime label, confidence score, and freshness
             metadata for each chain. This is exactly what subscribers receive in their daily JSON.
             Hover any field for a plain-language explanation.
@@ -51,6 +51,11 @@ export default function LiveChains({ rows }: LiveChainsProps) {
           Full track record →
         </Link>
       </div>
+
+      <p className="mt-5 text-base font-semibold leading-7 text-slate-100">
+        Click any chain below to open its deeper historical view — including recent history,
+        drivers, confidence, and current context.
+      </p>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         {rows.map((row) => (
@@ -104,13 +109,17 @@ export default function LiveChains({ rows }: LiveChainsProps) {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <HoverInfo tooltip={row.asOfTooltip} wrapperClassName="block">
                 <div className="rounded-xl border bg-background/40 p-2.5">
-                  <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">As of</div>
+                  <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    As of
+                  </div>
                   <div className="mt-1 text-sm font-medium text-white">{row.asOf}</div>
                 </div>
               </HoverInfo>
               <HoverInfo tooltip={row.lagTooltip} wrapperClassName="block" panelClassName="right-0 left-auto">
                 <div className="rounded-xl border bg-background/40 p-2.5">
-                  <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Lag</div>
+                  <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    Lag
+                  </div>
                   <div className="mt-1 text-sm font-medium text-white">{row.lagValue}</div>
                 </div>
               </HoverInfo>
