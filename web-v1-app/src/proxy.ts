@@ -1,5 +1,4 @@
 // src/proxy.ts
-// Clerk middleware + mobile redirect layer
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
@@ -38,7 +37,6 @@ function mapToMobilePath(pathname: string): string | null {
   if (pathname.startsWith("/api-docs")) return "/mobile/wiki";
   if (pathname === "/thresholds") return "/mobile/methodology";
 
-  // Keep auth/dashboard/other flows on desktop unless explicitly rebuilt.
   if (
     pathname.startsWith("/sign-in") ||
     pathname.startsWith("/sign-up") ||
@@ -48,7 +46,6 @@ function mapToMobilePath(pathname: string): string | null {
     return null;
   }
 
-  // Default mobile fallback for public brochure routes.
   return "/mobile";
 }
 
@@ -94,7 +91,13 @@ const proxyHandler = hasClerkKeys
         await auth.protect();
       }
     })
-  : function proxy(req: Request & { nextUrl: URL; headers: Headers; cookies: { get: (name: string) => { value?: string } | undefined } }) {
+  : function proxy(
+      req: Request & {
+        nextUrl: URL;
+        headers: Headers;
+        cookies: { get: (name: string) => { value?: string } | undefined };
+      }
+    ) {
       const url = req.nextUrl;
       const pathname = url.pathname;
       const requestedView = url.searchParams.get("view");
