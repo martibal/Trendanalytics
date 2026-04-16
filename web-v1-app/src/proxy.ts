@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, userAgent } from "next/server";
 
 const DESKTOP_VIEW_COOKIE = "ua_view";
 
 function isMobileRequest(req: NextRequest) {
-  const ua = req.headers.get("user-agent")?.toLowerCase() ?? "";
-  const chMobile = req.headers.get("sec-ch-ua-mobile");
-
-  return (
-    chMobile === "?1" ||
-    /android|iphone|ipod|ipad|blackberry|iemobile|opera mini|mobile/.test(ua)
-  );
+  const { device } = userAgent(req);
+  return device.type === "mobile" || device.type === "tablet";
 }
 
 function mapToMobilePath(pathname: string): string | null {
@@ -32,16 +27,14 @@ function mapToMobilePath(pathname: string): string | null {
 }
 
 export function proxy(req: NextRequest) {
-  const { nextUrl, cookies } = req;
-  const pathname = nextUrl.pathname;
-  const requestedView = nextUrl.searchParams.get("view");
-  const desktopCookie = cookies.get(DESKTOP_VIEW_COOKIE)?.value === "desktop";
+  const url = req.nextUrl.clone();
+  const pathname = url.pathname;
+  const requestedView = url.searchParams.get("view");
+  const desktopCookie = req.cookies.get(DESKTOP_VIEW_COOKIE)?.value === "desktop";
 
   if (requestedView === "desktop") {
-    const cleanUrl = nextUrl.clone();
-    cleanUrl.searchParams.delete("view");
-
-    const res = NextResponse.redirect(cleanUrl);
+    url.searchParams.delete("view");
+    const res = NextResponse.redirect(url);
     res.cookies.set(DESKTOP_VIEW_COOKIE, "desktop", {
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
@@ -51,23 +44,24 @@ export function proxy(req: NextRequest) {
   }
 
   if (requestedView === "mobile") {
-    const cleanUrl = nextUrl.clone();
-    cleanUrl.searchParams.delete("view");
-
+    url.searchParams.delete("view");
     const mobilePath = mapToMobilePath(pathname) ?? "/mobile";
-    cleanUrl.pathname = mobilePath;
+    url.pathname = mobilePath;
 
-    const res = NextResponse.redirect(cleanUrl);
-    res.cookies.delete(DESKTOP_VIEW_COOKIE);
+    const res = NextResponse.redirect(url);
+    res.cookies.set(DESKTOP_VIEW_COOKIE, "", {
+      path: "/",
+      maxAge: 0,
+      sameSite: "lax",
+    });
     return res;
   }
 
   if (!desktopCookie && isMobileRequest(req)) {
     const mobilePath = mapToMobilePath(pathname);
     if (mobilePath && mobilePath !== pathname) {
-      const target = nextUrl.clone();
-      target.pathname = mobilePath;
-      return NextResponse.redirect(target);
+      url.pathname = mobilePath;
+      return NextResponse.redirect(url);
     }
   }
 
