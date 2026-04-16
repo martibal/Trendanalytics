@@ -489,11 +489,11 @@ export default async function HomePage() {
         <ModalStyles />
 
         <Hero historyDepthDays={historyDepthDays} />
+        <LiveChains rows={displayRows} />
         <UseCases />
         <div className="mt-10">
           <Plans historyDepthDays={historyDepthDays} />
         </div>
-        <LiveChains rows={displayRows} />
         <JsonLayers />
         <ExploreGrid />
 
