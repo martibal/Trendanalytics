@@ -1,4 +1,3 @@
-// src/components/mobile/MobileChainChart.tsx
 "use client";
 
 import { useState, useCallback } from "react";
@@ -53,17 +52,15 @@ function shortDate(date: string): string {
 }
 
 function toChartRows(rows: HistoryRow[]): ChartRow[] {
-  return [...rows]
-    .reverse()
-    .map((r) => ({
-      date: r.date,
-      dateShort: shortDate(r.date),
-      regimeValue: REGIME_VALUES[r.label ?? ""] ?? 0,
-      confidence: typeof r.confidence === "number" ? r.confidence : 0,
-      label: r.label,
-      oneLiner: r.oneLiner,
-      color: REGIME_COLORS[r.label ?? ""] ?? REGIME_COLORS["UNKNOWN/DEGRADED"],
-    }));
+  return [...rows].reverse().map((r) => ({
+    date: r.date,
+    dateShort: shortDate(r.date),
+    regimeValue: REGIME_VALUES[r.label ?? ""] ?? 0,
+    confidence: typeof r.confidence === "number" ? r.confidence : 0,
+    label: r.label,
+    oneLiner: r.oneLiner,
+    color: REGIME_COLORS[r.label ?? ""] ?? REGIME_COLORS["UNKNOWN/DEGRADED"],
+  }));
 }
 
 function CustomTooltip({
@@ -71,43 +68,26 @@ function CustomTooltip({
   payload,
 }: {
   active?: boolean;
-  payload?: { payload: ChartRow }[];
+  payload?: Array<{ payload: ChartRow }>;
 }) {
   if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
+
+  const d = payload[0]?.payload;
+  if (!d) return null;
+
   const color = d.color;
+
   return (
-    <div className="rounded-xl border border-white/15 bg-[#0F1B2D] px-3 py-2.5 shadow-xl text-[11px] max-w-[200px]">
-      <div className="text-slate-400 mb-1">{d.date}</div>
+    <div className="max-w-[200px] rounded-xl border border-white/15 bg-[#0F1B2D] px-3 py-2.5 text-[11px] shadow-xl">
+      <div className="mb-1 text-slate-400">{d.date}</div>
       <div className="font-black" style={{ color }}>
         {d.label ?? "—"}
       </div>
-      <div className="text-slate-400 mt-0.5">
-        Confidence {d.confidence.toFixed(3)}
-      </div>
-      {d.oneLiner && (
-        <div className="text-slate-500 mt-1 leading-[1.5]">{d.oneLiner}</div>
-      )}
+      <div className="mt-0.5 text-slate-400">Confidence {d.confidence.toFixed(3)}</div>
+      {d.oneLiner ? (
+        <div className="mt-1 leading-[1.5] text-slate-500">{d.oneLiner}</div>
+      ) : null}
     </div>
-  );
-}
-
-function YAxisLabel({ value }: { value: number }) {
-  const label = REGIME_VALUE_LABELS[value];
-  const color = REGIME_COLORS[
-    label === "UNK" ? "UNKNOWN/DEGRADED" : label
-  ] ?? "#6B7280";
-  return (
-    <text
-      x={0}
-      y={0}
-      fill={color}
-      fontSize={8}
-      fontWeight="bold"
-      textAnchor="start"
-    >
-      {label}
-    </text>
   );
 }
 
@@ -121,10 +101,21 @@ export default function MobileChainChart({
   const chartRows = toChartRows(rows);
   const [selected, setSelected] = useState<ChartRow | null>(null);
 
-  const handleClick = useCallback((data: { activePayload?: { payload: ChartRow }[] }) => {
-    if (data?.activePayload?.[0]) {
-      setSelected(data.activePayload[0].payload);
-    }
+  const handleClick = useCallback((data: unknown) => {
+    const activePayload = (
+      data as
+        | {
+            activePayload?: Array<{
+              payload?: ChartRow;
+            }>;
+          }
+        | undefined
+    )?.activePayload;
+
+    const row = activePayload?.[0]?.payload;
+    if (!row) return;
+
+    setSelected(row);
   }, []);
 
   if (chartRows.length === 0) {
@@ -135,17 +126,15 @@ export default function MobileChainChart({
     );
   }
 
-  // Thin every Nth label so X-axis doesn't crowd
   const step = Math.max(1, Math.floor(chartRows.length / 6));
 
   return (
     <div>
-      {/* Selected row detail */}
-      {selected && (
+      {selected ? (
         <div
           className="mb-3 rounded-xl px-3 py-2.5 text-[11px]"
           style={{
-            backgroundColor: selected.color + "18",
+            backgroundColor: `${selected.color}18`,
             border: `1px solid ${selected.color}33`,
           }}
         >
@@ -156,15 +145,12 @@ export default function MobileChainChart({
             </span>
             <span className="text-slate-400">{selected.confidence.toFixed(3)}</span>
           </div>
-          {selected.oneLiner && (
-            <div className="mt-1 text-slate-500 leading-[1.5]">
-              {selected.oneLiner}
-            </div>
-          )}
+          {selected.oneLiner ? (
+            <div className="mt-1 leading-[1.5] text-slate-500">{selected.oneLiner}</div>
+          ) : null}
         </div>
-      )}
+      ) : null}
 
-      {/* Regime chart */}
       <div className="touch-pan-x">
         <ResponsiveContainer width="100%" height={120}>
           <AreaChart
@@ -178,7 +164,9 @@ export default function MobileChainChart({
                 <stop offset="95%" stopColor={chainColor} stopOpacity={0.02} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+
+            <CartesianGrid stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+
             <XAxis
               dataKey="dateShort"
               tick={{ fill: "#475569", fontSize: 9 }}
@@ -186,20 +174,44 @@ export default function MobileChainChart({
               axisLine={false}
               interval={step - 1}
             />
+
             <YAxis
               domain={[0, 4]}
               ticks={[0, 1, 2, 3, 4]}
-              tick={({ y, value }: { y: number; value: number }) => (
-                <text x={2} y={y + 3} fill={REGIME_COLORS[REGIME_VALUE_LABELS[value] === "UNK" ? "UNKNOWN/DEGRADED" : REGIME_VALUE_LABELS[value]] ?? "#6B7280"} fontSize={7} fontWeight="bold">
-                  {REGIME_VALUE_LABELS[value]}
-                </text>
-              )}
+              tick={(props: unknown) => {
+                const p = props as {
+                  y?: number;
+                  payload?: { value?: number };
+                  value?: number;
+                };
+
+                const y = typeof p.y === "number" ? p.y : 0;
+                const value = Number(p.payload?.value ?? p.value ?? 0);
+                const label = REGIME_VALUE_LABELS[value] ?? "UNK";
+                const color =
+                  REGIME_COLORS[
+                    label === "UNK" ? "UNKNOWN/DEGRADED" : label
+                  ] ?? "#6B7280";
+
+                return (
+                  <text x={2} y={y + 3} fill={color} fontSize={7} fontWeight="bold">
+                    {label}
+                  </text>
+                );
+              }}
               tickLine={false}
               axisLine={false}
               width={42}
             />
+
             <Tooltip content={<CustomTooltip />} />
-            <ReferenceLine y={2} stroke="rgba(255,255,255,0.1)" strokeDasharray="3 3" />
+
+            <ReferenceLine
+              y={2}
+              stroke="rgba(255,255,255,0.1)"
+              strokeDasharray="3 3"
+            />
+
             <Area
               type="stepAfter"
               dataKey="regimeValue"
@@ -213,25 +225,29 @@ export default function MobileChainChart({
         </ResponsiveContainer>
       </div>
 
-      {/* Confidence chart */}
       <div className="mt-2 touch-pan-x">
-        <div className="text-[9px] text-slate-600 mb-1 uppercase tracking-wider">
+        <div className="mb-1 text-[9px] uppercase tracking-wider text-slate-600">
           Confidence
         </div>
+
         <ResponsiveContainer width="100%" height={50}>
-          <AreaChart
-            data={chartRows}
-            margin={{ top: 2, right: 4, left: 42, bottom: 0 }}
-          >
+          <AreaChart data={chartRows} margin={{ top: 2, right: 4, left: 42, bottom: 0 }}>
             <defs>
               <linearGradient id="confGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3} />
                 <stop offset="95%" stopColor="#22d3ee" stopOpacity={0.02} />
               </linearGradient>
             </defs>
+
             <XAxis dataKey="dateShort" hide />
             <YAxis domain={[0, 1]} hide />
-            <ReferenceLine y={0.4} stroke="rgba(255,100,100,0.3)" strokeDasharray="3 3" />
+
+            <ReferenceLine
+              y={0.4}
+              stroke="rgba(255,100,100,0.3)"
+              strokeDasharray="3 3"
+            />
+
             <Area
               type="monotone"
               dataKey="confidence"
@@ -244,15 +260,14 @@ export default function MobileChainChart({
         </ResponsiveContainer>
       </div>
 
-      {/* Legend */}
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-        {(["CONGESTED", "HEATING", "STABLE", "CHEAP"] as const).map((l) => (
-          <span key={l} className="flex items-center gap-1 text-[9px] text-slate-600">
+        {(["CONGESTED", "HEATING", "STABLE", "CHEAP"] as const).map((label) => (
+          <span key={label} className="flex items-center gap-1 text-[9px] text-slate-600">
             <span
               className="h-1.5 w-3 rounded-full"
-              style={{ backgroundColor: REGIME_COLORS[l] }}
+              style={{ backgroundColor: REGIME_COLORS[label] }}
             />
-            {l}
+            {label}
           </span>
         ))}
       </div>

@@ -2,7 +2,7 @@
 // Mobile wiki — searchable glossary of all blockchain and Urd Atlas terminology
 
 import Link from "next/link";
-import { MobileBottomNav } from "../page";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import MobileWikiClient from "@/components/mobile/MobileWikiClient";
 import { WIKI_ENTRIES, WIKI_CATEGORIES } from "@/lib/mobile/wiki";
 

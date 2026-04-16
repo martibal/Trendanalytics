@@ -14,7 +14,7 @@ import {
   mobileLag,
   mobileBand,
 } from "@/lib/mobile/data";
-import { MobileBottomNav } from "../../page";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import MobileChainChart from "@/components/mobile/MobileChainChart";
 import "server-only";
 

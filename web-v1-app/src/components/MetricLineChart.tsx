@@ -369,7 +369,7 @@ export default function MetricLineChart(props: {
               content={(p) => (
                 <CustomTooltip
                   active={p.active}
-                  payload={p.payload as Array<{ name: string; value: number; color: string }>}
+                  payload={p.payload as unknown as Array<{ name: string; value: number; color: string }>}
                   label={typeof p.label === "string" ? p.label : String(p.label ?? "")}
                   unitLabel={unitLabel}
                 />

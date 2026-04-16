@@ -1,6 +1,4 @@
-// src/app/mobile/page.tsx
-// Mobile home screen — daily snapshot of all four chains
-
+import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import Link from "next/link";
 import { CHAIN_LIST } from "@/config/chains";
 import { readStorageObject } from "@/lib/storage";
@@ -87,8 +85,8 @@ function ConfidenceBar({
   const color = regimeColor(label);
   return (
     <div className="mt-2">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-wider text-slate-500">
           Confidence
         </span>
         <span className="text-[11px] font-bold text-slate-200">
@@ -113,17 +111,16 @@ function ChainCard({ state }: { state: MobileChainState }) {
   return (
     <Link
       href={`/mobile/chain/${state.chain}`}
-      className="block rounded-2xl border border-white/10 overflow-hidden active:scale-[0.98] transition-transform"
+      className="block overflow-hidden rounded-2xl border border-white/10 transition-transform active:scale-[0.98]"
       style={{ background: bg }}
     >
       <div className="p-4">
-        {/* Header row */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div
               className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black"
               style={{
-                backgroundColor: chainColor + "22",
+                backgroundColor: `${chainColor}22`,
                 color: chainColor,
                 border: `1px solid ${chainColor}44`,
               }}
@@ -132,18 +129,17 @@ function ChainCard({ state }: { state: MobileChainState }) {
             </div>
             <div>
               <div className="text-[13px] font-bold text-white">{state.name}</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">
+              <div className="mt-0.5 text-[10px] text-slate-500">
                 {state.asOf ?? "—"} · Lag {state.lagDays != null ? `${state.lagDays}d` : "—"}
               </div>
             </div>
           </div>
 
-          {/* Regime label */}
           <div
             className="rounded-xl px-2.5 py-1 text-[11px] font-black tracking-wider"
             style={{
               color,
-              backgroundColor: color + "22",
+              backgroundColor: `${color}22`,
               border: `1px solid ${color}44`,
             }}
           >
@@ -151,17 +147,14 @@ function ChainCard({ state }: { state: MobileChainState }) {
           </div>
         </div>
 
-        {/* Confidence bar */}
         <ConfidenceBar score={state.confidenceScore} label={state.regimeLabel} />
 
-        {/* One-liner */}
         {state.oneLiner && (
           <p className="mt-2.5 text-[11px] leading-[1.6] text-slate-400">
             {state.oneLiner}
           </p>
         )}
 
-        {/* Tap hint */}
         <div className="mt-2.5 flex items-center justify-between">
           <span className="text-[10px] text-slate-600">
             Tap for history and drivers →
@@ -174,23 +167,23 @@ function ChainCard({ state }: { state: MobileChainState }) {
 }
 
 export default async function MobileOverviewPage() {
-  const [states, dataset] = await Promise.all([
+  const [states, dataset, historyDays] = await Promise.all([
     buildChainStates(),
     readDatasetManifest(),
+    computeHistoryDepthDays(),
   ]);
-  const historyDays = dataset ? computeHistoryDepthDays(dataset) : null;
+
   const publishedAt = dataset?.published_at?.slice(0, 10) ?? null;
 
   return (
     <div className="flex min-h-screen flex-col bg-[#0A0E1A]">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-white/8 bg-[#0A0E1A]/95 backdrop-blur-sm px-4 pt-safe-top">
+      <header className="sticky top-0 z-10 border-b border-white/8 bg-[#0A0E1A]/95 px-4 pt-safe-top backdrop-blur-sm">
         <div className="flex items-center justify-between py-3">
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">
               Urd Atlas
             </div>
-            <div className="text-[11px] text-slate-500 mt-0.5">
+            <div className="mt-0.5 text-[11px] text-slate-500">
               On-chain regime classification
             </div>
           </div>
@@ -198,28 +191,24 @@ export default async function MobileOverviewPage() {
             <div className="text-[11px] font-bold text-white">
               {publishedAt ?? "—"}
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">
+            <div className="mt-0.5 text-[10px] text-slate-500">
               {historyDays ?? "—"} published days
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="flex-1 px-4 py-4 pb-24 space-y-3">
-        {/* Section label */}
-        <div className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-500 mb-1">
+      <main className="flex-1 space-y-3 px-4 py-4 pb-24">
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.25em] text-slate-500">
           Current chain state
         </div>
 
-        {/* Chain cards */}
         {states.map((state) => (
           <ChainCard key={state.chain} state={state} />
         ))}
 
-        {/* Footer strip */}
         <div className="mt-4 rounded-xl border border-white/6 bg-white/[0.02] px-4 py-3 text-center">
-          <div className="text-[10px] text-slate-500 leading-[1.7]">
+          <div className="text-[10px] leading-[1.7] text-slate-500">
             {historyDays ?? "—"} published days · every day since December 2024
           </div>
           <a
@@ -231,40 +220,7 @@ export default async function MobileOverviewPage() {
         </div>
       </main>
 
-      {/* Bottom nav */}
       <MobileBottomNav active="overview" />
     </div>
-  );
-}
-
-// Re-export for use in other mobile pages
-export function MobileBottomNav({ active }: { active: string }) {
-  const tabs = [
-    { key: "overview", label: "Overview", href: "/mobile", icon: "◉" },
-    { key: "btc", label: "BTC", href: "/mobile/chain/bitcoin", icon: "₿" },
-    { key: "eth", label: "ETH", href: "/mobile/chain/ethereum", icon: "Ξ" },
-    { key: "l2", label: "L2s", href: "/mobile/chain/arbitrum", icon: "⬡" },
-    { key: "wiki", label: "Wiki", href: "/mobile/wiki", icon: "⊞" },
-  ];
-
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/8 bg-[#0A0E1A]/98 backdrop-blur-sm pb-safe-bottom">
-      <div className="flex">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.key}
-            href={tab.href}
-            className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition-colors ${
-              active === tab.key
-                ? "text-cyan-400"
-                : "text-slate-500 active:text-slate-300"
-            }`}
-          >
-            <span className="text-[16px] leading-none">{tab.icon}</span>
-            {tab.label}
-          </Link>
-        ))}
-      </div>
-    </nav>
   );
 }
