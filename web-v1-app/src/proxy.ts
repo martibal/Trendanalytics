@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse, userAgent } from "next/server";
 
-const DESKTOP_VIEW_COOKIE = "ua_view";
-
 function isMobileRequest(req: NextRequest) {
   const { device } = userAgent(req);
   return device.type === "mobile" || device.type === "tablet";
@@ -30,34 +28,20 @@ export function proxy(req: NextRequest) {
   const url = req.nextUrl.clone();
   const pathname = url.pathname;
   const requestedView = url.searchParams.get("view");
-  const desktopCookie = req.cookies.get(DESKTOP_VIEW_COOKIE)?.value === "desktop";
 
   if (requestedView === "desktop") {
     url.searchParams.delete("view");
-    const res = NextResponse.redirect(url);
-    res.cookies.set(DESKTOP_VIEW_COOKIE, "desktop", {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-      sameSite: "lax",
-    });
-    return res;
+    return NextResponse.redirect(url);
   }
 
   if (requestedView === "mobile") {
     url.searchParams.delete("view");
     const mobilePath = mapToMobilePath(pathname) ?? "/mobile";
     url.pathname = mobilePath;
-
-    const res = NextResponse.redirect(url);
-    res.cookies.set(DESKTOP_VIEW_COOKIE, "", {
-      path: "/",
-      maxAge: 0,
-      sameSite: "lax",
-    });
-    return res;
+    return NextResponse.redirect(url);
   }
 
-  if (!desktopCookie && isMobileRequest(req)) {
+  if (isMobileRequest(req)) {
     const mobilePath = mapToMobilePath(pathname);
     if (mobilePath && mobilePath !== pathname) {
       url.pathname = mobilePath;
