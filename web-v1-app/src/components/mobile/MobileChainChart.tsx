@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
-  ResponsiveContainer,
   AreaChart,
   Area,
   XAxis,
@@ -71,16 +70,13 @@ function CustomTooltip({
   payload?: Array<{ payload: ChartRow }>;
 }) {
   if (!active || !payload?.length) return null;
-
   const d = payload[0]?.payload;
   if (!d) return null;
 
-  const color = d.color;
-
   return (
-    <div className="max-w-[200px] rounded-xl border border-white/15 bg-[#0F1B2D] px-3 py-2.5 text-[11px] shadow-xl">
+    <div className="max-w-[210px] rounded-xl border border-white/15 bg-[#0F1B2D] px-3 py-2.5 text-[11px] shadow-xl">
       <div className="mb-1 text-slate-400">{d.date}</div>
-      <div className="font-black" style={{ color }}>
+      <div className="font-black" style={{ color: d.color }}>
         {d.label ?? "—"}
       </div>
       <div className="mt-0.5 text-slate-400">Confidence {d.confidence.toFixed(3)}</div>
@@ -96,7 +92,7 @@ export default function MobileChainChart({
   rows: HistoryRow[];
   chainColor: string;
 }) {
-  const chartRows = toChartRows(rows);
+  const chartRows = useMemo(() => toChartRows(rows), [rows]);
   const [selected, setSelected] = useState<ChartRow | null>(null);
 
   const handleClick = useCallback((data: unknown) => {
@@ -112,114 +108,104 @@ export default function MobileChainChart({
 
     const row = activePayload?.[0]?.payload;
     if (!row) return;
-
     setSelected(row);
   }, []);
 
   if (chartRows.length === 0) {
-    return <div className="flex h-32 items-center justify-center text-[11px] text-slate-600">No history available</div>;
+    return <div className="flex h-36 items-center justify-center text-[11px] text-slate-600">No history available</div>;
   }
 
+  const regimeWidth = Math.max(640, chartRows.length * 18);
+  const confidenceWidth = Math.max(640, chartRows.length * 18);
   const step = Math.max(1, Math.floor(chartRows.length / 6));
 
   return (
-    <div>
-      {selected ? (
-        <div
-          className="mb-3 rounded-xl px-3 py-2.5 text-[11px]"
-          style={{
-            backgroundColor: `${selected.color}18`,
-            border: `1px solid ${selected.color}33`,
-          }}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-slate-400">{selected.date}</span>
-            <span className="font-black" style={{ color: selected.color }}>
-              {selected.label ?? "—"}
-            </span>
-            <span className="text-slate-400">{selected.confidence.toFixed(3)}</span>
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-white/8 bg-black/15 p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Regime history</div>
+            <div className="mt-1 text-[11px] text-slate-400">Drag horizontally if the chart is wider than your screen.</div>
           </div>
-          {selected.oneLiner ? <div className="mt-1 leading-[1.5] text-slate-500">{selected.oneLiner}</div> : null}
+          {selected ? (
+            <div className="text-right text-[11px]">
+              <div className="font-semibold text-white">{selected.date}</div>
+              <div style={{ color: selected.color }} className="font-black">{selected.label ?? "—"}</div>
+            </div>
+          ) : null}
         </div>
-      ) : null}
 
-      <div className="touch-pan-x">
-        <ResponsiveContainer width="100%" height={120}>
-          <AreaChart data={chartRows} onClick={handleClick} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="regimeGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={chainColor} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={chainColor} stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
+        <div className="mobile-inline-scroll -mx-3 overflow-x-auto px-3 pb-1">
+          <div style={{ width: regimeWidth }}>
+            <AreaChart width={regimeWidth} height={210} data={chartRows} onClick={handleClick} margin={{ top: 8, right: 10, left: 0, bottom: 8 }}>
+              <defs>
+                <linearGradient id="regimeGradMobile" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={chainColor} stopOpacity={0.26} />
+                  <stop offset="95%" stopColor={chainColor} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
 
-            <CartesianGrid stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-
-            <XAxis dataKey="dateShort" tick={{ fill: "#475569", fontSize: 9 }} tickLine={false} axisLine={false} interval={step - 1} />
-
-            <YAxis
-              domain={[0, 4]}
-              ticks={[0, 1, 2, 3, 4]}
-              tick={(props: unknown) => {
-                const p = props as { y?: number; payload?: { value?: number }; value?: number };
-                const y = typeof p.y === "number" ? p.y : 0;
-                const value = Number(p.payload?.value ?? p.value ?? 0);
-                const label = REGIME_VALUE_LABELS[value] ?? "UNK";
-                const color = REGIME_COLORS[label === "UNK" ? "UNKNOWN/DEGRADED" : label] ?? "#6B7280";
-
-                return (
-                  <text x={2} y={y + 3} fill={color} fontSize={7} fontWeight="bold">
-                    {label}
-                  </text>
-                );
-              }}
-              tickLine={false}
-              axisLine={false}
-              width={42}
-            />
-
-            <Tooltip content={<CustomTooltip />} />
-
-            <ReferenceLine y={2} stroke="rgba(255,255,255,0.1)" strokeDasharray="3 3" />
-
-            <Area
-              type="stepAfter"
-              dataKey="regimeValue"
-              stroke={chainColor}
-              strokeWidth={2}
-              fill="url(#regimeGrad)"
-              dot={false}
-              activeDot={{ r: 4, fill: chainColor }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+              <CartesianGrid stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+              <XAxis dataKey="dateShort" tick={{ fill: "#64748b", fontSize: 10 }} tickLine={false} axisLine={false} interval={step - 1} />
+              <YAxis
+                domain={[0, 4]}
+                ticks={[0, 1, 2, 3, 4]}
+                tick={(props: unknown) => {
+                  const p = props as { y?: number; payload?: { value?: number }; value?: number };
+                  const y = typeof p.y === "number" ? p.y : 0;
+                  const value = Number(p.payload?.value ?? p.value ?? 0);
+                  const label = REGIME_VALUE_LABELS[value] ?? "UNK";
+                  const color = REGIME_COLORS[label === "UNK" ? "UNKNOWN/DEGRADED" : label] ?? "#6B7280";
+                  return (
+                    <text x={4} y={y + 4} fill={color} fontSize={9} fontWeight="bold">
+                      {label}
+                    </text>
+                  );
+                }}
+                tickLine={false}
+                axisLine={false}
+                width={58}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <ReferenceLine y={2} stroke="rgba(255,255,255,0.12)" strokeDasharray="3 3" />
+              <Area type="stepAfter" dataKey="regimeValue" stroke={chainColor} strokeWidth={2.5} fill="url(#regimeGradMobile)" dot={false} activeDot={{ r: 4, fill: chainColor }} />
+            </AreaChart>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-2 touch-pan-x">
-        <div className="mb-1 text-[9px] uppercase tracking-wider text-slate-600">Confidence</div>
+      <div className="rounded-2xl border border-white/8 bg-black/15 p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Confidence history</div>
+            <div className="mt-1 text-[11px] text-slate-400">0.40 is the key threshold. Below that, read the label as degraded.</div>
+          </div>
+          {selected ? <div className="text-[11px] font-semibold text-slate-300">{selected.confidence.toFixed(3)}</div> : null}
+        </div>
 
-        <ResponsiveContainer width="100%" height={50}>
-          <AreaChart data={chartRows} margin={{ top: 2, right: 4, left: 42, bottom: 0 }}>
-            <defs>
-              <linearGradient id="confGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#22d3ee" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-
-            <XAxis dataKey="dateShort" hide />
-            <YAxis domain={[0, 1]} hide />
-
-            <ReferenceLine y={0.4} stroke="rgba(255,100,100,0.3)" strokeDasharray="3 3" />
-
-            <Area type="monotone" dataKey="confidence" stroke="#22d3ee" strokeWidth={1.5} fill="url(#confGrad)" dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
+        <div className="mobile-inline-scroll -mx-3 overflow-x-auto px-3 pb-1">
+          <div style={{ width: confidenceWidth }}>
+            <AreaChart width={confidenceWidth} height={96} data={chartRows} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="confGradMobile" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#22d3ee" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="dateShort" tick={{ fill: "#64748b", fontSize: 10 }} tickLine={false} axisLine={false} interval={step - 1} />
+              <YAxis domain={[0, 1]} tick={{ fill: "#64748b", fontSize: 10 }} tickCount={3} tickLine={false} axisLine={false} width={34} />
+              <ReferenceLine y={0.4} stroke="rgba(255,100,100,0.35)" strokeDasharray="3 3" />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="confidence" stroke="#22d3ee" strokeWidth={1.8} fill="url(#confGradMobile)" dot={false} activeDot={{ r: 3, fill: "#22d3ee" }} />
+            </AreaChart>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
         {(["CONGESTED", "HEATING", "STABLE", "CHEAP"] as const).map((label) => (
-          <span key={label} className="flex items-center gap-1 text-[9px] text-slate-600">
+          <span key={label} className="flex items-center gap-1 text-[10px] text-slate-500">
             <span className="h-1.5 w-3 rounded-full" style={{ backgroundColor: REGIME_COLORS[label] }} />
             {label}
           </span>
