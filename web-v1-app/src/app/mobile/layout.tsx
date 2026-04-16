@@ -1,12 +1,10 @@
-// src/app/mobile/layout.tsx
-// Mobile shell layout — PWA meta, viewport, safe areas
-
-import "./mobile.css";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import PwaRegister from "@/components/mobile/PwaRegister";
+import "./mobile.css";
 
-export const metadata = {
-  title: "Urd Atlas",
+export const metadata: Metadata = {
+  title: "Urd Atlas Mobile",
   description: "Daily on-chain regime classification for BTC, ETH, ARB, and BASE",
   manifest: "/manifest.json",
   appleWebApp: {
@@ -14,23 +12,21 @@ export const metadata = {
     statusBarStyle: "black-translucent",
     title: "Urd Atlas",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: "cover",
-  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function MobileLayout({ children }: { children: ReactNode }) {
   return (
-    <>
-      {/* PWA meta tags (injected into <head> by Next.js metadata) */}
-      <div className="mobile-shell">
-        {children}
-        <PwaRegister />
-      </div>
-    </>
+    <div className="mobile-shell min-h-screen bg-[#0A0E1A] text-white">
+      {children}
+      <PwaRegister />
+    </div>
   );
 }

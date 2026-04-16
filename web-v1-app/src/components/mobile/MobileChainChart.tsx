@@ -84,9 +84,7 @@ function CustomTooltip({
         {d.label ?? "—"}
       </div>
       <div className="mt-0.5 text-slate-400">Confidence {d.confidence.toFixed(3)}</div>
-      {d.oneLiner ? (
-        <div className="mt-1 leading-[1.5] text-slate-500">{d.oneLiner}</div>
-      ) : null}
+      {d.oneLiner ? <div className="mt-1 leading-[1.5] text-slate-500">{d.oneLiner}</div> : null}
     </div>
   );
 }
@@ -119,11 +117,7 @@ export default function MobileChainChart({
   }, []);
 
   if (chartRows.length === 0) {
-    return (
-      <div className="flex h-32 items-center justify-center text-[11px] text-slate-600">
-        No history available
-      </div>
-    );
+    return <div className="flex h-32 items-center justify-center text-[11px] text-slate-600">No history available</div>;
   }
 
   const step = Math.max(1, Math.floor(chartRows.length / 6));
@@ -145,19 +139,13 @@ export default function MobileChainChart({
             </span>
             <span className="text-slate-400">{selected.confidence.toFixed(3)}</span>
           </div>
-          {selected.oneLiner ? (
-            <div className="mt-1 leading-[1.5] text-slate-500">{selected.oneLiner}</div>
-          ) : null}
+          {selected.oneLiner ? <div className="mt-1 leading-[1.5] text-slate-500">{selected.oneLiner}</div> : null}
         </div>
       ) : null}
 
       <div className="touch-pan-x">
         <ResponsiveContainer width="100%" height={120}>
-          <AreaChart
-            data={chartRows}
-            onClick={handleClick}
-            margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-          >
+          <AreaChart data={chartRows} onClick={handleClick} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="regimeGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={chainColor} stopOpacity={0.3} />
@@ -167,31 +155,17 @@ export default function MobileChainChart({
 
             <CartesianGrid stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
 
-            <XAxis
-              dataKey="dateShort"
-              tick={{ fill: "#475569", fontSize: 9 }}
-              tickLine={false}
-              axisLine={false}
-              interval={step - 1}
-            />
+            <XAxis dataKey="dateShort" tick={{ fill: "#475569", fontSize: 9 }} tickLine={false} axisLine={false} interval={step - 1} />
 
             <YAxis
               domain={[0, 4]}
               ticks={[0, 1, 2, 3, 4]}
               tick={(props: unknown) => {
-                const p = props as {
-                  y?: number;
-                  payload?: { value?: number };
-                  value?: number;
-                };
-
+                const p = props as { y?: number; payload?: { value?: number }; value?: number };
                 const y = typeof p.y === "number" ? p.y : 0;
                 const value = Number(p.payload?.value ?? p.value ?? 0);
                 const label = REGIME_VALUE_LABELS[value] ?? "UNK";
-                const color =
-                  REGIME_COLORS[
-                    label === "UNK" ? "UNKNOWN/DEGRADED" : label
-                  ] ?? "#6B7280";
+                const color = REGIME_COLORS[label === "UNK" ? "UNKNOWN/DEGRADED" : label] ?? "#6B7280";
 
                 return (
                   <text x={2} y={y + 3} fill={color} fontSize={7} fontWeight="bold">
@@ -206,11 +180,7 @@ export default function MobileChainChart({
 
             <Tooltip content={<CustomTooltip />} />
 
-            <ReferenceLine
-              y={2}
-              stroke="rgba(255,255,255,0.1)"
-              strokeDasharray="3 3"
-            />
+            <ReferenceLine y={2} stroke="rgba(255,255,255,0.1)" strokeDasharray="3 3" />
 
             <Area
               type="stepAfter"
@@ -226,9 +196,7 @@ export default function MobileChainChart({
       </div>
 
       <div className="mt-2 touch-pan-x">
-        <div className="mb-1 text-[9px] uppercase tracking-wider text-slate-600">
-          Confidence
-        </div>
+        <div className="mb-1 text-[9px] uppercase tracking-wider text-slate-600">Confidence</div>
 
         <ResponsiveContainer width="100%" height={50}>
           <AreaChart data={chartRows} margin={{ top: 2, right: 4, left: 42, bottom: 0 }}>
@@ -242,20 +210,9 @@ export default function MobileChainChart({
             <XAxis dataKey="dateShort" hide />
             <YAxis domain={[0, 1]} hide />
 
-            <ReferenceLine
-              y={0.4}
-              stroke="rgba(255,100,100,0.3)"
-              strokeDasharray="3 3"
-            />
+            <ReferenceLine y={0.4} stroke="rgba(255,100,100,0.3)" strokeDasharray="3 3" />
 
-            <Area
-              type="monotone"
-              dataKey="confidence"
-              stroke="#22d3ee"
-              strokeWidth={1.5}
-              fill="url(#confGrad)"
-              dot={false}
-            />
+            <Area type="monotone" dataKey="confidence" stroke="#22d3ee" strokeWidth={1.5} fill="url(#confGrad)" dot={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -263,10 +220,7 @@ export default function MobileChainChart({
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
         {(["CONGESTED", "HEATING", "STABLE", "CHEAP"] as const).map((label) => (
           <span key={label} className="flex items-center gap-1 text-[9px] text-slate-600">
-            <span
-              className="h-1.5 w-3 rounded-full"
-              style={{ backgroundColor: REGIME_COLORS[label] }}
-            />
+            <span className="h-1.5 w-3 rounded-full" style={{ backgroundColor: REGIME_COLORS[label] }} />
             {label}
           </span>
         ))}

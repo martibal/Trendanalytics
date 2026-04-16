@@ -1,7 +1,9 @@
-import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import Link from "next/link";
 import { CHAIN_LIST } from "@/config/chains";
 import { readStorageObject } from "@/lib/storage";
+import { computeHistoryDepthDays } from "@/lib/historyDepth";
+import { readDatasetManifest } from "@/lib/dataset";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import {
   parseMobileChainState,
   regimeColor,
@@ -9,8 +11,6 @@ import {
   CHAIN_COLORS,
   type MobileChainState,
 } from "@/lib/mobile/data";
-import { computeHistoryDepthDays } from "@/lib/historyDepth";
-import { readDatasetManifest } from "@/lib/dataset";
 import "server-only";
 
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
@@ -74,21 +74,13 @@ function FreshnessIndicator({ status }: { status: string }) {
   );
 }
 
-function ConfidenceBar({
-  score,
-  label,
-}: {
-  score: number | null;
-  label: string | null;
-}) {
+function ConfidenceBar({ score, label }: { score: number | null; label: string | null }) {
   const pct = typeof score === "number" ? Math.round(score * 100) : 0;
   const color = regimeColor(label);
   return (
     <div className="mt-2">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wider text-slate-500">
-          Confidence
-        </span>
+        <span className="text-[10px] uppercase tracking-wider text-slate-500">Confidence</span>
         <span className="text-[11px] font-bold text-slate-200">
           {typeof score === "number" ? score.toFixed(3) : "—"}
         </span>
@@ -149,16 +141,12 @@ function ChainCard({ state }: { state: MobileChainState }) {
 
         <ConfidenceBar score={state.confidenceScore} label={state.regimeLabel} />
 
-        {state.oneLiner && (
-          <p className="mt-2.5 text-[11px] leading-[1.6] text-slate-400">
-            {state.oneLiner}
-          </p>
-        )}
+        {state.oneLiner ? (
+          <p className="mt-2.5 text-[11px] leading-[1.6] text-slate-400">{state.oneLiner}</p>
+        ) : null}
 
         <div className="mt-2.5 flex items-center justify-between">
-          <span className="text-[10px] text-slate-600">
-            Tap for history and drivers →
-          </span>
+          <span className="text-[10px] text-slate-600">Tap for history and drivers →</span>
           <FreshnessIndicator status={state.freshnessStatus} />
         </div>
       </div>
@@ -172,7 +160,6 @@ export default async function MobileOverviewPage() {
     readDatasetManifest(),
     computeHistoryDepthDays(),
   ]);
-
   const publishedAt = dataset?.published_at?.slice(0, 10) ?? null;
 
   return (
@@ -181,42 +168,50 @@ export default async function MobileOverviewPage() {
         <div className="flex items-center justify-between py-3">
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">
-              Urd Atlas
+              Urd Atlas Mobile
             </div>
-            <div className="mt-0.5 text-[11px] text-slate-500">
-              On-chain regime classification
-            </div>
+            <div className="mt-0.5 text-[11px] text-slate-500">Current chain state first</div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] font-bold text-white">
-              {publishedAt ?? "—"}
-            </div>
-            <div className="mt-0.5 text-[10px] text-slate-500">
-              {historyDays ?? "—"} published days
-            </div>
+            <div className="text-[11px] font-bold text-white">{publishedAt ?? "—"}</div>
+            <div className="mt-0.5 text-[10px] text-slate-500">{historyDays ?? "—"} published days</div>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 space-y-3 px-4 py-4 pb-24">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.25em] text-slate-500">
-          Current chain state
-        </div>
+      <main className="flex-1 space-y-4 px-4 py-4 pb-24">
+        <section className="rounded-2xl border border-cyan-500/15 bg-cyan-500/[0.04] p-4">
+          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300/80">How to use this</div>
+          <p className="mt-2 text-[13px] leading-[1.7] text-slate-200">
+            Start with the current status cards below. Then open a chain for recent history,
+            drivers, confidence, and context.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/mobile/track-record" className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200">
+              Track record
+            </Link>
+            <Link href="/mobile/plans" className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200">
+              Plans
+            </Link>
+            <Link href="/mobile/wiki" className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200">
+              Wiki
+            </Link>
+          </div>
+        </section>
+
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.25em] text-slate-500">Current chain state</div>
 
         {states.map((state) => (
           <ChainCard key={state.chain} state={state} />
         ))}
 
-        <div className="mt-4 rounded-xl border border-white/6 bg-white/[0.02] px-4 py-3 text-center">
+        <div className="rounded-xl border border-white/6 bg-white/[0.02] px-4 py-3 text-center">
           <div className="text-[10px] leading-[1.7] text-slate-500">
             {historyDays ?? "—"} published days · every day since December 2024
           </div>
-          <a
-            href="https://urdatlas.com"
-            className="mt-1.5 inline-block text-[11px] font-semibold text-cyan-400"
-          >
-            Full analysis and API → urdatlas.com
-          </a>
+          <Link href="/?view=desktop" className="mt-1.5 inline-block text-[11px] font-semibold text-cyan-400">
+            Open desktop analysis →
+          </Link>
         </div>
       </main>
 
