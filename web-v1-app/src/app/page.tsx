@@ -22,6 +22,7 @@ import Plans from "@/components/landing/Plans";
 import { computeHistoryDepthDays } from "@/lib/historyDepth";
 import JsonLayers from "@/components/landing/JsonLayers";
 import ExploreGrid from "@/components/landing/ExploreGrid";
+import UseCases from "@/components/landing/UseCases";
 import DataContractDetails from "@/components/landing/DataContractDetails";
 import MobileLanding from "@/components/mobile/MobileLanding";
 
@@ -286,9 +287,10 @@ async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
     CHAIN_LIST.map(async (chain) => {
       const meta = await readPublishedJson<MetaLatest>(`data/published/v1/meta/${chain.id}/latest.json`);
       const asOf = meta?.date ?? meta?.updated_through ?? meta?.regime?.asof_date ?? null;
-      // Always compute lag dynamically from as_of date at render time
-      // Do not trust lag_days_vs_utc_today from JSON — it becomes stale as days pass
-      const lagDays = lagDaysFromIsoDay(asOf ?? undefined);
+      const lagDays =
+        typeof meta?.confidence?.lag_days_vs_utc_today === "number"
+          ? meta.confidence.lag_days_vs_utc_today
+          : lagDaysFromIsoDay(asOf ?? undefined);
 
       return {
         chain: chain.id,
@@ -487,13 +489,13 @@ export default async function HomePage() {
         <ModalStyles />
 
         <Hero historyDepthDays={historyDepthDays} />
-        <LiveChains rows={displayRows} />
+        <UseCases />
         <div className="mt-10">
           <Plans historyDepthDays={historyDepthDays} />
         </div>
+        <LiveChains rows={displayRows} />
         <JsonLayers />
         <ExploreGrid />
-        <DataContractDetails dataset={dataset} dataSource={currentDataSource()} />
 
         <ExplainModal
           id="what-is-modal"

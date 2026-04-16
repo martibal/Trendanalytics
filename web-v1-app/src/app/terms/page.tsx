@@ -26,20 +26,40 @@ export default function TermsPage() {
   return (
     <main className="mx-auto max-w-4xl px-6 py-10">
       <header className="mb-8">
-        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.06),transparent_40%)] p-8">
-          <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">Terms of Service</div>
-          <h1 className="mt-3 text-4xl font-semibold leading-tight text-white sm:text-5xl">
-            Terms of Service
-          </h1>
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
-            These Terms govern access to the Urd Atlas public website, subscriber dashboard,
-            and authenticated JSON delivery API. By creating an account or purchasing a
-            subscription, you agree to be bound by these Terms.
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">Terms of Service</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              These Terms govern access to the Urd Atlas public website, subscriber dashboard,
+              and authenticated JSON delivery API.
+            </p>
+          </div>
+
+          <div className="rounded-xl border px-4 py-3 text-sm">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Status
+            </div>
+            <div className="mt-1 font-medium text-foreground">
+              Current terms version
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Applies to the current public site, dashboard, and authenticated delivery API.
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground">
+          <div className="font-medium text-foreground">Important</div>
+          <p className="mt-2">
+            These Terms apply to the current public website, subscriber dashboard, and
+            authenticated JSON delivery API. By creating an account, purchasing a subscription,
+            generating or using an API key, or otherwise using authenticated features of the
+            service, you agree to be bound by these Terms.
           </p>
-          <div className="mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
+          <p className="mt-2">
             Urd Atlas is descriptive only. It does not provide investment advice, trading advice,
             forecasts, or recommendations.
-          </div>
+          </p>
         </div>
       </header>
 
@@ -204,12 +224,24 @@ export default function TermsPage() {
 
         <Section title="10. Data Sources and Attribution">
           <p>
-            Urd Atlas uses public blockchain-derived data and published internal transformations of
-            those data artifacts.
+            The underlying blockchain transaction data used in Urd Atlas classifications is sourced
+            from <strong className="text-foreground">AWS Public Blockchain Data</strong>, a publicly
+            available dataset provided through the AWS Open Data Program
+            (registry.opendata.aws/aws-public-blockchain). This dataset is made freely available
+            for research, analytics, and commercial use.
           </p>
           <p>
-            AWS Public Blockchain Data attribution must remain visible where required by the
-            product specification and related documentation.
+            Urd Atlas does not redistribute raw blockchain data. The published outputs — regime
+            labels, confidence scores, scorecards, driver attribution, rolling averages, and all
+            derived JSON artifacts — are original analytical work produced by Urd Atlas&apos;s own
+            classification pipeline and methodology. These outputs constitute independent
+            intellectual property and are distinct from the underlying source data.
+          </p>
+          <p>
+            The distinction is material: Urd Atlas sells access to its analytical layer — the
+            normalisation, baseline scoring, persistence logic, confidence gating, and published
+            classification — not access to raw blockchain records. Subscribers receive Urd Atlas&apos;s
+            derived outputs, not copies or transformations of the AWS Public Blockchain Data source files.
           </p>
           <p>
             Additional information about methodology and data presentation is available at{" "}
