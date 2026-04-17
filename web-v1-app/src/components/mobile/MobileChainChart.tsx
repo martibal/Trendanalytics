@@ -28,7 +28,7 @@ const REGIME_VALUES: Record<string, number> = {
   "UNKNOWN/DEGRADED": 0,
 };
 
-const REGIME_LABEL_MAP: Record<number, string> = {
+const REGIME_VALUE_LABELS: Record<number, string> = {
   4: "CONGESTED",
   3: "HEATING",
   2: "STABLE",
@@ -42,7 +42,7 @@ function shortDate(date: string): string {
 }
 
 function toChartRows(rows: HistoryRow[]): ChartRow[] {
-  return [...rows].reverse().map((r) => ({
+  return rows.map((r) => ({
     date: r.date,
     dateShort: shortDate(r.date),
     regimeValue: REGIME_VALUES[r.label ?? ""] ?? 0,
@@ -64,48 +64,31 @@ function RegimeChart({
   selected: ChartRow | null;
   onSelect: (r: ChartRow) => void;
 }) {
-  const VH = 180;
-  const VW = 320;
-  const W_LABEL = 54;
-  const PAD_TOP = 10;
-  const PAD_BOT = 22;
-  const innerH = VH - PAD_TOP - PAD_BOT;
-  const innerW = VW - W_LABEL;
-
   const n = rows.length;
-  const slotW = innerW / n;
-  const xOf = (i: number) => W_LABEL + i * slotW;
-  const yOf = (v: number) => PAD_TOP + innerH - (v / 4) * innerH;
+  const slotW = Math.max(18, Math.min(34, 520 / Math.max(n, 1)));
+  const W_LABEL = 40;
+  const H = 118;
+  const PAD_TOP = 6;
+  const PAD_BOTTOM = 12;
+  const innerH = H - PAD_TOP - PAD_BOTTOM;
+  const VW = W_LABEL + n * slotW;
+  const VH = H;
 
-  // Step fill path
-  let fillD = "";
-  let linePath = "";
-  rows.forEach((r, i) => {
-    const x1 = xOf(i);
-    const x2 = xOf(i + 1);
-    const y = yOf(r.regimeValue);
-    if (i === 0) {
-      fillD += `M ${x1} ${y}`;
-      linePath += `M ${x1} ${y}`;
-    } else {
-      fillD += ` L ${x1} ${y}`;
-      linePath += ` L ${x1} ${y}`;
-    }
-    fillD += ` L ${x2} ${y}`;
-    linePath += ` L ${x2} ${y}`;
-  });
-  fillD += ` L ${VW} ${PAD_TOP + innerH} L ${W_LABEL} ${PAD_TOP + innerH} Z`;
+  const xOf = (i: number) => W_LABEL + i * slotW + slotW / 2;
+  const yOf = (v: number) => PAD_TOP + ((4 - v) / 4) * innerH;
 
-  const step = Math.max(1, Math.floor(n / 5));
-  const xLabels = rows.filter((_, i) => i === 0 || i % step === 0 || i === n - 1);
+  const stepPath = rows
+    .map((r, i) => {
+      const x = xOf(i);
+      const y = yOf(r.regimeValue);
+      if (i === 0) return `M ${x} ${y}`;
+      const prevX = xOf(i) - slotW;
+      return `L ${prevX + slotW} ${yOf(rows[i - 1]!.regimeValue)} L ${prevX + slotW} ${y}`;
+    })
+    .join(" ");
 
   return (
-    <svg
-      viewBox={`0 0 ${VW} ${VH}`}
-      width="100%"
-      style={{ display: "block", overflow: "visible" }}
-      preserveAspectRatio="none"
-    >
+    <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" height="118" preserveAspectRatio="none" style={{ display: "block" }}>
       <defs>
         <linearGradient id="rgGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={chainColor} stopOpacity="0.22" />
@@ -113,62 +96,34 @@ function RegimeChart({
         </linearGradient>
       </defs>
 
-      {/* Grid */}
-      {[0, 1, 2, 3, 4].map((v) => (
-        <line key={v} x1={W_LABEL} x2={VW} y1={yOf(v)} y2={yOf(v)}
-          stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-      ))}
-
-      {/* Neutral (STABLE) emphasis */}
-      <line x1={W_LABEL} x2={VW} y1={yOf(2)} y2={yOf(2)}
-        stroke="rgba(255,255,255,0.12)" strokeDasharray="4 4" />
-
-      {/* Y labels */}
-      {[4, 3, 2, 1, 0].map((v) => {
-        const lbl = REGIME_LABEL_MAP[v] ?? "UNK";
-        const col = REGIME_COLORS[lbl === "UNK" ? "UNKNOWN/DEGRADED" : lbl] ?? "#6B7280";
+      {[0, 1, 2, 3, 4].map((v) => {
+        const y = yOf(v);
+        const label = REGIME_VALUE_LABELS[v];
+        const c = REGIME_COLORS[label === "UNK" ? "UNKNOWN/DEGRADED" : label] ?? "#6B7280";
         return (
-          <text key={v} x={2} y={yOf(v) + 4} fill={col} fontSize={8}
-            fontWeight="bold" fontFamily="monospace">
-            {lbl.slice(0, 5)}
-          </text>
+          <g key={v}>
+            <line x1={W_LABEL} x2={VW} y1={y} y2={y} stroke="rgba(255,255,255,0.06)" />
+            <text x={2} y={y + 3} fill={c} fontSize={7} fontWeight="bold">{label}</text>
+          </g>
         );
       })}
 
-      {/* Fill */}
-      <path d={fillD} fill="url(#rgGrad)" />
+      <path d={stepPath} fill="none" stroke={chainColor} strokeWidth={2.2} />
 
-      {/* Line */}
-      <path d={linePath} fill="none" stroke={chainColor} strokeWidth={2.5} />
-
-      {/* X labels */}
-      {xLabels.map((r) => {
-        const i = rows.indexOf(r);
-        const cx = xOf(i) + slotW / 2;
+      {rows.map((r, i) => {
+        const x = xOf(i);
+        const y = yOf(r.regimeValue);
+        const isSelected = selected?.date === r.date;
         return (
-          <text key={r.date} x={cx} y={VH - 5} textAnchor="middle"
-            fill="#475569" fontSize={9}>
-            {r.dateShort}
-          </text>
+          <g key={r.date}>
+            <circle cx={x} cy={y} r={isSelected ? 4.4 : 3.2} fill={r.color} stroke="#0A0E1A" strokeWidth={isSelected ? 1.8 : 1.2} />
+            <rect x={W_LABEL + i * slotW} y={0} width={slotW} height={VH} fill="transparent" style={{ cursor: "pointer" }} onClick={() => onSelect(r)} />
+            {n <= 22 || i % Math.ceil(n / 6) === 0 ? (
+              <text x={x} y={VH - 1} textAnchor="middle" fill="#64748b" fontSize={7}>{r.dateShort}</text>
+            ) : null}
+          </g>
         );
       })}
-
-      {/* Selected dot */}
-      {selected && (() => {
-        const idx = rows.findIndex((r) => r.date === selected.date);
-        if (idx < 0) return null;
-        const cx = xOf(idx) + slotW / 2;
-        const cy = yOf(selected.regimeValue);
-        return <circle cx={cx} cy={cy} r={5} fill={selected.color}
-          stroke="#0A0E1A" strokeWidth={2} />;
-      })()}
-
-      {/* Tap targets */}
-      {rows.map((r, i) => (
-        <rect key={r.date} x={xOf(i)} y={PAD_TOP} width={slotW} height={innerH}
-          fill="transparent" style={{ cursor: "pointer" }}
-          onClick={() => onSelect(r)} />
-      ))}
     </svg>
   );
 }
@@ -182,117 +137,105 @@ function ConfidenceChart({
   selected: ChartRow | null;
   onSelect: (r: ChartRow) => void;
 }) {
-  const VH = 72;
-  const VW = 320;
-  const W_LABEL = 28;
-  const PAD_TOP = 8;
-  const PAD_BOT = 4;
-  const innerH = VH - PAD_TOP - PAD_BOT;
-  const innerW = VW - W_LABEL;
-
   const n = rows.length;
-  if (n < 2) return null;
+  const slotW = Math.max(18, Math.min(34, 520 / Math.max(n, 1)));
+  const W_LABEL = 24;
+  const H = 86;
+  const PAD_TOP = 6;
+  const PAD_BOTTOM = 12;
+  const innerH = H - PAD_TOP - PAD_BOTTOM;
+  const VW = W_LABEL + n * slotW;
+  const VH = H;
 
-  const slotW = innerW / n;
   const xOf = (i: number) => W_LABEL + i * slotW + slotW / 2;
-  const yOf = (v: number) => PAD_TOP + innerH - v * innerH;
+  const yOf = (v: number) => PAD_TOP + innerH - Math.max(0, Math.min(1, v)) * innerH;
 
-  const points = rows.map((r, i) => `${xOf(i)},${yOf(r.confidence)}`).join(" ");
-  const fillD =
-    `M ${xOf(0)} ${yOf(rows[0]!.confidence)} ` +
-    rows.slice(1).map((r, i) => `L ${xOf(i + 1)} ${yOf(r.confidence)}`).join(" ") +
-    ` L ${xOf(n - 1)} ${VH} L ${xOf(0)} ${VH} Z`;
-
+  const linePath = rows
+    .map((r, i) => `${i === 0 ? "M" : "L"} ${xOf(i)} ${yOf(r.confidence)}`)
+    .join(" ");
+  const fillD = `${linePath} L ${xOf(n - 1)} ${VH - PAD_BOTTOM} L ${xOf(0)} ${VH - PAD_BOTTOM} Z`;
   const gateY = yOf(0.4);
 
   return (
-    <svg viewBox={`0 0 ${VW} ${VH}`} width="100%"
-      style={{ display: "block" }} preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" height="86" preserveAspectRatio="none" style={{ display: "block" }}>
       <defs>
         <linearGradient id="cfGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.02" />
+          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.03" />
         </linearGradient>
       </defs>
 
-      {/* Gate line */}
-      <line x1={W_LABEL} x2={VW} y1={gateY} y2={gateY}
-        stroke="rgba(255,80,80,0.4)" strokeDasharray="4 3" strokeWidth={1} />
-      <text x={W_LABEL + 2} y={gateY - 2} fill="rgba(255,80,80,0.5)" fontSize={7}>
-        0.40
-      </text>
+      {[0, 0.4, 1].map((v) => {
+        const y = yOf(v);
+        return <line key={v} x1={W_LABEL} x2={VW} y1={y} y2={y} stroke={v === 0.4 ? "rgba(255,80,80,0.35)" : "rgba(255,255,255,0.06)"} strokeDasharray={v === 0.4 ? "4 3" : undefined} />;
+      })}
+      <text x={2} y={yOf(1) + 3} fill="#64748b" fontSize={7}>1.0</text>
+      <text x={2} y={gateY - 2} fill="rgba(255,80,80,0.5)" fontSize={7}>0.40</text>
+      <text x={2} y={yOf(0) - 2} fill="#64748b" fontSize={7}>0.0</text>
 
       <path d={fillD} fill="url(#cfGrad)" />
-      <polyline points={points} fill="none" stroke="#22d3ee" strokeWidth={1.8} />
+      <path d={linePath} fill="none" stroke="#22d3ee" strokeWidth={1.8} />
 
-      {selected && (() => {
-        const idx = rows.findIndex((r) => r.date === selected.date);
-        if (idx < 0) return null;
-        return <circle cx={xOf(idx)} cy={yOf(selected.confidence)} r={3.5}
-          fill="#22d3ee" stroke="#0A0E1A" strokeWidth={1.5} />;
-      })()}
-
-      {rows.map((r, i) => (
-        <rect key={r.date} x={W_LABEL + i * slotW} y={0} width={slotW} height={VH}
-          fill="transparent" style={{ cursor: "pointer" }}
-          onClick={() => onSelect(r)} />
-      ))}
+      {rows.map((r, i) => {
+        const x = xOf(i);
+        const y = yOf(r.confidence);
+        const isSelected = selected?.date === r.date;
+        return (
+          <g key={r.date}>
+            <circle cx={x} cy={y} r={isSelected ? 3.8 : 2.8} fill="#22d3ee" stroke="#0A0E1A" strokeWidth={1.2} />
+            <rect x={W_LABEL + i * slotW} y={0} width={slotW} height={VH} fill="transparent" style={{ cursor: "pointer" }} onClick={() => onSelect(r)} />
+          </g>
+        );
+      })}
     </svg>
   );
 }
 
-export default function MobileChainChart({
-  rows,
-  chainColor,
-}: {
-  rows: HistoryRow[];
-  chainColor: string;
-}) {
+export default function MobileChainChart({ rows, chainColor }: { rows: HistoryRow[]; chainColor: string }) {
   const chartRows = useMemo(() => toChartRows(rows), [rows]);
-  const [selected, setSelected] = useState<ChartRow | null>(null);
+  const [selected, setSelected] = useState<ChartRow | null>(chartRows[chartRows.length - 1] ?? null);
 
   if (chartRows.length === 0) {
     return (
-      <div className="flex h-36 items-center justify-center text-[11px] text-slate-600">
-        No history available
+      <div className="flex h-36 items-center justify-center rounded-xl border border-dashed border-white/10 text-[11px] text-slate-600">
+        No history available for this chart yet.
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      {/* Selected callout */}
       {selected ? (
-        <div className="rounded-xl px-3 py-2.5 text-[11px]"
-          style={{ backgroundColor: selected.color + "18", border: `1px solid ${selected.color}33` }}>
+        <div className="rounded-xl px-3 py-2.5 text-[11px]" style={{ backgroundColor: `${selected.color}18`, border: `1px solid ${selected.color}33` }}>
           <div className="flex items-center justify-between gap-2">
             <span className="text-slate-400">{selected.date}</span>
             <span className="font-black" style={{ color: selected.color }}>{selected.label ?? "—"}</span>
             <span className="text-slate-400">{selected.confidence.toFixed(3)}</span>
           </div>
-          {selected.oneLiner && (
-            <div className="mt-1 text-[10px] leading-[1.5] text-slate-500">{selected.oneLiner}</div>
-          )}
+          {selected.oneLiner ? <div className="mt-1 text-[10px] leading-[1.5] text-slate-500">{selected.oneLiner}</div> : null}
         </div>
-      ) : (
-        <div className="text-[10px] text-slate-600">Tap any point to inspect that day</div>
-      )}
+      ) : null}
 
-      {/* Regime */}
+      <div className="text-[10px] text-slate-600">Tap any point to inspect that day</div>
+
       <div className="overflow-hidden rounded-xl border border-white/8 bg-black/15 p-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-600">Regime</div>
-        <RegimeChart rows={chartRows} chainColor={chainColor} selected={selected} onSelect={setSelected} />
-      </div>
-
-      {/* Confidence */}
-      <div className="overflow-hidden rounded-xl border border-white/8 bg-black/15 p-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-600">
-          Confidence — 0.40 = publish gate
+        <div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div style={{ minWidth: `${Math.max(320, chartRows.length * 18 + 52)}px` }}>
+            <RegimeChart rows={chartRows} chainColor={chainColor} selected={selected} onSelect={setSelected} />
+          </div>
         </div>
-        <ConfidenceChart rows={chartRows} selected={selected} onSelect={setSelected} />
       </div>
 
-      {/* Legend */}
+      <div className="overflow-hidden rounded-xl border border-white/8 bg-black/15 p-2">
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-600">Confidence — 0.40 = publish gate</div>
+        <div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div style={{ minWidth: `${Math.max(320, chartRows.length * 18 + 32)}px` }}>
+            <ConfidenceChart rows={chartRows} selected={selected} onSelect={setSelected} />
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-wrap gap-x-3 gap-y-1">
         {(["CONGESTED", "HEATING", "STABLE", "CHEAP"] as const).map((label) => (
           <span key={label} className="flex items-center gap-1 text-[10px] text-slate-500">

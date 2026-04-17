@@ -19,8 +19,11 @@ function arrayBufferToUtf8(buffer: ArrayBuffer): string {
 async function readPublishedJson<T>(path: string): Promise<T | null> {
   const result = await readStorageObject(path);
   if (!result) return null;
-  try { return JSON.parse(arrayBufferToUtf8(result.body)) as T; }
-  catch { return null; }
+  try {
+    return JSON.parse(arrayBufferToUtf8(result.body)) as T;
+  } catch {
+    return null;
+  }
 }
 
 type MetaHistoryRow = {
@@ -30,34 +33,80 @@ type MetaHistoryRow = {
   confidence?: { confidence_score?: number };
 };
 
-async function buildHistoryRows(chain: ChainId, window: 30 | 90) {
-  const data = await readPublishedJson<{ rows?: MetaHistoryRow[] }>(
-    `data/published/v1/meta/${chain}/last${window}d.json`
-  );
-  return (data?.rows ?? [])
-    .filter((r) => typeof r.date === "string")
-    .map((r) => ({
-      date: r.date!,
-      label: r.status?.label ?? r.regime?.label ?? null,
-      confidence: typeof r.confidence?.confidence_score === "number" ? r.confidence.confidence_score : null,
-      oneLiner: r.status?.one_liner ?? null,
-    }))
-    .sort((a, b) => b.date.localeCompare(a.date));
+type HistoryBundle =
+  | MetaHistoryRow[]
+  | {
+      rows?: MetaHistoryRow[];
+      items?: MetaHistoryRow[];
+      data?: MetaHistoryRow[];
+    };
+
+function extractHistoryRows(bundle: HistoryBundle | null): MetaHistoryRow[] {
+  if (!bundle) return [];
+  if (Array.isArray(bundle)) return bundle;
+  if (Array.isArray(bundle.rows)) return bundle.rows;
+  if (Array.isArray(bundle.items)) return bundle.items;
+  if (Array.isArray(bundle.data)) return bundle.data;
+  return [];
 }
 
-function ScoreBar({ label, score, color, description }: {
-  label: string; score: number | null; color: string; description: string;
+async function buildHistoryRows(chain: ChainId) {
+  const candidateWindows = [30, 90, 365] as const;
+
+  for (const window of candidateWindows) {
+    const bundle = await readPublishedJson<HistoryBundle>(
+      `data/published/v1/meta/${chain}/last${window}d.json`
+    );
+    const rows = extractHistoryRows(bundle)
+      .filter((r) => typeof r.date === "string")
+      .map((r) => ({
+        date: r.date!,
+        label: r.status?.label ?? r.regime?.label ?? null,
+        confidence:
+          typeof r.confidence?.confidence_score === "number"
+            ? r.confidence.confidence_score
+            : null,
+        oneLiner: r.status?.one_liner ?? null,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (rows.length > 0) {
+      return { rows, sourceWindow: window };
+    }
+  }
+
+  return {
+    rows: [] as Array<{
+      date: string;
+      label: string | null;
+      confidence: number | null;
+      oneLiner: string | null;
+    }>,
+    sourceWindow: null as 30 | 90 | 365 | null,
+  };
+}
+
+function ScoreBar({
+  label,
+  score,
+  color,
+  description,
+}: {
+  label: string;
+  score: number | null;
+  color: string;
+  description: string;
 }) {
   const pct = typeof score === "number" ? Math.max(0, Math.min(100, score)) : 50;
   const isAbove50 = pct > 50;
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="mb-1.5 flex items-center justify-between">
         <div>
           <span className="text-[12px] font-bold text-white">{label}</span>
           <span className="ml-2 text-[10px] text-slate-500">{description}</span>
         </div>
-        <span className="text-[12px] font-bold text-white shrink-0 ml-2">
+        <span className="ml-2 shrink-0 text-[12px] font-bold text-white">
           {typeof score === "number" ? Math.round(score) : "—"}
           <span className="text-[10px] font-normal text-slate-500">/100</span>
         </span>
@@ -83,8 +132,8 @@ function ScoreBar({ label, score, color, description }: {
 }
 
 function TrendArrow({ trend }: { trend: string | null }) {
-  if (trend === "HEATING") return <span className="text-amber-300 font-bold">↑</span>;
-  if (trend === "COOLING") return <span className="text-blue-300 font-bold">↓</span>;
+  if (trend === "HEATING") return <span className="font-bold text-amber-300">↑</span>;
+  if (trend === "COOLING") return <span className="font-bold text-blue-300">↓</span>;
   return <span className="text-slate-500">→</span>;
 }
 
@@ -105,29 +154,32 @@ export default async function MobileChainPage({
   const cfg = CHAINS[chainId];
   if (!cfg) notFound();
 
-  const [meta, historyRows] = await Promise.all([
+  const [meta, history] = await Promise.all([
     readPublishedJson<Record<string, unknown>>(
       `data/published/v1/meta/${chainId}/latest.json`
     ),
-    buildHistoryRows(chainId, 30),
+    buildHistoryRows(chainId),
   ]);
 
+  const historyRows = history.rows;
   const state = parseMobileChainState(chainId, cfg.label, cfg.name, meta as never);
   const color = regimeColor(state.regimeLabel);
   const bg = regimeBg(state.regimeLabel);
   const chainColor = CHAIN_COLORS[chainId];
 
-  // Distribution from history
   const counts = historyRows.reduce<Record<string, number>>((acc, r) => {
     const k = r.label ?? "UNKNOWN/DEGRADED";
     acc[k] = (acc[k] ?? 0) + 1;
     return acc;
   }, {});
 
-  const avgConf = historyRows.filter(r => r.confidence != null).length > 0
-    ? historyRows.filter(r => r.confidence != null).reduce((a, r) => a + r.confidence!, 0)
-      / historyRows.filter(r => r.confidence != null).length
-    : null;
+  const confidenceValues = historyRows
+    .filter((r) => r.confidence != null)
+    .map((r) => r.confidence as number);
+  const avgConf =
+    confidenceValues.length > 0
+      ? confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length
+      : null;
 
   return (
     <div className="flex min-h-screen flex-col bg-[#0A0E1A]">
@@ -136,14 +188,16 @@ export default async function MobileChainPage({
         style={{ background: bg }}
       >
         <div className="flex items-center gap-3 py-3">
-          <Link href="/mobile" className="pr-1 text-lg text-slate-400">←</Link>
+          <Link href="/mobile" className="pr-1 text-lg text-slate-400">
+            ←
+          </Link>
           <div
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-black"
             style={{ backgroundColor: `${chainColor}22`, color: chainColor }}
           >
             {cfg.label}
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-[14px] font-bold text-white">{cfg.name}</div>
             <div className="text-[10px] text-slate-400">
               {state.asOf ?? "—"} · {state.lagDays != null ? `${state.lagDays}d lag` : "—"}
@@ -159,11 +213,9 @@ export default async function MobileChainPage({
       </header>
 
       <main className="flex-1 space-y-4 px-4 py-4 pb-24">
-
-        {/* What this chain is */}
         {cfg.subtitle && (
           <section className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1.5">
+            <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
               About {cfg.label}
             </div>
             <p className="text-[12px] leading-[1.7] text-slate-300">{cfg.subtitle}</p>
@@ -175,12 +227,11 @@ export default async function MobileChainPage({
           </section>
         )}
 
-        {/* Confidence + label */}
         <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Current confidence</div>
-              <div className="text-[32px] font-black text-white leading-none">
+              <div className="mb-1 text-[10px] uppercase tracking-wider text-slate-500">Current confidence</div>
+              <div className="text-[32px] font-black leading-none text-white">
                 {typeof state.confidenceScore === "number" ? state.confidenceScore.toFixed(3) : "—"}
               </div>
             </div>
@@ -214,23 +265,18 @@ export default async function MobileChainPage({
           )}
         </section>
 
-        {/* Scorecard */}
-        <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 space-y-5">
+        <section className="space-y-5 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
           <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
             Scorecard — 0 to 100, 50 is neutral
           </div>
-          <ScoreBar label="Demand" score={state.scorecard.demand?.score ?? null} color="#00FF88"
-            description="Usage pressure" />
-          <ScoreBar label="Friction" score={state.scorecard.friction?.score ?? null} color="#FF4444"
-            description="Cost + failure" />
-          <ScoreBar label="Capacity" score={state.scorecard.capacity?.score ?? null} color="#FF4444"
-            description="Block fullness" />
-          <p className="text-[10px] text-slate-600 leading-[1.6]">
+          <ScoreBar label="Demand" score={state.scorecard.demand?.score ?? null} color="#00FF88" description="Usage pressure" />
+          <ScoreBar label="Friction" score={state.scorecard.friction?.score ?? null} color="#FF4444" description="Cost + failure" />
+          <ScoreBar label="Capacity" score={state.scorecard.capacity?.score ?? null} color="#FF4444" description="Block fullness" />
+          <p className="text-[10px] leading-[1.6] text-slate-600">
             Scores above 50 mean the axis looks more pressured than usual. Below 50 means softer than usual. Low confidence pulls scores toward 50.
           </p>
         </section>
 
-        {/* Drivers */}
         {state.drivers.length > 0 && (
           <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
             <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
@@ -239,162 +285,92 @@ export default async function MobileChainPage({
             <div className="space-y-3">
               {state.drivers.map((d) => (
                 <div key={d.metric} className="rounded-xl border border-white/6 bg-black/10 p-3">
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <code className="text-[11px] font-mono font-bold text-white">{d.metric}</code>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-slate-500">{d.axis}</span>
-                      <TrendArrow trend={d.trend} />
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[12px] font-bold text-white">{d.metric}</div>
+                      <div className="mt-0.5 text-[10px] text-slate-500">{d.axis}</div>
                     </div>
+                    <TrendArrow trend={d.trend} />
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    {d.zRobust != null && (
-                      <div>
-                        <div className="text-[9px] text-slate-600">z-score</div>
-                        <div className="text-[12px] font-bold text-white">
-                          {d.zRobust > 0 ? "+" : ""}{d.zRobust.toFixed(2)}
-                        </div>
-                      </div>
-                    )}
-                    {d.pct90d != null && (
-                      <div>
-                        <div className="text-[9px] text-slate-600">Percentile</div>
-                        <div className="text-[12px] font-bold text-white">{Math.round(d.pct90d)}th</div>
-                      </div>
-                    )}
-                    {d.momentum != null && (
-                      <div>
-                        <div className="text-[9px] text-slate-600">MA7 vs MA30</div>
-                        <div className={`text-[12px] font-bold ${d.momentum > 0 ? "text-amber-300" : "text-blue-300"}`}>
-                          {d.momentum > 0 ? "+" : ""}{d.momentum.toFixed(3)}
-                        </div>
-                      </div>
-                    )}
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400">
+                    {d.zRobust != null && <span>z {d.zRobust > 0 ? "+" : ""}{d.zRobust.toFixed(2)}</span>}
+                    {d.pct90d != null && <span>{Math.round(d.pct90d)}th pct</span>}
+                    {d.momentum != null && <span>mom {d.momentum > 0 ? "+" : ""}{d.momentum.toFixed(2)}</span>}
                   </div>
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-[10px] text-slate-600 leading-[1.6]">
-              z-score: how far above/below the chain's 180-day median. Percentile: where today sits in the last 90 days. MA7 vs MA30: whether the short-term trend is running above or below medium-term.
-            </p>
           </section>
         )}
 
-        {/* History chart */}
         <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex items-center justify-between">
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-              30-day history
+              History
             </div>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-3 rounded-full" style={{ backgroundColor: chainColor }} />
-              <span className="text-[10px] text-slate-500">Regime over time</span>
+            <div className="rounded-lg bg-cyan-500/15 px-2.5 py-1 text-[10px] font-bold text-cyan-300">
+              {history.sourceWindow ? `${history.sourceWindow}d published view` : "No bundle"}
             </div>
           </div>
+
           <MobileChainChart rows={historyRows} chainColor={chainColor} />
-          <p className="mt-3 text-[10px] text-slate-600 leading-[1.6]">
-            Tap any point on the chart to see the label and confidence for that date.
-          </p>
-        </section>
 
-        {/* 30-day stats */}
-        <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-            30-day summary
-          </div>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div className="rounded-xl border border-white/6 bg-black/10 p-3 text-center">
-              <div className="text-[10px] text-slate-600">Avg confidence</div>
-              <div className="text-[18px] font-black text-white mt-0.5">
-                {avgConf != null ? avgConf.toFixed(3) : "—"}
-              </div>
-            </div>
-            <div className="rounded-xl border border-white/6 bg-black/10 p-3 text-center">
-              <div className="text-[10px] text-slate-600">Days in period</div>
-              <div className="text-[18px] font-black text-white mt-0.5">{historyRows.length}</div>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([label, count]) => {
-              const c = regimeColor(label);
-              const pct = Math.round((count / historyRows.length) * 100);
-              return (
-                <span key={label} className="rounded-full px-2.5 py-1 text-[10px] font-bold"
-                  style={{ color: c, backgroundColor: `${c}18`, border: `1px solid ${c}33` }}>
-                  {label.slice(0, 6)} · {count} ({pct}%)
-                </span>
-              );
-            })}
+          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+            <span>
+              {historyRows.length > 0
+                ? `Showing ${historyRows.length} published rows${avgConf != null ? ` · avg confidence ${avgConf.toFixed(3)}` : ""}`
+                : "No published history rows were found for this mobile chart."}
+            </span>
           </div>
         </section>
 
-        {/* Published labels list */}
-        <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-            Published labels
-          </div>
-          <div className="max-h-96 space-y-1.5 overflow-y-auto">
-            {historyRows.slice(0, 60).map((row) => {
-              const rc = regimeColor(row.label);
-              return (
-                <div key={row.date} className="flex items-center gap-3 border-b border-white/5 py-2 last:border-0">
-                  <span className="w-24 shrink-0 text-[11px] text-slate-500">{row.date}</span>
-                  <span
-                    className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black tracking-wide"
-                    style={{ color: rc, backgroundColor: `${rc}18` }}
-                  >
-                    {row.label ?? "—"}
-                  </span>
-                  <span className="text-[10px] text-slate-600 flex-1 truncate">
-                    {typeof row.confidence === "number" ? row.confidence.toFixed(3) : "—"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Determinism hash */}
-        {state.determinismHash && (
-          <section className="rounded-xl border border-white/6 bg-white/[0.02] px-4 py-3">
-            <div className="text-[10px] text-slate-600 mb-1.5">Latest determinism hash</div>
-            <code className="break-all font-mono text-[10px] text-slate-400">{state.determinismHash}</code>
-            <p className="mt-2 text-[10px] text-slate-600 leading-[1.5]">
-              SHA-256 fingerprint of the exact inputs used to produce this label. Verify any past label at urdatlas.com/track-record.
-            </p>
-          </section>
-        )}
-
-        {/* Primer caveats if exists */}
-        {cfg.primer?.caveats && cfg.primer.caveats.length > 0 && (
+        {historyRows.length > 0 && (
           <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-            <div className="mb-2.5 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-              Chain-specific notes
+            <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+              Label distribution
             </div>
-            <div className="space-y-2">
-              {cfg.primer.caveats.map((caveat) => (
-                <div key={caveat} className="flex items-start gap-2.5">
-                  <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400/60" />
-                  <span className="text-[12px] leading-[1.65] text-slate-300">{caveat}</span>
-                </div>
-              ))}
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(counts)
+                .sort((a, b) => b[1] - a[1])
+                .map(([label, count]) => {
+                  const chipColor = regimeColor(label);
+                  const pct = Math.round((count / historyRows.length) * 100);
+                  return (
+                    <span
+                      key={label}
+                      className="rounded-full px-2.5 py-1 text-[10px] font-bold"
+                      style={{
+                        color: chipColor,
+                        backgroundColor: `${chipColor}18`,
+                        border: `1px solid ${chipColor}33`,
+                      }}
+                    >
+                      {label.slice(0, 10)} · {count} ({pct}%)
+                    </span>
+                  );
+                })}
             </div>
           </section>
         )}
 
-        {/* API CTA */}
-        <div className="rounded-2xl border border-cyan-500/15 bg-cyan-500/5 p-4">
-          <div className="text-[12px] font-bold text-white mb-1">Get JSON access for {cfg.label}</div>
-          <p className="text-[11px] text-slate-400 mb-3">
-            Subscribe to receive daily Gold, Meta, and Derived files via API.
-            90-day history on Basic, 365 days on Pro.
-          </p>
-          <Link href="/mobile/plans" className="inline-block rounded-full bg-cyan-400 px-5 py-2 text-[12px] font-black text-[#06111b]">
-            See plans →
+        {state.determinismHash && (
+          <div className="rounded-xl border border-white/6 bg-white/[0.02] px-4 py-3">
+            <div className="mb-1 text-[10px] text-slate-600">Determinism hash</div>
+            <div className="break-all font-mono text-[11px] text-slate-400">
+              {state.determinismHash}
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-cyan-500/15 bg-cyan-500/5 px-4 py-3 text-center">
+          <div className="text-[11px] text-slate-400">Want JSON access for {cfg.label}?</div>
+          <Link href="/mobile/plans" className="mt-1 inline-block text-[12px] font-semibold text-cyan-400">
+            View mobile plans →
           </Link>
         </div>
       </main>
 
-      <MobileBottomNav active={CHAIN_NAV_KEY[chainId] ?? "overview"} />
+      <MobileBottomNav active={CHAIN_NAV_KEY[chainId]} />
     </div>
   );
 }
