@@ -17,9 +17,10 @@ function mapToMobilePath(pathname: string): string | null {
 
   if (pathname === "/track-record") return "/mobile/track-record";
   if (pathname === "/methodology") return "/mobile/methodology";
+  if (pathname === "/thresholds") return "/mobile/thresholds";
   if (pathname === "/about") return "/mobile/methodology";
   if (pathname === "/glossary" || pathname === "/faq") return "/mobile/wiki";
-  if (pathname.startsWith("/api-docs")) return "/mobile/wiki";
+  if (pathname === "/api-docs" || pathname.startsWith("/api-docs/")) return "/mobile/api-docs";
 
   return "/mobile";
 }
