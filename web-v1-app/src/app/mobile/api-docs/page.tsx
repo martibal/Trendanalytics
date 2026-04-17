@@ -5,7 +5,7 @@ const endpointCards = [
   {
     title: "Latest daily file",
     path: "/api/v1/files/<genre>/<chain>/latest.json",
-    body: "Fetch the latest published Gold, Meta, or Derived JSON for a chain.",
+    body: "Fetch the latest published Gold, Meta, or Derived JSON for an entitled chain.",
   },
   {
     title: "Historical window",
@@ -14,8 +14,8 @@ const endpointCards = [
   },
   {
     title: "Schema reference",
-    path: "/api-docs/schema",
-    body: "See every documented field before subscribing.",
+    path: "/api-docs/schema?view=desktop",
+    body: "Open the full field-by-field schema on desktop when you need every attribute.",
   },
 ] as const;
 
@@ -50,9 +50,7 @@ export default function MobileApiDocsPage() {
           </Link>
           <div>
             <div className="text-[14px] font-bold text-white">API Docs</div>
-            <div className="text-[10px] text-slate-500">
-              Simplified mobile reference
-            </div>
+            <div className="text-[10px] text-slate-500">Simplified mobile reference</div>
           </div>
         </div>
       </header>
@@ -61,12 +59,9 @@ export default function MobileApiDocsPage() {
         <div className="rounded-2xl border border-cyan-500/15 bg-cyan-500/5 px-4 py-3">
           <p className="text-[11px] leading-[1.65] text-slate-200">
             This mobile API page is a simplified version of the full desktop docs.
-            Use it to understand the structure quickly, then open the full reference if needed.
+            Use it to understand the structure quickly, then open the full reference when needed.
           </p>
-          <a
-            href="/api-docs?view=desktop"
-            className="mt-2 inline-block text-[11px] font-semibold text-cyan-300"
-          >
+          <a href="/api-docs?view=desktop" className="mt-2 inline-block text-[11px] font-semibold text-cyan-300">
             Open full desktop API docs →
           </a>
         </div>
@@ -88,10 +83,7 @@ export default function MobileApiDocsPage() {
               <p className="mt-2 text-[12px] leading-[1.65] text-slate-300">{card.body}</p>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {card.fields.map((field) => (
-                  <code
-                    key={field}
-                    className="rounded bg-black/25 px-1.5 py-0.5 font-mono text-[10px] text-slate-100"
-                  >
+                  <code key={field} className="rounded bg-black/25 px-1.5 py-0.5 font-mono text-[10px] text-slate-100">
                     {field}
                   </code>
                 ))}
@@ -114,26 +106,6 @@ export default function MobileApiDocsPage() {
                 <p className="mt-2 text-[11px] leading-[1.6] text-slate-400">{card.body}</p>
               </div>
             ))}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-            Need the full reference?
-          </div>
-          <div className="space-y-2">
-            <a
-              href="/api-docs/schema?view=desktop"
-              className="block rounded-xl border border-white/6 bg-black/15 px-4 py-3 text-[12px] font-semibold text-cyan-300"
-            >
-              Open full schema reference →
-            </a>
-            <a
-              href="/api-docs?view=desktop"
-              className="block rounded-xl border border-white/6 bg-black/15 px-4 py-3 text-[12px] font-semibold text-cyan-300"
-            >
-              Open full API docs →
-            </a>
           </div>
         </section>
       </main>
