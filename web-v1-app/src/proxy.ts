@@ -8,7 +8,7 @@ function isMobileRequest(req: NextRequest) {
 function mapToMobilePath(pathname: string): string | null {
   if (pathname.startsWith("/mobile")) return null;
   if (pathname.startsWith("/_next")) return null;
-  if (pathname.startsWith("/api")) return null;
+  if (pathname.startsWith("/api/")) return null;
 
   if (pathname === "/") return "/mobile";
 
