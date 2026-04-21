@@ -1,49 +1,19 @@
-import { InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable } from "../_components";
+import {
+  Callout,
+  InlineCode,
+  MethodologyHeader,
+  MethodologyNav,
+  Section,
+  SimpleTable,
+  WarningCallout,
+} from "../_components";
 
-const rows = [
-  ["date", "Gold / Meta", "ISO date", "UTC calendar date represented by the row", "A"],
-  ["chain", "Gold / Meta", "string", "Chain identifier: bitcoin, ethereum, arbitrum, base", "A"],
-  ["tx_count_daily", "Gold", "integer", "Total confirmed transactions recorded for the UTC date", "B"],
-  ["block_count_daily", "Gold", "integer", "Total blocks recorded for the UTC date", "B"],
-  ["value_transferred_native", "Gold", "number", "Total native-denominated transfer value observed for the day", "B"],
-  ["median_tx_value_native", "Gold", "number", "Median native-denominated transaction value for the day", "B"],
-  ["median_tx_fee_native", "Gold", "number", "Median native-denominated fee burden per transaction for the day", "B"],
-  ["failed_tx_rate", "Gold", "ratio or null", "Share of same-day transactions that failed where those semantics are meaningful and reliable", "B"],
-  ["gas_utilization_pct", "Gold", "ratio or null", "Fraction of available execution capacity consumed during the day where that concept is meaningful and comparable", "B"],
-  ["unique_active_addresses", "Gold", "integer", "Count of distinct same-day sender/recipient addresses after standard exclusions", "B"],
-  ["avg_block_time_sec", "Gold", "number or null", "Typical inter-block interval behavior for the UTC day", "B"],
-  ["<metric>__ma7", "Derived", "number", "7-day simple moving average of the corresponding Gold metric", "A"],
-  ["<metric>__ma30", "Derived", "number", "30-day simple moving average of the corresponding Gold metric", "A"],
-  ["derived.meta_confidence", "Derived", "object subset", "Confidence-related Meta fields copied into Derived for chart rendering", "A"],
-  ["methodology_version", "Meta", "string", "Version identifier of the analytical methodology governing the row", "A"],
-  ["updated_through", "Meta", "ISO date", "Most recent Gold observation date actually available to the Meta calculation", "A"],
-  ["publish_lag_days_policy", "Meta", "integer", "Expected normal publication lag for the chain under current policy", "A"],
-  ["confidence.confidence_score", "Meta", "0–1 number", "Top-line confidence for the published analytical state", "C"],
-  ["confidence.data_quality_score", "Meta", "0–1 number", "Evidence-quality component of confidence", "C"],
-  ["confidence.label_confidence_score", "Meta", "0–1 number", "Classification-clarity component of confidence", "C"],
-  ["confidence.lag_days_vs_asof_date", "Meta", "integer", "Difference in whole UTC days between date and updated_through", "A"],
-  ["confidence.lag_days_vs_utc_today", "Meta/UI", "integer", "Runtime freshness relative to the current UTC date when the row is read", "A (runtime)"],
-  ["scorecard.dimensions.<axis>.score_raw", "Meta", "0–100 number", "Pre-confidence axis score before degradation", "C"],
-  ["scorecard.dimensions.<axis>.score", "Meta", "0–100 number", "Confidence-degraded published axis score", "A/C"],
-  ["scorecard.dimensions.<axis>.effective_confidence", "Meta", "0–1 number", "Axis-level effective confidence applied to the raw score", "C"],
-  ["scorecard.dimensions.<axis>.coverage_factor", "Meta", "0–1 number", "Fraction of expected axis components available for the axis calculation", "C"],
-  ["scorecard.dimensions.<axis>.level", "Meta", "string", "Public display band for the axis score", "A"],
-  ["regime.label", "Meta", "string", "Published categorical regime state", "A"],
-  ["regime.ruleset_id", "Meta", "string", "Versioned identifier of the active chain ruleset/profile", "A"],
-  ["regime.drivers", "Meta", "array", "Top explanatory signals directionally consistent with the published label", "A/C"],
-  ["regime.drivers[].z_robust", "Meta", "number", "Driver-level robust z-score computed from 180-day raw daily history", "C"],
-  ["regime.determinism_hash", "Meta", "12-char hex string or null", "Canonical public integrity anchor for named regime rows", "A"],
-  ["status.label", "Meta", "string", "Presentation-layer status label for display use", "A"],
-  ["status.color", "Meta", "string", "Color family mapping for the status label", "A"],
-  ["status.one_liner", "Meta", "string", "Short presentation summary of scorecard state", "A"],
-] as const;
-
-export default async function MethodologyFieldsPage() {
+export default function MethodologyFieldsPage() {
   return (
-    <main className="mx-auto max-w-7xl px-6 py-10">
+    <main className="mx-auto max-w-6xl px-6 py-10">
       <MethodologyHeader
         title="Field Dictionary"
-        description="Field-by-field definitions for publicly meaningful Gold, Derived, and Meta outputs. Verification classes distinguish what can be recomputed from published artifacts alone and what must instead be checked against public chain evidence."
+        description="This page defines the public meaning of the main published fields and the interpretation warnings that matter most for technical users."
       />
 
       <MethodologyNav />
@@ -51,33 +21,113 @@ export default async function MethodologyFieldsPage() {
       <div className="grid gap-6">
         <Section title="How to use this page">
           <p>
-            This page is the public field dictionary. It is intentionally more compact than the full methodology reference.
-            Use it when you want to answer: what does this field mean, what layer owns it, and how should I verify or interpret it?
-          </p>
-          <p>
-            Verification class <InlineCode>A</InlineCode> means directly reproducible from published artifacts. <InlineCode>B</InlineCode> means independently checkable against public chain evidence. <InlineCode>C</InlineCode> means publicly interpretable but not fully reconstructable.
+            Use this page when you already know the field name and need the public meaning, unit
+            semantics, and interpretation boundaries. For deeper system-level logic, use the Public
+            Methodology Reference page.
           </p>
         </Section>
 
-        <Section title="Public field dictionary">
+        <Section title="Key Gold fields">
           <SimpleTable
-            headers={["Key", "Layer", "Type", "Meaning", "Verification"]}
-            rows={rows.map((row) => [
-              <InlineCode key={`${row[0]}-k`}>{row[0]}</InlineCode>,
-              row[1],
-              row[2],
-              row[3],
-              row[4],
-            ])}
+            headers={["Field", "Meaning", "Notes"]}
+            rows={[
+              [<InlineCode key="tx">tx_count_daily</InlineCode>, <>Confirmed daily transaction count.</>, <>Direct daily chain activity count.</>],
+              [<InlineCode key="fee">median_tx_fee_native</InlineCode>, <>Typical same-day transaction fee in native denomination.</>, <>Published as a median, not an arithmetic average.</>],
+              [<InlineCode key="val">median_tx_value_native</InlineCode>, <>Typical same-day transaction value in native denomination.</>, <>Used in the friction proxy ratio.</>],
+              [<InlineCode key="bt">avg_block_time_sec</InlineCode>, <>Typical daily inter-block interval behavior.</>, <>Interpret as a robust typical block interval field, not as a strict arithmetic mean claim.</>],
+            ]}
           />
         </Section>
 
-        <Section title="Important notes">
-          <ul className="list-disc pl-5">
-            <li><InlineCode>avg_block_time_sec</InlineCode> should be read as a robust typical block interval measure, not as a promise of a simple arithmetic average.</li>
-            <li><InlineCode>confidence.lag_days_vs_utc_today</InlineCode> is runtime freshness context and will change as calendar time advances.</li>
-            <li><InlineCode>regime.determinism_hash</InlineCode> is the primary public integrity anchor for named regime rows because archived Meta rows do not currently publish a separate revision integer.</li>
-          </ul>
+        <Section title="Key Meta fields">
+          <SimpleTable
+            headers={["Field", "Meaning", "Notes"]}
+            rows={[
+              [<InlineCode key="conf">confidence.confidence_score</InlineCode>, <>Top-line confidence of the published analytical state.</>, <>Gate threshold is 0.40.</>],
+              [<InlineCode key="label">regime.label</InlineCode>, <>Published descriptive state.</>, <>May change day to day when threshold conditions change.</>],
+              [<InlineCode key="hash">regime.determinism_hash</InlineCode>, <>Canonical public integrity anchor for named regime rows.</>, <>Used for public row traceability.</>],
+            ]}
+          />
+        </Section>
+
+        <Section title="Field note: regime.drivers[].z_robust">
+          <p>
+            <InlineCode>regime.drivers[].z_robust</InlineCode> is the driver-layer z-score published
+            for a regime driver row. It is computed from 180-day raw daily values, not from the
+            7-day smoothed scorecard series.
+          </p>
+          <WarningCallout title="Important comparison warning">
+            <p>
+              Do not expect <InlineCode>regime.drivers[].z_robust</InlineCode> to numerically match
+              a scorecard dimension score or the internal z-family behind that score. The driver
+              z-score and the scorecard normalization use different input series, different windows,
+              and different purposes. A high published driver z-score does not guarantee a high
+              scorecard dimension score for the same metric on the same day, and the reverse is also
+              true.
+            </p>
+          </WarningCallout>
+        </Section>
+
+        <Section title="Field note: scorecard.dimensions.friction.components.fee_burden_proxy.current">
+          <p>
+            This field is not a native fee amount. It is the current value of an internal friction
+            proxy defined as:
+          </p>
+          <p>
+            <InlineCode>median_tx_fee_native / median_tx_value_native</InlineCode>
+          </p>
+          <p>
+            Its unit is therefore a dimensionless ratio, not a native-denominated fee. It measures
+            fee burden relative to transaction value, not fee size in isolation.
+          </p>
+          <Callout title="Why this matters">
+            <p>
+              A friction score can be elevated even when absolute fees are not unusually high in
+              native terms, because the friction component is based on fee burden relative to
+              transferred value. Customers should therefore read this field as a burden proxy rather
+              than as a direct fee amount.
+            </p>
+          </Callout>
+        </Section>
+
+        <Section title="Field note: scorecard.dimensions.capacity.components.blocktime_instability.current">
+          <p>
+            For BTC capacity interpretation, the capacity axis does not score raw block time
+            directionally. Instead it uses a derived instability proxy built from relative deviation
+            around the recent block-time norm.
+          </p>
+          <p>
+            Public interpretation:
+          </p>
+          <p>
+            <InlineCode>{`|block_time - median30(block_time)| / median30(block_time)`}</InlineCode>,
+            then smoothed before scoring.
+          </p>
+          <WarningCallout title="Directional consequence">
+            <p>
+              This means the BTC capacity score is not a direct measure of “slow blocks only”. It is
+              a measure of unusual block-time behaviour in either direction. A period of unusually
+              fast but stable block times and a period of unusually slow but stable block times can
+              both produce low instability. Customers should therefore read BTC capacity as a
+              stress-or-instability proxy, not as a directional slow-block indicator.
+            </p>
+          </WarningCallout>
+        </Section>
+
+        <Section title="Field note: regime label stability">
+          <p>
+            <InlineCode>regime.label</InlineCode> is a daily descriptive state, not a built-in
+            multi-day stable segmentation layer.
+          </p>
+          <WarningCallout title="Downstream use warning">
+            <p>
+              Labels can change day to day in response to threshold crossings. This matters most for
+              <InlineCode>CONGESTED</InlineCode> and <InlineCode>CHEAP</InlineCode>, which do not
+              have a separate universal multi-day confirmation window. Customers who need multi-day
+              regime stability for downstream analytics should apply their own minimum-duration or
+              smoothing rule.
+            </p>
+          </WarningCallout>
         </Section>
       </div>
     </main>
