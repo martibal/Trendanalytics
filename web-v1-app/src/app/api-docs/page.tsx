@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource } from "@/lib/storage";
 
 const PUBLIC_ENDPOINTS = [
   ["GET", "/api/v1/status", "Per-chain freshness, lag, and publication context."],
@@ -49,8 +48,7 @@ export default async function ApiDocsPage() {
             <div className="font-medium uppercase tracking-[0.12em] text-slate-400">Published context</div>
             <div className="mt-2">Dataset <InlineCode>{dataset?.version ?? "—"}</InlineCode></div>
             <div className="mt-1">Methodology <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
-            <div className="mt-1">Runtime backend <InlineCode>{currentDataSource()}</InlineCode></div>
-            <div className="mt-2 text-slate-400">Runtime backend is a deployment detail, not the primary public provenance truth.</div>
+            <div className="mt-2 text-slate-400">Public provenance is expressed through per-file fields such as <InlineCode>date</InlineCode>, <InlineCode>updated_through</InlineCode>, <InlineCode>methodology_version</InlineCode>, dataset revision, and <InlineCode>regime.determinism_hash</InlineCode>.</div>
           </div>
         </div>
       </header>
@@ -67,7 +65,7 @@ export default async function ApiDocsPage() {
 
         <section className="rounded-2xl border p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-white">Authentication model</h2>
-          <p className="mt-4 text-sm leading-7 text-muted-foreground">Public endpoints require no key. Authenticated file delivery uses <InlineCode>X-API-Key</InlineCode>. Keys are created from the dashboard after purchase. Billing endpoints remain documented but inactive until business registration is completed.</p>
+          <p className="mt-4 text-sm leading-7 text-muted-foreground">Public endpoints require no key. Authenticated file delivery uses <InlineCode>X-API-Key</InlineCode>. Keys are created from the dashboard after purchase. Standard subscriber history stays explicit: Basic covers up to 90 days and Pro covers up to 365 days. If a full-archive unlock is offered separately, it is additional to standard Pro rather than implied by it. Billing endpoints remain documented but inactive until business registration is completed.</p>
           <CodeBlock>{`curl -H "X-API-Key: ta_live_xxxxxxxxx" https://www.urdatlas.com/api/v1/files/meta/bitcoin/90d/latest.json`}</CodeBlock>
         </section>
 

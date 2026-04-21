@@ -23,6 +23,38 @@ export default async function MethodologyChangelogPage() {
             ]}
           />
         </Section>
+        <Section title="Ready-to-use templates for the first real non-docs change">
+          <p>These rows are examples only. They show the level of specificity expected once the first real correction, methodology bump, or archival republish occurs.</p>
+          <SimpleTable
+            headers={["Example class", "Affected artifacts", "Methodology bump?", "Historical rows changed?", "Subscriber action required?", "What the entry should say"]}
+            rows={[
+              [
+                "historical correction template",
+                "gold/<chain>/<date>.json · derived/<chain>/<date>.json · meta/<chain>/<date>.json",
+                "No",
+                "Yes — targeted archived rows",
+                "Maybe",
+                "Explain what source issue or calculation defect was corrected, list the exact dates and chains touched, and state whether subscribers should re-pull those rows.",
+              ],
+              [
+                "methodology-breaking change template",
+                "meta ruleset / scorecard / threshold contract",
+                "Yes — required",
+                "Maybe",
+                "Yes",
+                "State the old and new methodology versions, what changed semantically, whether historical comparability is broken, and whether downstream consumers must re-baseline models or dashboards.",
+              ],
+              [
+                "republished archived rows template",
+                "published archive manifests · affected row bundles",
+                "Depends",
+                "Yes — republished archive subset",
+                "Yes if consumer stores local copies",
+                "Specify which archived files were republished, whether payload identity changed, how to detect affected rows, and whether existing local copies should be replaced.",
+              ],
+            ]}
+          />
+        </Section>
       </div>
     </main>
   );

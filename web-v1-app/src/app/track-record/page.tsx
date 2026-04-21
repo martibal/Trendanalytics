@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource, readStorageObject } from "@/lib/storage";
+import { readStorageObject } from "@/lib/storage";
 import ChainIcon from "@/components/ChainIcon";
 import RegimeBadge from "@/components/RegimeBadge";
 import RegimeTimeline from "@/components/track-record/RegimeTimeline";
@@ -83,6 +83,15 @@ type TrackRecordChainFilter = ChainId | "all";
 type TrackRecordWindowFilter = 30 | 90;
 
 type TrackRecordSearchParams = { chain?: string; window?: string };
+
+type ChainArchiveSummary = {
+  chain: ChainId;
+  chainLabel: string;
+  chainName: string;
+  count: number | null;
+  firstDate: string | null;
+  lastDate: string | null;
+};
 
 // ---------------------------------------------------------------------------
 // Shared UI primitives — identical to chain page and landing page
@@ -332,6 +341,36 @@ async function readChainHistory(chain: ChainId): Promise<TrackRow[]> {
     }));
 }
 
+async function readChainArchiveSummary(chain: ChainId): Promise<ChainArchiveSummary> {
+  const chainCfg = CHAIN_LIST.find((item) => item.id === chain);
+  const manifest = await readPublishedJson<{
+    available_days?: string[];
+    available_dates?: string[];
+    dates?: string[];
+    available_days_count?: number;
+  }>(`data/published/v1/meta/${chain}/manifest.json`);
+
+  const dates = manifest?.available_days ?? manifest?.available_dates ?? manifest?.dates ?? [];
+  const normalizedDates = Array.isArray(dates)
+    ? dates.filter((value): value is string => typeof value === "string" && value.length > 0).sort()
+    : [];
+  const count =
+    normalizedDates.length > 0
+      ? normalizedDates.length
+      : typeof manifest?.available_days_count === "number" && manifest.available_days_count > 0
+        ? manifest.available_days_count
+        : null;
+
+  return {
+    chain,
+    chainLabel: chainCfg?.label ?? chain.toUpperCase(),
+    chainName: chainCfg?.name ?? chain,
+    count,
+    firstDate: normalizedDates[0] ?? null,
+    lastDate: normalizedDates[normalizedDates.length - 1] ?? null,
+  };
+}
+
 function toRegimeBucket(label: string | null): RegimeBucket {
   if (label === "STABLE") return "STABLE";
   if (label === "HEATING") return "HEATING";
@@ -475,8 +514,12 @@ export default async function TrackRecordPage({
       ? ["bitcoin", "ethereum", "arbitrum", "base"]
       : [selectedChain];
 
-  const allRows = (await Promise.all(chainIds.map(readChainHistory)))
-    .flat()
+  const [allRows, archiveSummaries] = await Promise.all([
+    Promise.all(chainIds.map(readChainHistory)).then((rows) => rows.flat()),
+    Promise.all(chainIds.map(readChainArchiveSummary)),
+  ]);
+
+  const sortedRows = allRows
     .sort((a, b) => {
       const da = a.date ?? "";
       const db = b.date ?? "";
@@ -484,7 +527,17 @@ export default async function TrackRecordPage({
       return a.chain.localeCompare(b.chain);
     });
 
-  const filteredRows = allRows.slice(0, selectedWindow * chainIds.length);
+  const filteredRows = sortedRows.slice(0, selectedWindow * chainIds.length);
+  const totalArchiveRows = archiveSummaries.reduce((sum, item) => sum + (item.count ?? 0), 0);
+  const earliestArchiveDate = archiveSummaries
+    .map((item) => item.firstDate)
+    .filter((value): value is string => Boolean(value))
+    .sort()[0] ?? null;
+  const latestArchiveDate = archiveSummaries
+    .map((item) => item.lastDate)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .slice(-1)[0] ?? null;
   const hasAnyRevisionId = filteredRows.some(
     (row) => row.revisionId !== null && row.revisionId !== undefined
   );
@@ -571,7 +624,7 @@ export default async function TrackRecordPage({
                   </div>
                 ) : null}
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span>
+                  Public provenance uses <InlineCode>date</InlineCode>, <InlineCode>updated_through</InlineCode>, <InlineCode>methodology_version</InlineCode>, dataset revision, and <InlineCode>regime.determinism_hash</InlineCode>.
                 </div>
               </div>
             ) : null}
@@ -593,6 +646,49 @@ export default async function TrackRecordPage({
           </div>
         </div>
       </header>
+
+      {/* ── Since inception summary ────────────────────────────────────────── */}
+      <section className="mb-8 rounded-3xl border p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+              Since inception
+            </div>
+            <h2 className="mt-1 text-3xl font-semibold">Public archive summary</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
+              The interactive views below focus on 30d and 90d windows for quick analysis. This
+              summary shows the longer publication record behind the product so a buyer can see
+              both short-window behaviour and long-running operational continuity on the same page.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-4 text-xs text-slate-300">
+            <div className="font-medium uppercase tracking-[0.12em] text-slate-400">Archive overview</div>
+            <div className="mt-2">Visible rows since inception <span className="font-semibold text-white">{totalArchiveRows || "—"}</span></div>
+            <div className="mt-1">First published day <InlineCode>{earliestArchiveDate ?? "—"}</InlineCode></div>
+            <div className="mt-1">Latest published day <InlineCode>{latestArchiveDate ?? "—"}</InlineCode></div>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {archiveSummaries.map((summary) => (
+            <div key={summary.chain} className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3">
+                <ChainIcon chain={summary.chain} className="h-8 w-8 text-xs" label={`${summary.chainLabel} icon`} />
+                <div>
+                  <div className="text-sm font-medium text-white">{summary.chainName}</div>
+                  <div className="text-xs text-muted-foreground">{summary.chainLabel}</div>
+                </div>
+              </div>
+              <div className="mt-4 text-2xl font-semibold text-white">{summary.count ?? "—"}</div>
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Published days since inception</div>
+              <div className="mt-3 space-y-1 text-xs text-slate-300">
+                <div>First row <InlineCode>{summary.firstDate ?? "—"}</InlineCode></div>
+                <div>Latest row <InlineCode>{summary.lastDate ?? "—"}</InlineCode></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ── Filters and summary counts ────────────────────────────────────── */}
       <section className="mb-8 rounded-3xl border p-6 shadow-sm">
@@ -682,7 +778,8 @@ export default async function TrackRecordPage({
           These counts show how many published rows in the selected{" "}
           <span className="font-medium text-white">{selectedWindow}-day window</span> fell into
           each regime bucket. They describe frequency of published labels — not whether one
-          regime is better or worse than another.
+          regime is better or worse than another. The since-inception summary above is the
+          long-horizon trust signal; the 30d / 90d controls below are the short-horizon reading tools.
         </div>
       </section>
 
@@ -1030,22 +1127,17 @@ export default async function TrackRecordPage({
           Data contract and traceability
         </summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span></div>
           <div>
-            History bundles:{" "}
-            <InlineCode>
-              {selectedChain === "all"
-                ? "data/published/v1/meta/<chain>/last90d.json"
-                : `data/published/v1/meta/${selectedChain}/last90d.json`}
-            </InlineCode>
+            History bundles: <InlineCode>{selectedChain === "all" ? "data/published/v1/meta/&lt;chain&gt;/last90d.json" : `data/published/v1/meta/${selectedChain}/last90d.json`}</InlineCode>
           </div>
           <div>
             30d / 90d refers to published daily rows per visible chain, not calendar months
             of recomputed history.
           </div>
+          <div>Since-inception coverage is taken from the per-chain published manifest, while the interactive visual layer reads the canonical 30d / 90d history bundles for speed.</div>
+          <div>Public provenance model: <InlineCode>date</InlineCode> · <InlineCode>updated_through</InlineCode> · <InlineCode>methodology_version</InlineCode> · dataset revision · <InlineCode>regime.determinism_hash</InlineCode></div>
           <div>
-            The correct temporal coordinate for time-series analysis is the{" "}
-            <InlineCode>as_of</InlineCode> date (observation date), not the publication date.
+            The correct temporal coordinate for time-series analysis is the <InlineCode>as_of</InlineCode> date (observation date), not the publication date.
           </div>
         </div>
       </details>

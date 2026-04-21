@@ -220,7 +220,7 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
             },
             {
               name: "Pro", price: "$79/mo", note: "Four chains · 365-day JSON access.",
-              detail: `Best for multi-chain monitoring, heavier API use, and broader research workflows. Full archive: ${days ?? "499"} days and growing.`,
+              detail: `Best for multi-chain monitoring, heavier API use, and broader research workflows. Standard Pro includes 365 days of subscriber API history. The public track record can be longer because it reflects the full published archive.`,
               href: "/sign-up", cta: "Payments open soon", isFree: false,
               className: "border-purple-500/25 bg-purple-500/8",
             },

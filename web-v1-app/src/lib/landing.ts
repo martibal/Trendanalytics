@@ -217,7 +217,7 @@ export const landingPlans = [
     border: "border-purple-500/25 bg-purple-500/8",
     body: "All four chains. API access. 365-day history.",
     detail:
-      "Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Up to 365 days of history. Built for heavier research, multi-chain analysis, and API usage.",
+      "Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Standard Pro includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive.",
     bestFor: "Best for: multi-chain research, backtesting, and production pipelines.",
     href: "/sign-up",
     cta: "Start Pro →",

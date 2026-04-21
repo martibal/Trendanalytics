@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource, readStorageObject } from "@/lib/storage";
+import { readStorageObject } from "@/lib/storage";
 import RegimeBadge from "@/components/RegimeBadge";
 import StalenessBar from "@/components/ui/StalenessBar";
 import ChainIcon from "@/components/ChainIcon";
@@ -486,7 +486,7 @@ export default async function StatusPage() {
                   Expected windows <span className="font-semibold text-white">~09:00 / ~21:00 Europe/Oslo</span>
                 </div>
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span>
+                  Public provenance should be read through <InlineCode>date</InlineCode>, <InlineCode>updated_through</InlineCode>, <InlineCode>methodology_version</InlineCode>, dataset revision, and <InlineCode>regime.determinism_hash</InlineCode> — not runtime deployment details.
                 </div>
               </div>
             </div>
@@ -708,7 +708,7 @@ export default async function StatusPage() {
           <div>Dataset manifest: <InlineCode>data/published/v1/dataset.json</InlineCode></div>
           <div>Chain meta: <InlineCode>data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode></div>
           <div>Health classification is derived at render time — not read from a pre-computed status field.</div>
-          <div>Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span></div>
+          <div>Public provenance model: <InlineCode>date</InlineCode> · <InlineCode>updated_through</InlineCode> · <InlineCode>methodology_version</InlineCode> · dataset revision · <InlineCode>regime.determinism_hash</InlineCode></div>
         </div>
       </details>
 
