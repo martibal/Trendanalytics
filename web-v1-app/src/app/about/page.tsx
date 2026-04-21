@@ -294,13 +294,7 @@ const transparencyExplain: ExplainPair = {
     <>
       <p>
         Transparency is implemented at three levels. At the artifact level, every
-        published JSON file contains a <InlineCode>methodology_version</InlineCode> field
-        and a <InlineCode>revision_id</InlineCode> that identify the exact pipeline build
-        that produced it. At the classification level, the{" "}
-        <InlineCode>regime.determinism_hash</InlineCode> is a hash over the input data,
-        threshold parameters, and methodology version — making any retroactive
-        reclassification detectable. At the methodology level, threshold changes require a
-        version bump and are documented in the methodology changelog.
+        published JSON file contains a <InlineCode>methodology_version</InlineCode> field and publication context such as <InlineCode>updated_through</InlineCode>. At the classification level, the <InlineCode>regime.determinism_hash</InlineCode> is the public integrity anchor for named regime rows, making any material retroactive change to the named regime payload detectable. At the methodology level, threshold or semantic changes require a version bump and are documented in the methodology changelog.
       </p>
       <p className="mt-3">
         This architecture has a practical consequence for backtesting: you can reconstruct
@@ -342,9 +336,7 @@ const dataAttributionExplain: ExplainPair = {
       <p className="mt-3">
         The pipeline is deterministic and idempotent per (chain, date) — rerunning it for
         the same inputs produces the same outputs. Incremental mode skips already-processed
-        dates; rebuild mode recomputes all dates. Pipeline outputs are versioned by{" "}
-        <InlineCode>revision_id</InlineCode> and <InlineCode>methodology_version</InlineCode>,
-        enabling full provenance tracking from raw parquet to published JSON.
+        dates; rebuild mode recomputes all dates. Pipeline outputs are versioned by methodology version, published dataset revision, and named-row determinism hashes where applicable, enabling full public provenance tracking from published artifacts without exposing private pipeline internals.
       </p>
     </>
   ),
@@ -394,7 +386,7 @@ export default async function AboutPage() {
                   <div className="mt-1">Methodology <InlineCode>{dataset.methodology_version}</InlineCode></div>
                 ) : null}
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Source: <InlineCode>{currentDataSource()}</InlineCode>
+                  Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span>
                 </div>
               </div>
             ) : null}
@@ -562,31 +554,6 @@ export default async function AboutPage() {
       </section>
 
       {/* ── Navigation strip ─────────────────────────────────────────────── */}
-      {/* Who built this */}
-      <section className="mb-8 rounded-3xl border border-white/8 bg-white/[0.02] p-6">
-        <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
-          Who built this
-        </div>
-        <h2 className="mt-2 text-2xl font-semibold text-white">Built by one person</h2>
-        <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300">
-          Urd Atlas is an independent product built and maintained by a single developer.
-          It started as a personal project to answer one recurring frustration: on-chain
-          data is everywhere, but getting a structured, documented, daily answer to
-          "is this actually changing or is it noise?" required building an entire
-          pipeline from scratch. Urd Atlas packages that work so others do not have to.
-        </p>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
-          The methodology is open, the thresholds are published, and every label is
-          anchored by a determinism hash. If something looks wrong, you can trace it.
-          That is the standard this product holds itself to.
-        </p>
-        <div className="mt-4 text-sm">
-          <a href="mailto:support@urdatlas.com" className="text-cyan-400 hover:underline">
-            support@urdatlas.com
-          </a>
-        </div>
-      </section>
-
       <section className="mt-10 rounded-3xl border p-6 shadow-sm">
         <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">Explore</div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -637,7 +604,7 @@ export default async function AboutPage() {
         </summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
           <div>Dataset manifest: <InlineCode>data/published/v1/dataset.json</InlineCode></div>
-          <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
+          <div>Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span></div>
           <div>Methodology version: <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
           <div>This page is descriptive product documentation and remains aligned with methodology, glossary, status, API docs, and legal pages.</div>
         </div>

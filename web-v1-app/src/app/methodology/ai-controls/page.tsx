@@ -1,26 +1,34 @@
-import { MethodologyHeader, MethodologyNav, Section } from "../_components";
+import { Callout, MethodologyHeader, MethodologyNav, Section } from "../_components";
 
-export default function MethodologyAiControlsPage() {
+export default async function MethodologyAiControlsPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto max-w-5xl px-6 py-10">
       <MethodologyHeader
         title="AI Use & Quality Controls"
-        description="This page explains how trust in the published product is anchored in controls and verification rather than authorship claims."
+        description="How AI-assisted development relates to trust in the published product."
       />
+
       <MethodologyNav />
+
       <div className="grid gap-6">
         <Section title="Public position">
           <p>
-            Parts of the software development workflow may be AI-assisted. Trust in the published
-            product is therefore anchored not in authorship claims, but in versioned methodology,
-            deterministic publication logic, archived outputs, release controls, and verification
-            against known input-output expectations.
-          </p>
-          <p>
-            Where analytical logic affects published outputs, that logic is expected to be validated
-            against deterministic test cases and release checks before publication.
+            Parts of the software development workflow may be AI-assisted. Trust in the published product is therefore anchored not in authorship claims, but in versioned methodology, archived outputs, deterministic publication rules, release controls, and public verification paths.
           </p>
         </Section>
+
+        <Section title="Why this does not reduce the trust basis on its own">
+          <ul className="list-disc pl-5">
+            <li>Published outputs are constrained by versioned methodology and explicit public field meaning.</li>
+            <li>Archived rows remain available for inspection after publication.</li>
+            <li>Named regime rows expose a public determinism hash.</li>
+            <li>The public trust layer includes worked examples and a field contract, not just prose.</li>
+          </ul>
+        </Section>
+
+        <Callout title="Release-control rule">
+          Where analytical logic affects published outputs, that logic is expected to be validated against deterministic test cases, known input-output expectations, and release checks before publication.
+        </Callout>
       </div>
     </main>
   );

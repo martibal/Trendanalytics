@@ -1,21 +1,25 @@
 import { MethodologyHeader, MethodologyNav, Section, SimpleTable } from "../_components";
 
-export default function MethodologyChangelogPage() {
+export default async function MethodologyChangelogPage() {
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
       <MethodologyHeader
         title="Methodology Changelog"
-        description="Public change log for methodology language and interpretation rules that affect customer understanding."
+        description="Public customer change log for methodology, interpretation, thresholds, contracts, and historical corrections."
       />
       <MethodologyNav />
       <div className="grid gap-6">
-        <Section title="Current log">
+        <Section title="How to read this changelog">
+          <p>Every public change should be classified by type, backward-compatibility impact, whether the methodology version changed, whether archived rows changed, and whether a subscriber needs to take action.</p>
+        </Section>
+        <Section title="Current public log">
           <SimpleTable
-            headers={["Version", "Change", "Impact"]}
+            headers={["Date", "Class", "Affected artifacts", "Methodology bump?", "Historical rows changed?", "Subscriber action required?", "Summary"]}
             rows={[
-              [<>v1</>, <>Initial public methodology hub.</>, <>Baseline public trust layer.</>],
-              [<>v1.1</>, <>Clarified OR-based regime banding and confidence gate worked examples.</>, <>No change to archived outputs; documentation aligned to implementation.</>],
-              [<>v1.2</>, <>Added explicit warnings for day-to-day label flips, driver-vs-scorecard z-score differences, fee_burden_proxy semantics, and BTC blocktime_instability interpretation.</>, <>Interpretation layer strengthened for technical users.</>],
+              ["2026-04-21", "docs-only", "methodology hub", "No", "No", "No", "Introduced structured methodology hub and cross-linked trust-layer pages."],
+              ["2026-04-21", "interpretation-only", "reference / fields / boundaries", "No", "No", "No", "Clarified label volatility, regime-vs-scorecard normalization, fee_burden_proxy semantics, and BTC capacity as an instability proxy."],
+              ["2026-04-21", "artifact contract clarification", "schema / provenance docs", "No", "No", "No", "Removed public reliance on a required separate revision integer and aligned public provenance with fields actually present in the archive."],
+              ["2026-04-21", "operational documentation", "service / api docs / pricing surface", "No", "No", "No", "Added service expectations, public sample pack, and common workflows for pre-purchase diligence and customer onboarding."],
             ]}
           />
         </Section>

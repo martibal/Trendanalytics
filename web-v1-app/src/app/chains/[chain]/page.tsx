@@ -440,15 +440,6 @@ function maxDateMsFromRows<T extends { date?: string }>(rows: T[]): number | nul
   return max;
 }
 
-function maxUtcMs(...values: Array<number | null | undefined>): number | null {
-  let max: number | null = null;
-  for (const v of values) {
-    if (typeof v !== "number" || !Number.isFinite(v)) continue;
-    if (max === null || v > max) max = v;
-  }
-  return max;
-}
-
 function computeBoundsFromMax(maxMs: number, days: number) {
   const minMs = maxMs - (days - 1) * 24 * 60 * 60 * 1000;
   return { minMs, maxMs };
@@ -466,50 +457,6 @@ function withinBounds(date: string, bounds: { minMs: number; maxMs: number }) {
   const ms = parseIsoDayToUtcMs(date);
   if (ms === null) return false;
   return ms >= bounds.minMs && ms <= bounds.maxMs;
-}
-
-async function hydratePublishedWindow(params: {
-  chainId: ChainId;
-  days: number;
-  targetMaxMs: number;
-  derivedRows: DerivedRow[];
-  goldRows: GoldRow[];
-}): Promise<{
-  bounds: { minMs: number; maxMs: number };
-  derivedByDate: Map<string, DerivedRow>;
-  goldByDate: Map<string, GoldRow>;
-}> {
-  const { chainId, days, targetMaxMs, derivedRows, goldRows } = params;
-  const bounds = computeBoundsFromMax(targetMaxMs, days);
-  const derivedByDate = buildDerivedByDate(derivedRows);
-  const goldByDate = buildGoldByDate(goldRows);
-
-  const missingDays = listDays(bounds).filter(
-    (d) => !derivedByDate.has(d) || !goldByDate.has(d)
-  );
-
-  if (missingDays.length > 0) {
-    const dailyResults = await Promise.all(
-      missingDays.map(async (d) => {
-        const [dr, gr] = await Promise.all([
-          derivedByDate.has(d)
-            ? Promise.resolve(null)
-            : readPublishedJson<DerivedRow>(`derived/${chainId}/${d}.json`),
-          goldByDate.has(d)
-            ? Promise.resolve(null)
-            : readPublishedJson<GoldRow>(`gold/${chainId}/${d}.json`),
-        ]);
-        return { date: d, derived: dr, gold: gr };
-      })
-    );
-
-    for (const { date, derived, gold } of dailyResults) {
-      if (derived && typeof derived.date === "string") derivedByDate.set(date, derived);
-      if (gold && typeof gold.date === "string") goldByDate.set(date, gold);
-    }
-  }
-
-  return { bounds, derivedByDate, goldByDate };
 }
 
 function readGoldMetric(row: GoldRow | undefined, metric: string): number | null {
@@ -1858,16 +1805,38 @@ export default async function ChainPage({
       meta.scorecard?.asof_date ??
       meta.date
   );
-  const latestPublishedMs = maxUtcMs(maxDerived, maxGold, maxFromMeta);
-  if (latestPublishedMs === null) return notFound();
+  const maxMs = maxDerived ?? maxGold ?? maxFromMeta;
+  if (maxMs === null) return notFound();
 
-  const { bounds, derivedByDate, goldByDate } = await hydratePublishedWindow({
-    chainId,
-    days: effectiveWindowDays,
-    targetMaxMs: latestPublishedMs,
-    derivedRows,
-    goldRows,
-  });
+  const bounds = computeBoundsFromMax(maxMs, effectiveWindowDays);
+  const dayList = listDays(bounds);
+
+  const derivedByDate = buildDerivedByDate(derivedRows);
+  const goldByDate = buildGoldByDate(goldRows);
+
+  const missingDays = dayList.filter(
+    (d) => !derivedByDate.has(d) || !goldByDate.has(d)
+  );
+  if (missingDays.length > 0) {
+    const dailyResults = await Promise.all(
+      missingDays.map(async (d) => {
+        const [dr, gr] = await Promise.all([
+          derivedByDate.has(d)
+            ? Promise.resolve(null)
+            : readPublishedJson<DerivedRow>(`derived/${chainId}/${d}.json`),
+          goldByDate.has(d)
+            ? Promise.resolve(null)
+            : readPublishedJson<GoldRow>(`gold/${chainId}/${d}.json`),
+        ]);
+        return { date: d, derived: dr, gold: gr };
+      })
+    );
+
+    for (const { date, derived: dr, gold: gr } of dailyResults) {
+      if (dr && typeof dr.date === "string") derivedByDate.set(date, dr);
+      if (gr && typeof (gr as GoldRow).date === "string") goldByDate.set(date, gr as GoldRow);
+    }
+  }
 
   const displayName = meta.profile?.label ?? cfg.name;
   const displayAsOf = landingDisplayAsOf(hero);
@@ -1941,38 +1910,10 @@ export default async function ChainPage({
       const mGoldRows = Array.isArray(mGold) ? mGold : Array.isArray((mGold as { rows?: GoldRow[] })?.rows) ? (mGold as { rows?: GoldRow[] }).rows! : [];
       const mDerivedRows = Array.isArray(mDerived) ? mDerived : Array.isArray((mDerived as { rows?: DerivedRow[] })?.rows) ? (mDerived as { rows?: DerivedRow[] }).rows! : [];
 
-      const metricLatestMs = maxUtcMs(
-        maxDateMsFromRows(mDerivedRows),
-        maxDateMsFromRows(mGoldRows),
-        latestPublishedMs
-      );
-      if (metricLatestMs === null) {
-        return {
-          metric,
-          axis: undefined,
-          unitLabel: getUnitLabel(chainId, metric) ?? undefined,
-          data: [],
-          metricWindow,
-          mGoldPath,
-          mDerivedPath,
-          mBounds: computeBoundsFromMax(latestPublishedMs, metricWindow),
-          paramKey,
-          hasData: false,
-        };
-      }
-
-      const hydratedMetricWindow = metricWindow === effectiveWindowDays
-        ? { bounds, derivedByDate, goldByDate }
-        : await hydratePublishedWindow({
-            chainId,
-            days: metricWindow,
-            targetMaxMs: metricLatestMs,
-            derivedRows: mDerivedRows,
-            goldRows: mGoldRows,
-          });
-
-      const { bounds: mBounds, derivedByDate: mDerivedByDate, goldByDate: mGoldByDate } =
-        hydratedMetricWindow;
+      const mDerivedByDate = buildDerivedByDate(mDerivedRows);
+      const mGoldByDate = buildGoldByDate(mGoldRows);
+      const mMaxMs = maxDateMsFromRows(mDerivedRows) ?? maxDateMsFromRows(mGoldRows) ?? maxMs;
+      const mBounds = computeBoundsFromMax(mMaxMs, metricWindow);
 
       const data = buildChartDataObserved({ bounds: mBounds, derivedByDate: mDerivedByDate, goldByDate: mGoldByDate, metric });
       const metricDriver = driversAll.find((d) => d.metric === metric);
@@ -2255,7 +2196,7 @@ export default async function ChainPage({
         ) : (
           <div className="space-y-6">
             {charts.map((c, index) => (
-              <section key={c.metric} id={`chart-${safeId(c.metric)}`} className="rounded-3xl border p-5 shadow-sm">
+              <section key={c.metric} className="rounded-3xl border p-5 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
@@ -2294,7 +2235,7 @@ export default async function ChainPage({
                           }
                         });
                         newParams.set(c.paramKey, String(w));
-                        const href = gatedHref ?? `/chains/${chainId}?${newParams.toString()}#chart-${safeId(c.metric)}`;
+                        const href = gatedHref ?? `/chains/${chainId}?${newParams.toString()}`;
                         return (
                           <Link
                             key={w}
@@ -2606,7 +2547,7 @@ export default async function ChainPage({
       <details className="mt-10 rounded-2xl border p-5">
         <summary className="cursor-pointer text-sm font-medium">Data contract & traceability</summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
+          <div>Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span></div>
           <div>Meta path: <InlineCode>{metaPath}</InlineCode></div>
           <div>Gold path: <InlineCode>{goldPath}</InlineCode></div>
           <div>Derived path: <InlineCode>{derivedPath}</InlineCode></div>

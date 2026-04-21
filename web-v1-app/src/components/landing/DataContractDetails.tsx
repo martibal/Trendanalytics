@@ -46,7 +46,7 @@ export default function DataContractDetails({ dataset, dataSource }: DataContrac
                 Methodology <span className="font-semibold text-white">{dataset?.methodology_version ?? "—"}</span>
               </div>
               <div>
-                Source <span className="font-semibold text-white">{dataSource}</span>
+                Runtime backend <span className="font-semibold text-white">{dataSource}</span> <span className="text-slate-500">(deployment detail)</span>
               </div>
             </div>
           </div>

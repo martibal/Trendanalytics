@@ -199,22 +199,10 @@ async function buildStatusRows(): Promise<StatusRow[]> {
       const meta = await readPublishedJson<MetaLatest>(
         `data/published/v1/meta/${chain.id}/latest.json`
       );
-      // Use meta.date as primary — this matches the date chain pages display
-      // updated_through can be one day behind meta.date causing lag to read one too many
-      const asOf = meta?.date ?? meta?.updated_through ?? meta?.regime?.asof_date ?? null;
-      // Compute lag dynamically at render time.
-      // Convention: data from yesterday = 1d lag (one publish cycle behind).
-      // Count days from as_of_date to yesterday (not today), so that data published
-      // yesterday shows as 1d and data from today shows as 0d.
-      const lagDays = (() => {
-        if (!asOf) return null;
-        const asOfMs = new Date(asOf + "T00:00:00Z").getTime();
-        const now = new Date();
-        // Use yesterday as the reference point
-        const yesterdayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1);
-        const diff = Math.round((yesterdayMs - asOfMs) / 86400000);
-        return diff >= 0 ? diff : 0;
-      })();
+      const asOf = meta?.updated_through ?? meta?.regime?.asof_date ?? meta?.date ?? null;
+      const lagDays = typeof meta?.confidence?.lag_days_vs_utc_today === "number"
+        ? meta.confidence.lag_days_vs_utc_today
+        : null;
       const delay = expectedDelayDays(chain.id);
       return {
         chain: chain.id,
@@ -498,7 +486,7 @@ export default async function StatusPage() {
                   Expected windows <span className="font-semibold text-white">~09:00 / ~21:00 Europe/Oslo</span>
                 </div>
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Source: <InlineCode>{currentDataSource()}</InlineCode>
+                  Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span>
                 </div>
               </div>
             </div>
@@ -518,6 +506,9 @@ export default async function StatusPage() {
               </div>
               <MoreLink id="how-to-read-modal" label="Full explanation" />
             </div>
+          </div>
+          <div className="mt-4 rounded-2xl border border-white/8 bg-white/3 p-4 text-sm leading-7 text-slate-300">
+            Operational expectations, support response target, and revision / correction policy are documented at <Link href="/service" className="underline text-cyan-200">/service</Link>.
           </div>
         </div>
       </header>
@@ -717,7 +708,7 @@ export default async function StatusPage() {
           <div>Dataset manifest: <InlineCode>data/published/v1/dataset.json</InlineCode></div>
           <div>Chain meta: <InlineCode>data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode></div>
           <div>Health classification is derived at render time — not read from a pre-computed status field.</div>
-          <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
+          <div>Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span></div>
         </div>
       </details>
 

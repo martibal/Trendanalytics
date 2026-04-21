@@ -54,7 +54,7 @@ export function whatIsTrackRecordExplanation(): ExplainContent {
           specifically the <InlineCode>meta/&lt;chain&gt;/last90d.json</InlineCode> artifacts.
           These are immutable published outputs of the regime classification pipeline, not
           recomputed or retroactively adjusted values. Each row corresponds to a single daily meta
-          artifact identified by its as-of date, revision_id, and methodology_version.
+          artifact identified by its as-of date, methodology_version, and determinism hash where applicable.
         </p>
         <p className="mt-3">
           The page serves three analytical functions. First, it provides a regime frequency
@@ -85,8 +85,7 @@ export function whatIsTrackRecordExplanation(): ExplainContent {
         <li>
           Fields: <InlineCode>status.label</InlineCode> ·{" "}
           <InlineCode>confidence.confidence_score</InlineCode> ·{" "}
-          <InlineCode>revision_id</InlineCode> ·{" "}
-          <InlineCode>methodology_version</InlineCode>
+          <InlineCode>methodology_version</InlineCode> · <InlineCode>regime.determinism_hash</InlineCode>
         </li>
       </ul>
     ),
@@ -454,8 +453,7 @@ export function historicalTableExplanation(): ExplainContent {
             not directly comparable.
           </li>
           <li>
-            <span className="font-medium text-white">Revision</span> — a sequential identifier
-            for the dataset build that produced this row.
+            <span className="font-medium text-white">Published context</span> — methodology version, updated-through, and named-row determinism hash where applicable.
           </li>
         </ul>
       </>
@@ -464,18 +462,14 @@ export function historicalTableExplanation(): ExplainContent {
       <>
         <p>
           The table renders a chronologically ordered slice of the published meta history bundle.
-          Each row is a daily meta artifact uniquely identified by the triple (chain, date,
-          revision_id). The revision_id is a monotonically increasing integer — higher values
-          indicate later pipeline builds. Where multiple revisions exist for the same (chain,
-          date) pair, the table reflects the most recent publication.
+          Each row is a daily Meta artifact identified publicly by chain, date, methodology_version, and named-row determinism hash where applicable. Historical corrections should be understood through public revision notices and dataset-level provenance, not through a single required integer field.
         </p>
         <p className="mt-3">
           The methodology_version field is the critical comparability boundary. Rows with
           different methodology versions were produced under different classification rules and
           potentially different threshold parameters — naive comparison across a methodology
           version change boundary will conflate genuine network state changes with classification
-          rule changes. The methodology changelog at <InlineCode>/methodology/previously</InlineCode>{" "}
-          documents all version transitions.
+          rule changes. The methodology changelog at <InlineCode>/methodology/changelog</InlineCode> documents all version transitions.
         </p>
         <p className="mt-3">
           The lag field deserves careful handling. A lag of 1 means the published row describes
@@ -493,7 +487,7 @@ export function historicalTableExplanation(): ExplainContent {
           Source: <InlineCode>meta/&lt;chain&gt;/last90d.json</InlineCode>
         </li>
         <li>
-          Row identifier: (chain, date, revision_id)
+          Row identifier: (chain, date, methodology_version, determinism_hash where applicable)
         </li>
         <li>
           Temporal coordinate for analysis: <InlineCode>as_of</InlineCode> date, not publication
@@ -510,48 +504,33 @@ export function historicalTableExplanation(): ExplainContent {
 
 export function revisionIdExplanation(): ExplainContent {
   return {
-    title: "What revision_id means",
-    subtitle: "The pipeline build identifier and why it matters for reproducibility.",
+    title: "How archived rows are identified",
+    subtitle: "Public provenance uses the fields actually present in the archive.",
     basic: (
       <>
         <p>
-          The revision ID is a number that identifies exactly which pipeline run produced a
-          particular row. Think of it like an edition number on a printed publication — every
-          time the pipeline runs and publishes new data, the revision number goes up.
+          Archived rows are identified publicly by <InlineCode>chain</InlineCode>, <InlineCode>date</InlineCode>, and <InlineCode>methodology_version</InlineCode>. Named regime rows add <InlineCode>regime.determinism_hash</InlineCode> as the public integrity anchor.
         </p>
         <p className="mt-3">
-          For most users this is just a transparency detail. But if you ever want to verify that
-          a label you saw on a particular date is the same as what someone else is looking at,
-          the revision ID lets you confirm they are looking at the same published build.
+          This means you do not need a separate revision integer to verify that two people are looking at the same archived named regime row.
         </p>
       </>
     ),
     advanced: (
       <>
         <p>
-          The revision_id is a monotonically increasing integer assigned at pipeline build time.
-          Combined with the determinism hash visible on chain pages, it forms the complete
-          provenance anchor for any published row: the revision_id identifies the build, and the
-          determinism hash identifies the specific computation within that build.
+          Public provenance should be read through methodology_version, updated_through, dataset revision or publication batch context, and determinism_hash where applicable. This is the canonical public provenance model for archived Meta outputs.
         </p>
         <p className="mt-3">
-          For reproducibility auditing, the correct procedure is: (1) record the (chain, date,
-          revision_id, determinism_hash) tuple for the row in question; (2) retrieve the same
-          published artifact from the JSON endpoint; (3) verify that the determinism hash matches.
-          A match confirms the label was produced by a documented, unchanged computation. A
-          mismatch indicates the artifact was republished under a different methodology or
-          threshold configuration.
+          For reproducibility auditing, record the public identity tuple for the row in question, retrieve the same published artifact, and verify the determinism hash for named regime rows.
         </p>
       </>
     ),
     traceability: (
       <ul className="list-disc pl-5">
-        <li>
-          Field: <InlineCode>revision_id</InlineCode> in published meta artifact
-        </li>
-        <li>
-          Combined with: <InlineCode>regime.determinism_hash</InlineCode> for full provenance
-        </li>
+        <li>Fields: <InlineCode>chain</InlineCode>, <InlineCode>date</InlineCode>, <InlineCode>methodology_version</InlineCode></li>
+        <li>Named rows: <InlineCode>regime.determinism_hash</InlineCode></li>
+        <li>See also: <InlineCode>/methodology/provenance</InlineCode></li>
       </ul>
     ),
   };

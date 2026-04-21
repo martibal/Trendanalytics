@@ -216,7 +216,7 @@ export default async function ChainHistoryPage({
               Traceability
             </div>
             <div className="mt-1 font-medium text-foreground">
-              Source: {currentDataSource()}
+              Runtime backend: {currentDataSource()} (deployment detail)
             </div>
             <div className="mt-1 text-xs text-muted-foreground">{canonicalPath}</div>
             <div className="mt-2 text-xs text-muted-foreground">

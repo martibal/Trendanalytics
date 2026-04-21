@@ -1040,7 +1040,7 @@ export default async function ChainPage({
         <div className="font-medium text-foreground">Runtime data contract</div>
         <ul className="mt-2 list-disc pl-5">
           <li>
-            Data source: <InlineCode>{currentDataSource()}</InlineCode>
+            Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span>
           </li>
           <li>
             Meta path: <InlineCode>{metaPath}</InlineCode>

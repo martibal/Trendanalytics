@@ -60,6 +60,9 @@ export default function TermsPage() {
             Urd Atlas is descriptive only. It does not provide investment advice, trading advice,
             forecasts, or recommendations.
           </p>
+          <p className="mt-2">
+            Public operational expectations, support handling, and revision / correction policy are documented at <Link href="/service" className="underline">/service</Link>.
+          </p>
         </div>
       </header>
 
@@ -224,24 +227,12 @@ export default function TermsPage() {
 
         <Section title="10. Data Sources and Attribution">
           <p>
-            The underlying blockchain transaction data used in Urd Atlas classifications is sourced
-            from <strong className="text-foreground">AWS Public Blockchain Data</strong>, a publicly
-            available dataset provided through the AWS Open Data Program
-            (registry.opendata.aws/aws-public-blockchain). This dataset is made freely available
-            for research, analytics, and commercial use.
+            Urd Atlas uses public blockchain-derived data and published internal transformations of
+            those data artifacts.
           </p>
           <p>
-            Urd Atlas does not redistribute raw blockchain data. The published outputs — regime
-            labels, confidence scores, scorecards, driver attribution, rolling averages, and all
-            derived JSON artifacts — are original analytical work produced by Urd Atlas&apos;s own
-            classification pipeline and methodology. These outputs constitute independent
-            intellectual property and are distinct from the underlying source data.
-          </p>
-          <p>
-            The distinction is material: Urd Atlas sells access to its analytical layer — the
-            normalisation, baseline scoring, persistence logic, confidence gating, and published
-            classification — not access to raw blockchain records. Subscribers receive Urd Atlas&apos;s
-            derived outputs, not copies or transformations of the AWS Public Blockchain Data source files.
+            AWS Public Blockchain Data attribution must remain visible where required by the
+            product specification and related documentation.
           </p>
           <p>
             Additional information about methodology and data presentation is available at{" "}

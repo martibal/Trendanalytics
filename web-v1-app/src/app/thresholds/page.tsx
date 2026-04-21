@@ -442,10 +442,7 @@ const simulatorExplain: ExplainPair = {
         they cannot overwrite canonical meta artifacts.
       </p>
       <p className="mt-3">
-        The identity hash is derived from the canonical revision_id plus the threshold
-        parameter vector. This means two users who submit identical threshold configurations
-        against the same dataset revision will receive the same identity hash and the same
-        output — the custom classification is fully reproducible and auditable.
+        The identity hash is derived from the canonical custom-threshold parameter vector plus the archived publication context used for the preview. This means two users who submit identical threshold configurations against the same published context will receive the same identity hash and the same output — the custom classification is fully reproducible and auditable.
       </p>
     </>
   ),
@@ -547,7 +544,7 @@ export default async function ThresholdsPage() {
                   </div>
                 ) : null}
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Source: <InlineCode>{currentDataSource()}</InlineCode>
+                  Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span>
                 </div>
               </div>
             ) : null}
@@ -833,7 +830,7 @@ export default async function ThresholdsPage() {
           Data contract and traceability
         </summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
+          <div>Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span></div>
           <div>
             Dataset manifest:{" "}
             <InlineCode>data/published/v1/dataset.json</InlineCode>
@@ -841,8 +838,8 @@ export default async function ThresholdsPage() {
           <div>
             Threshold values are fixed per methodology version. Changes to thresholds
             require a methodology version bump and are documented in{" "}
-            <Link href="/methodology/previously" className="underline hover:text-foreground">
-              /methodology/previously
+            <Link href="/methodology/changelog" className="underline hover:text-foreground">
+              /methodology/changelog
             </Link>
             .
           </div>

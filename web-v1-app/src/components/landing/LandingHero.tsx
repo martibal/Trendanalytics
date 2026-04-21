@@ -54,7 +54,7 @@ export default function LandingHero(props: LandingHeroProps) {
             <Stat label="Dataset" value={datasetVersion} />
             <Stat label="Published at" value={publishedAt} />
             <Stat label="Methodology" value={methodologyVersion} />
-            <Stat label="Data source" value={dataSource} />
+            <Stat label="Runtime backend" value={`${dataSource} (deployment detail)`} />
           </div>
         </aside>
       </div>

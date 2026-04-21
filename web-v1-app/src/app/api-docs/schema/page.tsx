@@ -185,7 +185,7 @@ export default async function SchemaPage() {
                   <div className="mt-2">Methodology <IC>{dataset.methodology_version}</IC></div>
                 ) : null}
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Source: <IC>{currentDataSource()}</IC>
+                  Runtime backend: <IC>{currentDataSource()}</IC> <span className="text-slate-500">(deployment detail)</span>
                 </div>
               </div>
             ) : null}
@@ -339,8 +339,8 @@ export default async function SchemaPage() {
           <FieldRow field="date" type="string (YYYY-MM-DD)" basic="The as-of date this meta row describes." advanced="Canonical date field — matches the Gold row this meta output was computed over. Used as the primary key for row-level lookups and time-series ordering." />
           <FieldRow field="chain" type="string" basic={<>Which chain this row belongs to: <IC>bitcoin</IC>, <IC>ethereum</IC>, <IC>arbitrum</IC>, or <IC>base</IC>.</>} advanced="Chain identifier propagated from the Gold layer. Determines the metric profile applied during computation." />
           <FieldRow field="updated_through" type="string (YYYY-MM-DD)" nullable basic="The most recent Gold date whose data was included in this meta computation. Usually equal to date but may differ during partial rebuilds." advanced="The temporal ceiling of the evidence window used for this meta row. A date field rather than a timestamp to match the Gold schema convention. Critical for time-series analysis — use this as the observation date, not the pipeline run timestamp." />
-          <FieldRow field="methodology_version" type="string" nullable basic="Which version of the analytical model produced this row. If methodology changes, this field changes." advanced={<>Version string identifying the pipeline methodology. Required for comparability analysis: rows with different methodology_version values may have been produced under different threshold parameters, metric definitions, or scoring formulas. Changes to this field are documented at <IC>/methodology/previously</IC>.</>} />
-          <FieldRow field="revision_id" type="number" nullable basic="A sequential number identifying which pipeline build produced this row. Higher numbers are more recent." advanced="Monotonically increasing integer assigned at pipeline build time. Combined with the determinism_hash, forms the complete provenance anchor: revision_id identifies the build; determinism_hash identifies the specific computation within that build." />
+          <FieldRow field="methodology_version" type="string" nullable basic="Which version of the analytical model produced this row. If methodology changes, this field changes." advanced={<>Version string identifying the pipeline methodology. Required for comparability analysis: rows with different methodology_version values may have been produced under different threshold parameters, metric definitions, or scoring formulas. Changes to this field are documented at <IC>/methodology/changelog</IC>.</>} />
+          <FieldRow field="revision_id" type="number" nullable basic="This field is not currently part of the canonical public provenance model for archived Meta outputs. Public provenance is instead anchored in date, updated_through, methodology_version, dataset revision, and regime.determinism_hash where applicable." advanced="Public provenance should be read via methodology_version, updated_through, dataset revision, and regime.determinism_hash. Do not treat revision_id as the sole or required public traceability anchor." />
 
           {/* status */}
           <div className="rounded-2xl border border-white/8 bg-white/3 px-5 py-3">

@@ -8,12 +8,13 @@ import { CHAIN_LIST } from "@/config/chains";
 import { useTheme } from "@/components/site/ThemeProvider";
 
 const DESKTOP_ITEMS = [
-  { href: "/glossary", label: "Glossary" },
-  { href: "/track-record", label: "Track Record" },
-  { href: "/thresholds", label: "Thresholds" },
+  { href: "/methodology", label: "Methodology" },
   { href: "/api-docs", label: "API Docs" },
   { href: "/status", label: "Status" },
+  { href: "/track-record", label: "Track Record" },
+  { href: "/thresholds", label: "Thresholds" },
   { href: "/faq", label: "Q&A" },
+  { href: "/service", label: "Service" },
   { href: "/about", label: "About" },
 ] as const;
 

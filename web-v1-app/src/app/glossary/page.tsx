@@ -52,33 +52,56 @@ export default async function GlossaryPage({
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-8">
-        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8">
-          <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">Glossary</div>
-          <h1 className="mt-3 text-4xl font-semibold leading-tight text-white sm:text-5xl">
-            Every term, defined
-          </h1>
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
-            Plain-language and technical definitions for every field and concept in the product.
-            Each entry is written at two levels — accessible to new readers, precise enough for
-            analysts who want to verify the methodology.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500">
-            <span>Dataset: <span className="text-slate-300">{dataset?.version ?? "—"}</span></span>
-            <span>Methodology: <span className="text-slate-300">{dataset?.methodology_version ?? "—"}</span></span>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">Glossary</h1>
+            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+              Public definitions for the product’s published terminology, fields, and interpretation
+              boundaries. The glossary exists to make the product readable without turning it into an
+              advisory or predictive surface.
+            </p>
+          </div>
+
+          <div className="rounded-xl border px-4 py-3 text-sm">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Published context
+            </div>
+            <div className="mt-1 font-medium text-foreground">
+              Dataset: {dataset?.version ?? "—"}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Methodology: {dataset?.methodology_version ?? "—"}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Runtime backend: {currentDataSource()} (deployment detail)
+            </div>
           </div>
         </div>
       </header>
 
       <div className="grid gap-6">
-        <section className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.06),transparent_40%)] p-6">
-          <p className="text-sm leading-7 text-slate-300">
-            Every term in the Urd Atlas product has a precise meaning. This glossary documents
-            what each field and concept means in this specific context — not how other products
-            use the same terms. If a term is still unclear after reading the glossary, the{" "}
-            <Link href="/methodology" className="text-cyan-400 hover:underline">Methodology</Link>
-            {" "}page provides the full model context.
+        <Section title="How to use the glossary">
+          <p>
+            The glossary explains what published fields and concepts mean inside the product’s
+            descriptive framework. It should be used together with{" "}
+            <Link href="/methodology" className="underline">
+              Methodology
+            </Link>
+            ,{" "}
+            <Link href="/thresholds" className="underline">
+              Thresholds
+            </Link>
+            ,{" "}
+            <Link href="/status" className="underline">
+              Status
+            </Link>
+            , and chain pages.
           </p>
-        </section>
+          <p>
+            Definitions are product-specific. They describe how the term is used in Urd Atlas,
+            not how every other analytics product necessarily uses the same term.
+          </p>
+        </Section>
 
         <Section title="Interpretation boundary">
           <ul className="list-disc pl-5">
@@ -129,8 +152,8 @@ export default async function GlossaryPage({
               </Link>
             </li>
             <li>
-              <Link href="/methodology/previously" className="underline">
-                /methodology/previously
+              <Link href="/methodology/changelog" className="underline">
+                /methodology/changelog
               </Link>
             </li>
             <li>

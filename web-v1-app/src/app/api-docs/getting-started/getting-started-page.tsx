@@ -167,6 +167,8 @@ export default function GettingStartedJsonApiPage() {
               <div className="mt-2 flex flex-col gap-2 text-sm">
                 <Link href="/api-docs" className="text-cyan-200 underline">API Docs — technical reference</Link>
                 <Link href="/api-docs/schema" className="text-cyan-200 underline">JSON Schema — every field explained</Link>
+                <Link href="/api-docs/samples" className="text-cyan-200 underline">Public sample pack — real example artifacts</Link>
+                <Link href="/api-docs/workflows" className="text-cyan-200 underline">Common workflows — first useful notebook path</Link>
                 <Link href="/dashboard" className="text-cyan-200 underline">Dashboard — create API keys</Link>
               </div>
             </div>

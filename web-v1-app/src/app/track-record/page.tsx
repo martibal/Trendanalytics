@@ -571,7 +571,7 @@ export default async function TrackRecordPage({
                   </div>
                 ) : null}
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Source: <InlineCode>{currentDataSource()}</InlineCode>
+                  Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span>
                 </div>
               </div>
             ) : null}
@@ -907,7 +907,7 @@ export default async function TrackRecordPage({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <MoreLink id="table-modal" label="How to read the table" />
-            <MoreLink id="revision-modal" label="What is revision_id?" />
+            <MoreLink id="revision-modal" label="How are archived rows identified?" />
           </div>
         </div>
 
@@ -1030,7 +1030,7 @@ export default async function TrackRecordPage({
           Data contract and traceability
         </summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
+          <div>Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span></div>
           <div>
             History bundles:{" "}
             <InlineCode>
