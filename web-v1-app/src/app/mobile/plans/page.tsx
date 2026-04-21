@@ -83,7 +83,7 @@ export default async function MobilePlansPage() {
         </div>
 
         <div className="rounded-3xl border border-amber-500/20 bg-amber-500/8 px-4 py-3 text-xs leading-6 text-amber-100/85">
-          Payments are temporarily inactive while business registration is being finalized. Explore the public site and mobile surface now; enable checkout as soon as Stripe is live.
+          Payments are temporarily inactive while business registration is being finalized. Explore the public site and mobile surface now; enable checkout as soon as Stripe is enabled.
         </div>
       </main>
 

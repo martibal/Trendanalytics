@@ -192,7 +192,7 @@ export default async function SignUpPage() {
                 Clerk is not configured in this environment.
               </div>
               <p className="mt-2 text-sm text-amber-100/90">
-                The sign-up route is live, but the identity provider is not fully wired in this
+                The sign-up route is available, but the identity provider is not fully wired in this
                 runtime yet. Add valid Clerk environment variables before rendering the embedded
                 sign-up component.
               </p>

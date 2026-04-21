@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource, readStorageObject } from "@/lib/storage";
+import { readStorageObject } from "@/lib/storage";
 import RegimeBadge from "@/components/RegimeBadge";
 import StalenessBar from "@/components/ui/StalenessBar";
 import ChainIcon from "@/components/ChainIcon";
@@ -25,6 +25,20 @@ type StatusRow = {
   published_regime: string | null;
   confidence_score: number | null;
   expected_delay_days: number;
+};
+
+type LandingHero = {
+  display_asof?: string | null;
+  regime_asof?: string | null;
+  asof?: {
+    display?: string | null;
+    latest_available?: string | null;
+    gold?: string | null;
+    derived?: string | null;
+    meta?: string | null;
+    meta_actual?: string | null;
+    regime?: string | null;
+  };
 };
 
 type MetaLatest = {
@@ -140,6 +154,31 @@ function fmtDate(d?: string | null) {
   return d && d.trim().length > 0 ? d : "—";
 }
 
+function parseIsoDayToOsloMs(date?: string | null): number | null {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const [y, m, d] = date.split("-").map(Number);
+  const ms = Date.UTC(y, m - 1, d);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function osloTodayMs(): number {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const get = (t: string) => Number(parts.find((part) => part.type === t)?.value ?? "0");
+  return Date.UTC(get("year"), get("month") - 1, get("day"));
+}
+
+function lagDaysFromIsoDay(date?: string | null): number | null {
+  const asOfMs = parseIsoDayToOsloMs(date);
+  if (asOfMs === null) return null;
+  const diff = osloTodayMs() - asOfMs;
+  return diff >= 0 ? Math.floor(diff / 86400000) : null;
+}
+
+function heroDisplayAsOf(hero?: LandingHero | null): string | null {
+  return hero?.display_asof ?? hero?.asof?.display ?? hero?.asof?.latest_available ?? hero?.asof?.gold ?? hero?.asof?.derived ?? hero?.asof?.meta ?? null;
+}
+
 function confidenceBand(v?: number | null) {
   if (typeof v !== "number") return "—";
   if (v >= 0.7) return "Good";
@@ -196,20 +235,13 @@ function deriveHealth(params: {
 async function buildStatusRows(): Promise<StatusRow[]> {
   return Promise.all(
     CHAIN_LIST.map(async (chain) => {
-      const meta = await readPublishedJson<MetaLatest>(
-        `data/published/v1/meta/${chain.id}/latest.json`
-      );
-      const asOf = meta?.updated_through ?? meta?.regime?.asof_date ?? meta?.date ?? null;
-      // Compute lag dynamically at render time from as_of date vs UTC today
-      // This avoids using the stale lag_days_vs_utc_today field from JSON
-      // which was computed at publish time and becomes outdated as days pass.
-      const lagDays = (() => {
-        if (!asOf) return null;
-        const asOfMs = new Date(asOf + "T00:00:00Z").getTime();
-        const todayMs = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z").getTime();
-        const diff = Math.round((todayMs - asOfMs) / 86400000);
-        return diff >= 0 ? diff : null;
-      })();
+      const [meta, hero] = await Promise.all([
+        readPublishedJson<MetaLatest>(`data/published/v1/meta/${chain.id}/latest.json`),
+        readPublishedJson<LandingHero>(`data/published/v1/landing/${chain.id}/hero.json`),
+      ]);
+      const displayAsOf = heroDisplayAsOf(hero);
+      const asOf = displayAsOf ?? meta?.updated_through ?? meta?.regime?.asof_date ?? meta?.date ?? null;
+      const lagDays = lagDaysFromIsoDay(asOf);
       const delay = expectedDelayDays(chain.id);
       return {
         chain: chain.id,
@@ -331,17 +363,13 @@ const cadenceExplain: ExplainPair = {
   advanced: (
     <>
       <p>
-        Publication cadence is governed by <InlineCode>PUBLISH_LAG_DAYS_POLICY</InlineCode>{" "}
-        in the pipeline: BTC and ETH expect 1-day lag; ARB and BASE expect 7-day lag.
-        The staleness thresholds are calibrated relative to expected lag, not relative
-        to zero — which is why the same absolute lag value can be normal for one chain
-        and anomalous for another.
+        Publication cadence is chain-specific by design: BTC and ETH expect 1-day lag; ARB and BASE expect 7-day lag. The staleness thresholds are calibrated relative to expected lag, not relative to zero — which is why the same absolute lag value can be normal for one chain and anomalous for another.
       </p>
       <p className="mt-3">
         The operational pipeline is generally scheduled to publish around 09:00 and 21:00
         Europe/Oslo. In practice, visible availability can move slightly because of
-        upstream source delays, chain-specific lag characteristics, deployment timing, or
-        processing time.
+        AWS upstream publication timing, chain-specific lag characteristics, deployment timing, or
+        processing time. Urd Atlas checks for newly available upstream data twice daily.
       </p>
       <p className="mt-3">
         The staleness classification table is: for BTC/ETH, soft warn at lag &gt; 2d,
@@ -357,7 +385,7 @@ const cadenceExplain: ExplainPair = {
       <li>Expected publish windows: around 09:00 and 21:00 Europe/Oslo</li>
       <li>BTC/ETH: expected 1d · warn &gt;2d · fail &gt;4d</li>
       <li>ARB/BASE: expected 7d · warn &gt;10d · fail &gt;15d</li>
-      <li>Source: <InlineCode>PUBLISH_LAG_DAYS_POLICY</InlineCode> in pipeline</li>
+      <li>Source: chain-specific public cadence policy described on this page</li>
     </ul>
   ),
 };
@@ -493,7 +521,7 @@ export default async function StatusPage() {
                   Expected windows <span className="font-semibold text-white">~09:00 / ~21:00 Europe/Oslo</span>
                 </div>
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Source: <InlineCode>{currentDataSource()}</InlineCode>
+                  Source: <InlineCode>published artifact metadata</InlineCode>
                 </div>
               </div>
             </div>
@@ -712,7 +740,7 @@ export default async function StatusPage() {
           <div>Dataset manifest: <InlineCode>data/published/v1/dataset.json</InlineCode></div>
           <div>Chain meta: <InlineCode>data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode></div>
           <div>Health classification is derived at render time — not read from a pre-computed status field.</div>
-          <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
+          <div>Primary provenance fields: <InlineCode>date</InlineCode>, <InlineCode>updated_through</InlineCode>, <InlineCode>methodology_version</InlineCode>, and <InlineCode>regime.determinism_hash</InlineCode></div>
         </div>
       </details>
 

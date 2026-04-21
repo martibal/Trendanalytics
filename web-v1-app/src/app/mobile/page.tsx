@@ -67,7 +67,7 @@ function FreshnessIndicator({ status }: { status: string }) {
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-60" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
       </span>
-      Live
+      On schedule
     </span>
   );
   if (status === "warn") return (
@@ -113,7 +113,7 @@ function ChainCard({ state }: { state: MobileChainState }) {
             </div>
             <div className="min-w-0">
               <div className="text-[14px] font-bold text-white">{state.name}</div>
-              <div className="mt-0.5 text-[11px] text-slate-500">
+              <div className="mt-0.5 text-[11px] text-slate-300">
                 {state.asOf ?? "—"} · {state.lagDays != null ? `${state.lagDays}d lag` : "—"}
               </div>
             </div>
@@ -129,10 +129,10 @@ function ChainCard({ state }: { state: MobileChainState }) {
         {/* Confidence */}
         <div className="mt-3">
           <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wider text-slate-500">Confidence</span>
+            <span className="text-[10px] uppercase tracking-wider text-slate-300">Confidence</span>
             <span className="text-[11px] font-bold text-slate-200">
               {typeof state.confidenceScore === "number" ? state.confidenceScore.toFixed(3) : "—"}
-              <span className="ml-1.5 font-normal text-slate-500">{state.confidenceBand}</span>
+              <span className="ml-1.5 font-normal text-slate-300">{state.confidenceBand}</span>
             </span>
           </div>
           <div className="h-2 w-full rounded-full bg-white/10">
@@ -151,7 +151,7 @@ function ChainCard({ state }: { state: MobileChainState }) {
               { label: "Ca", value: state.scorecard.capacity?.score, title: "Capacity" },
             ].map(({ label, value, title }) => (
               <div key={label} className="flex-1 rounded-xl border border-white/6 bg-black/15 px-2 py-1.5 text-center">
-                <div className="text-[9px] text-slate-600">{title}</div>
+                <div className="text-[9px] text-slate-400">{title}</div>
                 <div className="text-[13px] font-black text-white">
                   {typeof value === "number" ? Math.round(value) : "—"}
                 </div>
@@ -165,7 +165,7 @@ function ChainCard({ state }: { state: MobileChainState }) {
         ) : null}
 
         <div className="mt-3 flex items-center justify-between gap-3">
-          <span className="text-[11px] text-slate-500">History, drivers, scorecard →</span>
+          <span className="text-[11px] text-slate-300">History, drivers, scorecard →</span>
           <FreshnessIndicator status={state.freshnessStatus} />
         </div>
       </div>
@@ -180,7 +180,7 @@ export default async function MobileOverviewPage() {
     computeHistoryDepthDays(),
   ]);
 
-  const publishedAt = dataset?.published_at?.slice(0, 10) ?? null;
+  const publishedAt = dataset?.published_at ? new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Oslo", year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(dataset.published_at)) : null;
   const allOnSchedule = states.every(s => s.freshnessStatus === "ok");
 
   return (
@@ -193,7 +193,7 @@ export default async function MobileOverviewPage() {
           </div>
           <div className="text-right">
             <div className="text-[11px] font-bold text-white">{publishedAt ?? "—"}</div>
-            <div className="mt-0.5 text-[10px] text-slate-500">{historyDays ?? "—"} published days</div>
+            <div className="mt-0.5 text-[10px] text-slate-300">{historyDays ?? "—"} published days</div>
           </div>
         </div>
       </header>
@@ -210,7 +210,7 @@ export default async function MobileOverviewPage() {
             <div className={`text-[11px] font-bold ${allOnSchedule ? "text-emerald-300" : "text-amber-300"}`}>
               {allOnSchedule ? "Pipeline running on schedule" : "Some chains delayed"}
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">
+            <div className="text-[10px] text-slate-300 mt-0.5">
               Expected refresh: ~09:00 and 21:00 Europe/Oslo
             </div>
           </div>
@@ -223,20 +223,20 @@ export default async function MobileOverviewPage() {
         {/* Stats row */}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Published days</div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-slate-300">Published days</div>
             <div className="mt-1 text-[28px] font-black text-white">{historyDays ?? "—"}</div>
-            <div className="mt-1 text-[10px] text-slate-500">Since December 2024</div>
+            <div className="mt-1 text-[10px] text-slate-300">Since December 2024</div>
           </div>
           <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Chains covered</div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-slate-300">Chains covered</div>
             <div className="mt-1 text-[28px] font-black text-white">4</div>
-            <div className="mt-1 text-[10px] text-slate-500">BTC · ETH · ARB · BASE</div>
+            <div className="mt-1 text-[10px] text-slate-300">BTC · ETH · ARB · BASE</div>
           </div>
         </div>
 
         {/* Chain cards */}
         <div>
-          <div className="mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+          <div className="mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-slate-300">
             Current chain state
           </div>
           <div className="space-y-3">
@@ -248,7 +248,7 @@ export default async function MobileOverviewPage() {
 
         {/* What you are looking at */}
         <section className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-300 mb-3">
             What these labels mean
           </div>
           <div className="space-y-2.5">
@@ -268,14 +268,14 @@ export default async function MobileOverviewPage() {
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[10px] text-slate-600 leading-[1.6]">
+          <p className="mt-3 text-[10px] text-slate-400 leading-[1.6]">
             All labels are chain-relative. HEATING on Ethereum means Ethereum is running hotter than Ethereum normally does — not hotter than Bitcoin.
           </p>
         </section>
 
         {/* Confidence explained */}
         <section className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-300 mb-3">
             How to read confidence
           </div>
           <div className="space-y-2">
@@ -285,7 +285,7 @@ export default async function MobileOverviewPage() {
               { range: "< 0.40", band: "Degraded", desc: "Below publish gate — UNKNOWN/DEGRADED shown instead.", color: "#6B7280" },
             ].map(({ range, band, desc, color }) => (
               <div key={band} className="flex items-start gap-3 rounded-xl border border-white/5 bg-black/10 px-3 py-2.5">
-                <code className="shrink-0 font-mono text-[10px] text-slate-500 w-16">{range}</code>
+                <code className="shrink-0 font-mono text-[10px] text-slate-300 w-16">{range}</code>
                 <div>
                   <span className="text-[11px] font-bold" style={{ color }}>{band}</span>
                   <span className="ml-2 text-[11px] text-slate-400">{desc}</span>
@@ -297,7 +297,7 @@ export default async function MobileOverviewPage() {
 
         {/* Quick navigation */}
         <section className="rounded-3xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-300 mb-3">
             Explore
           </div>
           <div className="grid grid-cols-2 gap-2.5">
@@ -319,7 +319,7 @@ export default async function MobileOverviewPage() {
 
         {/* Desktop bridge */}
         <div className="rounded-2xl border border-white/6 bg-white/[0.02] px-4 py-3 text-center">
-          <div className="text-[11px] text-slate-500">Full analysis, API, and schema reference</div>
+          <div className="text-[11px] text-slate-300">Full analysis, API, and schema reference</div>
           <Link href="/?view=desktop" className="mt-1 inline-block text-[12px] font-semibold text-cyan-400">
             Open desktop version → urdatlas.com
           </Link>

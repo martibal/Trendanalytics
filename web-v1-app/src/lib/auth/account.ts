@@ -298,7 +298,30 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
     };
   }
 
-  const authState = await auth();
+  let authState: Awaited<ReturnType<typeof auth>> | null = null;
+
+  try {
+    authState = await auth();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("clerkMiddleware") || message.includes("auth() was called but Clerk can't detect usage")) {
+      console.warn("[account] auth unavailable without clerk middleware; falling back to public snapshot", { message });
+      const snapshot = buildPublicSnapshot();
+      const labels = snapshotLabels(snapshot);
+      return {
+        authConfigured: true,
+        isAuthenticated: false,
+        account: null,
+        snapshot,
+        apiKeys: [],
+        tierLabel: labels.tierLabel,
+        entitledChainLabel: labels.entitledChainLabel,
+        historyDepthLabel: labels.historyDepthLabel,
+      };
+    }
+    throw error;
+  }
+
   const authProviderUserId = authState.userId ?? null;
 
   console.info("[account] auth state", {

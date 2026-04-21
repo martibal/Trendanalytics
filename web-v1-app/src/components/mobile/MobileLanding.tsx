@@ -6,6 +6,7 @@ import type { SurfaceRowDisplay } from "@/lib/landingSurface";
 type MobileLandingProps = {
   rows: SurfaceRowDisplay[];
   historyDepthDays?: number | null;
+  lastUpdatedLabel?: string | null;
 };
 
 const jsonCards = [
@@ -36,7 +37,7 @@ const nextLinks = [
   { title: "JSON Schema", body: "See every field in Gold, Meta, and Derived before you subscribe.", href: "/api-docs/schema" },
 ] as const;
 
-export default function MobileLanding({ rows, historyDepthDays }: MobileLandingProps) {
+export default function MobileLanding({ rows, historyDepthDays, lastUpdatedLabel }: MobileLandingProps) {
   const days = historyDepthDays;
 
   return (
@@ -49,6 +50,12 @@ export default function MobileLanding({ rows, historyDepthDays }: MobileLandingP
           <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.8)]" />
           Daily chain-state JSON
         </div>
+
+        {lastUpdatedLabel ? (
+          <div className="mt-3 inline-flex items-center rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-[11px] font-medium text-cyan-50">
+            Last data load: {lastUpdatedLabel}
+          </div>
+        ) : null}
 
         <h1 className="mt-4 text-[2.1rem] font-black leading-[1.0] tracking-[-0.04em] text-white">
           Separating blockchain noise from structural change

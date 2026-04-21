@@ -46,7 +46,7 @@ export default function DataContractDetails({ dataset, dataSource }: DataContrac
                 Methodology <span className="font-semibold text-white">{dataset?.methodology_version ?? "—"}</span>
               </div>
               <div>
-                Runtime backend <span className="font-semibold text-white">{dataSource}</span> <span className="text-slate-500">(deployment detail)</span>
+                Primary provenance fields <span className="font-semibold text-white">date · updated_through · methodology_version · determinism_hash</span>
               </div>
             </div>
           </div>

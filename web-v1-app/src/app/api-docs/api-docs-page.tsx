@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource } from "@/lib/storage";
 
 const PUBLIC_ENDPOINTS = [
   ["GET", "/api/v1/status", "Per-chain freshness, lag, and publication context."],
@@ -49,7 +48,7 @@ export default async function ApiDocsPage() {
             <div className="font-medium uppercase tracking-[0.12em] text-slate-400">Published context</div>
             <div className="mt-2">Dataset <InlineCode>{dataset?.version ?? "—"}</InlineCode></div>
             <div className="mt-1">Methodology <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
-            <div className="mt-1">Runtime backend <InlineCode>{currentDataSource()}</InlineCode></div>
+            <div className="mt-1">Published artifact contract</div>
             <div className="mt-2 text-slate-400">Runtime backend is a deployment detail, not the primary public provenance truth.</div>
           </div>
         </div>

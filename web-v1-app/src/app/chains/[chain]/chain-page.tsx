@@ -12,7 +12,7 @@ import ScoreGauge from "@/components/ui/ScoreGauge";
 import StalenessBar from "@/components/ui/StalenessBar";
 import { getChainConfig, type ChainId } from "@/config/chains";
 import { getUnitLabel } from "@/config/units";
-import { currentDataSource, readStorageObject } from "@/lib/storage";
+import { readStorageObject } from "@/lib/storage";
 
 import { currentUser } from "@clerk/nextjs/server";
 import "server-only";
@@ -2237,10 +2237,9 @@ export default async function ChainPage({
                         newParams.set(c.paramKey, String(w));
                         const href = gatedHref ?? `/chains/${chainId}?${newParams.toString()}#chart-${safeId(c.metric)}`;
                         return (
-                          <Link
+                          <a
                             key={w}
                             href={href}
-                            prefetch={false}
                             className={[
                               "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition select-none",
                               isActive
@@ -2249,7 +2248,7 @@ export default async function ChainPage({
                             ].join(" ")}
                           >
                             {label}
-                          </Link>
+                          </a>
                         );
                       })}
                     </nav>
@@ -2547,7 +2546,7 @@ export default async function ChainPage({
       <details className="mt-10 rounded-2xl border p-5">
         <summary className="cursor-pointer text-sm font-medium">Data contract & traceability</summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
+          <div>Data source: <InlineCode>published artifact metadata</InlineCode></div>
           <div>Meta path: <InlineCode>{metaPath}</InlineCode></div>
           <div>Gold path: <InlineCode>{goldPath}</InlineCode></div>
           <div>Derived path: <InlineCode>{derivedPath}</InlineCode></div>

@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource } from "@/lib/storage";
 import { type ThresholdControlValues } from "@/components/thresholds/ThresholdControls";
 import ThresholdControlsClient from "@/components/thresholds/ThresholdControlsClient";
 
@@ -544,7 +543,7 @@ export default async function ThresholdsPage() {
                   </div>
                 ) : null}
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span>
+                  Published artifact contract
                 </div>
               </div>
             ) : null}
@@ -830,7 +829,7 @@ export default async function ThresholdsPage() {
           Data contract and traceability
         </summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span></div>
+          <div>Published artifact contract</div>
           <div>
             Dataset manifest:{" "}
             <InlineCode>data/published/v1/dataset.json</InlineCode>

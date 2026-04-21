@@ -22,6 +22,6 @@ export async function POST() {
     503,
     "portal_disabled",
     "Billing portal is temporarily unavailable.",
-    "Payments are disabled until business registration and live billing setup are complete."
+    "Payments are disabled until business registration and billing setup are complete."
   );
 }

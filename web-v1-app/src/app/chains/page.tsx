@@ -10,7 +10,7 @@ import WindowSelector from "@/components/ui/WindowSelector";
 import ExplainModal from "@/components/ExplainModal";
 import { getChainConfig, type ChainId } from "@/config/chains";
 import { getUnitLabel } from "@/config/units";
-import { currentDataSource, readStorageObject } from "@/lib/storage";
+import { readStorageObject } from "@/lib/storage";
 import {
   asOfExplanation,
   chartHowToReadExplanation,
@@ -758,19 +758,19 @@ export default async function ChainPage({
 
           <div className="mt-3 grid gap-1 text-sm text-muted-foreground">
             <div>
-              <span className="font-medium text-foreground">Data source:</span>{" "}
-              <InlineCode>{currentDataSource()}</InlineCode>
+              <span className="font-medium text-foreground">Published context:</span>{" "}
+              Artifact semantics are defined publicly in Methodology, Provenance &amp; Revisions, and the schema reference.
             </div>
             <div>
-              <span className="font-medium text-foreground">Meta path:</span>{" "}
+              <span className="font-medium text-foreground">Meta artifact:</span>{" "}
               <InlineCode>{metaPath}</InlineCode>
             </div>
             <div>
-              <span className="font-medium text-foreground">Gold path:</span>{" "}
+              <span className="font-medium text-foreground">Gold artifact:</span>{" "}
               <InlineCode>{goldPath}</InlineCode>
             </div>
             <div>
-              <span className="font-medium text-foreground">Derived path:</span>{" "}
+              <span className="font-medium text-foreground">Derived artifact:</span>{" "}
               <InlineCode>{derivedPath}</InlineCode>
             </div>
           </div>
@@ -1040,7 +1040,7 @@ export default async function ChainPage({
         <div className="font-medium text-foreground">Runtime data contract</div>
         <ul className="mt-2 list-disc pl-5">
           <li>
-            Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span>
+            Published artifact contract
           </li>
           <li>
             Meta path: <InlineCode>{metaPath}</InlineCode>

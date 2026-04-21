@@ -15,6 +15,6 @@ export async function POST() {
     503,
     "checkout_disabled",
     "Checkout is temporarily unavailable.",
-    "Payments are disabled until business registration and live billing setup are complete."
+    "Payments are disabled until business registration and billing setup are complete."
   );
 }

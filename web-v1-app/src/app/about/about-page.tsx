@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource } from "@/lib/storage";
 
 import "server-only";
 
@@ -394,7 +393,7 @@ export default async function AboutPage() {
                   <div className="mt-1">Methodology <InlineCode>{dataset.methodology_version}</InlineCode></div>
                 ) : null}
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Source: <InlineCode>{currentDataSource()}</InlineCode>
+                  Source: <InlineCode>published artifact metadata</InlineCode>
                 </div>
               </div>
             ) : null}
@@ -637,7 +636,7 @@ export default async function AboutPage() {
         </summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
           <div>Dataset manifest: <InlineCode>data/published/v1/dataset.json</InlineCode></div>
-          <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
+          <div>Data source: <InlineCode>published artifact metadata</InlineCode></div>
           <div>Methodology version: <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
           <div>This page is descriptive product documentation and remains aligned with methodology, glossary, status, API docs, and legal pages.</div>
         </div>

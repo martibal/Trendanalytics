@@ -65,10 +65,6 @@ export default function JsonLayers() {
         <h2 className="text-3xl font-black tracking-[-0.02em] text-white leading-tight">
           Gold, Meta, Derived.
         </h2>
-        <p className="max-w-[52ch] text-[14px] leading-[1.8] text-slate-400">
-          Gold tells you what happened. Meta tells you what it means. Derived tells you how it is
-          trending. Together they are the full daily JSON surface.
-        </p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -90,10 +86,10 @@ export default function JsonLayers() {
             <div className="text-[18px] font-black tracking-[-0.01em] text-white mb-1">
               {layer.title}
             </div>
-            <div className="font-mono text-[10px] font-medium letter-spacing-[0.1em] text-slate-500 mb-3">
+            <div className="font-mono text-[10px] font-medium letter-spacing-[0.1em] text-slate-300 mb-3">
               {layer.subtitle}
             </div>
-            <p className="text-[13px] leading-[1.7] text-slate-400 mb-5 flex-1">{layer.desc}</p>
+            <p className="text-[13px] leading-[1.7] text-slate-300 mb-5 flex-1">{layer.desc}</p>
             <div className="space-y-2.5">
               {layer.fields.map(({ name, note }) => (
                 <div key={name} className="flex gap-2.5 items-start">
@@ -107,22 +103,22 @@ export default function JsonLayers() {
                   <div>
                     <span className="font-mono text-[11px] text-slate-300">{name}</span>
                     {note && (
-                      <span className="font-mono text-[10px] text-slate-600 ml-2">{note}</span>
+                      <span className="font-mono text-[10px] text-slate-400 ml-2">{note}</span>
                     )}
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-5 font-mono text-[10px] font-semibold text-slate-600 transition group-hover:text-cyan-400">
+            <div className="mt-5 font-mono text-[10px] font-semibold text-slate-400 transition group-hover:text-cyan-400">
               See all {layer.tag} fields →
             </div>
           </Link>
         ))}
       </div>
 
-      <p className="mt-5 text-[12px] text-slate-600 font-mono text-center">
+      <p className="mt-5 text-[12px] text-slate-400 font-mono text-center">
         Delivered via{" "}
-        <code className="text-slate-500">GET /api/v1/files/&lt;genre&gt;/&lt;chain&gt;/&lt;window&gt;/latest.json</code>
+        <code className="text-slate-300">GET /api/v1/files/&lt;genre&gt;/&lt;chain&gt;/&lt;window&gt;/latest.json</code>
         {" · "}
         <Link href="/api-docs/schema" className="text-cyan-500/70 hover:text-cyan-400 hover:underline">
           Full schema reference

@@ -58,7 +58,7 @@ export default function LiveChains({ rows }: { rows: SurfaceRowDisplay[] }) {
           <h2 className="text-3xl font-black tracking-[-0.02em] text-white leading-tight">
             The current published regime, per chain.
           </h2>
-          <p className="mt-2 max-w-2xl text-[14px] leading-[1.8] text-slate-400">
+          <p className="mt-2 max-w-2xl text-[14px] leading-[1.8] text-slate-300">
             This is what the pipeline published most recently — regime label, confidence, and
             freshness metadata for each chain. Exactly what subscribers receive in their daily JSON.
             Hover any field for a plain-language explanation.
@@ -82,10 +82,10 @@ export default function LiveChains({ rows }: { rows: SurfaceRowDisplay[] }) {
             {/* Header */}
             <div className="flex items-start justify-between gap-2 mb-5">
               <div>
-                <div className="text-[22px] font-black tracking-[-0.02em] text-white">
+                <div className="text-[22px] font-black tracking-[-0.02em] text-white drop-shadow-[0_1px_0_rgba(255,255,255,0.02)]">
                   {row.label}
                 </div>
-                <div className="font-mono text-[9px] font-medium uppercase tracking-[0.18em] text-slate-500 mt-0.5">
+                <div className="font-mono text-[9px] font-medium uppercase tracking-[0.18em] text-slate-300 mt-0.5">
                   {row.name}
                 </div>
               </div>
@@ -106,15 +106,15 @@ export default function LiveChains({ rows }: { rows: SurfaceRowDisplay[] }) {
                   </span>
                 </Tooltip>
               ) : (
-                <span className="text-sm text-slate-600">No published label</span>
+                <span className="text-sm text-slate-400">No published label</span>
               )}
-              <p className="mt-1.5 text-[11px] leading-[1.55] text-slate-500">{row.takeaway}</p>
+              <p className="mt-1.5 text-[11px] leading-[1.55] text-slate-300">{row.takeaway}</p>
             </div>
 
             {/* Confidence */}
             <BlockTooltip tooltip={row.confidenceTooltip}>
               <div className="mt-4 rounded-xl border border-white/6 bg-black/20 p-3">
-                <div className="font-mono text-[9px] font-medium uppercase tracking-[0.14em] text-slate-600">
+                <div className="font-mono text-[9px] font-medium uppercase tracking-[0.14em] text-slate-400">
                   Confidence
                 </div>
                 <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -130,7 +130,7 @@ export default function LiveChains({ rows }: { rows: SurfaceRowDisplay[] }) {
             <div className="mt-2 grid grid-cols-2 gap-2">
               <BlockTooltip tooltip={row.asOfTooltip}>
                 <div className="rounded-lg border border-white/5 bg-black/20 p-2.5">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-slate-600">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400">
                     As of
                   </div>
                   <div className="mt-1 font-mono text-[12px] font-semibold text-white">
@@ -140,7 +140,7 @@ export default function LiveChains({ rows }: { rows: SurfaceRowDisplay[] }) {
               </BlockTooltip>
               <BlockTooltip tooltip={row.lagTooltip} align="right">
                 <div className="rounded-lg border border-white/5 bg-black/20 p-2.5">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-slate-600">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400">
                     Lag
                   </div>
                   <div className="mt-1 font-mono text-[12px] font-semibold text-white">
@@ -150,7 +150,7 @@ export default function LiveChains({ rows }: { rows: SurfaceRowDisplay[] }) {
               </BlockTooltip>
             </div>
 
-            <div className="mt-4 font-mono text-[10px] font-medium text-slate-600 transition group-hover/card:text-cyan-400">
+            <div className="mt-4 font-mono text-[10px] font-medium text-slate-400 transition group-hover/card:text-cyan-400">
               Open chain detail →
             </div>
           </Link>

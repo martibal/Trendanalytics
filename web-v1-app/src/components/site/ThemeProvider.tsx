@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-export type ThemeMode = "dark" | "light";
+export type ThemeMode = "dark";
 
 const STORAGE_KEY = "ta-theme";
 
@@ -23,26 +23,17 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function applyTheme(mode: ThemeMode) {
   const root = document.documentElement;
-  root.classList.toggle("dark", mode === "dark");
-  root.dataset.theme = mode;
-  window.localStorage.setItem(STORAGE_KEY, mode);
+  root.classList.add("dark");
+  root.dataset.theme = "dark";
+  window.localStorage.setItem(STORAGE_KEY, "dark");
 }
 
 function getInitialTheme(): ThemeMode {
-  if (typeof window === "undefined") {
-    return "dark";
-  }
-
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark") {
-    return stored;
-  }
-
   return "dark";
 }
 
 export default function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeMode>(getInitialTheme);
+  const [theme, setThemeState] = useState<ThemeMode>("dark");
 
   useEffect(() => {
     applyTheme(theme);
@@ -51,8 +42,8 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme,
-      setTheme: setThemeState,
-      toggleTheme: () => setThemeState((prev) => (prev === "dark" ? "light" : "dark")),
+      setTheme: () => setThemeState("dark"),
+      toggleTheme: () => setThemeState("dark"),
     }),
     [theme]
   );

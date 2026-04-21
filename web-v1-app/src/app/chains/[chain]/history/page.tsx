@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { currentDataSource, readStorageObject } from "@/lib/storage";
+import { readStorageObject } from "@/lib/storage";
 
 type ChainId = "bitcoin" | "ethereum" | "arbitrum" | "base";
 
@@ -216,7 +216,7 @@ export default async function ChainHistoryPage({
               Traceability
             </div>
             <div className="mt-1 font-medium text-foreground">
-              Runtime backend: {currentDataSource()} (deployment detail)
+              Published artifact contract
             </div>
             <div className="mt-1 text-xs text-muted-foreground">{canonicalPath}</div>
             <div className="mt-2 text-xs text-muted-foreground">

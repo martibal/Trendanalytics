@@ -16,7 +16,7 @@ export default function ServicePage() {
           <h2 className="text-xl font-semibold text-white">Support channel</h2>
           <div className="mt-4 space-y-3 text-sm leading-7 text-muted-foreground">
             <p>Primary support contact: <a className="underline" href="mailto:support@urdatlas.com">support@urdatlas.com</a>.</p>
-            <p>Human reply target: within 2 business days. Faster responses may happen, but this is the public expectation baseline.</p>
+            <p>Reply target: within 2–4 business days. Faster responses may happen, but this is the public expectation baseline.</p>
             <p>Production-impacting incidents or access problems should be reported with chain, date, endpoint used, and a copy of the returned error if available.</p>
           </div>
         </section>
@@ -35,12 +35,13 @@ export default function ServicePage() {
             <p>Status updates for persistent delays or operational issues should be posted on <Link href="/status" className="underline">/status</Link>.</p>
             <p>Corrections that affect archived artifacts should be accompanied by a correction note or changelog entry explaining whether the change was docs-only, interpretation-only, a methodology change, or a historical correction.</p>
             <p>Freshness issues, upstream data issues, methodology changes, and historical corrections are distinct classes of event and should be communicated as such.</p>
+            <p>Urd Atlas depends on AWS upstream publication timing. If AWS publishes later than usual, that delay is outside the direct control of Urd Atlas. The pipeline still checks for newly available data automatically twice daily to catch late-arriving upstream files as soon as they appear.</p>
           </div>
         </section>
         <section className="rounded-2xl border p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-white">Buyer fit and cadence expectations</h2>
           <div className="mt-4 space-y-3 text-sm leading-7 text-muted-foreground">
-            <p>BTC and ETH are intended for near-daily regime conditioning and monitoring workflows.</p>
+            <p>BTC and ETH are intended for near-daily regime conditioning and monitoring workflows when AWS upstream publication remains on its normal cadence.</p>
             <p>ARB and BASE are published on a slower cadence by design and are better suited to state-aware monitoring, historical segmentation, and notebook research than to intraday execution workflows.</p>
             <p>Urd Atlas is not an intraday execution feed. It is a descriptive regime and context product.</p>
           </div>

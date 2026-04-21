@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import Link from "next/link";
+import Script from "next/script";
 import { notFound } from "next/navigation";
 
 import MetricLineChart, { type MetricPoint } from "@/components/MetricLineChart";
@@ -14,7 +15,6 @@ import { getChainConfig, type ChainId } from "@/config/chains";
 import { getUnitLabel } from "@/config/units";
 import { currentDataSource, readStorageObject } from "@/lib/storage";
 
-import { currentUser } from "@clerk/nextjs/server";
 import "server-only";
 
 type Driver = {
@@ -162,29 +162,95 @@ function InlineCode({ children }: { children: React.ReactNode }) {
 
 function ModalStyles() {
   return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: `
-          .ta-modal {
-            display: none;
-          }
-          .ta-modal:target {
-            display: flex;
-          }
-        `,
-      }}
-    />
+    <>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .ta-modal-dialog {
+              width: min(64rem, calc(100vw - 2rem));
+              max-height: 88vh;
+              margin: auto;
+              padding: 0;
+              border: 1px solid rgba(34, 211, 238, 0.2);
+              border-radius: 1.5rem;
+              background: #071322;
+              color: white;
+              box-shadow: 0 24px 80px rgba(8, 47, 73, 0.45);
+            }
+            .ta-modal-dialog::backdrop {
+              background: rgba(2, 8, 23, 0.82);
+              backdrop-filter: blur(6px);
+            }
+          `,
+        }}
+      />
+      <Script id="ta-modal-controller" strategy="afterInteractive">{`
+        (() => {
+          if (window.__taModalControllerInstalled) return;
+          window.__taModalControllerInstalled = true;
+
+          const restoreScroll = (dialog) => {
+            const raw = dialog?.dataset?.scrollY;
+            document.body.style.overflow = "";
+            if (!raw) return;
+            const y = Number(raw);
+            if (!Number.isFinite(y)) return;
+            requestAnimationFrame(() => window.scrollTo({ top: y, behavior: "auto" }));
+          };
+
+          document.addEventListener("click", (event) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+
+            const opener = target.closest("[data-modal-open]");
+            if (opener) {
+              event.preventDefault();
+              const id = opener.getAttribute("data-modal-open");
+              if (!id) return;
+              const dialog = document.getElementById(id);
+              if (!(dialog instanceof HTMLDialogElement)) return;
+              dialog.dataset.scrollY = String(window.scrollY || window.pageYOffset || 0);
+              if (!dialog.open) dialog.showModal();
+              document.body.style.overflow = "hidden";
+              return;
+            }
+
+            const closer = target.closest("[data-modal-close]");
+            if (closer) {
+              event.preventDefault();
+              const dialog = closer.closest("dialog");
+              if (dialog instanceof HTMLDialogElement) {
+                dialog.close();
+                restoreScroll(dialog);
+              }
+            }
+          });
+
+          document.addEventListener(
+            "close",
+            (event) => {
+              const target = event.target;
+              if (target instanceof HTMLDialogElement && target.classList.contains("ta-modal-dialog")) {
+                restoreScroll(target);
+              }
+            },
+            true,
+          );
+        })();
+      `}</Script>
+    </>
   );
 }
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
   return (
-    <a
-      href={`#${id}`}
+    <button
+      type="button"
+      data-modal-open={id}
       className="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/5 px-3 py-1 text-xs font-medium text-cyan-200 hover:bg-cyan-500/10"
     >
       {label}
-    </a>
+    </button>
   );
 }
 
@@ -202,14 +268,8 @@ function ExplainModal({
   traceability?: ReactNode;
 }) {
   return (
-    <div id={id} className="ta-modal fixed inset-0 z-[80] items-center justify-center p-4">
-      <a
-        href="#"
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-        aria-label="Close dialog"
-      />
-      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-cyan-500/20 bg-[#071322] shadow-2xl shadow-cyan-950/40">
-        {/* Sticky header — always visible, never scrolls away */}
+    <dialog id={id} className="ta-modal-dialog">
+      <div className="relative z-10 flex max-h-[88vh] w-full flex-col overflow-hidden rounded-3xl border border-cyan-500/20 bg-[#071322] shadow-2xl shadow-cyan-950/40">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/8 px-6 py-5">
           <div>
             <h3 className="text-2xl font-semibold text-white">{title}</h3>
@@ -217,16 +277,16 @@ function ExplainModal({
               <div className="mt-2 text-sm leading-6 text-slate-300">{subtitle}</div>
             ) : null}
           </div>
-          <a
-            href="#"
+          <button
+            type="button"
+            data-modal-close
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl text-slate-200 hover:bg-white/10"
             aria-label="Close dialog"
           >
             ×
-          </a>
+          </button>
         </div>
 
-        {/* Scrollable body */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
@@ -254,7 +314,7 @@ function ExplainModal({
           ) : null}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -1761,16 +1821,8 @@ export default async function ChainPage({
   const chainId = cfg.id;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
 
-  // Auth context — currentUser() is more reliable here than auth() on a public chain route
-  // because these chart selectors should unlock for any signed-in user, even without route protection.
-  const signedInUser = await currentUser().catch(() => null);
-  const isSignedIn = Boolean(signedInUser?.id);
-
   const requestedWindow = normalizeWindow(resolvedSearchParams?.window);
-  // Gate window: unauthenticated users are limited to 30d
-  // Gate: anonymous users capped at 30d. Signed-in users get full range.
-  const effectiveRequestedWindow = isSignedIn ? requestedWindow : Math.min(requestedWindow, 30) as 30;
-  const effectiveWindowDays = effectiveRequestedWindow;
+  const effectiveWindowDays = requestedWindow;
 
   const metaPath = `meta/${chainId}/latest.json`;
   const heroPath = `landing/${chainId}/hero.json`;
@@ -1891,9 +1943,7 @@ export default async function ChainPage({
     candidates.map(async (metric) => {
       const paramKey = metricParamKey(metric);
       const rawParam = (resolvedSearchParams as Record<string, string> | undefined)?.[paramKey];
-      const metricWindow: 30 | 90 | 180 | 365 = isSignedIn
-        ? normalizeWindow(rawParam)
-        : 30;
+      const metricWindow: 30 | 90 | 180 | 365 = normalizeWindow(rawParam);
 
       const mGoldPath = `gold/${chainId}/last${metricWindow}d.json`;
       const mDerivedPath = `derived/${chainId}/last${metricWindow}d.json`;
@@ -1935,19 +1985,12 @@ export default async function ChainPage({
 
   const charts = chartDataByMetric.filter((c) => c.hasData);
 
-  const windowOptions = isSignedIn
-    ? [
-        { key: "30", label: "30d", href: `/chains/${chainId}?window=30` },
-        { key: "90", label: "90d", href: `/chains/${chainId}?window=90` },
-        { key: "180", label: "180d", href: `/chains/${chainId}?window=180` },
-        { key: "365", label: "365d", href: `/chains/${chainId}?window=365` },
-      ]
-    : [
-        { key: "30", label: "30d", href: `/chains/${chainId}?window=30` },
-        { key: "90", label: "90d ↑", href: "/sign-in" },
-        { key: "180", label: "180d ↑", href: "/sign-in" },
-        { key: "365", label: "365d ↑", href: "/sign-in" },
-      ];
+  const windowOptions = [
+    { key: "30", label: "30d", href: `/chains/${chainId}?window=30` },
+    { key: "90", label: "90d", href: `/chains/${chainId}?window=90` },
+    { key: "180", label: "180d", href: `/chains/${chainId}?window=180` },
+    { key: "365", label: "365d", href: `/chains/${chainId}?window=365` },
+  ];
 
   const chainProfilePair = chainProfileCopy(chainId);
 
@@ -2163,16 +2206,10 @@ export default async function ChainPage({
               own recent history. Use the window selector to change the time range.
               Click any chart for a full explanation of what it measures and why it is shown.
             </p>
-            {!isSignedIn && (
-              <p className="mt-2 text-xs text-slate-500">
-                Showing 30-day history.{" "}
-                <a href="/sign-in" className="text-cyan-400 hover:underline">Sign in free</a>
-                {" "}to unlock 90, 180, and 365-day views.
-                {" "}
-                <a href="/#plans" className="text-slate-400 hover:underline">A paid subscription</a>
-                {" "}gives you the JSON data behind these charts.
-              </p>
-            )}
+            <p className="mt-2 text-xs text-slate-500">
+              The chart surface is public. Paid plans unlock the JSON files behind these readings for
+              API, notebook, dashboard, and downstream workflow use.
+            </p>
           </div>
 
         </div>
@@ -2196,7 +2233,11 @@ export default async function ChainPage({
         ) : (
           <div className="space-y-6">
             {charts.map((c, index) => (
-              <section key={c.metric} className="rounded-3xl border p-5 shadow-sm">
+              <section
+                key={c.metric}
+                id={`chart-${safeId(chainId)}-${safeId(c.metric)}`}
+                className="scroll-mt-28 rounded-3xl border p-5 shadow-sm"
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
@@ -2212,20 +2253,12 @@ export default async function ChainPage({
                     <div className="text-xs text-muted-foreground">Units: {c.unitLabel ?? "—"}</div>
                     {/* Per-chart window selector */}
                     <nav className="flex flex-wrap items-center gap-1.5" aria-label={`Window for ${c.metric}`}>
-                      {(isSignedIn
-                        ? [
-                            { w: 30, label: "30d" },
-                            { w: 90, label: "90d" },
-                            { w: 180, label: "180d" },
-                            { w: 365, label: "365d" },
-                          ]
-                        : [
-                            { w: 30, label: "30d" },
-                            { w: 90, label: "90d ↑", href: "/sign-in" },
-                            { w: 180, label: "180d ↑", href: "/sign-in" },
-                            { w: 365, label: "365d ↑", href: "/sign-in" },
-                          ]
-                      ).map(({ w, label, href: gatedHref }) => {
+                      {[
+                        { w: 30, label: "30d" },
+                        { w: 90, label: "90d" },
+                        { w: 180, label: "180d" },
+                        { w: 365, label: "365d" },
+                      ].map(({ w, label }) => {
                         const isActive = c.metricWindow === w;
                         const newParams = new URLSearchParams();
                         // Preserve other metric params
@@ -2235,7 +2268,7 @@ export default async function ChainPage({
                           }
                         });
                         newParams.set(c.paramKey, String(w));
-                        const href = gatedHref ?? `/chains/${chainId}?${newParams.toString()}`;
+                        const href = `/chains/${chainId}?${newParams.toString()}#chart-${safeId(chainId)}-${safeId(c.metric)}`;
                         return (
                           <Link
                             key={w}
@@ -2294,15 +2327,15 @@ export default async function ChainPage({
                   title={`How to read ${c.metric}`}
                   subtitle={
                     <>
-                      Window <InlineCode>{String(effectiveWindowDays)}d</InlineCode> · Units{" "}
+                      Window <InlineCode>{String(c.metricWindow)}d</InlineCode> · Units{" "}
                       <InlineCode>{c.unitLabel ?? "—"}</InlineCode>
                     </>
                   }
                   pair={chartReadExplanation(c.metric, effectiveWindowDays, c.unitLabel)}
                   traceability={
                     <ul className="list-disc pl-5">
-                      <li>Derived path: <InlineCode>{derivedPath}</InlineCode></li>
-                      <li>Gold path: <InlineCode>{goldPath}</InlineCode></li>
+                      <li>Derived path: <InlineCode>{c.mDerivedPath}</InlineCode></li>
+                      <li>Gold path: <InlineCode>{c.mGoldPath}</InlineCode></li>
                       <li>Metric key: <InlineCode>{c.metric}</InlineCode></li>
                     </ul>
                   }
@@ -2317,7 +2350,7 @@ export default async function ChainPage({
                     <ul className="list-disc pl-5">
                       <li>Metric: <InlineCode>{c.metric}</InlineCode></li>
                       <li>Axis: <InlineCode>{c.axis ?? "—"}</InlineCode></li>
-                      <li>Visible chart source window: <InlineCode>{`${effectiveWindowDays}d`}</InlineCode></li>
+                      <li>Visible chart source window: <InlineCode>{`${c.metricWindow}d`}</InlineCode></li>
                     </ul>
                   }
                 />

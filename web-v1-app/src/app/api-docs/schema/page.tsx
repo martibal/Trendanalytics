@@ -6,7 +6,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource } from "@/lib/storage";
 
 import "server-only";
 
@@ -185,7 +184,7 @@ export default async function SchemaPage() {
                   <div className="mt-2">Methodology <IC>{dataset.methodology_version}</IC></div>
                 ) : null}
                 <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Runtime backend: <IC>{currentDataSource()}</IC> <span className="text-slate-500">(deployment detail)</span>
+                  Published artifact contract
                 </div>
               </div>
             ) : null}

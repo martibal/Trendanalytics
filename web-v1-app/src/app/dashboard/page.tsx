@@ -62,7 +62,7 @@ function deriveLifecycleState(params: {
   if (!params.authConfigured) {
     return {
       label: "Auth not configured",
-      detail: "Identity provider keys are not configured yet, so the subscriber lifecycle is only partially live.",
+      detail: "Identity provider keys are not configured yet, so the subscriber lifecycle is only partially enabled.",
     };
   }
 
@@ -186,7 +186,7 @@ export default async function DashboardPage() {
       {!accountView.authConfigured ? (
         <section className="mb-8 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5">
           <div className="text-sm font-medium text-amber-200">
-            Dashboard shell is live, but Clerk environment variables are not configured yet.
+            Dashboard shell is available, but Clerk environment variables are not configured yet.
           </div>
           <p className="mt-2 text-sm text-amber-100/90">
             The route renders safely during development before identity is connected. Once Clerk keys
@@ -481,7 +481,7 @@ export default async function DashboardPage() {
               </p>
 
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100/90">
-                Payments will be re-enabled once business registration, bank account setup, and live
+                Payments will be re-enabled once business registration, bank account setup, and enabled
                 Stripe configuration are complete.
               </div>
             </div>

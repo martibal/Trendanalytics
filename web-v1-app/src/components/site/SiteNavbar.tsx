@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CHAIN_LIST } from "@/config/chains";
-import { useTheme } from "@/components/site/ThemeProvider";
 
 const DESKTOP_ITEMS = [
   { href: "/methodology", label: "Methodology" },
@@ -27,21 +26,6 @@ function navLinkClass(active: boolean) {
       ? "bg-muted text-foreground"
       : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
   ].join(" ");
-}
-
-function ThemeToggle() {
-  const { theme, toggleTheme } = useTheme();
-
-  return (
-    <button
-      type="button"
-      onClick={toggleTheme}
-      aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      className="inline-flex h-9 min-w-[108px] items-center justify-center rounded-lg border border-border bg-background px-3 text-sm text-foreground transition hover:bg-muted"
-    >
-      {theme === "dark" ? "Light mode" : "Dark mode"}
-    </button>
-  );
 }
 
 function AuthAwareActions({
@@ -219,7 +203,6 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
         </div>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <ThemeToggle />
           {CLERK_CONFIGURED ? (
             <AuthAwareActions />
           ) : (
@@ -284,8 +267,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
             })}
 
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <ThemeToggle />
-              {CLERK_CONFIGURED ? (
+                  {CLERK_CONFIGURED ? (
                 <AuthAwareActions mobile onNavigate={closeMenus} />
               ) : (
                 <Link

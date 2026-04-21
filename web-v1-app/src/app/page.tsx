@@ -84,6 +84,22 @@ type LandingHero = {
   };
 };
 
+
+function formatOsloTimestamp(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Oslo",
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 type MetaLatest = {
   date?: string;
   updated_through?: string;
@@ -477,17 +493,18 @@ export default async function HomePage() {
       : landingFallbackRows;
 
   const displayRows = rows.map(toSurfaceRowDisplay);
+  const lastDataLoadLabel = formatOsloTimestamp(dataset?.published_at ?? statusPayload?.generated_at_utc ?? null);
   const whatIsExplain = whatIsUrdAtlasExplanation();
   const boundaryExplain = interpretationBoundaryExplanation();
 
   return (
     <>
-      <MobileLanding rows={displayRows} historyDepthDays={historyDepthDays} />
+      <MobileLanding rows={displayRows} historyDepthDays={historyDepthDays} lastUpdatedLabel={lastDataLoadLabel} />
 
       <main className="mx-auto hidden max-w-7xl px-6 py-10 lg:block">
         <ModalStyles />
 
-        <Hero historyDepthDays={historyDepthDays} />
+        <Hero historyDepthDays={historyDepthDays} lastUpdatedLabel={lastDataLoadLabel} />
         <LiveChains rows={displayRows} />
         <UseCases />
         <div className="mt-10">

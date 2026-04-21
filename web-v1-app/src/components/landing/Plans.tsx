@@ -11,14 +11,14 @@ export default function Plans({ historyDepthDays }: PlansProps) {
       <div className="max-w-3xl">
         <div className="text-[9px] font-black uppercase tracking-[0.28em] text-cyan-500/70">Subscriber plans</div>
         <h2 className="mt-2 text-3xl font-semibold text-white sm:text-4xl leading-tight">Choose the smallest plan that matches your research workflow.</h2>
-        <p className="mt-4 text-sm leading-7 text-slate-400">The public site explains the surface. Paid plans unlock authenticated JSON delivery. Until billing is activated, the fastest due-diligence path is the public sample pack, schema reference, verification pack, and service policy.</p>
+        <p className="mt-4 text-sm leading-7 text-slate-300">The public site explains the surface. Paid plans unlock authenticated JSON delivery. Until billing is activated, the fastest due-diligence path is the public sample pack, schema reference, verification pack, and service policy.</p>
       </div>
 
       <div className="mt-6 grid gap-3 lg:grid-cols-3">
         {landingUseCases.map((item) => (
           <div key={item.title} className="rounded-xl border border-white/6 bg-white/[0.02] p-4">
             <div className="text-xs font-bold text-white">{item.title}</div>
-            <div className="mt-1.5 text-xs leading-5 text-slate-500">{item.body}</div>
+            <div className="mt-1.5 text-xs leading-5 text-slate-300">{item.body}</div>
           </div>
         ))}
       </div>
@@ -39,7 +39,7 @@ export default function Plans({ historyDepthDays }: PlansProps) {
               <div className={`rounded-full border border-white/10 bg-black/10 px-3 py-1 text-[10px] font-bold ${plan.accent}`}>{plan.tierTag}</div>
             </div>
             <div className="mt-4 text-sm font-semibold text-white">{plan.body}</div>
-            <div className="mt-2 text-xs leading-5 text-slate-500 flex-1">{plan.detail}</div>
+            <div className="mt-2 text-xs leading-5 text-slate-300 flex-1">{plan.detail}</div>
             {"bestFor" in plan && plan.bestFor ? <div className={`mt-3 text-xs leading-5 ${plan.accent} opacity-80`}>{plan.bestFor as string}</div> : null}
             <div className="mt-6">
               {plan.name === "Free" ? (
@@ -57,16 +57,16 @@ export default function Plans({ historyDepthDays }: PlansProps) {
       <div className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-500">History Add-on</div>
+            <div className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-300">History Add-on</div>
             <div className="mt-1.5 text-sm font-bold text-white">Full archive — {historyDepthDays ?? "499"}+ days</div>
-            <p className="mt-1 text-xs leading-5 text-slate-500 max-w-xl">Separate one-time unlock for the complete published archive. Pro defaults to 365 days because that covers most active research workflows without requiring full-archive scope by default.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-300 max-w-xl">Separate one-time unlock for the complete published archive. Pro defaults to 365 days because that covers most active research workflows without requiring full-archive scope by default.</p>
           </div>
           <CheckoutButton plan="history_addon" className="shrink-0 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-semibold text-slate-300 hover:bg-white/10 transition">Add full history →</CheckoutButton>
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-white/5 bg-white/[0.015] px-5 py-3 text-xs leading-6 text-slate-600">
-        <span className="font-semibold text-slate-500">Buyer fit: </span>
+      <div className="mt-4 rounded-xl border border-white/5 bg-white/[0.015] px-5 py-3 text-xs leading-6 text-slate-400">
+        <span className="font-semibold text-slate-300">Buyer fit: </span>
         Pro is built for multi-chain research, regime conditioning, notebook workflows, and API-driven dashboards. BTC / ETH support near-daily workflows; ARB / BASE are better suited to slower state-aware monitoring and historical segmentation.
       </div>
     </section>

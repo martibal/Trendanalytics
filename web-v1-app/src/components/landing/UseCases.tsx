@@ -23,7 +23,7 @@ const SCENARIOS = [
         text: "You now have a clean, documented dataset of structural congestion periods — with z-scores, percentiles, and driver attribution pre-computed. Split your own data by these periods and condition your analysis accordingly.",
       },
     ],
-    why: "Every label is hash-anchored to its exact inputs. What you backtest on is identical to what was published live on that date — not reconstructed after the fact.",
+    why: "Every label is hash-anchored to its exact inputs. What you backtest on is identical to what was published on that date — not reconstructed after the fact.",
     link: { label: "Browse historical labels →", href: "/track-record" },
   },
   {
@@ -81,7 +81,7 @@ export default function UseCases() {
       <h2 className="text-2xl font-semibold text-white sm:text-3xl">
         What you actually do with the JSON files
       </h2>
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
         Three concrete workflows. Each shows what you fetch, what you read out, and why it is useful —
         so you can decide whether this matches how you work before subscribing.
       </p>
@@ -113,7 +113,7 @@ export default function UseCases() {
             </div>
 
             <div className="mt-4 rounded-xl border border-white/8 bg-black/15 px-3 py-2.5">
-              <p className="text-[11px] leading-[1.6] text-slate-400">{s.why}</p>
+              <p className="text-[11px] leading-[1.6] text-slate-300">{s.why}</p>
             </div>
 
             <Link

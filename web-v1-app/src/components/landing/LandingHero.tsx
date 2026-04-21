@@ -4,7 +4,6 @@ type LandingHeroProps = {
   datasetVersion: string | null;
   publishedAt: string | null;
   methodologyVersion: string | null;
-  dataSource: string;
 };
 
 function Stat({ label, value }: { label: string; value: string | null }) {
@@ -17,7 +16,7 @@ function Stat({ label, value }: { label: string; value: string | null }) {
 }
 
 export default function LandingHero(props: LandingHeroProps) {
-  const { datasetVersion, publishedAt, methodologyVersion, dataSource } = props;
+  const { datasetVersion, publishedAt, methodologyVersion } = props;
 
   return (
     <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm sm:p-8">
@@ -54,7 +53,6 @@ export default function LandingHero(props: LandingHeroProps) {
             <Stat label="Dataset" value={datasetVersion} />
             <Stat label="Published at" value={publishedAt} />
             <Stat label="Methodology" value={methodologyVersion} />
-            <Stat label="Runtime backend" value={`${dataSource} (deployment detail)`} />
           </div>
         </aside>
       </div>

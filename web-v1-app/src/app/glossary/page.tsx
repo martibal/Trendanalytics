@@ -1,7 +1,6 @@
 // src/app/glossary/page.tsx
 import Link from "next/link";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource } from "@/lib/storage";
 import GlossaryIndexClient from "@/components/glossary/GlossaryIndexClient";
 import {
   loadGlossaryApiEntries,
@@ -73,7 +72,7 @@ export default async function GlossaryPage({
               Methodology: {dataset?.methodology_version ?? "—"}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              Runtime backend: {currentDataSource()} (deployment detail)
+              Published artifact contract
             </div>
           </div>
         </div>

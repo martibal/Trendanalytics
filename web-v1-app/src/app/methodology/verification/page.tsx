@@ -32,7 +32,7 @@ export default async function MethodologyVerificationPage() {
               ["1", <InlineCode key="g">sample-pack/ethereum/2026-03-31/gold.json</InlineCode>, <>Gold row loads with <InlineCode>chain = ethereum</InlineCode> and <InlineCode>date = 2026-03-31</InlineCode>.</>, "A / B"],
               ["2", <InlineCode key="d">sample-pack/ethereum/2026-03-31/derived.json</InlineCode>, <>Derived row loads for the same <InlineCode>chain</InlineCode> and <InlineCode>date</InlineCode>, exposing smoothed fields such as <InlineCode>__ma7</InlineCode> and <InlineCode>__ma30</InlineCode>.</>, "A"],
               ["3", <InlineCode key="m">sample-pack/ethereum/2026-03-31/meta.json</InlineCode>, <>Meta row resolves to named state <InlineCode>CONGESTED</InlineCode> with public gate threshold <InlineCode>0.40</InlineCode>.</>, "A"],
-              ["4", <>Recompute the named-row integrity anchor</>, <>Canonical hash recomputes to <InlineCode>f8301b3b40c5</InlineCode>.</>, "A"],
+              ["4", <>Recompute the named-row integrity anchor</>, <>Canonical hash recomputes to <InlineCode>81b295000696</InlineCode>.</>, "A"],
               ["5", <>Independently inspect Gold-level facts</>, <>Gold-level counts and fee behaviour should be independently checkable against public Ethereum evidence for the same date.</>, "B"],
               ["6", <>Interpret remaining classifier internals carefully</>, <>The full regime classifier remains deliberately non-public even though the published outcome is auditable.</>, "C"],
             ]}
@@ -94,7 +94,7 @@ payload = {
 canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
 sha = hashlib.sha256(canonical).hexdigest()[:12]
 assert sha == meta["regime"]["determinism_hash"]
-assert sha == "f8301b3b40c5"
+assert sha == "81b295000696"
 
 print({
     "chain": meta["chain"],
@@ -110,7 +110,7 @@ print({
               [<InlineCode key="d">date</InlineCode>, "2026-03-31"],
               [<InlineCode key="l">label</InlineCode>, "CONGESTED"],
               [<InlineCode key="g">gate_threshold</InlineCode>, "0.40"],
-              [<InlineCode key="h">determinism_hash</InlineCode>, "f8301b3b40c5"],
+              [<InlineCode key="h">determinism_hash</InlineCode>, "81b295000696"],
             ]}
           />
         </Section>
@@ -125,7 +125,7 @@ print({
               ["Meta", <InlineCode key="m1">publish_confidence.threshold</InlineCode>, "0.40", "Public gate threshold for whether a named label may be published."],
               ["Meta", <InlineCode key="m2">regime.ruleset_id</InlineCode>, "eth_l1_v1", "Pins the named output to a specific public ruleset identifier."],
               ["Meta", <InlineCode key="m3">status.label</InlineCode>, "CONGESTED", "Named public output for the worked example."],
-              ["Meta", <InlineCode key="m4">regime.determinism_hash</InlineCode>, "f8301b3b40c5", "Integrity anchor proving the named-row payload identity."],
+              ["Meta", <InlineCode key="m4">regime.determinism_hash</InlineCode>, "81b295000696", "Integrity anchor proving the named-row payload identity."],
             ]}
           />
         </Section>
