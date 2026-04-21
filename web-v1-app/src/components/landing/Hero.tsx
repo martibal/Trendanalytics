@@ -77,8 +77,17 @@ export default function Hero({ historyDepthDays }: HeroProps) {
             </div>
           </div>
 
+          {/* Brand name */}
+          <div className="relative mb-4 inline-flex items-center gap-4">
+            <div className="pointer-events-none absolute inset-x-4 -bottom-2 h-8 rounded-full bg-cyan-400/15 blur-2xl" />
+            <span className="relative text-[3rem] font-black uppercase leading-none tracking-[0.22em] bg-gradient-to-b from-cyan-100 via-cyan-200 to-cyan-400 bg-clip-text text-transparent sm:text-[3.8rem] lg:text-[4.8rem]">
+              Urd Atlas
+            </span>
+            <span className="hidden h-px w-14 bg-gradient-to-r from-cyan-200/80 via-cyan-300/30 to-transparent sm:block" />
+          </div>
+
           {/* H1 */}
-          <h1 className="mb-7 text-[2.4rem] font-black leading-[0.93] tracking-[-0.04em] text-white sm:text-[3.1rem] lg:text-[4.1rem]">
+          <h1 className="mb-7 text-[1.9rem] font-black leading-[1.05] tracking-[-0.03em] text-white sm:text-[2.4rem] lg:text-[3rem]">
             Separate blockchain{" "}
             <span className="bg-gradient-to-br from-cyan-200 via-cyan-300 to-sky-400 bg-clip-text text-transparent">
               noise from structural change
