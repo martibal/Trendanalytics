@@ -131,6 +131,25 @@ export default function MethodologyReferencePage() {
               They will not produce identical values for the same metric on the same day.
             </p>
           </Callout>
+          <Callout title="BTC capacity note">
+            <p>
+              For Bitcoin, <InlineCode>gas_utilization_pct</InlineCode> is not published. The
+              capacity axis therefore relies entirely on <InlineCode>blocktime_instability</InlineCode>,
+              computed as the rolling mean of{" "}
+              <InlineCode>{`|avg_block_time_sec − rolling_median_30| / rolling_median_30`}</InlineCode>.
+            </p>
+            <p>
+              This instability index measures deviation from the chain&apos;s own recent block-time
+              norm in both directions. A period of consistently fast block production and a period
+              of consistently slow block production will both produce low instability and therefore
+              a low capacity score. A high capacity score on Bitcoin means block timing is unusually
+              erratic relative to recent history — not that blocks are slow.
+            </p>
+            <p>
+              Consumers using BTC capacity scores should interpret them as a block-time volatility
+              signal, not a congestion-in-the-traditional-sense signal.
+            </p>
+          </Callout>
         </Section>
 
         <Section title="Regime methodology" id="regime">
@@ -163,15 +182,27 @@ export default function MethodologyReferencePage() {
             <InlineCode>CHEAP</InlineCode> are state-triggered classifications and do not require
             separate trend confirmation or a fixed multi-day confirmation window before publication.
           </p>
-          <WarningCallout title="Downstream stability note">
-            <p>
-              Labels can change day to day in response to single-day threshold crossings. This is
-              most important for <InlineCode>CONGESTED</InlineCode> and{" "}
-              <InlineCode>CHEAP</InlineCode>, which can flip into or out of state immediately when
-              their conditions are met. Downstream consumers who require multi-day regime stability
-              should apply their own minimum-duration or smoothing filter.
-            </p>
-          </WarningCallout>
+          <Callout title="Label stability for downstream consumers">
+            <ul className="list-disc pl-5">
+              <li>
+                <InlineCode>HEATING</InlineCode> requires directional trend confirmation: the
+                short-term moving average must be running ahead of the medium-term average before
+                the label fires. <InlineCode>HEATING</InlineCode> will therefore not appear on a
+                single-day elevation alone.
+              </li>
+              <li>
+                <InlineCode>CONGESTED</InlineCode> and <InlineCode>CHEAP</InlineCode> do not require
+                trend confirmation. Either label can fire on a single-day threshold crossing if the
+                relevant axis signals are sufficiently elevated or depressed.
+              </li>
+              <li>
+                Labels can therefore change day to day in response to daily evidence. Consumers who
+                use regime labels as period classifiers for backtesting or segmentation should be
+                aware of this and apply their own minimum-duration filter to the label series if
+                multi-day stability is required for their use case.
+              </li>
+            </ul>
+          </Callout>
         </Section>
 
         <Section title="Derived metric consequences that matter for interpretation">

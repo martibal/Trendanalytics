@@ -199,6 +199,33 @@ export default function MethodologyFieldsPage() {
             </p>
           </WarningCallout>
         </Section>
+
+        <Section title="Important notes">
+          <ul className="list-disc pl-5">
+            <li>
+              <InlineCode>regime.drivers[].z_robust</InlineCode> and scorecard dimension scores are
+              not expected to numerically match because they use different input series, windows,
+              and normalization families.
+            </li>
+            <li>
+              <InlineCode>regime.label</InlineCode> is a daily classification layer, not a built-in
+              minimum-duration segmentation series for backtesting.
+            </li>
+            <li>
+              For Bitcoin, capacity should be interpreted as block-time instability relative to the
+              recent norm, not as a directional slow-block measure.
+            </li>
+            <li>
+              The friction scorecard uses an internal <InlineCode>fee_burden_proxy</InlineCode>
+              component defined as <InlineCode>median_tx_fee_native / median_tx_value_native</InlineCode>.
+              This is a normalized ratio, not an absolute fee value. The current field published
+              inside <InlineCode>scorecard.dimensions.friction.components.fee_burden_proxy</InlineCode>
+              reflects this ratio in native units. A high friction score driven by{" "}
+              <InlineCode>fee_burden_proxy</InlineCode> means fees are elevated relative to
+              transaction value on this chain — not that the absolute native fee is high.
+            </li>
+          </ul>
+        </Section>
       </div>
     </main>
   );
