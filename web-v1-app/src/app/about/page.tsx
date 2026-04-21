@@ -259,9 +259,9 @@ const dataLayersExplain: ExplainPair = {
   ),
   traceability: (
     <ul className="list-disc pl-5">
-      <li>Gold: <InlineCode>data/published/v1/gold/&lt;chain&gt;/&lt;date&gt;.json</InlineCode></li>
-      <li>Meta: <InlineCode>data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode></li>
-      <li>Derived: <InlineCode>data/published/v1/derived/&lt;chain&gt;/&lt;date&gt;.json</InlineCode></li>
+      <li>Gold: published daily Gold artifact per chain and date</li>
+      <li>Meta: published latest Meta artifact per chain</li>
+      <li>Derived: published daily Derived artifact per chain and date</li>
     </ul>
   ),
 };
@@ -384,9 +384,6 @@ export default async function AboutPage() {
                 {dataset.methodology_version ? (
                   <div className="mt-1">Methodology <InlineCode>{dataset.methodology_version}</InlineCode></div>
                 ) : null}
-                <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Public provenance uses per-artifact fields such as <InlineCode>date</InlineCode>, <InlineCode>updated_through</InlineCode>, <InlineCode>methodology_version</InlineCode>, dataset revision, and <InlineCode>regime.determinism_hash</InlineCode>.
-                </div>
               </div>
             ) : null}
           </div>
@@ -602,9 +599,9 @@ export default async function AboutPage() {
           Data contract and traceability
         </summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>Dataset manifest: <InlineCode>data/published/v1/dataset.json</InlineCode></div>
+          <div>Public provenance anchors: date / updated_through / methodology_version / published revision / regime.determinism_hash</div>
+          <div>Current published revision: <InlineCode>{dataset?.version ?? "—"}</InlineCode></div>
           <div>Methodology version: <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
-          <div>Public provenance model: <InlineCode>date</InlineCode> · <InlineCode>updated_through</InlineCode> · <InlineCode>methodology_version</InlineCode> · dataset revision · <InlineCode>regime.determinism_hash</InlineCode></div>
           <div>This page is descriptive product documentation and remains aligned with methodology, glossary, status, API docs, and legal pages.</div>
         </div>
       </details>

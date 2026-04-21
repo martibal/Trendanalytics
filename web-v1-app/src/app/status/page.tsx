@@ -284,7 +284,7 @@ const howToReadExplain: ExplainPair = {
   ),
   traceability: (
     <ul className="list-disc pl-5">
-      <li>Source: <InlineCode>data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode></li>
+      <li>Source: latest published Meta artifact for each chain</li>
       <li>Lag field: <InlineCode>confidence.lag_days_vs_utc_today</InlineCode></li>
       <li>Confidence field: <InlineCode>confidence.confidence_score</InlineCode></li>
       <li>Health derived at render time — not read from a pre-computed field</li>
@@ -485,9 +485,6 @@ export default async function StatusPage() {
                 <div className="mt-1">
                   Expected windows <span className="font-semibold text-white">~09:00 / ~21:00 Europe/Oslo</span>
                 </div>
-                <div className="mt-2 border-t border-white/10 pt-2 text-slate-400">
-                  Public provenance should be read through <InlineCode>date</InlineCode>, <InlineCode>updated_through</InlineCode>, <InlineCode>methodology_version</InlineCode>, dataset revision, and <InlineCode>regime.determinism_hash</InlineCode> — not runtime deployment details.
-                </div>
               </div>
             </div>
           </div>
@@ -602,7 +599,7 @@ export default async function StatusPage() {
         </div>
 
         <div className="border-t px-5 py-3 text-xs text-muted-foreground">
-          Source: <InlineCode>data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode> ·
+          Source: latest published Meta artifact per chain ·
           Health is derived at render time from lag vs expected cadence
         </div>
       </section>
@@ -705,10 +702,9 @@ export default async function StatusPage() {
           Data contract and traceability
         </summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>Dataset manifest: <InlineCode>data/published/v1/dataset.json</InlineCode></div>
-          <div>Chain meta: <InlineCode>data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode></div>
+          <div>Public provenance anchors: date / updated_through / methodology_version / published revision / regime.determinism_hash</div>
           <div>Health classification is derived at render time — not read from a pre-computed status field.</div>
-          <div>Public provenance model: <InlineCode>date</InlineCode> · <InlineCode>updated_through</InlineCode> · <InlineCode>methodology_version</InlineCode> · dataset revision · <InlineCode>regime.determinism_hash</InlineCode></div>
+          <div>Operational expectations and correction policy are documented on the service and provenance pages.</div>
         </div>
       </details>
 
