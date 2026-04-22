@@ -17,15 +17,11 @@ import {
   type SurfaceRowDisplay,
 } from "@/lib/landingSurface";
 import Hero from "@/components/landing/Hero";
-import LiveChains from "@/components/landing/LiveChains";
 import Plans from "@/components/landing/Plans";
 import { computeHistoryDepthDays } from "@/lib/historyDepth";
-import JsonLayers from "@/components/landing/JsonLayers";
 import ExploreGrid from "@/components/landing/ExploreGrid";
 import UseCases from "@/components/landing/UseCases";
 import MobileLanding from "@/components/mobile/MobileLanding";
-import GetStarted from "@/components/landing/GetStarted";
-import ShortFullContent from "@/components/site/ShortFullContent";
 
 import "server-only";
 
@@ -133,7 +129,9 @@ function ExplainModal({
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/8 px-6 py-5">
           <div>
             <h3 className="text-2xl font-semibold text-white">{title}</h3>
-            {subtitle ? <div className="mt-2 text-sm leading-6 text-slate-300">{subtitle}</div> : null}
+            {subtitle ? (
+              <div className="mt-2 text-sm leading-6 text-slate-300">{subtitle}</div>
+            ) : null}
           </div>
           <a
             href="#"
@@ -239,7 +237,9 @@ function heroRegimeAsOf(hero?: LandingHero | null): string | null {
 async function buildLandingHeroMap(): Promise<Map<string, LandingHero | null>> {
   const heroes = await Promise.all(
     CHAIN_LIST.map(async (chain) => {
-      const hero = await readPublishedJson<LandingHero>(`data/published/v1/landing/${chain.id}/hero.json`);
+      const hero = await readPublishedJson<LandingHero>(
+        `data/published/v1/landing/${chain.id}/hero.json`,
+      );
       return [chain.id, hero] as const;
     }),
   );
@@ -286,7 +286,9 @@ function withLandingHero(row: StatusApiRow, hero?: LandingHero | null): StatusAp
 async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
   return Promise.all(
     CHAIN_LIST.map(async (chain) => {
-      const meta = await readPublishedJson<MetaLatest>(`data/published/v1/meta/${chain.id}/latest.json`);
+      const meta = await readPublishedJson<MetaLatest>(
+        `data/published/v1/meta/${chain.id}/latest.json`,
+      );
       const asOf = meta?.date ?? meta?.updated_through ?? meta?.regime?.asof_date ?? null;
       const lagDays =
         typeof meta?.confidence?.lag_days_vs_utc_today === "number"
@@ -419,32 +421,36 @@ function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
   };
 }
 
+function formatDataLoad(value: string | null | undefined): string | null {
+  if (!value) return null;
 
-function formatDataLoad(isoString: string | null | undefined): string | null {
-  if (!isoString) return null;
-  try {
-    const d = new Date(isoString);
-    const day = d.getUTCDate();
-    const month = d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" });
-    const year = d.getUTCFullYear();
-    const hh = String(d.getUTCHours()).padStart(2, "0");
-    const mm = String(d.getUTCMinutes()).padStart(2, "0");
-    return `${day} ${month} ${year}, ${hh}:${mm}`;
-  } catch {
-    return null;
-  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Oslo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  return `${formatter.format(date)} Oslo time`;
 }
 
 export default async function HomePage() {
   const dataset: DatasetManifest | null = await readDatasetManifest();
 
-  const [landingPayload, statusPayload, metaFallbackRows, historyDepthDays, landingHeroMap] = await Promise.all([
-    readPublishedJson<LandingApiResponse>("data/published/v1/landing/index.json"),
-    readPublishedJson<StatusApiResponse>("data/published/v1/status/index.json"),
-    buildMetaFallbackRows(),
-    computeHistoryDepthDays().catch(() => null),
-    buildLandingHeroMap(),
-  ]);
+  const [landingPayload, statusPayload, metaFallbackRows, historyDepthDays, landingHeroMap] =
+    await Promise.all([
+      readPublishedJson<LandingApiResponse>("data/published/v1/landing/index.json"),
+      readPublishedJson<StatusApiResponse>("data/published/v1/status/index.json"),
+      buildMetaFallbackRows(),
+      computeHistoryDepthDays().catch(() => null),
+      buildLandingHeroMap(),
+    ]);
 
   const landingChains = extractLandingChains(landingPayload);
   const statusRows =
@@ -478,7 +484,7 @@ export default async function HomePage() {
   });
 
   const normalizedMetaFallbackRows = metaFallbackRows.map((row) =>
-    withLandingHero(row, landingHeroMap.get(row.chain))
+    withLandingHero(row, landingHeroMap.get(row.chain)),
   );
 
   const rows =
@@ -498,36 +504,42 @@ export default async function HomePage() {
   const whatIsExplain = whatIsUrdAtlasExplanation();
   const boundaryExplain = interpretationBoundaryExplanation();
 
+  const lastDataLoad =
+    formatDataLoad(statusPayload?.generated_at_utc) ??
+    formatDataLoad(dataset?.published_at ?? null);
+
   return (
     <>
       <MobileLanding rows={displayRows} historyDepthDays={historyDepthDays} />
 
-      <main className="mx-auto hidden max-w-7xl px-6 py-10 lg:block">
+      <main className="relative mx-auto hidden max-w-[1200px] overflow-hidden px-6 py-10 lg:block">
+        <div
+          className="pointer-events-none absolute right-0 top-0 -z-10 h-[600px] w-[800px]"
+          style={{
+            background:
+              "radial-gradient(ellipse 800px 600px at 100% 0%, rgba(0,212,255,0.07), transparent)",
+          }}
+        />
+
         <ModalStyles />
 
-        <Hero historyDepthDays={historyDepthDays} lastDataLoad={formatDataLoad(statusPayload?.generated_at_utc)} />
-        <ShortFullContent
-          pageKey="home"
-          summary={<>Urd Atlas publishes daily chain-state JSON for BTC, ETH, ARB, and BASE. It tells you the current regime, confidence, and driver context without using price, forecasts, or recommendations.</>}
-          bullets={[
-            <>What you get: <strong>Gold</strong> for direct daily observations, <strong>Derived</strong> for deterministic trend context, and <strong>Meta</strong> for regime, confidence, and drivers.</>,
-            <>Why trust it: a public methodology, verification pack, sample JSON files, and a published archive of what the product actually released over time.</>,
-            <>Commercial shape: Basic = 1 chain / 90 days. Pro = 4 chains / 365 days. Full archive access can be offered separately.</>,
-          ]}
-          whyItMatters={<>A first-time visitor should understand the product in seconds, while deeper sections remain available for full due diligence.</>}
-          fullContent={
-            <>
-              <GetStarted />
-              <LiveChains rows={displayRows} />
-              <UseCases />
-              <div className="mt-10">
-                <Plans historyDepthDays={historyDepthDays} />
-              </div>
-              <JsonLayers />
-              <ExploreGrid />
-            </>
-          }
+        <Hero
+          historyDepthDays={historyDepthDays}
+          rows={displayRows}
+          lastDataLoad={lastDataLoad}
         />
+
+        <div id="plans" className="mt-12">
+          <Plans historyDepthDays={historyDepthDays} />
+        </div>
+
+        <div className="mt-12">
+          <UseCases />
+        </div>
+
+        <div className="mt-12">
+          <ExploreGrid />
+        </div>
 
         <ExplainModal
           id="what-is-modal"
