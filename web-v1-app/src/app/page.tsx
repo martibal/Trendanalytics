@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { currentDataSource, readStorageObject } from "@/lib/storage";
+import { readStorageObject } from "@/lib/storage";
 import {
   whatIsUrdAtlasExplanation,
   interpretationBoundaryExplanation,
@@ -23,7 +23,6 @@ import { computeHistoryDepthDays } from "@/lib/historyDepth";
 import JsonLayers from "@/components/landing/JsonLayers";
 import ExploreGrid from "@/components/landing/ExploreGrid";
 import UseCases from "@/components/landing/UseCases";
-import DataContractDetails from "@/components/landing/DataContractDetails";
 import MobileLanding from "@/components/mobile/MobileLanding";
 import GetStarted from "@/components/landing/GetStarted";
 
@@ -419,6 +418,22 @@ function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
   };
 }
 
+
+function formatDataLoad(isoString: string | null | undefined): string | null {
+  if (!isoString) return null;
+  try {
+    const d = new Date(isoString);
+    const day = d.getUTCDate();
+    const month = d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" });
+    const year = d.getUTCFullYear();
+    const hh = String(d.getUTCHours()).padStart(2, "0");
+    const mm = String(d.getUTCMinutes()).padStart(2, "0");
+    return `${day} ${month} ${year}, ${hh}:${mm}`;
+  } catch {
+    return null;
+  }
+}
+
 export default async function HomePage() {
   const dataset: DatasetManifest | null = await readDatasetManifest();
 
@@ -469,14 +484,14 @@ export default async function HomePage() {
     statusRows.length > 0
       ? statusRows
       : metaFallbackRows.some(
-            (r) =>
-              r.published_regime !== null ||
-              r.confidence_score !== null ||
-              r.as_of !== null ||
-              r.lag_days !== null,
-          )
-        ? normalizedMetaFallbackRows
-        : landingFallbackRows;
+          (r) =>
+            r.published_regime !== null ||
+            r.confidence_score !== null ||
+            r.as_of !== null ||
+            r.lag_days !== null,
+        )
+      ? normalizedMetaFallbackRows
+      : landingFallbackRows;
 
   const displayRows = rows.map(toSurfaceRowDisplay);
   const whatIsExplain = whatIsUrdAtlasExplanation();
@@ -489,7 +504,7 @@ export default async function HomePage() {
       <main className="mx-auto hidden max-w-7xl px-6 py-10 lg:block">
         <ModalStyles />
 
-        <Hero historyDepthDays={historyDepthDays} />
+        <Hero historyDepthDays={historyDepthDays} lastDataLoad={formatDataLoad(statusPayload?.generated_at_utc)} />
         <GetStarted />
         <LiveChains rows={displayRows} />
         <UseCases />

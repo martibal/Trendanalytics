@@ -26,19 +26,16 @@ const WHAT_POINTS = [
   },
 ];
 
-type HeroProps = {
-  historyDepthDays?: number | null;
-  lastUpdatedLabel?: string | null;
-};
+type HeroProps = { historyDepthDays?: number | null; lastDataLoad?: string | null };
 
-export default function Hero({ historyDepthDays, lastUpdatedLabel }: HeroProps) {
+export default function Hero({ historyDepthDays, lastDataLoad }: HeroProps) {
   const days = historyDepthDays;
 
   return (
     <div className="mb-14">
       {/* Trust bar */}
       <div className="mb-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/8 pb-5">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[11px] text-slate-300">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[11px] text-slate-400">
           <span className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />
             <span className="font-semibold text-white">Published every day since December 2024</span>
@@ -49,14 +46,14 @@ export default function Hero({ historyDepthDays, lastUpdatedLabel }: HeroProps) 
           </span>
           <span className="hidden text-white/12 sm:inline">|</span>
           <span>4 chains · Gold · Meta · Derived</span>
-          {lastUpdatedLabel ? (
+          {lastDataLoad && (
             <>
               <span className="hidden text-white/12 sm:inline">|</span>
-              <span className="rounded-full border border-cyan-400/20 bg-cyan-400/8 px-2.5 py-1 text-[10px] font-semibold text-cyan-100">
-                Last data load: {lastUpdatedLabel}
+              <span className="rounded border border-white/8 bg-white/[0.04] px-2 py-0.5 text-slate-400">
+                Last data load: {lastDataLoad}
               </span>
             </>
-          ) : null}
+          )}
         </div>
         <Link
           href="/track-record"
@@ -72,7 +69,7 @@ export default function Hero({ historyDepthDays, lastUpdatedLabel }: HeroProps) 
         <div>
           {/* Eyebrow */}
           <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <span className="font-mono text-[9px] font-black uppercase tracking-[0.28em] text-slate-300">
+            <span className="font-mono text-[9px] font-black uppercase tracking-[0.28em] text-slate-500">
               On-chain regime classification
             </span>
             <span className="text-white/12">·</span>
@@ -80,7 +77,7 @@ export default function Hero({ historyDepthDays, lastUpdatedLabel }: HeroProps) 
               {CHAINS.map((c) => (
                 <span
                   key={c}
-                  className="rounded-md border border-cyan-300/45 bg-cyan-300/18 px-2.5 py-1 font-mono text-[10px] font-black tracking-[0.18em] text-white shadow-[0_0_18px_rgba(34,211,238,0.16)]"
+                  className="rounded border border-cyan-400/25 bg-cyan-400/8 px-2 py-0.5 font-mono text-[9px] font-black tracking-widest text-cyan-300"
                 >
                   {c}
                 </span>
@@ -106,7 +103,7 @@ export default function Hero({ historyDepthDays, lastUpdatedLabel }: HeroProps) 
           </h1>
 
           {/* Lead */}
-          <p className="mb-9 max-w-[54ch] text-[17px] leading-[1.85] text-slate-100 sm:text-[18px]">
+          <p className="mb-9 max-w-[54ch] text-[17px] leading-[1.85] text-slate-300 sm:text-[18px]">
             Daily regime labels, confidence scores, and driver attribution for BTC, ETH, ARB, and
             BASE — delivered as ready-to-use JSON. Everything you need to understand current chain
             state, nothing you have to build yourself.
@@ -115,7 +112,7 @@ export default function Hero({ historyDepthDays, lastUpdatedLabel }: HeroProps) 
           {/* Gate box */}
           <div className="mb-7 flex items-start gap-3 rounded-xl border border-cyan-500/15 bg-cyan-500/[0.04] px-4 py-3.5">
             <span className="mt-0.5 shrink-0 text-[15px]">🔒</span>
-            <p className="text-[13px] leading-[1.7] text-slate-100">
+            <p className="text-[13px] leading-[1.7] text-slate-300">
               <span className="font-bold text-white">Never a weak label presented as strong.</span>{" "}
               When evidence is insufficient, the model publishes{" "}
               <code className="rounded bg-white/8 px-1 py-0.5 font-mono text-[11px] text-emerald-300">
@@ -170,10 +167,10 @@ export default function Hero({ historyDepthDays, lastUpdatedLabel }: HeroProps) 
                 days
               </span>
             </div>
-            <div className="mt-1 font-mono text-[10px] text-slate-300">
+            <div className="mt-1 font-mono text-[10px] text-slate-600">
               every day · no gaps · since December 2024
             </div>
-            <p className="mt-4 text-[12px] leading-[1.75] text-slate-100">
+            <p className="mt-4 text-[12px] leading-[1.75] text-slate-300">
               Every label is inspectable, hash-anchored, and verifiable. Not a reconstruction — the
               same published artifact subscribers receive in their daily JSON.
             </p>
@@ -196,7 +193,7 @@ export default function Hero({ historyDepthDays, lastUpdatedLabel }: HeroProps) 
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400/60" />
                   <div>
                     <div className="text-[12px] font-semibold text-white">{label}</div>
-                    <p className="mt-0.5 text-[11px] leading-[1.6] text-slate-300">{detail}</p>
+                    <p className="mt-0.5 text-[11px] leading-[1.6] text-slate-500">{detail}</p>
                     {highlight && (
                       <p className="mt-0.5 font-mono text-[10px] font-bold text-cyan-300">
                         {highlight}

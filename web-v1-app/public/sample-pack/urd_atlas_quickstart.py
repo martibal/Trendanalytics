@@ -1,15 +1,15 @@
 """
 Urd Atlas — Quickstart
 ======================
-Laster sample pack zip lokalt og viser:
-  1. Regime-label og confidence for ETH
-  2. Alle driver-felter med z-score og percentil
-  3. Eksempel på hvordan du splitter egne data på HEATING vs andre regimer
+Loads the sample pack zip locally and shows:
+  1. Regime label and confidence for ETH
+  2. All driver fields with z-score and percentile
+  3. Example of splitting your own data by HEATING vs other regimes
 
-Krav: Python 3.8+, ingen eksterne avhengigheter utover standardbiblioteket.
+Requirements: Python 3.8+, no external dependencies beyond the standard library.
 
-Last ned zip fra: https://www.urdatlas.com/sample-pack/urd-atlas-public-sample-pack.zip
-Legg zip-filen i samme mappe som dette scriptet, eller oppdater ZIP_PATH under.
+Download zip from: https://www.urdatlas.com/sample-pack/urd-atlas-public-sample-pack.zip
+Place the zip file in the same folder as this script, or update ZIP_PATH below.
 """
 
 import json
@@ -25,7 +25,7 @@ ZIP_PATH = Path("urd-atlas-public-sample-pack.zip")
 def load_json_from_zip(zf: zipfile.ZipFile, name_fragment: str) -> dict:
     matches = [n for n in zf.namelist() if name_fragment in n]
     if not matches:
-        raise FileNotFoundError(f"Ingen fil i zip matcher: {name_fragment!r}")
+        raise FileNotFoundError(f"No file in zip matches: {name_fragment!r}")
     with zf.open(matches[0]) as f:
         return json.load(f)
 
@@ -57,14 +57,14 @@ print(f"  Summary    : {one_liner}")
 print(f"  Hash       : {det_hash}")
 print()
 
-# Confidence gate: samme logikk som Urd Atlas bruker internt
+# Confidence gate: same logic Urd Atlas uses internally
 CONFIDENCE_THRESHOLD = 0.40
 if confidence >= 0.70:
     band = "Good"
 elif confidence >= CONFIDENCE_THRESHOLD:
     band = "Caution"
 else:
-    band = "Degraded — label usikker, bruk med forsiktighet"
+    band = "Degraded — label uncertain, use with caution"
 
 print(f"  Confidence band: {band}")
 print()
@@ -92,7 +92,7 @@ print()
 # ---------------------------------------------------------------------------
 
 dims = eth_meta.get("scorecard", {}).get("dimensions", {})
-print("  Scorecard (0–100, 50 = nøytralt mot chain-historikk):")
+print("  Scorecard (0–100, 50 = neutral vs chain history):")
 for dim_name, dim in dims.items():
     score  = dim.get("score", 0)
     level  = dim.get("level", "—")
@@ -115,11 +115,11 @@ print()
 
 
 # ---------------------------------------------------------------------------
-# 6. Gold — rådata
+# 6. Gold — raw data
 # ---------------------------------------------------------------------------
 
 gold_metrics = eth_gold.get("metrics", eth_gold)
-print("  Gold-felter (rådata, native units):")
+print("  Gold fields (raw data, native units):")
 skip = {"chain", "date", "methodology_version"}
 for k, v in gold_metrics.items():
     if k not in skip and not isinstance(v, dict):
@@ -133,7 +133,7 @@ print()
 
 derived_metrics = eth_derived.get("metrics", eth_derived)
 ma7_fields = {k: v for k, v in derived_metrics.items() if k.endswith("__ma7") and v is not None}
-print("  MA7-felter (7-dagers rullende snitt):")
+print("  MA7 fields (7-day rolling mean):")
 for k, v in list(ma7_fields.items())[:5]:
     print(f"  {k:<45} {v:.4f}" if isinstance(v, float) else f"  {k:<45} {v}")
 print()
@@ -144,14 +144,14 @@ print()
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
-print("  EKSEMPEL: Regime-kondisjonert split")
+print("  EXAMPLE: Regime-conditioned split")
 print("=" * 60)
 print("""
-  Tenk deg at du har en daglig tidsserie — returns, volum,
-  spreads, hva som helst. Du vil se om den oppfører seg
-  annerledes i HEATING vs STABLE/CHEAP.
+  Imagine you have a daily time series — returns, volume,
+  spreads, anything. You want to see if it behaves
+  differently in HEATING vs STABLE/CHEAP.
 
-  Med Urd Atlas API (Pro) henter du historisk Meta JSON:
+  With the Urd Atlas API (Pro) you fetch historical Meta JSON:
 
     import requests
 
@@ -159,14 +159,14 @@ print("""
     url = "https://www.urdatlas.com/api/v1/files/meta/ethereum/last365d/latest.json"
     data = requests.get(url, headers={"Authorization": f"Bearer {API_KEY}"}).json()
 
-    # Bygg et regime-kart: dato → label
+    # Build a regime map: date → label
     regime_map = {
         row["date"]: row["status"]["label"]
         for row in data["rows"]
         if row["confidence"]["confidence_score"] >= 0.70   # kun high-confidence
     }
 
-    # Koble mot egne data
+    # Join against your own data
     import pandas as pd
     df = pd.read_csv("min_data.csv", parse_dates=["date"])
     df["regime"] = df["date"].dt.strftime("%Y-%m-%d").map(regime_map)
@@ -178,9 +178,9 @@ print("""
     print(heating.describe())
     print(stable.describe())
 
-  Hvert regime-label er hash-forankret — du vet at du
-  backtester på nøyaktig det som ble publisert live
-  den datoen, ikke en rekonstruksjon.
+  Every regime label is hash-anchored — you know you are
+  backtesting on exactly what was published live on that date,
+  not a reconstruction.
 """)
 
-print("  Ferdig. Abonner på https://www.urdatlas.com for API-tilgang.")
+print("  Done. Subscribe at https://www.urdatlas.com for API access.")
