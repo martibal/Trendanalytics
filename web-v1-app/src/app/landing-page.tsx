@@ -25,6 +25,7 @@ import ExploreGrid from "@/components/landing/ExploreGrid";
 import UseCases from "@/components/landing/UseCases";
 import DataContractDetails from "@/components/landing/DataContractDetails";
 import MobileLanding from "@/components/mobile/MobileLanding";
+import GetStarted from "@/components/landing/GetStarted";
 
 import "server-only";
 
@@ -489,6 +490,7 @@ export default async function HomePage() {
         <ModalStyles />
 
         <Hero historyDepthDays={historyDepthDays} />
+        <GetStarted />
         <LiveChains rows={displayRows} />
         <UseCases />
         <div className="mt-10">

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
-import { readStorageObject } from "@/lib/storage";
+import { currentDataSource, readStorageObject } from "@/lib/storage";
 import {
   whatIsUrdAtlasExplanation,
   interpretationBoundaryExplanation,
@@ -23,7 +23,9 @@ import { computeHistoryDepthDays } from "@/lib/historyDepth";
 import JsonLayers from "@/components/landing/JsonLayers";
 import ExploreGrid from "@/components/landing/ExploreGrid";
 import UseCases from "@/components/landing/UseCases";
+import DataContractDetails from "@/components/landing/DataContractDetails";
 import MobileLanding from "@/components/mobile/MobileLanding";
+import GetStarted from "@/components/landing/GetStarted";
 
 import "server-only";
 
@@ -83,22 +85,6 @@ type LandingHero = {
     regime?: string;
   };
 };
-
-
-function formatOsloTimestamp(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Oslo",
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-}
 
 type MetaLatest = {
   date?: string;
@@ -483,28 +469,28 @@ export default async function HomePage() {
     statusRows.length > 0
       ? statusRows
       : metaFallbackRows.some(
-          (r) =>
-            r.published_regime !== null ||
-            r.confidence_score !== null ||
-            r.as_of !== null ||
-            r.lag_days !== null,
-        )
-      ? normalizedMetaFallbackRows
-      : landingFallbackRows;
+            (r) =>
+              r.published_regime !== null ||
+              r.confidence_score !== null ||
+              r.as_of !== null ||
+              r.lag_days !== null,
+          )
+        ? normalizedMetaFallbackRows
+        : landingFallbackRows;
 
   const displayRows = rows.map(toSurfaceRowDisplay);
-  const lastDataLoadLabel = formatOsloTimestamp(dataset?.published_at ?? statusPayload?.generated_at_utc ?? null);
   const whatIsExplain = whatIsUrdAtlasExplanation();
   const boundaryExplain = interpretationBoundaryExplanation();
 
   return (
     <>
-      <MobileLanding rows={displayRows} historyDepthDays={historyDepthDays} lastUpdatedLabel={lastDataLoadLabel} />
+      <MobileLanding rows={displayRows} historyDepthDays={historyDepthDays} />
 
       <main className="mx-auto hidden max-w-7xl px-6 py-10 lg:block">
         <ModalStyles />
 
-        <Hero historyDepthDays={historyDepthDays} lastUpdatedLabel={lastDataLoadLabel} />
+        <Hero historyDepthDays={historyDepthDays} />
+        <GetStarted />
         <LiveChains rows={displayRows} />
         <UseCases />
         <div className="mt-10">
