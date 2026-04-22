@@ -571,7 +571,7 @@ export default async function AboutPage() {
           Urd Atlas is an independent product built and maintained by a single developer.
           It started as a personal project to answer one recurring frustration: on-chain
           data is everywhere, but getting a structured, documented, daily answer to
-          "is this actually changing or is it noise?" required building an entire
+          &quot;is this actually changing or is it noise?&quot; required building an entire
           pipeline from scratch. Urd Atlas packages that work so others do not have to.
         </p>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">

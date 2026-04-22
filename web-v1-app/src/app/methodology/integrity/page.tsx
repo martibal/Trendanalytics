@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import { Callout, InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable } from "../_components";
 
 export default async function MethodologyIntegrityPage() {
@@ -10,7 +11,17 @@ export default async function MethodologyIntegrityPage() {
 
       <MethodologyNav />
 
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="methodology-integrity"
+        summary={<>Integrity explains how published rows keep a stable public identity over time and how archived outputs remain traceable.</>}
+        bullets={[
+          <>Named regime rows expose a public determinism hash over the public regime payload.</>,
+          <>If the named regime payload changes, the determinism hash should change. If the payload does not change, the hash should stay stable.</>,
+          <>Historical outputs are intended to remain interpretable under the methodology version under which they were published.</>,
+        ]}
+        whyItMatters={<>Trust is stronger when users can inspect publication identity and detect meaningful archival change.</>}
+        fullContent={
+          <div className="grid gap-6">
         <Section title="Public row identity">
           <p>
             Public row identity is anchored in fields actually present in the archive, not in a separate revision integer.
@@ -42,7 +53,9 @@ export default async function MethodologyIntegrityPage() {
             Historical outputs should be interpreted as valid under the methodology version under which they were published. If methodology changes in a way that changes field meaning or label semantics, that change should be versioned rather than silently applied retroactively in public documentation.
           </p>
         </Section>
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

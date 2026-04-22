@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import Link from "next/link";
 import { Callout, InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable } from "../_components";
 
@@ -9,7 +10,17 @@ export default async function MethodologyProvenancePage() {
         description="The canonical public model for identifying archived rows, interpreting methodology_version, understanding determinism hashes, and reading revisions and corrections through time."
       />
       <MethodologyNav />
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="methodology-provenance"
+        summary={<>This page gives the canonical public model for how to identify a published row and understand what changed through time.</>}
+        bullets={[
+          <>Public provenance is anchored in date, updated_through, methodology_version, published revision, and regime.determinism_hash.</>,
+          <>Docs-only edits, rebuilds, methodology changes, and historical corrections are distinct change classes and should be interpreted differently.</>,
+          <>Runtime backend and storage paths are deployment details, not the main public provenance truth.</>,
+        ]}
+        whyItMatters={<>Users should be able to tell quickly whether an observed difference is just documentation, a rebuild, a methodology shift, or a real archival correction.</>}
+        fullContent={
+          <div className="grid gap-6">
         <Section title="Canonical public provenance model">
           <SimpleTable
             headers={["Concept", "Public meaning", "When it changes"]}
@@ -43,7 +54,9 @@ export default async function MethodologyProvenancePage() {
             <li><Link href="/service" className="underline">Service Expectations, Support & Revisions</Link></li>
           </ul>
         </Section>
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

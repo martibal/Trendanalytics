@@ -98,7 +98,7 @@ export default function MobileMethodologyPage() {
           <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300 mb-2">What Urd Atlas does</div>
           <p className="text-[13px] leading-[1.75] text-slate-100">
             Every day, the pipeline reads raw blockchain data for BTC, ETH, ARB, and BASE —
-            scores each metric against that chain's own 180-day history — and publishes one
+            scores each metric against that chain&apos;s own 180-day history — and publishes one
             descriptive regime label per chain with a confidence score and driver attribution.
           </p>
           <p className="mt-3 text-[12px] leading-[1.7] text-slate-400">
@@ -230,7 +230,7 @@ export default function MobileMethodologyPage() {
           </div>
           <p className="text-[12px] leading-[1.7] text-slate-300">
             Every published Meta artifact includes a SHA-256 fingerprint computed from the
-            exact inputs that produced that day's classification — the Gold values,
+            exact inputs that produced that day&apos;s classification — the Gold values,
             180-day baseline, threshold parameters, and methodology version.
           </p>
           <p className="mt-2.5 text-[12px] leading-[1.7] text-slate-400">

@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -122,7 +123,17 @@ export default function GettingStartedJsonApiPage() {
         </div>
       </header>
 
-      <div className="grid gap-8">
+      <ShortFullContent
+        pageKey="getting-started"
+        summary={<>You can think of Urd Atlas onboarding in three steps: inspect a sample JSON, understand Gold / Derived / Meta, and make your first API pull.</>}
+        bullets={[
+          <>If you only do one thing before buying, download one sample Meta file and inspect its label, confidence, and determinism hash.</>,
+          <>If you only do one thing after buying, create an API key and fetch one latest.json file successfully.</>,
+          <>Basic gives one chain with 90 days. Pro gives all four chains with 365 days. Full archive access, when offered, remains a separate add-on.</>,
+        ]}
+        whyItMatters={<>A new user should be able to understand the product and reach a first successful API request without reading the entire guide.</>}
+        fullContent={
+          <div className="grid gap-8">
 
         {/* ── 1. What is JSON ── */}
         <Section id="what-is-json" eyebrow="Chapter 1" title="What JSON is">
@@ -836,7 +847,9 @@ python3 fetch_urdatlas.py`}</CodeBlock>
           </div>
         </Section>
 
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

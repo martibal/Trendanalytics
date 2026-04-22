@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 // src/app/api-docs/schema/page.tsx
 // JSON Schema Reference — complete field-level documentation for Gold, Meta, and Derived
 // artifacts. This page exists to let potential subscribers understand exactly what they
@@ -198,6 +199,17 @@ export default async function SchemaPage() {
         </div>
       </header>
 
+      <ShortFullContent
+        pageKey="schema-reference"
+        summary={<>This page is the structural contract for the published JSON artifacts. Use it when you need exact field names, object structure, and parsing expectations.</>}
+        bullets={[
+          <>Use <strong>Schema Reference</strong> for contract structure and parsing. Use <Link href="/methodology/fields" className="underline">Field Dictionary</Link> when you need deeper interpretation.</>,
+          <>The three artifact families are <strong>Gold</strong>, <strong>Meta</strong>, and <strong>Derived</strong>. Each one has its own field groups and intended use.</>,
+          <>If you are evaluating the product, inspect one sample file first, then come here to resolve exact field meaning and structure.</>,
+        ]}
+        whyItMatters={<>A buyer should be able to confirm exactly what a subscription delivers without scanning hundreds of lines before they find the right field.</>}
+        fullContent={
+          <>
       {/* ══════════════════════════════════════════════════════════════════ */}
       {/* GOLD                                                              */}
       {/* ══════════════════════════════════════════════════════════════════ */}
@@ -470,6 +482,10 @@ export default async function SchemaPage() {
           />
         </div>
       </section>
+
+          </>
+        }
+      />
 
       {/* ── Navigation strip ─────────────────────────────────────────────── */}
       <section className="mt-10 rounded-3xl border p-6 shadow-sm">

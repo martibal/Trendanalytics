@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import { InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable } from "../_components";
 
 export default async function MethodologyFreshnessPage() {
@@ -10,7 +11,17 @@ export default async function MethodologyFreshnessPage() {
 
       <MethodologyNav />
 
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="methodology-freshness"
+        summary={<>Freshness explains how recently each chain has been published and how to interpret lag without confusing it with confidence.</>}
+        bullets={[
+          <>BTC and ETH are expected to refresh on about a 1-day cadence. ARB and BASE are expected to refresh on about a 7-day cadence.</>,
+          <>Freshness answers how recent a row is. Confidence answers how strong the current evidence is. These are separate dimensions.</>,
+          <>Lag should be read against chain-specific expected cadence, not one universal rule.</>,
+        ]}
+        whyItMatters={<>Users need to know quickly whether a row is current enough for their workflow without reading the full policy.</>}
+        fullContent={
+          <div className="grid gap-6">
         <Section title="Current public freshness policy">
           <SimpleTable
             headers={["Chain", "Expected lag", "Soft warning", "Hard fail"]}
@@ -41,7 +52,9 @@ export default async function MethodologyFreshnessPage() {
             <li><InlineCode>lag_days_vs_utc_today</InlineCode> = runtime freshness relative to the current UTC date</li>
           </ul>
         </Section>
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

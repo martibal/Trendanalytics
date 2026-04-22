@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import {
   Callout,
   InlineCode,
@@ -18,7 +19,17 @@ export default function MethodologyFieldsPage() {
 
       <MethodologyNav />
 
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="methodology-fields"
+        summary={<>Use this page to look up what a published field means, how to interpret it, and whether it is directly reproducible or only independently checkable.</>}
+        bullets={[
+          <>Field Dictionary is for meaning and interpretation. Use Schema Reference when you need structural contract detail for parsing.</>,
+          <>Every entry should answer three questions: what the field is, why it exists, and what common misreadings to avoid.</>,
+          <>Basic meaning comes first. Advanced and traceability detail remain available in the full version.</>,
+        ]}
+        whyItMatters={<>Users should be able to resolve field meaning quickly without scanning the entire methodology section every time.</>}
+        fullContent={
+          <div className="grid gap-6">
         <Section title="How to use this page">
           <p>
             Use this page when you already know the field name and need the public meaning, unit
@@ -226,7 +237,9 @@ export default function MethodologyFieldsPage() {
             </li>
           </ul>
         </Section>
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

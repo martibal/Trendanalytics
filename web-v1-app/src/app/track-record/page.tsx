@@ -22,6 +22,8 @@ import {
   trackRecordBoundaryExplanation,
 } from "@/lib/content/trackRecordExplanations";
 
+import ShortFullContent from "@/components/site/ShortFullContent";
+
 import "server-only";
 
 // ---------------------------------------------------------------------------
@@ -647,6 +649,17 @@ export default async function TrackRecordPage({
         </div>
       </header>
 
+      <ShortFullContent
+        pageKey="track-record"
+        summary={<>This page shows what Urd Atlas actually published through time. It is an archive view, not a reconstructed backtest.</>}
+        bullets={[
+          <>Use it to inspect regime continuity, confidence history, transitions, and archive depth for each chain.</>,
+          <>The key trust property is that historical outputs are shown as published, not silently recomputed for presentation.</>,
+          <>Short windows are for quick inspection. The since-inception summary is for archive continuity and operational trust.</>,
+        ]}
+        whyItMatters={<>A skeptical buyer should be able to understand in seconds that this page is evidence of real published history, not a marketing chart.</>}
+        fullContent={
+          <>
       {/* ── Since inception summary ────────────────────────────────────────── */}
       <section className="mb-8 rounded-3xl border p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1141,6 +1154,10 @@ export default async function TrackRecordPage({
           </div>
         </div>
       </details>
+
+          </>
+        }
+      />
 
       {/* ── All modals ────────────────────────────────────────────────────── */}
       <ExplainModal

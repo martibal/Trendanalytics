@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import { MethodologyHeader, MethodologyNav, Section, SimpleTable } from "../_components";
 
 export default async function MethodologyChangelogPage() {
@@ -8,7 +9,17 @@ export default async function MethodologyChangelogPage() {
         description="Public customer change log for methodology, interpretation, thresholds, contracts, and historical corrections."
       />
       <MethodologyNav />
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="methodology-changelog"
+        summary={<>This page records customer-facing changes to methodology, interpretation, contracts, and historical corrections.</>}
+        bullets={[
+          <>Every change should be classified by type, backward-compatibility impact, methodology bump, archival impact, and subscriber action.</>,
+          <>Docs-only changes should be easy to distinguish from output-affecting corrections or methodology-breaking changes.</>,
+          <>Templates for future non-docs changes set the required level of specificity before the first real correction arrives.</>,
+        ]}
+        whyItMatters={<>A clear changelog lowers the cost of trust because users can see exactly what changed and whether they need to react.</>}
+        fullContent={
+          <div className="grid gap-6">
         <Section title="How to read this changelog">
           <p>Every public change should be classified by type, backward-compatibility impact, whether the methodology version changed, whether archived rows changed, and whether a subscriber needs to take action.</p>
         </Section>
@@ -55,7 +66,9 @@ export default async function MethodologyChangelogPage() {
             ]}
           />
         </Section>
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import Link from "next/link";
 import {
   Callout,
@@ -19,7 +20,18 @@ export default function MethodologyReferencePage() {
 
       <MethodologyNav />
 
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="methodology-reference"
+        summary={<>This page defines what Urd Atlas publishes, how to read regime and confidence, and where public methodology stops.</>}
+        bullets={[
+          <>Gold is the daily observation layer, Derived is the deterministic transform layer, and Meta is the analytical regime layer.</>,
+          <>Confidence publishes how strong the current evidence is. Rows below the public 0.40 gate are shown as UNKNOWN/DEGRADED instead of being presented as strong labels.</>,
+          <>Regime labels are descriptive interpretations of chain-relative conditions, not forecasts or trading signals.</>,
+          <>Public methodology is meant to explain meaning and behavior without exposing enough detail to reconstruct source data or clone the private pipeline.</>,
+        ]}
+        whyItMatters={<>A technical buyer should be able to understand the analytical contract of the product in seconds before deciding whether to read the full implementation-facing detail.</>}
+        fullContent={
+          <div className="grid gap-6">
         <Section title="Purpose of this reference">
           <p>
             This page defines the public meaning of the published artifacts. It is meant to let a
@@ -275,7 +287,9 @@ export default function MethodologyReferencePage() {
             .
           </p>
         </Section>
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

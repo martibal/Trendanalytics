@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 
 import Link from "next/link";
-import Script from "next/script";
 import { notFound } from "next/navigation";
 
 import MetricLineChart, { type MetricPoint } from "@/components/MetricLineChart";
@@ -162,95 +161,29 @@ function InlineCode({ children }: { children: React.ReactNode }) {
 
 function ModalStyles() {
   return (
-    <>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            .ta-modal-dialog {
-              width: min(64rem, calc(100vw - 2rem));
-              max-height: 88vh;
-              margin: auto;
-              padding: 0;
-              border: 1px solid rgba(34, 211, 238, 0.2);
-              border-radius: 1.5rem;
-              background: #071322;
-              color: white;
-              box-shadow: 0 24px 80px rgba(8, 47, 73, 0.45);
-            }
-            .ta-modal-dialog::backdrop {
-              background: rgba(2, 8, 23, 0.82);
-              backdrop-filter: blur(6px);
-            }
-          `,
-        }}
-      />
-      <Script id="ta-modal-controller" strategy="afterInteractive">{`
-        (() => {
-          if (window.__taModalControllerInstalled) return;
-          window.__taModalControllerInstalled = true;
-
-          const restoreScroll = (dialog) => {
-            const raw = dialog?.dataset?.scrollY;
-            document.body.style.overflow = "";
-            if (!raw) return;
-            const y = Number(raw);
-            if (!Number.isFinite(y)) return;
-            requestAnimationFrame(() => window.scrollTo({ top: y, behavior: "auto" }));
-          };
-
-          document.addEventListener("click", (event) => {
-            const target = event.target;
-            if (!(target instanceof Element)) return;
-
-            const opener = target.closest("[data-modal-open]");
-            if (opener) {
-              event.preventDefault();
-              const id = opener.getAttribute("data-modal-open");
-              if (!id) return;
-              const dialog = document.getElementById(id);
-              if (!(dialog instanceof HTMLDialogElement)) return;
-              dialog.dataset.scrollY = String(window.scrollY || window.pageYOffset || 0);
-              if (!dialog.open) dialog.showModal();
-              document.body.style.overflow = "hidden";
-              return;
-            }
-
-            const closer = target.closest("[data-modal-close]");
-            if (closer) {
-              event.preventDefault();
-              const dialog = closer.closest("dialog");
-              if (dialog instanceof HTMLDialogElement) {
-                dialog.close();
-                restoreScroll(dialog);
-              }
-            }
-          });
-
-          document.addEventListener(
-            "close",
-            (event) => {
-              const target = event.target;
-              if (target instanceof HTMLDialogElement && target.classList.contains("ta-modal-dialog")) {
-                restoreScroll(target);
-              }
-            },
-            true,
-          );
-        })();
-      `}</Script>
-    </>
+    <style
+      dangerouslySetInnerHTML={{
+        __html: `
+          .ta-modal {
+            display: none;
+          }
+          .ta-modal:target {
+            display: flex;
+          }
+        `,
+      }}
+    />
   );
 }
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
   return (
-    <button
-      type="button"
-      data-modal-open={id}
+    <a
+      href={`#${id}`}
       className="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/5 px-3 py-1 text-xs font-medium text-cyan-200 hover:bg-cyan-500/10"
     >
       {label}
-    </button>
+    </a>
   );
 }
 
@@ -268,8 +201,14 @@ function ExplainModal({
   traceability?: ReactNode;
 }) {
   return (
-    <dialog id={id} className="ta-modal-dialog">
-      <div className="relative z-10 flex max-h-[88vh] w-full flex-col overflow-hidden rounded-3xl border border-cyan-500/20 bg-[#071322] shadow-2xl shadow-cyan-950/40">
+    <div id={id} className="ta-modal fixed inset-0 z-[80] items-center justify-center p-4">
+      <a
+        href="#"
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        aria-label="Close dialog"
+      />
+      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-cyan-500/20 bg-[#071322] shadow-2xl shadow-cyan-950/40">
+        {/* Sticky header — always visible, never scrolls away */}
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/8 px-6 py-5">
           <div>
             <h3 className="text-2xl font-semibold text-white">{title}</h3>
@@ -277,16 +216,16 @@ function ExplainModal({
               <div className="mt-2 text-sm leading-6 text-slate-300">{subtitle}</div>
             ) : null}
           </div>
-          <button
-            type="button"
-            data-modal-close
+          <a
+            href="#"
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl text-slate-200 hover:bg-white/10"
             aria-label="Close dialog"
           >
             ×
-          </button>
+          </a>
         </div>
 
+        {/* Scrollable body */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
@@ -314,7 +253,7 @@ function ExplainModal({
           ) : null}
         </div>
       </div>
-    </dialog>
+    </div>
   );
 }
 
@@ -1822,7 +1761,8 @@ export default async function ChainPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
 
   const requestedWindow = normalizeWindow(resolvedSearchParams?.window);
-  const effectiveWindowDays = requestedWindow;
+  const effectiveRequestedWindow = requestedWindow;
+  const effectiveWindowDays = effectiveRequestedWindow;
 
   const metaPath = `meta/${chainId}/latest.json`;
   const heroPath = `landing/${chainId}/hero.json`;
@@ -1985,12 +1925,6 @@ export default async function ChainPage({
 
   const charts = chartDataByMetric.filter((c) => c.hasData);
 
-  const windowOptions = [
-    { key: "30", label: "30d", href: `/chains/${chainId}?window=30` },
-    { key: "90", label: "90d", href: `/chains/${chainId}?window=90` },
-    { key: "180", label: "180d", href: `/chains/${chainId}?window=180` },
-    { key: "365", label: "365d", href: `/chains/${chainId}?window=365` },
-  ];
 
   const chainProfilePair = chainProfileCopy(chainId);
 
@@ -2207,8 +2141,7 @@ export default async function ChainPage({
               Click any chart for a full explanation of what it measures and why it is shown.
             </p>
             <p className="mt-2 text-xs text-slate-500">
-              The chart surface is public. Paid plans unlock the JSON files behind these readings for
-              API, notebook, dashboard, and downstream workflow use.
+              All chart windows are public. Paid plans give you the JSON files and API access behind these views.
             </p>
           </div>
 
@@ -2233,11 +2166,7 @@ export default async function ChainPage({
         ) : (
           <div className="space-y-6">
             {charts.map((c, index) => (
-              <section
-                key={c.metric}
-                id={`chart-${safeId(chainId)}-${safeId(c.metric)}`}
-                className="scroll-mt-28 rounded-3xl border p-5 shadow-sm"
-              >
+              <section key={c.metric} id={`chart-${safeId(c.metric)}`} className="rounded-3xl border p-5 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
@@ -2268,7 +2197,7 @@ export default async function ChainPage({
                           }
                         });
                         newParams.set(c.paramKey, String(w));
-                        const href = `/chains/${chainId}?${newParams.toString()}#chart-${safeId(chainId)}-${safeId(c.metric)}`;
+                        const href = `/chains/${chainId}?${newParams.toString()}#chart-${safeId(c.metric)}`;
                         return (
                           <Link
                             key={w}
@@ -2327,15 +2256,15 @@ export default async function ChainPage({
                   title={`How to read ${c.metric}`}
                   subtitle={
                     <>
-                      Window <InlineCode>{String(c.metricWindow)}d</InlineCode> · Units{" "}
+                      Window <InlineCode>{String(effectiveWindowDays)}d</InlineCode> · Units{" "}
                       <InlineCode>{c.unitLabel ?? "—"}</InlineCode>
                     </>
                   }
                   pair={chartReadExplanation(c.metric, effectiveWindowDays, c.unitLabel)}
                   traceability={
                     <ul className="list-disc pl-5">
-                      <li>Derived path: <InlineCode>{c.mDerivedPath}</InlineCode></li>
-                      <li>Gold path: <InlineCode>{c.mGoldPath}</InlineCode></li>
+                      <li>Derived path: <InlineCode>{derivedPath}</InlineCode></li>
+                      <li>Gold path: <InlineCode>{goldPath}</InlineCode></li>
                       <li>Metric key: <InlineCode>{c.metric}</InlineCode></li>
                     </ul>
                   }
@@ -2350,7 +2279,7 @@ export default async function ChainPage({
                     <ul className="list-disc pl-5">
                       <li>Metric: <InlineCode>{c.metric}</InlineCode></li>
                       <li>Axis: <InlineCode>{c.axis ?? "—"}</InlineCode></li>
-                      <li>Visible chart source window: <InlineCode>{`${c.metricWindow}d`}</InlineCode></li>
+                      <li>Visible chart source window: <InlineCode>{`${effectiveWindowDays}d`}</InlineCode></li>
                     </ul>
                   }
                 />
@@ -2580,7 +2509,7 @@ export default async function ChainPage({
       <details className="mt-10 rounded-2xl border p-5">
         <summary className="cursor-pointer text-sm font-medium">Data contract & traceability</summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>Runtime backend: <InlineCode>{currentDataSource()}</InlineCode> <span className="text-slate-500">(deployment detail)</span></div>
+          <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
           <div>Meta path: <InlineCode>{metaPath}</InlineCode></div>
           <div>Gold path: <InlineCode>{goldPath}</InlineCode></div>
           <div>Derived path: <InlineCode>{derivedPath}</InlineCode></div>

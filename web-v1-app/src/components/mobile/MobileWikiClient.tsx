@@ -267,7 +267,7 @@ export default function MobileWikiClient({
       <div className="px-4 py-3 space-y-2.5">
         {results.length === 0 ? (
           <div className="py-12 text-center text-[12px] text-slate-600">
-            No results for "{query}"
+            No results for &quot;{query}&quot;
           </div>
         ) : (
           results.map((entry) => (

@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import QaPageClient from "@/components/qa/QaPageClient";
 import { qaEntries, qaCategories } from "@/lib/qa";
 
@@ -25,8 +26,17 @@ export default function FaqPage() {
           <span>Expected refresh windows: around 09:00 and 21:00 Europe/Oslo</span>
         </div>
       </header>
-
-      <QaPageClient />
+      <ShortFullContent
+        pageKey="faq"
+        summary={<>Use this page when you want short answers to the skeptical questions a serious buyer would ask before trusting the product.</>}
+        bullets={[
+          <>The Q&amp;A covers noise vs regime change, confidence, baselines, JSON artifacts, and trust signals.</>,
+          <>Start with the short answer. Expand only the questions you actually care about.</>,
+          <>Basic and Advanced explanation levels remain available inside the full answers.</>,
+        ]}
+        whyItMatters={<>The page should feel fast and scannable for new users, without removing technical answers for skeptical readers.</>}
+        fullContent={<QaPageClient />}
+      />
     </main>
   );
 }

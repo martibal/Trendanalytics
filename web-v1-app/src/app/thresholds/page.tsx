@@ -6,6 +6,8 @@ import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { type ThresholdControlValues } from "@/components/thresholds/ThresholdControls";
 import ThresholdControlsClient from "@/components/thresholds/ThresholdControlsClient";
 
+import ShortFullContent from "@/components/site/ShortFullContent";
+
 import "server-only";
 
 // ---------------------------------------------------------------------------

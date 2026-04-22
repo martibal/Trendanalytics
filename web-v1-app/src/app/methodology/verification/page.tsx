@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import { Callout, InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable, WarningCallout } from "../_components";
 
 function CodeBlock({ children }: { children: string }) {
@@ -12,7 +13,18 @@ export default async function MethodologyVerificationPage() {
         description="Worked examples showing what a careful reader can recompute from published artifacts, what should instead be checked against public chain evidence, and how to interpret edge cases that look inconsistent until the methodology is understood."
       />
       <MethodologyNav />
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="methodology-verification"
+        summary={<>This page tells you how much of the published output you can verify yourself in practice.</>}
+        bullets={[
+          <>Class A items are directly reproducible from public artifacts.</>,
+          <>Class B items are independently checkable against public chain evidence, but not reconstructable from Urd Atlas files alone.</>,
+          <>Class C items remain intentionally black box because they would expose private implementation or source-data reconstruction paths.</>,
+          <>One end-to-end diligence path should be enough to test Gold → Derived → Meta behavior before buying.</>,
+        ]}
+        whyItMatters={<>Verification is the fastest route from skepticism to trust for a technical evaluator.</>}
+        fullContent={
+          <div className="grid gap-6">
         <Section title="Verification classes used here">
           <SimpleTable
             headers={["Class", "Meaning", "Typical examples"]}
@@ -149,7 +161,9 @@ print({
             <li>Compare one Gold metric against a public explorer or independently gathered chain data for the same date.</li>
           </ul>
         </Section>
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 // src/app/terms/page.tsx
 import Link from "next/link";
 
@@ -66,7 +67,17 @@ export default function TermsPage() {
         </div>
       </header>
 
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="terms"
+        summary={<>This page defines the legal terms for using the public website, subscriber dashboard, authenticated file delivery, and related product surfaces.</>}
+        bullets={[
+          <>The product is descriptive on-chain context, not financial advice or a trading signal service.</>,
+          <>Plans, access scope, and API-key usage are governed by subscription entitlements rather than informal expectations.</>,
+          <>The full legal text remains available in the full version for precise rights, restrictions, and disclaimers.</>,
+        ]}
+        whyItMatters={<>Users should know the main contractual boundaries quickly without being forced into full legal prose first.</>}
+        fullContent={
+          <div className="grid gap-6">
         <Section title="1. Service Description">
           <p>
             Urd Atlas is a descriptive on-chain analytics product. It provides a public,
@@ -347,7 +358,9 @@ export default function TermsPage() {
             .
           </p>
         </Section>
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

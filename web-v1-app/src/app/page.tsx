@@ -25,6 +25,7 @@ import ExploreGrid from "@/components/landing/ExploreGrid";
 import UseCases from "@/components/landing/UseCases";
 import MobileLanding from "@/components/mobile/MobileLanding";
 import GetStarted from "@/components/landing/GetStarted";
+import ShortFullContent from "@/components/site/ShortFullContent";
 
 import "server-only";
 
@@ -505,14 +506,28 @@ export default async function HomePage() {
         <ModalStyles />
 
         <Hero historyDepthDays={historyDepthDays} lastDataLoad={formatDataLoad(statusPayload?.generated_at_utc)} />
-        <GetStarted />
-        <LiveChains rows={displayRows} />
-        <UseCases />
-        <div className="mt-10">
-          <Plans historyDepthDays={historyDepthDays} />
-        </div>
-        <JsonLayers />
-        <ExploreGrid />
+        <ShortFullContent
+          pageKey="home"
+          summary={<>Urd Atlas publishes daily chain-state JSON for BTC, ETH, ARB, and BASE. It tells you the current regime, confidence, and driver context without using price, forecasts, or recommendations.</>}
+          bullets={[
+            <>What you get: <strong>Gold</strong> for direct daily observations, <strong>Derived</strong> for deterministic trend context, and <strong>Meta</strong> for regime, confidence, and drivers.</>,
+            <>Why trust it: a public methodology, verification pack, sample JSON files, and a published archive of what the product actually released over time.</>,
+            <>Commercial shape: Basic = 1 chain / 90 days. Pro = 4 chains / 365 days. Full archive access can be offered separately.</>,
+          ]}
+          whyItMatters={<>A first-time visitor should understand the product in seconds, while deeper sections remain available for full due diligence.</>}
+          fullContent={
+            <>
+              <GetStarted />
+              <LiveChains rows={displayRows} />
+              <UseCases />
+              <div className="mt-10">
+                <Plans historyDepthDays={historyDepthDays} />
+              </div>
+              <JsonLayers />
+              <ExploreGrid />
+            </>
+          }
+        />
 
         <ExplainModal
           id="what-is-modal"

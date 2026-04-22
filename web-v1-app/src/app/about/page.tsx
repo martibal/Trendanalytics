@@ -4,6 +4,8 @@ import Link from "next/link";
 
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 
+import ShortFullContent from "@/components/site/ShortFullContent";
+
 import "server-only";
 
 // ---------------------------------------------------------------------------
@@ -390,6 +392,17 @@ export default async function AboutPage() {
         </div>
       </header>
 
+      <ShortFullContent
+        pageKey="about"
+        summary={<>Urd Atlas is a narrow product built to separate persistent on-chain regime change from short-term noise using deterministic, explainable daily outputs.</>}
+        bullets={[
+          <>What it does: publishes descriptive regime context, confidence, and driver explanation for BTC, ETH, ARB, and BASE.</>,
+          <>What it does not do: no price, no forecasts, no recommendations, and no opaque black-box signal output.</>,
+          <>Why trust it: thresholds are published, labels are traceable, historical outputs are archived, and the public trust layer explains what can and cannot be verified.</>,
+        ]}
+        whyItMatters={<>A new visitor should be able to understand the product mandate and trust model before reading the full product philosophy.</>}
+        fullContent={
+          <>
       {/* ── Core proposition cards ────────────────────────────────────────── */}
       <section className="mb-8 grid gap-4 lg:grid-cols-3">
 
@@ -605,6 +618,10 @@ export default async function AboutPage() {
           <div>This page is descriptive product documentation and remains aligned with methodology, glossary, status, API docs, and legal pages.</div>
         </div>
       </details>
+
+          </>
+        }
+      />
 
       {/* ── All modals ────────────────────────────────────────────────────── */}
       <ExplainModal

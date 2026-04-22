@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import { MethodologyHeader, MethodologyNav, Section, WarningCallout, InlineCode } from "../_components";
 
 export default function MethodologyBoundariesPage() {
@@ -8,7 +9,17 @@ export default function MethodologyBoundariesPage() {
         description="This page separates disclosure boundaries from analytical interpretation boundaries, so customers can see both what the public trust layer does not reveal and what the product should not be used to infer."
       />
       <MethodologyNav />
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="methodology-boundaries"
+        summary={<>This page defines what Urd Atlas discloses publicly, what remains private, and why that boundary exists.</>}
+        bullets={[
+          <>Public docs explain artifact meaning, field semantics, verification paths, thresholds, and trust signals.</>,
+          <>Private implementation details such as exact joins, repair rules, source schemas, and feature tables are intentionally withheld.</>,
+          <>The goal is auditable outputs and documented behavior without enabling source-data reconstruction or pipeline cloning.</>,
+        ]}
+        whyItMatters={<>A clear boundary makes the black-box portion of the product feel disciplined rather than suspicious.</>}
+        fullContent={
+          <div className="grid gap-6">
         <Section title="What the public methodology discloses">
           <ul className="list-disc pl-5 text-sm leading-7 text-slate-300">
             <li>Field meaning and artifact ownership</li>
@@ -67,7 +78,9 @@ export default function MethodologyBoundariesPage() {
             rules.
           </p>
         </WarningCallout>
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

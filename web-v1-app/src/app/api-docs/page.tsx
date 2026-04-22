@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
@@ -53,7 +54,18 @@ export default async function ApiDocsPage() {
         </div>
       </header>
 
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="api-docs"
+        summary={<>Use this page to see what the API delivers, what you should inspect before buying, and where to go first.</>}
+        bullets={[
+          <>Start with <strong>Getting started</strong> if you want the fastest route from zero to your first pull.</>,
+          <>Open <strong>Public sample pack</strong> to inspect real JSON artifacts before subscribing.</>,
+          <>Use <strong>Schema reference</strong> when you need exact parsing and field structure.</>,
+          <>Use <strong>Common workflows</strong> when you want to see how analysts and dashboards actually use the data.</>,
+        ]}
+        whyItMatters={<>A technical buyer should immediately know where to start, what the API returns, and how to validate the product before purchase.</>}
+        fullContent={
+          <div className="grid gap-6">
         <section className="rounded-2xl border p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-white">Before you buy</h2>
           <div className="mt-4 grid gap-4 lg:grid-cols-3 text-sm leading-7 text-muted-foreground">
@@ -88,7 +100,9 @@ export default async function ApiDocsPage() {
             </table>
           </div>
         </section>
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }

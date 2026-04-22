@@ -9,6 +9,8 @@ import RegimeBadge from "@/components/RegimeBadge";
 import StalenessBar from "@/components/ui/StalenessBar";
 import ChainIcon from "@/components/ChainIcon";
 
+import ShortFullContent from "@/components/site/ShortFullContent";
+
 import "server-only";
 
 // ---------------------------------------------------------------------------
@@ -545,6 +547,17 @@ export default async function StatusPage() {
         </div>
       </header>
 
+      <ShortFullContent
+        pageKey="status"
+        summary={<>This page tells you whether the currently published rows are usable right now, how fresh they are, and whether confidence is holding up independently of freshness.</>}
+        bullets={[
+          <>Status answers health first: are rows on schedule, slightly delayed, or materially stale for their chain-specific cadence.</>,
+          <>Confidence is shown alongside freshness, but it is a different question: evidence quality for the published label, not recency.</>,
+          <>BTC/ETH and ARB/BASE use different expected delay policies, so lag must be interpreted relative to chain cadence.</>,
+        ]}
+        whyItMatters={<>A user should be able to decide quickly whether today’s published rows are operationally safe enough for their workflow before reading the full policy.</>}
+        fullContent={
+          <>
       {/* ── Per-chain staleness banners ───────────────────────────────────── */}
       <section className="mb-8 space-y-3">
         {rows.map((row) => (
@@ -742,6 +755,10 @@ export default async function StatusPage() {
           <div>Operational expectations and correction policy are documented on the service and provenance pages.</div>
         </div>
       </details>
+
+          </>
+        }
+      />
 
       {/* ── All modals ────────────────────────────────────────────────────── */}
       <ExplainModal

@@ -336,7 +336,7 @@ const cadenceExplain: ExplainPair = {
     <>
       <p>
         Different blockchains publish at different speeds. This is not a bug — it is a
-        deliberate policy based on how long it takes to process each chain's data.
+        deliberate policy based on how long it takes to process each chain&apos;s data.
       </p>
       <ul className="mt-3 list-disc space-y-2 pl-5">
         <li>
@@ -346,7 +346,7 @@ const cadenceExplain: ExplainPair = {
         </li>
         <li>
           <span className="font-medium text-white">Arbitrum and Base</span> — published
-          with an expected 7-day delay by design. Seeing "7 days lag" for these chains is
+          with an expected 7-day delay by design. Seeing &quot;7 days lag&quot; for these chains is
           completely normal. WARN only shows above 10 days, FAIL above 15 days.
         </li>
       </ul>

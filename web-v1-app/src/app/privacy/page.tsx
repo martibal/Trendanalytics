@@ -1,3 +1,4 @@
+import ShortFullContent from "@/components/site/ShortFullContent";
 // src/app/privacy/page.tsx
 import Link from "next/link";
 
@@ -38,7 +39,17 @@ export default function PrivacyPage() {
         </div>
       </header>
 
-      <div className="grid gap-6">
+      <ShortFullContent
+        pageKey="privacy"
+        summary={<>This page explains what kinds of user data Urd Atlas may handle across the public website, subscriber system, dashboard, billing, and authenticated file delivery.</>}
+        bullets={[
+          <>The public website and the subscriber system are different surfaces with different data-handling implications.</>,
+          <>The key things a customer usually wants to know first are what account data is stored, which third parties are used, and where support/privacy requests should go.</>,
+          <>The full policy remains available below for legal precision.</>,
+        ]}
+        whyItMatters={<>A user should be able to understand the privacy model in plain language before reading the full legal text.</>}
+        fullContent={
+          <div className="grid gap-6">
         <Section title="1. Scope">
           <p>
             This Privacy Policy applies to Urd Atlas public pages, subscriber account pages,
@@ -239,7 +250,9 @@ export default function PrivacyPage() {
         </Section>
 
 
-      </div>
+          </div>
+        }
+      />
     </main>
   );
 }
