@@ -15,78 +15,63 @@ const JSON_FILE_CARDS = [
   {
     key: "gold",
     title: "Gold",
-    titleClass: "text-amber-300",
-    tagClass: "border-amber-400/25 bg-amber-400/10 text-amber-300",
-    subtitle: "WHAT HAPPENED",
-    glowClass:
-      "bg-[radial-gradient(ellipse_at_top_left,rgba(251,191,36,0.08),transparent_60%)]",
-    fields: [
-      { dot: "bg-amber-300", name: "tx_count_daily", note: "daily activity count" },
-      { dot: "bg-amber-300", name: "unique_active_addresses", note: "breadth of use" },
-      { dot: "bg-amber-300", name: "median_fee_native", note: "daily fee level" },
-      { dot: "bg-amber-300", name: "failed_tx_rate", note: "friction signal" },
+    eyebrow: "What happened",
+    accent: "text-amber-300",
+    border: "border-amber-400/15",
+    glow:
+      "bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.10),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]",
+    body: "Daily factual inputs in native units. This is the authoritative record of observed chain activity on that date.",
+    bullets: [
+      "tx_count_daily",
+      "unique_active_addresses",
+      "median_fee_native",
+      "failed_tx_rate",
     ],
-    description:
-      "Gold tells you what actually happened on-chain on that date.",
   },
   {
     key: "meta",
     title: "Meta",
-    titleClass: "text-cyan-300",
-    tagClass: "border-cyan-400/25 bg-cyan-400/10 text-cyan-300",
-    subtitle: "WHAT IT MEANS",
-    glowClass:
-      "bg-[radial-gradient(ellipse_at_top_left,rgba(0,212,255,0.07),transparent_60%)]",
-    fields: [
-      { dot: "bg-cyan-300", name: "status.label", note: "published regime" },
-      { dot: "bg-cyan-300", name: "confidence_score", note: "evidence strength" },
-      { dot: "bg-cyan-300", name: "regime.drivers", note: "why the label fired" },
-      { dot: "bg-cyan-300", name: "status.one_liner", note: "plain-language read" },
+    eyebrow: "What it means",
+    accent: "text-cyan-300",
+    border: "border-cyan-400/15",
+    glow:
+      "bg-[radial-gradient(circle_at_top_left,rgba(0,212,255,0.12),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]",
+    body: "The commercial core: published regime, confidence, scorecard, drivers, and concise interpretation in reusable JSON.",
+    bullets: [
+      "status.label",
+      "confidence_score",
+      "regime.drivers",
+      "status.one_liner",
     ],
-    description:
-      "Meta tells you what the current chain state means right now.",
   },
   {
     key: "derived",
     title: "Derived",
-    titleClass: "text-emerald-300",
-    tagClass: "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
-    subtitle: "HOW IT IS TRENDING",
-    glowClass:
-      "bg-[radial-gradient(ellipse_at_top_left,rgba(52,211,153,0.06),transparent_60%)]",
-    fields: [
-      { dot: "bg-emerald-300", name: "metric__ma7", note: "short trend" },
-      { dot: "bg-emerald-300", name: "metric__ma30", note: "medium baseline" },
-      { dot: "bg-emerald-300", name: "z_score", note: "historical position" },
-      { dot: "bg-emerald-300", name: "percentile_180d", note: "relative context" },
-    ],
-    description:
-      "Derived tells you how the underlying state is moving through time.",
+    eyebrow: "How it is trending",
+    accent: "text-emerald-300",
+    border: "border-emerald-400/15",
+    glow:
+      "bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.10),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]",
+    body: "Smoothed trend context and relative position through time, so recent change can be read against a more stable baseline.",
+    bullets: ["metric__ma7", "metric__ma30", "z_score", "percentile_180d"],
   },
 ] as const;
 
-const DILIGENCE_STEPS = [
-  {
-    title: "Inspect sample artifacts",
-    body: "Open real published JSON before paying. Confirm the structure is understandable and useful.",
-  },
-  {
-    title: "Read the methodology boundary",
-    body: "See what is public, what is independently verifiable, and where the intentionally non-public boundary begins.",
-  },
-  {
-    title: "Check the track record",
-    body: "Inspect the published archive to verify continuity, stability, and historical traceability.",
-  },
-  {
-    title: "Match to your workflow",
-    body: "Decide whether you want this for notebooks, dashboards, API pulls, or periodic regime review.",
-  },
+const HERO_POINTS = [
+  "Daily published JSON for BTC, ETH, ARB, and BASE",
+  "Deterministic classification pipeline with explicit confidence",
+  "Public track record and inspectable schema before purchase",
+] as const;
+
+const TRUST_POINTS = [
+  "Weak evidence degrades to UNKNOWN/DEGRADED instead of being dressed up as certainty.",
+  "Every subscriber workflow starts from the same published JSON that you can inspect on-site.",
+  "The methodology explains the descriptive boundary clearly: current state, not recommendations.",
 ] as const;
 
 function confidenceBandClass(band?: string | null) {
   const base =
-    "inline-flex items-center rounded-md border px-2 py-0.5 font-mono text-[11px] font-bold";
+    "inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[11px] font-bold";
 
   switch ((band ?? "").toLowerCase()) {
     case "good":
@@ -94,68 +79,81 @@ function confidenceBandClass(band?: string | null) {
     case "caution":
       return `${base} border-amber-400/20 bg-amber-400/10 text-amber-300`;
     default:
-      return `${base} border-slate-600/30 bg-slate-600/20 text-slate-500`;
+      return `${base} border-slate-600/30 bg-slate-600/20 text-slate-400`;
   }
+}
+
+function StatCard({ value, label, note }: { value: string; label: string; note?: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 backdrop-blur-sm">
+      <div className="text-[26px] font-black tracking-[-0.03em] text-white">{value}</div>
+      <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-slate-400">
+        {label}
+      </div>
+      {note ? <div className="mt-2 text-xs leading-5 text-slate-400">{note}</div> : null}
+    </div>
+  );
 }
 
 function ChainCard({ row }: { row: SurfaceRowDisplay }) {
   return (
     <Link
       href={row.href}
-      className="group flex flex-col rounded-2xl border border-cyan-300/18 bg-gradient-to-b from-[#17324f] via-[#10233a] to-[#0a1627] p-5 shadow-[0_18px_44px_rgba(0,0,0,0.38),0_0_0_1px_rgba(34,211,238,0.03)] transition-all duration-150 hover:-translate-y-0.5 hover:border-cyan-300/28 hover:shadow-[0_22px_52px_rgba(0,0,0,0.45),0_0_28px_rgba(34,211,238,0.10)]"
+      className="group flex h-full flex-col rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(12,23,39,0.98),rgba(8,15,28,0.98))] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.32)] transition-all duration-200 hover:-translate-y-1 hover:border-cyan-300/25 hover:shadow-[0_28px_70px_rgba(0,0,0,0.42)]"
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[22px] font-extrabold tracking-[-0.02em] text-white">
-            {row.label}
-          </div>
-          <div className="mt-0.5 font-mono text-[9px] font-medium uppercase tracking-[0.18em] text-cyan-300/85">
+          <div className="text-[22px] font-bold tracking-[-0.03em] text-white">{row.label}</div>
+          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200/75">
             {row.name}
           </div>
         </div>
         <span className={row.statusClass}>{row.statusText}</span>
       </div>
 
-      <div className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cyan-300/75">
-        REGIME
-      </div>
-      <div className="mb-3">
-        <RegimeBadge label={row.publishedRegime ?? "UNKNOWN/DEGRADED"} />
-      </div>
-
-      <div className="mb-3 rounded-xl border border-white/6 bg-black/20 p-3">
-        <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.14em] text-slate-500">
-          CONFIDENCE
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[28px] font-extrabold tracking-tight text-white">
-            {row.confidenceValue}
-          </span>
-          <span className={confidenceBandClass(row.confidenceBand)}>{row.confidenceBand}</span>
-        </div>
-      </div>
-
-      <div className="mb-4 grid grid-cols-2 gap-2">
-        <div className="rounded-lg border border-white/5 bg-black/20 p-2.5">
-          <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-slate-500">
-            AS OF
+      <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
+          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
+            Published regime
           </div>
-          <div className="mt-1 break-words font-mono text-[12px] font-semibold text-white">
-            {row.asOf}
+          <div className="mt-2">
+            <RegimeBadge label={row.publishedRegime ?? "UNKNOWN/DEGRADED"} />
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/5 bg-black/20 p-2.5">
-          <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-slate-500">
-            LAG
+        <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
+          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
+            Confidence
           </div>
-          <div className="mt-1 font-mono text-[12px] font-semibold text-white">
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[26px] font-black tracking-tight text-white">
+              {row.confidenceValue}
+            </span>
+            <span className={confidenceBandClass(row.confidenceBand)}>{row.confidenceBand}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
+          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
+            As of
+          </div>
+          <div className="mt-2 font-mono text-[12px] font-semibold text-white">{row.asOf}</div>
+        </div>
+        <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
+          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
+            Lag
+          </div>
+          <div className="mt-2 font-mono text-[12px] font-semibold text-white">
             {row.lagValue}
           </div>
         </div>
       </div>
 
-      <div className="mt-auto font-mono text-[10px] text-slate-500 transition-colors group-hover:text-cyan-300">
+      <p className="mt-4 text-sm leading-6 text-slate-300">{row.takeaway}</p>
+
+      <div className="mt-auto pt-4 font-mono text-[11px] text-slate-500 transition-colors group-hover:text-cyan-300">
         Open chain detail →
       </div>
     </Link>
@@ -174,228 +172,205 @@ export default function Hero({
 
   return (
     <section className="w-full">
-      {/* Level 1 */}
-      <div className="mb-12 border-b border-white/6 pb-6 pt-6">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
-            <div>
-              <div className="font-mono text-[28px] font-bold leading-none text-cyan-400">
-                {publishedDays}
-              </div>
-              <div className="mt-2 font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
-                PUBLISHED DAYS
-              </div>
+      <div className="relative overflow-hidden border-b border-white/6 bg-[linear-gradient(180deg,#08111F_0%,#0A1730_42%,#08111A_100%)]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(circle_at_20%_18%,rgba(0,212,255,0.18),transparent_34%),radial-gradient(circle_at_82%_20%,rgba(59,130,246,0.18),transparent_30%),radial-gradient(circle_at_50%_100%,rgba(0,255,136,0.07),transparent_35%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:72px_72px] opacity-[0.06]" />
+        </div>
+
+        <div className="relative mx-auto max-w-[1280px] px-6 pb-20 pt-8 lg:px-8 lg:pb-24 lg:pt-10">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-100/90">
+              <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.85)]" />
+              Daily chain-state JSON
             </div>
 
-            <div>
-              <div className="font-mono text-[14px] font-medium leading-none text-white">
-                {lastDataLoad ?? "—"}
-              </div>
-              <div className="mt-2 font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
-                LAST DATA LOAD
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-[6px] w-[6px] rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-300">
-                  LIVE
-                </span>
-              </div>
-              <div className="mt-2 font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
-                since Dec 2024
-              </div>
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-300">
+              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 font-mono">
+                4 chains
+              </span>
+              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 font-mono">
+                Hash-anchored track record
+              </span>
             </div>
           </div>
 
-          <Link
-            href="/track-record"
-            className="font-mono text-[11px] font-semibold text-cyan-400 hover:underline"
-          >
-            Browse track record →
-          </Link>
-        </div>
-      </div>
+          <div className="mt-10 grid gap-10 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] xl:items-start">
+            <div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-cyan-200/70">
+                Urd Atlas
+              </div>
 
-      {/* Level 2 */}
-      <div className="relative mb-12 overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#04080F_0%,#061420_100%)] px-1 py-1">
-        <div className="pointer-events-none absolute -right-16 -top-24 h-[900px] w-[900px] rounded-full bg-[radial-gradient(circle,rgba(0,212,255,0.12),transparent_65%)]" />
-        <div className="pointer-events-none absolute -bottom-24 -left-12 h-[700px] w-[700px] rounded-full bg-[radial-gradient(circle,rgba(0,255,136,0.06),transparent_65%)]" />
+              <h1 className="mt-5 max-w-4xl text-[2.9rem] font-black leading-[0.98] tracking-[-0.05em] text-white sm:text-[3.8rem] xl:text-[4.7rem]">
+                Separate blockchain noise from structural change.
+              </h1>
 
-        <div className="relative px-2 py-4 sm:px-4 sm:py-6">
-          <div className="relative mb-3 inline-block">
-            <div className="text-[3.2rem] font-black uppercase leading-none tracking-[0.25em] text-white [text-shadow:0_0_80px_rgba(0,212,255,0.5),0_0_160px_rgba(0,212,255,0.2)] sm:text-[4rem] lg:text-[6rem]">
-              URD ATLAS
+              <p className="mt-6 max-w-3xl text-[18px] leading-8 text-slate-300">
+                Urd Atlas publishes daily JSON for BTC, ETH, ARB, and BASE so you can read current
+                chain state without building your own ingestion, normalization, confidence, and
+                regime-classification stack.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <StatCard
+                  value={publishedDays}
+                  label="Published days"
+                  note="Public archive since Dec 2024"
+                />
+                <StatCard
+                  value={lastDataLoad ?? "—"}
+                  label="Last data load"
+                  note="Rendered in Oslo time"
+                />
+                <StatCard
+                  value="UNKNOWN/DEGRADED"
+                  label="Weak evidence policy"
+                  note="Low-quality evidence is not promoted"
+                />
+              </div>
+
+              <div className="mt-7 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    document
+                      .getElementById("latest-surface")
+                      ?.scrollIntoView({ behavior: "smooth" })
+                  }
+                  className="inline-flex items-center rounded-full bg-cyan-400 px-6 py-3 text-[13px] font-black text-[#06111B] shadow-[0_10px_30px_rgba(34,211,238,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(34,211,238,0.36)]"
+                >
+                  See current chain state →
+                </button>
+
+                <Link
+                  href="/api-docs/schema"
+                  className="inline-flex items-center rounded-full border border-white/12 bg-white/[0.05] px-6 py-3 text-[13px] font-semibold text-slate-100 transition hover:border-cyan-300/25 hover:bg-white/[0.08]"
+                >
+                  Inspect sample JSON
+                </Link>
+              </div>
+
+              <div className="mt-6 space-y-2.5">
+                {HERO_POINTS.map((point) => (
+                  <div key={point} className="flex items-start gap-3 text-sm leading-6 text-slate-300">
+                    <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-cyan-300" />
+                    <span>{point}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <h1 className="mb-6 text-[2rem] font-bold leading-[1.0] tracking-[-0.03em] text-white sm:text-[2.2rem] lg:text-[2.6rem]">
-            <span className="block">Daily JSON that separates</span>
-            <span className="block text-cyan-400">noise from structural change</span>
-          </h1>
-
-          <div className="flex max-w-[48ch] items-start gap-[14px]">
-            <span className="mt-[6px] h-[18px] w-[2px] shrink-0 bg-cyan-400" />
-            <p className="text-[17px] leading-[1.9] text-slate-400">
-              Urd Atlas ingests daily on-chain data from AWS Public Blockchain Data, runs it
-              through a deterministic classification pipeline, and publishes three JSON files per
-              chain — Gold, Meta, and Derived — available via API and inspectable on this site.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Level 3 */}
-      <div className="mb-12 grid grid-cols-1 gap-[14px] sm:grid-cols-2 xl:grid-cols-4">
-        {rows.map((row) => (
-          <ChainCard key={row.chain} row={row} />
-        ))}
-      </div>
-
-      {/* Level 4 */}
-      <div className="mb-12">
-        <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-cyan-400">
-          THE THREE JSON FILES
-        </div>
-        <p className="mb-5 text-[14px] leading-[1.8] text-slate-400">
-          Gold tells you what happened. Meta tells you what it means. Derived tells you how it is
-          trending.
-        </p>
-
-        <div className="grid grid-cols-1 gap-[14px] lg:grid-cols-3">
-          {JSON_FILE_CARDS.map((card) => (
-            <div
-              key={card.key}
-              className={`relative overflow-hidden rounded-2xl border border-white/7 bg-[#080F1C] p-6 ${card.glowClass}`}
-            >
-              <div
-                className={`inline-flex rounded-full border px-2.5 py-1 font-mono text-[11px] font-bold ${card.tagClass}`}
-              >
-                {card.title}
+            <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-200/70">
+                    Product snapshot
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">
+                    Three files. Three jobs.
+                  </div>
+                </div>
+                <Link
+                  href="/track-record"
+                  className="font-mono text-[11px] font-semibold text-cyan-200 hover:text-cyan-100"
+                >
+                  Track record →
+                </Link>
               </div>
 
-              <div className={`mt-4 text-[22px] font-extrabold ${card.titleClass}`}>
-                {card.title}
-              </div>
-              <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-slate-500">
-                {card.subtitle}
-              </div>
-              <p className="mt-3 text-[13px] leading-[1.7] text-slate-400">{card.description}</p>
-
-              <div className="mt-5 space-y-2.5">
-                {card.fields.map((field) => (
-                  <div key={field.name} className="flex items-start gap-2.5">
-                    <span className={`mt-[6px] h-[3px] w-[3px] shrink-0 rounded-full ${field.dot}`} />
-                    <div className="min-w-0">
-                      <div className="font-mono text-[11px] text-slate-300">{field.name}</div>
-                      <div className="font-mono text-[10px] text-slate-600">{field.note}</div>
+              <div className="mt-5 space-y-3">
+                {JSON_FILE_CARDS.map((card) => (
+                  <div
+                    key={card.key}
+                    className={`rounded-2xl border p-4 ${card.border} ${card.glow}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className={`text-base font-bold ${card.accent}`}>{card.title}</div>
+                        <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                          {card.eyebrow}
+                        </div>
+                      </div>
+                      <div className="rounded-full border border-white/10 bg-black/15 px-2.5 py-1 font-mono text-[10px] text-slate-300">
+                        JSON
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-slate-300">{card.body}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {card.bullets.map((bullet) => (
+                        <span
+                          key={bullet}
+                          className="rounded-full border border-white/8 bg-black/15 px-2.5 py-1 font-mono text-[10px] text-slate-300"
+                        >
+                          {bullet}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          ))}
+          </div>
         </div>
       </div>
 
-      {/* Level 5 */}
-      <details className="mb-12 rounded-xl border border-cyan-500/15 bg-cyan-500/[0.03] px-6 py-4">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
-          <div className="min-w-0">
-            <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-cyan-400">
-              PRE-PURCHASE DUE DILIGENCE
-            </span>
-            <span className="ml-3 text-[13px] font-semibold text-white">
-              Get started in 15 minutes — without subscribing.
-            </span>
-          </div>
-          <span className="shrink-0 font-mono text-[11px] text-cyan-400">Show →</span>
-        </summary>
+      <div className="mx-auto -mt-10 max-w-[1200px] px-6 lg:-mt-14">
+        <div className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,18,31,0.96),rgba(7,13,24,0.96))] p-5 shadow-[0_28px_70px_rgba(0,0,0,0.30)] backdrop-blur-sm lg:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-300/80">
+                Why trust the output
+              </div>
+              <h2 className="mt-2 text-[1.55rem] font-semibold tracking-[-0.03em] text-white sm:text-[1.8rem]">
+                The public site is a proof layer, not just a sales layer.
+              </h2>
+            </div>
 
-        <div className="mt-6 border-t border-white/6 pt-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {DILIGENCE_STEPS.map((step, index) => (
+            <div className="flex flex-wrap gap-3 text-[11px]">
+              <Link href="/methodology" className="text-cyan-300 hover:text-cyan-200">
+                Methodology →
+              </Link>
+              <Link href="/api-docs/schema" className="text-cyan-300 hover:text-cyan-200">
+                Schema →
+              </Link>
+              <Link href="/service" className="text-cyan-300 hover:text-cyan-200">
+                Service policy →
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
+            {TRUST_POINTS.map((point) => (
               <div
-                key={step.title}
-                className="rounded-xl border border-white/7 bg-black/20 px-4 py-4"
+                key={point}
+                className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4 text-sm leading-6 text-slate-300"
               >
-                <div className="mb-2 flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-cyan-500/25 bg-black font-mono text-[11px] font-bold text-cyan-400">
-                    {index + 1}
-                  </div>
-                  <div className="text-[14px] font-semibold text-white">{step.title}</div>
-                </div>
-                <div className="text-[12px] leading-[1.7] text-slate-400">{step.body}</div>
+                {point}
               </div>
             ))}
           </div>
         </div>
-      </details>
+      </div>
 
-      {/* Level 6 */}
-      <div className="w-full">
-        <div className="mb-4 flex items-start gap-3 rounded-xl border border-cyan-500/15 bg-cyan-500/[0.04] px-5 py-4 shadow-[0_0_0_1px_rgba(0,212,255,0.12),0_0_32px_rgba(0,212,255,0.06),inset_0_1px_0_rgba(0,212,255,0.10)]">
-          <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/10">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="text-cyan-400"
-            >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
+      <div id="latest-surface" className="mx-auto mt-12 max-w-[1200px] px-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-300/80">
+              Latest published surface
+            </div>
+            <h2 className="mt-2 text-[1.8rem] font-semibold tracking-[-0.03em] text-white sm:text-[2.15rem]">
+              Current chain state at a glance
+            </h2>
           </div>
-
-          <p className="text-[13px] leading-[1.7] text-slate-300">
-            <span className="font-bold text-white">Never a weak label presented as strong.</span>{" "}
-            When evidence is insufficient, the model publishes{" "}
-            <code className="rounded bg-white/8 px-1.5 py-0.5 font-mono text-[11px] text-emerald-300">
-              UNKNOWN/DEGRADED
-            </code>{" "}
-            instead of guessing. You always know what you are working with.
-          </p>
+          <div className="text-sm leading-6 text-slate-400">
+            Open any chain to inspect the full descriptive surface and the latest published row.
+          </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() =>
-              document.getElementById("plans")?.scrollIntoView({ behavior: "smooth" })
-            }
-            className="inline-flex items-center rounded-lg bg-cyan-400 px-8 py-3 font-mono text-[13px] font-black text-[#04080F] shadow-[0_0_0_1px_rgba(34,211,238,0.5),0_0_20px_rgba(34,211,238,0.3),0_4px_15px_rgba(0,0,0,0.4)] transition-all hover:-translate-y-[2px] hover:shadow-[0_0_0_1px_rgba(34,211,238,0.7),0_0_40px_rgba(34,211,238,0.45),0_8px_24px_rgba(0,0,0,0.55)]"
-          >
-            See plans →
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              document.getElementById("latest-surface")?.scrollIntoView({ behavior: "smooth" })
-            }
-            className="inline-flex items-center rounded-lg border border-white/10 bg-transparent px-6 py-[11px] font-mono text-[13px] font-medium text-slate-400 transition-all hover:border-cyan-400/25 hover:text-slate-300"
-          >
-            Inspect free surface
-          </button>
-        </div>
-
-        <div className="flex flex-wrap gap-5 font-mono text-[11px] text-slate-600">
-          <Link href="/api-docs/schema" className="hover:text-slate-300">
-            JSON schema →
-          </Link>
-          <a href="#what-is-modal" className="hover:text-slate-300">
-            What this is
-          </a>
-          <a href="#boundary-modal" className="hover:text-slate-300">
-            Interpretation boundary
-          </a>
-          <Link href="/methodology" className="hover:text-slate-300">
-            Full methodology
-          </Link>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {rows.map((row) => (
+            <ChainCard key={row.chain} row={row} />
+          ))}
         </div>
       </div>
     </section>

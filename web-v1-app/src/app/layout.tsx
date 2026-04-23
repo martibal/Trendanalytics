@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fragment, type ReactNode } from "react";
-import "./globals.css";
-import SiteNavbar from "@/components/site/SiteNavbar";
+
 import SiteFooter from "@/components/site/SiteFooter";
-import ThemeProvider from "@/components/site/ThemeProvider";
 import HashModalScrollManager from "@/components/site/HashModalScrollManager";
+import SiteNavbar from "@/components/site/SiteNavbar";
+import ThemeProvider from "@/components/site/ThemeProvider";
+
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Urd Atlas",
@@ -33,15 +35,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning data-scroll-behavior="smooth">
-      <body className="min-h-dvh bg-background text-foreground antialiased">
+      <body className="min-h-dvh overflow-x-hidden bg-background text-foreground antialiased">
         <AuthProvider>
           <ThemeProvider>
             <HashModalScrollManager />
             <div className="flex min-h-dvh flex-col bg-background">
               <SiteNavbar />
-              <div className="flex-1">
-                <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
-              </div>
+              <div className="flex-1 w-full">{children}</div>
               <SiteFooter />
             </div>
           </ThemeProvider>

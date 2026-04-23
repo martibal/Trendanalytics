@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
 import { CHAIN_LIST } from "@/config/chains";
 
 const DESKTOP_ITEMS = [
@@ -11,9 +12,6 @@ const DESKTOP_ITEMS = [
   { href: "/api-docs", label: "API Docs" },
   { href: "/status", label: "Status" },
   { href: "/track-record", label: "Track Record" },
-  { href: "/thresholds", label: "Thresholds" },
-  { href: "/faq", label: "Q&A" },
-  { href: "/service", label: "Service" },
   { href: "/about", label: "About" },
 ] as const;
 
@@ -21,10 +19,10 @@ const CLERK_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 function navLinkClass(active: boolean) {
   return [
-    "inline-flex h-9 items-center rounded-lg px-3 text-sm transition-colors",
+    "inline-flex h-10 items-center rounded-full px-4 text-sm font-medium transition-colors",
     active
-      ? "bg-muted text-foreground"
-      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+      ? "border border-cyan-400/20 bg-cyan-400/10 text-white"
+      : "text-slate-300 hover:bg-white/[0.05] hover:text-white",
   ].join(" ");
 }
 
@@ -37,38 +35,38 @@ function AuthAwareActions({
 }) {
   const { isLoaded, isSignedIn } = useAuth();
 
-  const linkClass = mobile
-    ? "rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-    : "inline-flex h-9 items-center rounded-lg border border-border bg-background px-3 text-sm text-foreground transition hover:bg-muted";
+  const dashboardClass = mobile
+    ? "inline-flex items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-white"
+    : "inline-flex h-11 items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-5 text-sm font-semibold text-white transition hover:bg-cyan-400/16";
 
-  const logoutButtonClass = mobile
-    ? "rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-    : "inline-flex h-9 items-center rounded-lg border border-border bg-background px-3 text-sm text-foreground transition hover:bg-muted";
+  const secondaryClass = mobile
+    ? "inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200"
+    : "inline-flex h-11 items-center rounded-full border border-white/10 bg-white/[0.03] px-5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06]";
 
   if (!isLoaded) {
-    return <span className={linkClass}>Account</span>;
+    return <span className={secondaryClass}>Account</span>;
   }
 
   if (!isSignedIn) {
     return (
-      <Link href="/sign-in" className={linkClass} onClick={onNavigate}>
-        Sign In
-      </Link>
+      <>
+        <Link href="/dashboard" className={dashboardClass} onClick={onNavigate}>
+          Dashboard
+        </Link>
+        <Link href="/sign-in" className={secondaryClass} onClick={onNavigate}>
+          Log in
+        </Link>
+      </>
     );
   }
 
   return (
     <>
-      <Link href="/dashboard" className={linkClass} onClick={onNavigate}>
+      <Link href="/dashboard" className={dashboardClass} onClick={onNavigate}>
         Dashboard
       </Link>
-
       <SignOutButton redirectUrl="/">
-        <button
-          type="button"
-          className={logoutButtonClass}
-          onClick={onNavigate}
-        >
+        <button type="button" className={secondaryClass} onClick={onNavigate}>
           Log out
         </button>
       </SignOutButton>
@@ -81,10 +79,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const chainsRef = useRef<HTMLDivElement | null>(null);
 
-  const isChainsActive = useMemo(
-    () => pathname === "/chains" || pathname?.startsWith("/chains/"),
-    [pathname]
-  );
+  const isChainsActive = pathname === "/chains" || pathname?.startsWith("/chains/");
 
   function closeMenus() {
     setChainsOpen(false);
@@ -93,89 +88,75 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
 
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {
-      if (!chainsRef.current) {
-        return;
-      }
-
+      if (!chainsRef.current) return;
       if (!chainsRef.current.contains(event.target as Node)) {
         setChainsOpen(false);
       }
     }
 
-    function onEscape(event: KeyboardEvent) {
+    function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         closeMenus();
       }
     }
 
     document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onEscape);
+    document.addEventListener("keydown", onKeyDown);
 
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onEscape);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/80 bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-5">
+    <header className="sticky top-0 z-50 border-b border-white/8 bg-[#06101b]/92 backdrop-blur-md supports-[backdrop-filter]:bg-[#06101b]/80">
+      <div className="mx-auto flex h-16 w-full items-center justify-between gap-4 px-6 sm:px-8 xl:px-12 2xl:px-16">
+        <div className="flex min-w-0 items-center gap-3 xl:gap-8">
           <Link
             href="/"
             onClick={closeMenus}
-            className="inline-flex items-center gap-2 rounded-lg px-1 py-1 text-sm font-semibold tracking-wide text-foreground hover:opacity-85"
+            className="inline-flex min-w-0 items-center gap-3 rounded-full px-1 py-1 text-white transition hover:opacity-90"
           >
-            <span className="inline-flex size-7 items-center justify-center rounded-full border border-border bg-card text-xs font-bold text-primary">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-400/10 text-sm font-black text-cyan-300">
               UA
             </span>
-            <span className="truncate">Urd Atlas</span>
+            <span className="truncate text-xl font-semibold tracking-[-0.03em]">Urd Atlas</span>
           </Link>
 
-          <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex">
+          <nav aria-label="Primary" className="hidden items-center gap-1 xl:flex">
             <div ref={chainsRef} className="relative">
               <button
                 type="button"
                 aria-haspopup="menu"
                 aria-expanded={chainsOpen}
                 onClick={() => setChainsOpen((prev) => !prev)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    setChainsOpen((prev) => !prev);
-                  }
-                  if (event.key === "Escape") {
-                    setChainsOpen(false);
-                  }
-                }}
                 className={navLinkClass(Boolean(isChainsActive))}
               >
                 Chains
-                <span className="ml-2 text-xs text-muted-foreground">▾</span>
+                <span className="ml-2 text-xs text-slate-500">▾</span>
               </button>
 
               {chainsOpen ? (
                 <div
                   role="menu"
                   aria-label="Chains"
-                  className="absolute left-0 top-11 min-w-[220px] rounded-xl border border-border bg-popover p-2 shadow-lg"
+                  className="absolute left-0 top-12 min-w-[260px] rounded-2xl border border-white/10 bg-[#07111d]/96 p-2 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur-md"
                 >
                   <Link
                     href="/chains"
                     onClick={closeMenus}
-                    className="block rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
+                    className="block rounded-xl px-3 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                   >
                     All chains overview
                   </Link>
-
-                  <div className="my-2 h-px bg-border" />
-
+                  <div className="my-2 h-px bg-white/8" />
                   {CHAIN_LIST.map((chain) => (
                     <Link
                       key={chain.id}
                       href={`/chains/${chain.id}`}
                       onClick={closeMenus}
-                      className="block rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      className="block rounded-xl px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white"
                     >
                       {chain.label} · {chain.name}
                     </Link>
@@ -185,9 +166,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
             </div>
 
             {DESKTOP_ITEMS.map((item) => {
-              const active =
-                pathname === item.href || pathname?.startsWith(`${item.href}/`);
-
+              const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}
@@ -202,16 +181,24 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
           </nav>
         </div>
 
-        <div className="hidden items-center gap-3 lg:flex">
+        <div className="hidden items-center gap-3 xl:flex">
           {CLERK_CONFIGURED ? (
             <AuthAwareActions />
           ) : (
-            <Link
-              href="/sign-in"
-              className="inline-flex h-9 items-center rounded-lg border border-border bg-background px-3 text-sm text-foreground transition hover:bg-muted"
-            >
-              Sign In
-            </Link>
+            <>
+              <Link
+                href="/dashboard"
+                className="inline-flex h-11 items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-5 text-sm font-semibold text-white transition hover:bg-cyan-400/16"
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/sign-in"
+                className="inline-flex h-11 items-center rounded-full border border-white/10 bg-white/[0.03] px-5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06]"
+              >
+                Log in
+              </Link>
+            </>
           )}
         </div>
 
@@ -220,30 +207,26 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
           aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((prev) => !prev)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background text-sm text-foreground transition hover:bg-muted lg:hidden"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-lg text-white transition hover:bg-white/[0.06] xl:hidden"
         >
           {mobileOpen ? "✕" : "☰"}
         </button>
       </div>
 
       {mobileOpen ? (
-        <div className="border-t border-border bg-background lg:hidden">
-          <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-4 sm:px-6 lg:px-8">
-            <Link
-              href="/chains"
-              onClick={closeMenus}
-              className={navLinkClass(Boolean(isChainsActive))}
-            >
+        <div className="border-t border-white/8 bg-[#06101b]/98 xl:hidden">
+          <div className="mx-auto flex w-full flex-col gap-3 px-6 py-4 sm:px-8">
+            <Link href="/chains" onClick={closeMenus} className={navLinkClass(Boolean(isChainsActive))}>
               Chains overview
             </Link>
 
-            <div className="grid gap-2 rounded-xl border border-border bg-card p-3">
+            <div className="grid gap-2 rounded-2xl border border-white/10 bg-white/[0.02] p-3">
               {CHAIN_LIST.map((chain) => (
                 <Link
                   key={chain.id}
                   href={`/chains/${chain.id}`}
                   onClick={closeMenus}
-                  className="rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  className="rounded-xl px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white"
                 >
                   {chain.label} · {chain.name}
                 </Link>
@@ -251,9 +234,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
             </div>
 
             {DESKTOP_ITEMS.map((item) => {
-              const active =
-                pathname === item.href || pathname?.startsWith(`${item.href}/`);
-
+              const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}
@@ -266,17 +247,26 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
               );
             })}
 
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-                  {CLERK_CONFIGURED ? (
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              {CLERK_CONFIGURED ? (
                 <AuthAwareActions mobile onNavigate={closeMenus} />
               ) : (
-                <Link
-                  href="/sign-in"
-                  onClick={closeMenus}
-                  className="rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                >
-                  Sign In
-                </Link>
+                <>
+                  <Link
+                    href="/dashboard"
+                    onClick={closeMenus}
+                    className="inline-flex items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-white"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/sign-in"
+                    onClick={closeMenus}
+                    className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200"
+                  >
+                    Log in
+                  </Link>
+                </>
               )}
             </div>
           </div>
@@ -288,6 +278,5 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
 
 export default function SiteNavbar() {
   const pathname = usePathname();
-
-  return <SiteNavbarInner key={pathname ?? "root"} pathname={pathname} />;
+  return <SiteNavbarInner pathname={pathname} />;
 }
