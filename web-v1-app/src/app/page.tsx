@@ -306,7 +306,7 @@ function shortDisplayDate(value: string): string {
   if (!value || value === "—") return "Updated —";
   const parsed = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return `Updated ${value}`;
-  return `Updated ${new Intl.DateTimeFormat("en-US", {
+  return `Updated data per ${new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     timeZone: "UTC",
@@ -943,7 +943,7 @@ function JsonExampleModal(props: {
             </p>
 
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[12px] font-semibold text-slate-400">
-              <span>Source: <span className="text-slate-200">{props.example.sourcePath}</span></span>
+          
               <span>Chain/date: <span className="text-slate-200">{props.example.chain ?? "—"} / {props.example.date ?? "—"}</span></span>
               <span>Meta confidence: <span className="text-slate-200">{formatExampleConfidence(props.example.confidenceScore)}</span></span>
             </div>
