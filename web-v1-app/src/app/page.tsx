@@ -79,6 +79,24 @@ type MetaLatest = {
   regime?: { asof_date?: string };
 };
 
+type MetaDriver = {
+  axis?: string;
+  metric?: string;
+  trend?: string;
+  z_robust?: number | null;
+  pct_90d?: number | null;
+  momentum_7d_vs_30d?: number | null;
+  current?: number | null;
+};
+
+type DerivedLatest = Record<string, unknown>;
+
+type PrimaryChangeDisplay = {
+  label: string;
+  value: string;
+  tone: "up" | "down" | "flat" | "limited";
+};
+
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
   return new TextDecoder("utf-8").decode(new Uint8Array(buffer));
 }
@@ -224,6 +242,32 @@ async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
   );
 }
 
+async function buildPrimaryChangeMap(): Promise<Map<string, PrimaryChangeDisplay>> {
+  const entries = await Promise.all(
+    CHAIN_LIST.map(async (chain) => {
+      const [meta, derived] = await Promise.all([
+        readPublishedJson<MetaLatest>(`data/published/v1/meta/${chain.id}/latest.json`),
+        readPublishedJson<DerivedLatest>(`data/published/v1/derived/${chain.id}/latest.json`),
+      ]);
+
+      const confidenceScore =
+        typeof meta?.confidence?.confidence_score === "number" ? meta.confidence.confidence_score : null;
+
+      return [
+        chain.id,
+        buildPrimaryChangeDisplay({
+          chainId: chain.id,
+          meta,
+          derived,
+          confidenceScore,
+        }),
+      ] as const;
+    }),
+  );
+
+  return new Map(entries);
+}
+
 function statusText(status: StatusApiRow["status"]) {
   if (status === "ok") return "OK";
   if (status === "warn") return "WARN";
@@ -306,7 +350,7 @@ function shortDisplayDate(value: string): string {
   if (!value || value === "—") return "Updated —";
   const parsed = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return `Updated ${value}`;
-  return `Updated data per ${new Intl.DateTimeFormat("en-US", {
+  return `Data updated through ${new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     timeZone: "UTC",
@@ -315,15 +359,476 @@ function shortDisplayDate(value: string): string {
 
 function regimeTextClass(regime: string | null | undefined): string {
   const value = (regime ?? "").toUpperCase();
-  if (value === "STABLE") return "text-emerald-600";
-  if (value === "HEATING") return "text-orange-500";
-  if (value === "CONGESTED") return "text-rose-600";
+  if (value === "STABLE") return "text-[#1f8a68]";
+  if (value === "HEATING") return "text-[#b96a2a]";
+  if (value === "CONGESTED") return "text-[#b35353]";
   if (value === "CHEAP") return "text-blue-600";
   return "text-slate-500";
 }
 
 function prettyRegime(regime: string | null | undefined): string {
   return (regime ?? "UNKNOWN").toUpperCase();
+}
+
+
+type PrimaryDriverLike = {
+  label?: string;
+  value?: string;
+  tone?: "up" | "down" | "flat" | "limited";
+};
+
+function confidenceVisualState(confidence: number | null) {
+  if (confidence === null) {
+    return {
+      valueClass: "text-slate-500",
+      noteClass: "text-slate-500",
+      note: "Confidence unavailable. Use the chain page for full context.",
+    };
+  }
+
+  if (confidence >= 70) {
+    return {
+      valueClass: "text-emerald-600",
+      noteClass: "text-emerald-700",
+      note: "High confidence. Low need for manual cross-check.",
+    };
+  }
+
+  if (confidence >= 55) {
+    return {
+      valueClass: "text-amber-500",
+      noteClass: "text-amber-700",
+      note: "Usable confidence. A quick cross-check is recommended.",
+    };
+  }
+
+  if (confidence >= 40) {
+    return {
+      valueClass: "text-orange-500",
+      noteClass: "text-orange-700",
+      note: "Caution. Verify against the chain page before relying on this signal.",
+    };
+  }
+
+  return {
+    valueClass: "text-rose-600",
+    noteClass: "text-rose-700",
+    note: "Degraded confidence. Treat this as tentative and cross-check carefully.",
+  };
+}
+
+function primaryDriverValueClass(tone?: PrimaryDriverLike["tone"]) {
+  if (tone === "up") return "text-emerald-600";
+  if (tone === "down") return "text-rose-600";
+  if (tone === "limited") return "text-amber-700";
+  return "text-slate-600";
+}
+
+function splitPrimaryDriverValue(value?: string): { name: string; change: string } {
+  const safeValue = value?.trim();
+  if (!safeValue) return { name: "No clear driver", change: "—" };
+
+  const vsIndex = safeValue.search(/\s[+-]?\d+(?:\.\d+)?%?\s+vs\s+/i);
+  if (vsIndex > 0) {
+    return {
+      name: safeValue.slice(0, vsIndex).trim(),
+      change: safeValue.slice(vsIndex).trim(),
+    };
+  }
+
+  const percentileIndex = safeValue.search(/\s\d+(?:st|nd|rd|th)\s+pct\.?$/i);
+  if (percentileIndex > 0) {
+    return {
+      name: safeValue.slice(0, percentileIndex).trim(),
+      change: safeValue.slice(percentileIndex).trim(),
+    };
+  }
+
+  const highVsIndex = safeValue.search(/\shigh\s+vs\s+/i);
+  if (highVsIndex > 0) {
+    return {
+      name: safeValue.slice(0, highVsIndex).trim(),
+      change: safeValue.slice(highVsIndex).trim(),
+    };
+  }
+
+  const lowVsIndex = safeValue.search(/\slow\s+vs\s+/i);
+  if (lowVsIndex > 0) {
+    return {
+      name: safeValue.slice(0, lowVsIndex).trim(),
+      change: safeValue.slice(lowVsIndex).trim(),
+    };
+  }
+
+  const elevatedIndex = safeValue.search(/\selevated$/i);
+  if (elevatedIndex > 0) {
+    return {
+      name: safeValue.slice(0, elevatedIndex).trim(),
+      change: "elevated",
+    };
+  }
+
+  const depressedIndex = safeValue.search(/\sdepressed$/i);
+  if (depressedIndex > 0) {
+    return {
+      name: safeValue.slice(0, depressedIndex).trim(),
+      change: "depressed",
+    };
+  }
+
+  return {
+    name: safeValue,
+    change: "current driver",
+  };
+}
+
+function numericFromUnknown(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function formatSignedPercent(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded > 0) return `+${rounded}%`;
+  return `${rounded}%`;
+}
+
+function metricDisplayName(metric: string): string {
+  const normalized = metric.toLowerCase();
+
+  const labels: Record<string, string> = {
+    tx_count_daily: "Activity",
+    unique_active_addresses: "Active addresses",
+    median_fee_native: "Fees",
+    median_tx_fee_native: "Fees",
+    failed_tx_rate: "Failure rate",
+    gas_utilization_pct: "Gas utilization",
+    median_gas_price: "Gas price",
+    avg_block_time_sec: "Block time",
+    block_count_daily: "Block count",
+  };
+
+  return labels[normalized] ?? normalized.replaceAll("_", " ");
+}
+
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function metricLookupKeys(metric: string): string[] {
+  const normalized = metric.toLowerCase();
+
+  const aliases: Record<string, string[]> = {
+    tx_count_daily: ["tx_count_daily", "transaction_count", "transactions_daily"],
+    unique_active_addresses: ["unique_active_addresses", "active_addresses", "daily_active_addresses"],
+    median_fee_native: ["median_fee_native", "median_tx_fee_native"],
+    median_tx_fee_native: ["median_tx_fee_native", "median_fee_native"],
+    failed_tx_rate: ["failed_tx_rate", "failure_rate", "failed_transaction_rate"],
+    gas_utilization_pct: ["gas_utilization_pct", "gas_utilization", "gas_used_ratio"],
+    median_gas_price: ["median_gas_price", "gas_price_median"],
+    avg_block_time_sec: ["avg_block_time_sec", "block_time_sec", "average_block_time_sec"],
+    block_count_daily: ["block_count_daily", "blocks_daily"],
+  };
+
+  return Array.from(new Set([normalized, ...(aliases[normalized] ?? [])]));
+}
+
+function derivedContainers(derived: DerivedLatest | null): Record<string, unknown>[] {
+  if (!derived) return [];
+
+  const root = asRecord(derived);
+  if (!root) return [];
+
+  return [
+    root,
+    asRecord(root.metrics),
+    asRecord(root.values),
+    asRecord(root.derived),
+    asRecord(root.data),
+  ].filter((item): item is Record<string, unknown> => item !== null);
+}
+
+function readDerivedMetricNumber(
+  derived: DerivedLatest | null,
+  metric: string,
+  suffix: "ma7" | "ma30",
+): number | null {
+  const containers = derivedContainers(derived);
+  const metrics = metricLookupKeys(metric);
+
+  const suffixKeys =
+    suffix === "ma7"
+      ? ["ma7", "ma_7", "rolling_7d", "rolling7"]
+      : ["ma30", "ma_30", "rolling_30d", "rolling30"];
+
+  for (const container of containers) {
+    for (const metricKey of metrics) {
+      const flatKeys =
+        suffix === "ma7"
+          ? [`${metricKey}__ma7`, `${metricKey}_ma7`, `${metricKey}__rolling_7d`]
+          : [`${metricKey}__ma30`, `${metricKey}_ma30`, `${metricKey}__rolling_30d`];
+
+      for (const flatKey of flatKeys) {
+        const value = numericFromUnknown(container[flatKey]);
+        if (value !== null) return value;
+      }
+
+      const nested = asRecord(container[metricKey]);
+      if (nested) {
+        for (const suffixKey of suffixKeys) {
+          const value = numericFromUnknown(nested[suffixKey]);
+          if (value !== null) return value;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function normalizePercentile(value: number): number {
+  if (!Number.isFinite(value)) return 50;
+
+  // Supports both 0..1 and 0..100 percentile formats.
+  const percentile = value <= 1 ? value * 100 : value;
+
+  return Math.max(0, Math.min(100, Math.round(percentile)));
+}
+
+function driverPercentileText(metric: string, pct_90d: number): PrimaryChangeDisplay {
+  const percentile = normalizePercentile(pct_90d);
+  const metricName = metricDisplayName(metric);
+
+  if (percentile >= 95) {
+    return {
+      label: "Primary driver",
+      value: `${metricName} high vs 90d`,
+      tone: "up",
+    };
+  }
+
+  if (percentile >= 70) {
+    return {
+      label: "Primary driver",
+      value: `${metricName} ${percentile}th pct.`,
+      tone: "up",
+    };
+  }
+
+  if (percentile <= 5) {
+    return {
+      label: "Primary driver",
+      value: `${metricName} low vs 90d`,
+      tone: "down",
+    };
+  }
+
+  if (percentile <= 30) {
+    return {
+      label: "Primary driver",
+      value: `${metricName} ${percentile}th pct.`,
+      tone: "down",
+    };
+  }
+
+  return {
+    label: "Primary driver",
+    value: `${metricName} central range`,
+    tone: "flat",
+  };
+}
+
+function driverZScoreText(metric: string, zRobust: number): PrimaryChangeDisplay {
+  const metricName = metricDisplayName(metric);
+
+  if (zRobust >= 1) {
+    return {
+      label: "Primary driver",
+      value: `${metricName} elevated`,
+      tone: "up",
+    };
+  }
+
+  if (zRobust <= -1) {
+    return {
+      label: "Primary driver",
+      value: `${metricName} depressed`,
+      tone: "down",
+    };
+  }
+
+  return {
+    label: "Primary driver",
+    value: `${metricName} near baseline`,
+    tone: "flat",
+  };
+}
+
+function excludedPrimaryChangeMetrics(chainId: ChainId): Set<string> {
+  const globallyExcluded = [
+    "avg_block_time_sec",
+    "block_time_sec",
+    "average_block_time_sec",
+    "block_count_daily",
+    "blocks_daily",
+  ];
+
+  if (chainId === "base") {
+    return new Set([
+      ...globallyExcluded,
+    ]);
+  }
+
+  return new Set(globallyExcluded);
+}
+
+function choosePrimaryDrivers(chainId: ChainId, meta: MetaLatest | null): MetaDriver[] {
+  const rawDrivers = (meta as { regime?: { drivers?: unknown } } | null)?.regime?.drivers;
+  if (!Array.isArray(rawDrivers)) return [];
+
+  const excluded = excludedPrimaryChangeMetrics(chainId);
+
+  const drivers = rawDrivers.filter(
+    (driver): driver is MetaDriver =>
+      !!driver &&
+      typeof driver === "object" &&
+      typeof (driver as MetaDriver).metric === "string" &&
+      !excluded.has(((driver as MetaDriver).metric as string).toLowerCase()),
+  );
+
+  return [...drivers].sort((a, b) => {
+    const aZ = Math.abs(a.z_robust ?? 0);
+    const bZ = Math.abs(b.z_robust ?? 0);
+
+    if (bZ !== aZ) return bZ - aZ;
+
+    const aPct =
+      typeof a.pct_90d === "number"
+        ? Math.abs(normalizePercentile(a.pct_90d) - 50)
+        : 0;
+
+    const bPct =
+      typeof b.pct_90d === "number"
+        ? Math.abs(normalizePercentile(b.pct_90d) - 50)
+        : 0;
+
+    return bPct - aPct;
+  });
+}
+
+function buildPrimaryChangeDisplay(params: {
+  chainId: ChainId;
+  meta: MetaLatest | null;
+  derived: DerivedLatest | null;
+  confidenceScore: number | null;
+}): PrimaryChangeDisplay {
+  const { chainId, meta, derived, confidenceScore } = params;
+
+  if (confidenceScore !== null && confidenceScore < 0.4) {
+    return {
+      label: "Primary driver",
+      value: "Coverage-limited signal",
+      tone: "limited",
+    };
+  }
+
+  const drivers = choosePrimaryDrivers(chainId, meta);
+
+  if (drivers.length === 0) {
+    return {
+      label: "Primary driver",
+      value: "No clear driver",
+      tone: "limited",
+    };
+  }
+
+  // First pass: prefer actual MA7 vs MA30 movement when available and material.
+  for (const driver of drivers) {
+    const metric = driver.metric;
+    if (!metric) continue;
+
+    const ma7 = readDerivedMetricNumber(derived, metric, "ma7");
+    const ma30 = readDerivedMetricNumber(derived, metric, "ma30");
+
+    if (ma7 !== null && ma30 !== null && ma30 !== 0) {
+      const changePct = ((ma7 - ma30) / Math.abs(ma30)) * 100;
+      const absChange = Math.abs(changePct);
+
+      if (absChange >= 0.75) {
+        return {
+          label: "Primary driver",
+          value: `${metricDisplayName(metric)} ${formatSignedPercent(changePct)} vs 30d`,
+          tone: changePct > 0 ? "up" : "down",
+        };
+      }
+    }
+
+    if (typeof driver.momentum_7d_vs_30d === "number" && Number.isFinite(driver.momentum_7d_vs_30d)) {
+      const changePct = driver.momentum_7d_vs_30d * 100;
+      const absChange = Math.abs(changePct);
+
+      if (absChange >= 0.75) {
+        return {
+          label: "Primary driver",
+          value: `${metricDisplayName(metric)} ${formatSignedPercent(changePct)} vs 30d`,
+          tone: changePct > 0 ? "up" : "down",
+        };
+      }
+    }
+  }
+
+  // Second pass: if MA movement is not material, show historical position.
+  // This prevents Base from showing "No material 7d shift" when the driver is
+  // still meaningfully high/low in the distribution.
+  for (const driver of drivers) {
+    const metric = driver.metric;
+    if (!metric) continue;
+
+    if (typeof driver.pct_90d === "number" && Number.isFinite(driver.pct_90d)) {
+      const percentile = normalizePercentile(driver.pct_90d);
+
+      if (percentile >= 70 || percentile <= 30) {
+        return driverPercentileText(metric, driver.pct_90d);
+      }
+    }
+  }
+
+  // Third pass: use robust z-score if percentile is not available/extreme.
+  for (const driver of drivers) {
+    const metric = driver.metric;
+    if (!metric) continue;
+
+    if (typeof driver.z_robust === "number" && Number.isFinite(driver.z_robust)) {
+      if (Math.abs(driver.z_robust) >= 1) {
+        return driverZScoreText(metric, driver.z_robust);
+      }
+    }
+  }
+
+  // Final fallback: still show the model-selected driver, but without pretending
+  // that there is a material 7d-vs-30d change.
+  const fallback = drivers[0];
+
+  return {
+    label: "Primary driver",
+    value: fallback.metric
+      ? `${metricDisplayName(fallback.metric)} ${fallback.trend ?? "driver"}`
+      : "No clear driver",
+    tone: "flat",
+  };
+}
+
+function primaryChangeToneClass(tone: PrimaryChangeDisplay["tone"]): string {
+  if (tone === "up") return "text-blue-700";
+  if (tone === "down") return "text-sky-700";
+  if (tone === "limited") return "text-amber-700";
+  return "text-[#557099]";
 }
 
 function ChainLogo({ chain }: { chain: string }) {
@@ -461,42 +966,84 @@ function ShieldIcon() {
   );
 }
 
-function StatusCard({ row }: { row: SurfaceRowDisplay }) {
+function StatusCard({
+  row,
+  primaryDriver,
+  primaryChange,
+}: {
+  row: SurfaceRowDisplay;
+  primaryDriver?: PrimaryDriverLike;
+  primaryChange?: PrimaryDriverLike;
+}) {
   const confidence = numericConfidence(row);
   const regime = prettyRegime(row.publishedRegime);
+  const confidenceState = confidenceVisualState(confidence);
+
+  const displayedPrimaryDriver = primaryDriver ?? primaryChange ?? null;
 
   return (
     <Link
       href={row.href}
-      className="group rounded-[13px] border border-[#d8e5f4] bg-white/90 p-5 shadow-[0_14px_34px_rgba(15,47,91,0.11)] transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_18px_42px_rgba(15,47,91,0.16)]"
+      className="group flex min-h-[262px] flex-col rounded-[13px] border border-[#c9d9ea] bg-[#edf5fb] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.09)] transition hover:-translate-y-0.5 hover:border-[#adc7e4] hover:bg-[#e8f2fb] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_42px_rgba(15,47,91,0.13)]"
     >
-      <div className="flex items-start gap-3">
-        <ChainLogo chain={row.chain} />
-        <div className="min-w-0 pt-0.5">
-          <div className="text-[20px] font-extrabold text-[#0d2447]">
-            {row.name}
-          </div>
-          <div
-            className={`mt-1.5 text-[13px] font-black uppercase tracking-[0.08em] ${regimeTextClass(
-              row.publishedRegime
-            )}`}
-          >
-            {regime}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <ChainLogo chain={row.chain} />
+          <div className="min-w-0 pt-0.5">
+            <div className="text-[20px] font-extrabold text-[#0d2447]">
+              {row.name}
+            </div>
+            <div
+              className={`mt-1.5 text-[13px] font-black uppercase tracking-[0.08em] ${regimeTextClass(
+                row.publishedRegime
+              )}`}
+            >
+              {regime}
+            </div>
           </div>
         </div>
+
+        {displayedPrimaryDriver ? (
+          <div className="max-w-[170px] shrink-0 text-right">
+            <div className="text-[12px] font-black uppercase tracking-[0.12em] text-[#557099]">
+              {displayedPrimaryDriver.label ?? "Primary driver"}
+            </div>
+
+            <div
+              className={`mt-1 text-[15px] font-extrabold leading-[1.15] ${primaryDriverValueClass(
+                displayedPrimaryDriver.tone
+              )}`}
+            >
+              {splitPrimaryDriverValue(displayedPrimaryDriver.value).name}
+            </div>
+
+            <div
+              className={`mt-0.5 text-[15px] font-extrabold leading-[1.15] ${primaryDriverValueClass(
+                displayedPrimaryDriver.tone
+              )}`}
+            >
+              {splitPrimaryDriverValue(displayedPrimaryDriver.value).change}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-8">
         <div className="text-[12px] font-black uppercase tracking-[0.12em] text-[#557099]">
           Confidence
         </div>
-        <div className="mt-1 text-[28px] font-semibold leading-none tracking-[-0.04em] text-[#0a1d3a]">
+        <div
+          className={`mt-1 text-[14px] font-semibold leading-none tracking-[-0.04em] ${confidenceState.valueClass}`}
+        >
           {confidence !== null ? `${confidence}%` : "—"}
+        </div>
+        <div className={`mt-2 text-[12px] font-medium leading-5 ${confidenceState.noteClass}`}>
+          {confidenceState.note}
         </div>
       </div>
 
-      <div className="mt-7 flex items-center justify-between gap-3 text-[13px] font-medium text-[#557099]">
-        <span>{shortDisplayDate(row.asOf)}</span>
+      <div className="mt-auto flex items-center justify-between gap-3 pt-7 text-[13px] font-medium text-[#557099]">
+        <span>{shortDisplayDate(row.asOf).replace("Updated ", "Data updated through ")}</span>
         <span className="text-blue-500 transition group-hover:translate-x-0.5">
           <ArrowIcon />
         </span>
@@ -990,9 +1537,9 @@ function JsonExampleModal(props: {
 }
 
 function FeaturePill(props: { icon: ReactNode; title: string; note: string }) {
-  return (
-    <div className="grid min-w-0 grid-cols-[46px_minmax(0,1fr)] gap-4 border-r border-[#dbe7f7] px-5 py-4 last:border-r-0">
-      <MiniIcon>{props.icon}</MiniIcon>
+  return (       
+    <div className="grid min-w-0 grid-cols-[46px_minmax(0,1fr)] gap-4 border-r border-[#cbdced] px-5 py-4 last:border-r-0">
+     <MiniIcon>{props.icon}</MiniIcon>
       <div className="min-w-0">
         <div className="text-[17px] font-extrabold text-[#0d2447]">{props.title}</div>
         <div className="mt-1.5 text-[14px] font-medium leading-5 text-[#536e99]">{props.note}</div>
@@ -1082,6 +1629,7 @@ export default async function HomePage() {
     historyDepthDays,
     landingHeroMap,
     jsonExampleCodeMap,
+    primaryChangeMap,
   ] = await Promise.all([
     readPublishedJson<LandingApiResponse>("data/published/v1/landing/index.json"),
     readPublishedJson<StatusApiResponse>("data/published/v1/status/index.json"),
@@ -1089,6 +1637,7 @@ export default async function HomePage() {
     computeHistoryDepthDays().catch(() => null),
     buildLandingHeroMap(),
     buildJsonExampleCodeMap(),
+    buildPrimaryChangeMap(),
   ]);
 
   const landingChains = extractLandingChains(landingPayload);
@@ -1152,18 +1701,18 @@ export default async function HomePage() {
       <section className="relative isolate overflow-hidden bg-[#031329] text-white">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_8%,rgba(44,109,255,0.12),transparent_28%),linear-gradient(180deg,#031329_0%,#041327_100%)]" />
 
-        <div className="pointer-events-none absolute inset-y-0 right-[5%] hidden items-center lg:flex">
-          <div className="relative h-[500px] w-[500px] opacity-[0.15] xl:h-[700px] xl:w-[700px]">
-            <Image
-              src="/web%20bilder/ygg.png"
-              alt=""
-              fill
-              sizes="320px"
-              className="object-contain"
-              priority
-            />
+          <div className="pointer-events-none absolute inset-y-0 right-[2%] hidden items-center lg:flex">
+            <div className="relative h-[250px] w-[250px] translate-y-12 opacity-[0.30] xl:h-[520px] xl:w-[520px]">
+              <Image
+                src="/web-bilder/ygg-transparent.png"
+                alt=""
+                fill
+                sizes="(min-width: 1280px) 520px, 250px"
+                className="object-contain"
+                priority
+              />
+            </div>
           </div>
-        </div>
 
         <SectionShell className="relative pb-20 pt-16 md:pb-24 md:pt-20 lg:pb-[4.4rem] lg:pt-[4.6rem]">
             <div className="max-w-[820px]">
@@ -1172,8 +1721,7 @@ export default async function HomePage() {
                 <span className="block text-[#2f7cff]">from structural change.</span>
               </h1>
               <p className="mt-7 max-w-[800px] text-[24px] font-semibold leading-8 text-white/88 sm:text-[20px]">
-                Urd Atlas delivers daily Gold, Meta, and Derived JSON files for each chain, built to show whether recent on-chain movement looks like noise or structural change.
-                For analysts, builders, and research teams who want blockchain regime context without maintaining their own data pipeline.
+                Daily Gold, Meta, and Derived JSON for BTC, ETH, ARB, and BASE. Regime context without maintaining your own pipeline
               </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
@@ -1212,11 +1760,15 @@ export default async function HomePage() {
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {displayRows.slice(0, 4).map((row) => (
-              <StatusCard key={row.chain} row={row} />
+              <StatusCard
+                key={row.chain}
+                row={row}
+                primaryChange={primaryChangeMap.get(row.chain)}
+              />
             ))}
           </div>
 
-          <div className="mt-12 grid overflow-hidden rounded-[14px] border border-[#d8e5f4] bg-white/86 shadow-[0_14px_34px_rgba(15,47,91,0.08)] sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mt-12 grid overflow-hidden rounded-[14px] border border-[#c9d9ea] bg-[#edf5fb] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)] sm:grid-cols-2 lg:grid-cols-5">
             <FeaturePill icon={<CalendarIcon />} title="Daily JSON" note="Fresh data every day" />
             <FeaturePill icon={<CalendarIcon />} title="Long history" note={`${publishedDays} days and growing`} />
             <FeaturePill icon={<TriangleIcon />} title="4 Chains" note="BTC, ETH, ARB, BASE" />
@@ -1241,7 +1793,7 @@ export default async function HomePage() {
             >
             <div className="max-w-[1200px]">
               <h2 className="text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447]">
-                JSON is our product for your analytical needs
+                JSON is our product
               </h2>
               <p className="mt-4 max-w-[9800px] text-[17px] font-medium leading-8 text-[#37547b]">
                 Each chain is published as three inspectable JSON layers. Click on a layer below to inspect a concrete example file.
