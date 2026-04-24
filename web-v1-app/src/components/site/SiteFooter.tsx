@@ -5,7 +5,7 @@ const SUPPORT_EMAIL = "support@urdatlas.com";
 
 export default function SiteFooter() {
   return (
-    <footer className="border-t border-white/8 bg-[#08111d]">
+    <footer className="bg-[#031329]">
       <div className="mx-auto w-full px-6 py-12 sm:px-8 xl:px-12 2xl:px-16">
         <div className="grid gap-10 md:grid-cols-4">
           <section>

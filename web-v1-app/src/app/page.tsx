@@ -1,8 +1,8 @@
 import React, { type ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
-import MobileLanding from "@/components/mobile/MobileLanding";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { computeHistoryDepthDays } from "@/lib/historyDepth";
 import {
@@ -280,285 +280,816 @@ function formatDataLoad(value: string | null | undefined): string | null {
 }
 
 function shellClassName(extra?: string) {
-  return `mx-auto w-full max-w-[1560px] px-8 sm:px-10 xl:px-14 2xl:px-20 ${extra ?? ""}`.trim();
+  return `w-full px-5 sm:px-7 lg:px-10 2xl:px-16 ${extra ?? ""}`.trim();
 }
 
-function SectionShell(props: { children: ReactNode; className?: string }) {
-  return <div className={shellClassName(props.className)}>{props.children}</div>;
-}
-
-const CHAIN_ICON_STYLES: Record<string, React.CSSProperties> = {
-  bitcoin: {
-    background: "linear-gradient(180deg, rgba(247,147,26,0.96), rgba(219,122,0,0.94))",
-    borderColor: "rgba(247,147,26,0.2)",
-  },
-  ethereum: {
-    background: "linear-gradient(180deg, rgba(93,102,130,0.9), rgba(63,72,98,0.94))",
-    borderColor: "rgba(148,163,184,0.16)",
-  },
-  arbitrum: {
-    background: "linear-gradient(180deg, rgba(60,87,123,0.94), rgba(34,56,88,0.96))",
-    borderColor: "rgba(96,165,250,0.16)",
-  },
-  base: {
-    background: "linear-gradient(180deg, rgba(244,246,252,0.95), rgba(228,232,241,0.95))",
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-};
-
-const CHAIN_ABBR: Record<string, string> = {
-  bitcoin: "₿",
-  ethereum: "Ξ",
-  arbitrum: "ARB",
-  base: "—",
-};
-
-function ChainIcon({ chain, label }: { chain: string; label: string }) {
-  const isBase = chain === "base";
-  const style = CHAIN_ICON_STYLES[chain];
-  const abbr = CHAIN_ABBR[chain] ?? label.slice(0, 3).toUpperCase();
-
+function SectionShell(props: {
+  children: ReactNode;
+  className?: string;
+  widthClassName?: string;
+}) {
   return (
-    <span
-      className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
-        isBase ? "text-[#165DFF]" : "text-white"
-      }`}
-      style={style ?? { background: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.12)" }}
-      aria-hidden="true"
-    >
-      {abbr}
-    </span>
+    <div className={shellClassName(props.className)}>
+      <div className={props.widthClassName ?? "w-full"}>{props.children}</div>
+    </div>
   );
 }
 
 function numericConfidence(row: SurfaceRowDisplay): number | null {
   const raw = Number.parseFloat(row.confidenceValue);
   if (!Number.isFinite(raw)) return null;
+  if (raw > 1) return Math.max(0, Math.min(100, Math.round(raw)));
   return Math.max(0, Math.min(100, Math.round(raw * 100)));
 }
 
-function filledDotCount(score: number | null): number {
-  if (score === null) return 0;
-  if (score >= 80) return 5;
-  if (score >= 60) return 4;
-  if (score >= 40) return 3;
-  if (score >= 20) return 2;
-  if (score > 0) return 1;
-  return 0;
+function shortDisplayDate(value: string): string {
+  if (!value || value === "—") return "Updated —";
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return `Updated ${value}`;
+  return `Updated ${new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(parsed)}`;
 }
 
 function regimeTextClass(regime: string | null | undefined): string {
   const value = (regime ?? "").toUpperCase();
-  if (value === "STABLE") return "text-[#2F6BFF]";
-  if (value === "CONGESTED") return "text-[#FF5D7A]";
-  if (value === "HEATING") return "text-amber-300";
-  if (value === "CHEAP") return "text-sky-300";
-  return "text-slate-300";
+  if (value === "STABLE") return "text-emerald-600";
+  if (value === "HEATING") return "text-orange-500";
+  if (value === "CONGESTED") return "text-rose-600";
+  if (value === "CHEAP") return "text-blue-600";
+  return "text-slate-500";
 }
 
-function confidenceDotClass(regime: string | null | undefined, filled: boolean): string {
-  if (!filled) return "bg-white/12";
-
-  const value = (regime ?? "").toUpperCase();
-  if (value === "STABLE") return "bg-[#2F6BFF]";
-  if (value === "CONGESTED") return "bg-[#FF5D7A]";
-  if (value === "HEATING") return "bg-amber-300";
-  if (value === "CHEAP") return "bg-sky-300";
-  return "bg-slate-300";
+function prettyRegime(regime: string | null | undefined): string {
+  return (regime ?? "UNKNOWN").toUpperCase();
 }
 
-function ConfidenceDots(props: { regime: string | null | undefined; score: number | null }) {
-  const filled = filledDotCount(props.score);
-
-  return (
-    <div className="flex items-center gap-2">
-      {Array.from({ length: 5 }, (_, index) => (
-        <span
-          key={index}
-          className={`h-3 w-3 rounded-full ${confidenceDotClass(props.regime, index < filled)}`}
-        />
-      ))}
-    </div>
-  );
-}
-
-function FeatureIconDocument() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M7 3.5h6.5L18 8v12a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 20V5A1.5 1.5 0 0 1 7.5 3.5Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-      <path d="M13.5 3.5V8H18" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M9 12.5h6M9 16h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function FeatureIconDatabase() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <ellipse cx="12" cy="5.5" rx="6.5" ry="2.75" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M5.5 5.5v6c0 1.52 2.91 2.75 6.5 2.75s6.5-1.23 6.5-2.75v-6" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M5.5 11.5v6c0 1.52 2.91 2.75 6.5 2.75s6.5-1.23 6.5-2.75v-6" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
-function FeatureIconTarget() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="1.6" />
-      <circle cx="12" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function FeatureItem(props: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-  className?: string;
-}) {
-  return (
-    <div className={`grid min-w-0 grid-cols-[48px_minmax(0,1fr)] items-start gap-5 ${props.className ?? ""}`}>
-      <span className="mt-0.5 inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#2F6BFF]/18 text-[#2F6BFF]">
-        {props.icon}
+function ChainLogo({ chain }: { chain: string }) {
+  if (chain === "ethereum") {
+    return (
+      <span
+        className="relative inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef3fb] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
+        aria-hidden="true"
+      >
+        <svg viewBox="0 0 34 34" className="h-8 w-8">
+          <path d="M17 2.5 8.5 17.1 17 22.2l8.5-5.1L17 2.5Z" fill="#2b374c" />
+          <path d="M17 2.5v19.7l8.5-5.1L17 2.5Z" fill="#61708b" />
+          <path d="m8.5 18.8 8.5 12.7 8.5-12.7-8.5 5.1-8.5-5.1Z" fill="#202b3e" />
+          <path d="M17 23.9v7.6l8.5-12.7-8.5 5.1Z" fill="#56647d" />
+        </svg>
       </span>
-      <div className="min-w-0">
-        <div className="text-[28px] font-medium tracking-[-0.03em] text-white">{props.title}</div>
-        <p className="mt-3 max-w-[320px] text-[17px] leading-8 text-slate-400">{props.description}</p>
-      </div>
-    </div>
+    );
+  }
+
+  if (chain === "arbitrum") {
+    return (
+      <span
+        className="relative inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef3fb] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
+        aria-hidden="true"
+      >
+        <svg viewBox="0 0 34 34" className="h-9 w-9">
+          <path d="m17 2.8 12.3 7.1v14.2L17 31.2 4.7 24.1V9.9L17 2.8Z" fill="#15263d" />
+          <path d="M9.6 23.5 18.7 7.7h3.6l-9.1 15.8H9.6Z" fill="#69a7ff" />
+          <path d="M16.2 25.8 24 12.3h3.4l-7.8 13.5h-3.4Z" fill="#ffffff" opacity="0.86" />
+          <path d="m6.8 11.2 2.7-1.6v14.8l-2.7-1.5V11.2Z" fill="#8dbbff" opacity="0.55" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (chain === "base") {
+    return (
+      <span
+        className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef3fb] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
+        aria-hidden="true"
+      >
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#1b66ff]">
+          <span className="h-3.5 w-3.5 rounded-full bg-white" />
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#f7931a] text-[26px] font-black text-white shadow-[0_10px_22px_rgba(247,147,26,0.24)]"
+      aria-hidden="true"
+    >
+      ₿
+    </span>
   );
 }
 
-function LayerBlock(props: {
+function ArrowIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M8 12h8m0 0-3.2-3.2M16 12l-3.2 3.2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function MiniIcon({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] border border-blue-500/25 bg-blue-500/8 text-blue-600">
+      {children}
+    </span>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path
+        d="M7 3v3M17 3v3M5 9h14M6.5 5.5h11A1.5 1.5 0 0 1 19 7v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18V7a1.5 1.5 0 0 1 1.5-1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path d="M9 13h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TriangleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path d="m12 4 8.5 15h-17L12 4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M12 10v4m0 3h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ApiIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path
+        d="M8 8 4 12l4 4M16 8l4 4-4 4M13.5 5.5l-3 13"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path
+        d="M12 3.8 18.5 6v5.6c0 4.1-2.6 7.1-6.5 8.6-3.9-1.5-6.5-4.5-6.5-8.6V6L12 3.8Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m9.5 12.1 1.7 1.7 3.6-4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function StatusCard({ row }: { row: SurfaceRowDisplay }) {
+  const confidence = numericConfidence(row);
+  const regime = prettyRegime(row.publishedRegime);
+
+  return (
+    <Link
+      href={row.href}
+      className="group rounded-[13px] border border-[#d8e5f4] bg-white/90 p-5 shadow-[0_14px_34px_rgba(15,47,91,0.11)] transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_18px_42px_rgba(15,47,91,0.16)]"
+    >
+      <div className="flex items-start gap-3">
+        <ChainLogo chain={row.chain} />
+        <div className="min-w-0 pt-0.5">
+          <div className="text-[20px] font-extrabold text-[#0d2447]">
+            {row.name}
+          </div>
+          <div
+            className={`mt-1.5 text-[13px] font-black uppercase tracking-[0.08em] ${regimeTextClass(
+              row.publishedRegime
+            )}`}
+          >
+            {regime}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <div className="text-[12px] font-black uppercase tracking-[0.12em] text-[#557099]">
+          Confidence
+        </div>
+        <div className="mt-1 text-[28px] font-semibold leading-none tracking-[-0.04em] text-[#0a1d3a]">
+          {confidence !== null ? `${confidence}%` : "—"}
+        </div>
+      </div>
+
+      <div className="mt-7 flex items-center justify-between gap-3 text-[13px] font-medium text-[#557099]">
+        <span>{shortDisplayDate(row.asOf)}</span>
+        <span className="text-blue-500 transition group-hover:translate-x-0.5">
+          <ArrowIcon />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+type JsonLayerTone = "gold" | "meta" | "derived";
+type JsonExampleConfidence = "high" | "degraded";
+type JsonExampleKey = `${JsonLayerTone}_${JsonExampleConfidence}`;
+
+type JsonExampleFile = {
+  code: string;
+  sourcePath: string;
+  chain: string | null;
+  date: string | null;
+  confidenceScore: number | null;
+};
+
+type JsonExampleCodeMap = Record<JsonExampleKey, JsonExampleFile>;
+
+type MetaManifest = {
+  available_days?: unknown;
+  available_dates?: unknown;
+  dates?: unknown;
+  latest?: unknown;
+};
+
+type ConfidenceCandidate = {
+  chain: ChainId;
+  date: string;
+  score: number;
+};
+
+const JSON_LAYER_TONES: JsonLayerTone[] = ["gold", "meta", "derived"];
+const EXAMPLE_SCAN_DAYS = 420;
+
+function asPlainRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function getNestedValue(source: unknown, pathParts: readonly string[]): unknown {
+  let current: unknown = source;
+
+  for (const part of pathParts) {
+    const record = asPlainRecord(current);
+    if (!record) return undefined;
+    current = record[part];
+  }
+
+  return current;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return null;
+}
+
+function normalizeConfidenceToPercent(score: number | null): number | null {
+  if (score === null || !Number.isFinite(score)) return null;
+  const percent = Math.abs(score) <= 1 ? score * 100 : score;
+  return Math.max(0, Math.min(100, percent));
+}
+
+function formatExampleConfidence(score: number | null): string {
+  const percent = normalizeConfidenceToPercent(score);
+  if (percent === null) return "—";
+  return `${Math.round(percent)}%`;
+}
+
+function extractConfidenceScore(meta: unknown): number | null {
+  const candidates: unknown[] = [
+    getNestedValue(meta, ["confidence", "confidence_score"]),
+    getNestedValue(meta, ["confidence", "score"]),
+    getNestedValue(meta, ["confidence_score"]),
+    getNestedValue(meta, ["scorecard", "confidence_score"]),
+    getNestedValue(meta, ["publish_confidence", "confidence_score"]),
+    getNestedValue(meta, ["publish_confidence", "score"]),
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = toFiniteNumber(candidate);
+    if (parsed !== null) return parsed;
+  }
+
+  return null;
+}
+
+function extractIsoDateFromJson(json: unknown): string | null {
+  if (typeof json === "string" && /^\d{4}-\d{2}-\d{2}$/.test(json)) {
+    return json;
+  }
+
+  const candidates: unknown[] = [
+    getNestedValue(json, ["date"]),
+    getNestedValue(json, ["as_of"]),
+    getNestedValue(json, ["updated_through"]),
+    getNestedValue(json, ["regime", "asof_date"]),
+    getNestedValue(json, ["asof", "display"]),
+    getNestedValue(json, ["asof", "latest_available"]),
+    getNestedValue(json, ["latest", "date"]),
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function extractManifestDates(manifest: MetaManifest | null): string[] {
+  if (!manifest) return [];
+
+  const rawDates =
+    (Array.isArray(manifest.available_days) && manifest.available_days) ||
+    (Array.isArray(manifest.available_dates) && manifest.available_dates) ||
+    (Array.isArray(manifest.dates) && manifest.dates) ||
+    [];
+
+  const dateSet = new Set<string>();
+
+  for (const value of rawDates) {
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      dateSet.add(value);
+    }
+  }
+
+  const latestDate = extractIsoDateFromJson(manifest.latest);
+  if (latestDate) dateSet.add(latestDate);
+
+  return Array.from(dateSet).sort();
+}
+
+async function readMetaCandidateDates(chain: ChainId): Promise<string[]> {
+  const manifest = await readPublishedJson<MetaManifest>(`data/published/v1/meta/${chain}/manifest.json`);
+  const manifestDates = extractManifestDates(manifest);
+
+  if (manifestDates.length > 0) {
+    return manifestDates.slice(-EXAMPLE_SCAN_DAYS);
+  }
+
+  const latest = await readPublishedJson<unknown>(`data/published/v1/meta/${chain}/latest.json`);
+  const latestDate = extractIsoDateFromJson(latest);
+  return latestDate ? [latestDate] : [];
+}
+
+function publishedLayerPath(layer: JsonLayerTone, candidate: ConfidenceCandidate): string {
+  return `data/published/v1/${layer}/${candidate.chain}/${candidate.date}.json`;
+}
+
+async function hasAllLayerFiles(candidate: ConfidenceCandidate): Promise<boolean> {
+  const checks = await Promise.all(
+    JSON_LAYER_TONES.map((layer) => readStorageObject(publishedLayerPath(layer, candidate))),
+  );
+
+  return checks.every(Boolean);
+}
+
+async function buildConfidenceCandidates(): Promise<ConfidenceCandidate[]> {
+  const nested = await Promise.all(
+    CHAIN_LIST.map(async (chain) => {
+      const dates = await readMetaCandidateDates(chain.id);
+      const candidates = await Promise.all(
+        dates.map(async (date) => {
+          const meta = await readPublishedJson<unknown>(`data/published/v1/meta/${chain.id}/${date}.json`);
+          const score = extractConfidenceScore(meta);
+
+          if (score === null) return null;
+
+          return {
+            chain: chain.id,
+            date,
+            score,
+          } satisfies ConfidenceCandidate;
+        }),
+      );
+
+      const readableCandidates = candidates.filter(
+        (candidate): candidate is ConfidenceCandidate => candidate !== null,
+      );
+
+      if (readableCandidates.length > 0) {
+        return readableCandidates;
+      }
+
+      const latest = await readPublishedJson<unknown>(`data/published/v1/meta/${chain.id}/latest.json`);
+      const latestScore = extractConfidenceScore(latest);
+      const latestDate = extractIsoDateFromJson(latest);
+
+      if (latestScore === null || !latestDate) {
+        return [];
+      }
+
+      return [
+        {
+          chain: chain.id,
+          date: latestDate,
+          score: latestScore,
+        } satisfies ConfidenceCandidate,
+      ];
+    }),
+  );
+
+  return nested.flat();
+}
+
+async function selectConfidenceCandidate(
+  candidates: ConfidenceCandidate[],
+  confidence: JsonExampleConfidence,
+): Promise<ConfidenceCandidate | null> {
+  const sorted = [...candidates].sort((a, b) =>
+    confidence === "high" ? b.score - a.score : a.score - b.score,
+  );
+
+  for (const candidate of sorted) {
+    if (await hasAllLayerFiles(candidate)) {
+      return candidate;
+    }
+  }
+
+  return sorted[0] ?? null;
+}
+
+function unavailableExample(params: {
+  layer: JsonLayerTone;
+  confidence: JsonExampleConfidence;
+  candidate: ConfidenceCandidate | null;
+  sourcePath: string;
+  reason: string;
+}): JsonExampleFile {
+  return {
+    sourcePath: `/${params.sourcePath}`,
+    chain: params.candidate?.chain ?? null,
+    date: params.candidate?.date ?? null,
+    confidenceScore: params.candidate?.score ?? null,
+    code: JSON.stringify(
+      {
+        error: "json_example_unavailable",
+        layer: params.layer,
+        confidence_example: params.confidence,
+        selected_chain: params.candidate?.chain ?? null,
+        selected_date: params.candidate?.date ?? null,
+        selected_meta_confidence_score: params.candidate?.score ?? null,
+        attempted_source_path: `/${params.sourcePath}`,
+        reason: params.reason,
+      },
+      null,
+      2,
+    ),
+  };
+}
+
+async function readExampleFileForCandidate(
+  layer: JsonLayerTone,
+  confidence: JsonExampleConfidence,
+  candidate: ConfidenceCandidate | null,
+): Promise<JsonExampleFile> {
+  if (!candidate) {
+    return unavailableExample({
+      layer,
+      confidence,
+      candidate,
+      sourcePath: `data/published/v1/${layer}/<chain>/<date>.json`,
+      reason: "No Meta files with readable confidence_score were found.",
+    });
+  }
+
+  const sourcePath = publishedLayerPath(layer, candidate);
+  const result = await readStorageObject(sourcePath);
+
+  if (!result) {
+    return unavailableExample({
+      layer,
+      confidence,
+      candidate,
+      sourcePath,
+      reason: "The selected Meta confidence date exists, but the matching layer file was not found.",
+    });
+  }
+
+  try {
+    const raw = arrayBufferToUtf8(result.body);
+    const parsed: unknown = JSON.parse(raw);
+
+    return {
+      code: JSON.stringify(parsed, null, 2),
+      sourcePath: `/${sourcePath}`,
+      chain: candidate.chain,
+      date: candidate.date,
+      confidenceScore: candidate.score,
+    };
+  } catch {
+    return unavailableExample({
+      layer,
+      confidence,
+      candidate,
+      sourcePath,
+      reason: "The selected layer file exists, but it is not valid JSON.",
+    });
+  }
+}
+
+async function buildJsonExampleCodeMap(): Promise<JsonExampleCodeMap> {
+  const candidates = await buildConfidenceCandidates();
+  const highCandidate = await selectConfidenceCandidate(candidates, "high");
+  const degradedCandidate = await selectConfidenceCandidate(candidates, "degraded");
+
+  const [goldHigh, goldDegraded, metaHigh, metaDegraded, derivedHigh, derivedDegraded] =
+    await Promise.all([
+      readExampleFileForCandidate("gold", "high", highCandidate),
+      readExampleFileForCandidate("gold", "degraded", degradedCandidate),
+      readExampleFileForCandidate("meta", "high", highCandidate),
+      readExampleFileForCandidate("meta", "degraded", degradedCandidate),
+      readExampleFileForCandidate("derived", "high", highCandidate),
+      readExampleFileForCandidate("derived", "degraded", degradedCandidate),
+    ]);
+
+  return {
+    gold_high: goldHigh,
+    gold_degraded: goldDegraded,
+    meta_high: metaHigh,
+    meta_degraded: metaDegraded,
+    derived_high: derivedHigh,
+    derived_degraded: derivedDegraded,
+  };
+}
+
+function jsonLayerToneClasses(tone: JsonLayerTone) {
+  if (tone === "gold") {
+    return {
+      card: "border-yellow-300/24 bg-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_22px_60px_rgba(3,19,41,0.24)]",
+      badge: "border-yellow-300/35 bg-yellow-300/10 text-yellow-200",
+      title: "text-yellow-200",
+      bullet: "text-yellow-300",
+    };
+  }
+
+  if (tone === "meta") {
+    return {
+      card: "border-cyan-300/24 bg-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_22px_60px_rgba(3,19,41,0.24)]",
+      badge: "border-cyan-300/35 bg-cyan-300/10 text-cyan-200",
+      title: "text-cyan-200",
+      bullet: "text-cyan-300",
+    };
+  }
+
+  return {
+    card: "border-emerald-300/24 bg-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_22px_60px_rgba(3,19,41,0.24)]",
+    badge: "border-emerald-300/35 bg-emerald-300/10 text-emerald-200",
+    title: "text-emerald-200",
+    bullet: "text-emerald-300",
+  };
+}
+
+function JsonLayerCard(props: {
+  tone: JsonLayerTone;
   title: string;
   subtitle: string;
-  titleClassName?: string;
-  className?: string;
+  description: string;
+  fields: readonly { name: string; note: string }[];
 }) {
+  const tone = jsonLayerToneClasses(props.tone);
+
   return (
-    <div className={`min-w-0 py-4 ${props.className ?? ""}`}>
-      <div className={`text-[78px] font-semibold leading-[0.94] tracking-[-0.06em] ${props.titleClassName ?? "text-white"}`}>
+    <a
+      href={`#json-${props.tone}-high`}
+      className={`group block rounded-[20px] border p-8 transition hover:-translate-y-0.5 hover:border-white/24 hover:shadow-[0_24px_70px_rgba(0,0,0,0.28)] ${tone.card}`}
+    >
+      <div className={`inline-flex rounded-full border px-4 py-1.5 text-[14px] font-black ${tone.badge}`}>
         {props.title}
       </div>
-      <div className="mt-4 text-[19px] leading-8 text-slate-400">{props.subtitle}</div>
+
+      <h3 className={`mt-7 text-[38px] font-black tracking-[-0.045em] ${tone.title}`}>
+        {props.title}
+      </h3>
+
+      <div className="mt-2 text-[13px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+        {props.subtitle}
+      </div>
+
+      <p className="mt-6 max-w-[440px] text-[18px] font-semibold leading-9 text-slate-200">
+        {props.description}
+      </p>
+
+      <div className="mt-8 space-y-5">
+        {props.fields.map((field) => (
+          <div key={field.name} className="grid grid-cols-[12px_minmax(0,1fr)] gap-3">
+            <span className={`mt-2.5 h-2 w-2 rounded-full ${tone.bullet.replace("text-", "bg-")}`} />
+            <div>
+              <div className="font-mono text-[16px] font-bold text-white">{field.name}</div>
+              <div className="mt-1 text-[13px] leading-6 text-slate-400">{field.note}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-9 text-[15px] font-black text-white/85 transition group-hover:text-white">
+        Open example JSON →
+      </div>
+    </a>
+  );
+}
+
+function JsonExampleModal(props: {
+  tone: JsonLayerTone;
+  confidence: JsonExampleConfidence;
+  title: string;
+  subtitle: string;
+  example: JsonExampleFile;
+}) {
+  const tone = jsonLayerToneClasses(props.tone);
+  const isDegraded = props.confidence === "degraded";
+
+  return (
+    <div
+      id={`json-${props.tone}-${props.confidence}`}
+      className="fixed inset-0 z-[100] hidden items-center justify-center bg-[#020817]/82 px-5 py-8 backdrop-blur-sm [&:target]:flex"
+    >
+      <a href="#json-layers" className="absolute inset-0" aria-label="Close JSON example" />
+
+      <section className="relative w-full max-w-[980px] rounded-[26px] border border-white/12 bg-[#061426] p-6 shadow-[0_32px_120px_rgba(0,0,0,0.56)] sm:p-8">
+        <div className="flex items-start justify-between gap-5">
+          <div>
+            <div className={`inline-flex rounded-full border px-4 py-1.5 text-[13px] font-black ${tone.badge}`}>
+              {props.title}
+            </div>
+
+            <h3 className={`mt-5 text-[34px] font-black tracking-[-0.045em] ${tone.title}`}>
+              {isDegraded ? "Low confidence / degraded" : "High confidence"} {props.title} example
+            </h3>
+
+            <p className="mt-2 max-w-[720px] text-[15px] leading-7 text-slate-400">
+              {props.subtitle}
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[12px] font-semibold text-slate-400">
+              <span>Source: <span className="text-slate-200">{props.example.sourcePath}</span></span>
+              <span>Chain/date: <span className="text-slate-200">{props.example.chain ?? "—"} / {props.example.date ?? "—"}</span></span>
+              <span>Meta confidence: <span className="text-slate-200">{formatExampleConfidence(props.example.confidenceScore)}</span></span>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <a
+                href={`#json-${props.tone}-high`}
+                className={`inline-flex h-10 items-center rounded-full border px-4 text-[13px] font-black transition ${
+                  props.confidence === "high"
+                    ? "border-cyan-300/40 bg-cyan-300/14 text-cyan-100"
+                    : "border-white/12 text-slate-300 hover:bg-white/8"
+                }`}
+              >
+                High confidence example
+              </a>
+
+              <a
+                href={`#json-${props.tone}-degraded`}
+                className={`inline-flex h-10 items-center rounded-full border px-4 text-[13px] font-black transition ${
+                  props.confidence === "degraded"
+                    ? "border-amber-300/45 bg-amber-300/12 text-amber-100"
+                    : "border-white/12 text-slate-300 hover:bg-white/8"
+                }`}
+              >
+                Low confidence / degraded example
+              </a>
+            </div>
+          </div>
+
+          <a
+            href="#json-layers"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-white/12 px-4 text-[13px] font-black text-white transition hover:bg-white/8"
+          >
+            Close
+          </a>
+        </div>
+
+        <pre className="mt-7 max-h-[62vh] overflow-auto rounded-[18px] border border-white/10 bg-[#020b18] p-5 font-mono text-[13px] leading-7 text-slate-100">
+          <code>{props.example.code}</code>
+        </pre>
+      </section>
     </div>
   );
 }
 
-function PricingCard(props: {
-  plan: string;
+function FeaturePill(props: { icon: ReactNode; title: string; note: string }) {
+  return (
+    <div className="grid min-w-0 grid-cols-[46px_minmax(0,1fr)] gap-4 border-r border-[#dbe7f7] px-5 py-4 last:border-r-0">
+      <MiniIcon>{props.icon}</MiniIcon>
+      <div className="min-w-0">
+        <div className="text-[17px] font-extrabold text-[#0d2447]">{props.title}</div>
+        <div className="mt-1.5 text-[14px] font-medium leading-5 text-[#536e99]">{props.note}</div>
+      </div>
+    </div>
+  );
+}
+
+function StepItem(props: { number: string; title: string; note: string }) {
+  return (
+    <div className="relative grid grid-cols-[68px_minmax(0,1fr)] gap-5 text-left">
+      <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-[34px] font-semibold text-blue-600">
+        {props.number}
+      </span>
+      <div>
+        <div className="text-[20px] font-extrabold text-[#0d2447]">{props.title}</div>
+        <div className="mt-2 text-[18px] leading-7 text-[#557099]">{props.note}</div>
+      </div>
+    </div>
+  );
+}
+
+function PlanCard(props: {
+  tone: "free" | "basic" | "pro";
+  name: string;
   price: string;
-  note: string;
+  pill: string;
+  headline: string;
+  body: string;
+  bestFor: string;
   href: string;
   cta: string;
-  badge?: string;
 }) {
+  const cardClass =
+    "border border-[#89a9d1]/28 bg-[linear-gradient(145deg,rgba(22,34,54,0.96)_0%,rgba(55,78,112,0.88)_40%,rgba(30,47,73,0.96)_72%,rgba(18,29,47,0.98)_100%)] shadow-[inset_0_1px_0_rgba(210,230,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.03),0_22px_60px_rgba(3,14,32,0.32)]";
+
+  const pillClass =
+    "border border-[#b8d1f0]/22 bg-[linear-gradient(180deg,rgba(210,228,248,0.14)_0%,rgba(150,181,214,0.08)_100%)] text-[#e3efff] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]";
+
+  const buttonClass =
+    "border border-[#9fc1ea]/30 bg-[linear-gradient(180deg,rgba(176,205,236,0.16)_0%,rgba(107,146,191,0.12)_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-[linear-gradient(180deg,rgba(176,205,236,0.22)_0%,rgba(107,146,191,0.16)_100%)]";
+
   return (
-    <div className="flex min-h-[260px] flex-col rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,16,28,0.95),rgba(6,10,20,0.98))] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
-      <div className="flex min-h-[34px] items-start justify-between gap-3">
-        <div className="text-[28px] font-medium tracking-[-0.03em] text-white">{props.plan}</div>
-        {props.badge ? (
-          <span className="rounded-full bg-[#2F6BFF] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
-            {props.badge}
-          </span>
-        ) : null}
+    <article className={`relative flex min-h-[405px] flex-col rounded-[28px] p-8 ${cardClass}`}>
+      <div className="flex items-start justify-between gap-5">
+        <h3 className="text-[15px] font-black uppercase tracking-[0.22em] text-white">
+          {props.name}
+        </h3>
+        <div className={`rounded-full px-4 py-1.5 text-[12px] font-black ${pillClass}`}>
+          {props.pill}
+        </div>
       </div>
 
-      <div className="mt-8 flex items-end gap-2">
-        <span className="text-[84px] font-semibold leading-none tracking-[-0.08em] text-white">{props.price}</span>
-        {props.price !== "Custom" ? <span className="pb-3 text-[26px] text-slate-400">/mo</span> : null}
+      <div className="mt-5 text-[46px] font-black leading-none tracking-[-0.055em] text-white">
+        {props.price}
       </div>
 
-      <p className="mt-5 max-w-[260px] text-[19px] leading-8 text-slate-400">{props.note}</p>
+      <p className="mt-7 text-[19px] font-black leading-7 text-white">
+        {props.headline}
+      </p>
+
+      <p className="mt-4 max-w-[460px] text-[16px] font-medium leading-7 text-[#eef5ff]">
+        {props.body}
+      </p>
+
+      <p className="mt-auto pt-8 text-[16px] leading-7 text-[#bfd2ea]">
+        {props.bestFor}
+      </p>
 
       <Link
         href={props.href}
-        className="mt-auto inline-flex h-14 items-center rounded-full border border-white/10 px-6 text-[16px] font-medium text-white transition hover:border-white/18 hover:bg-white/[0.04]"
+        className={`mt-7 inline-flex h-[52px] w-fit items-center justify-center rounded-full px-7 text-[15px] font-black transition ${buttonClass}`}
       >
         {props.cta}
       </Link>
-    </div>
-  );
-}
-
-function LiveStatePanel(props: { rows: SurfaceRowDisplay[]; updatedLabel: string }) {
-  const topRows = props.rows.slice(0, 4);
-
-  return (
-    <div className="relative rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(11,17,30,0.94),rgba(8,12,22,0.98))] p-7 shadow-[0_36px_120px_rgba(0,0,0,0.24)] backdrop-blur-md xl:p-8">
-      <div className="mb-6 flex items-center gap-4 text-[17px] text-slate-400">
-        <div className="flex items-center gap-2.5">
-          <span className="h-3 w-3 rounded-full bg-[#2F6BFF]" />
-          <span className="font-medium uppercase tracking-[0.22em] text-[#2F6BFF]">Live</span>
-        </div>
-        <span>{props.updatedLabel}</span>
-      </div>
-
-      <div className="overflow-hidden rounded-[26px] border border-white/8 bg-black/10">
-        {topRows.map((row, index) => {
-          const score = numericConfidence(row);
-          const regime = (row.publishedRegime ?? "UNKNOWN").toUpperCase();
-
-          return (
-            <Link
-              key={row.chain}
-              href={row.href}
-              className={`grid items-center gap-5 px-6 py-5 transition hover:bg-white/[0.025] ${
-                index < topRows.length - 1 ? "border-b border-white/8" : ""
-              } grid-cols-[minmax(0,1.45fr)_auto_minmax(110px,auto)]`}
-            >
-              <div className="flex min-w-0 items-center gap-4">
-                <ChainIcon chain={row.chain} label={row.label} />
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    <span className="text-[28px] font-medium tracking-[-0.04em] text-white">{row.label}</span>
-                    <span className={`text-[20px] font-medium tracking-[-0.02em] ${regimeTextClass(regime)}`}>
-                      {regime}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-[16px] text-slate-500">{row.name}</div>
-                </div>
-              </div>
-
-              <ConfidenceDots regime={regime} score={score} />
-
-              <div className="text-right">
-                <div className="text-[34px] font-medium tracking-[-0.05em] text-white">
-                  {score !== null ? `${score}%` : "—"}
-                </div>
-                <div className="mt-1 text-[15px] text-slate-500">{row.asOf}</div>
-              </div>
-            </Link>
-          );
-        })}
-
-        <div className="grid grid-cols-3 gap-4 border-t border-white/8 px-6 py-4 text-[12px] font-medium uppercase tracking-[0.22em] text-slate-500">
-          <div>Network</div>
-          <div className="text-center">Regime</div>
-          <div className="text-right">Confidence</div>
-        </div>
-      </div>
-    </div>
+    </article>
   );
 }
 
 export default async function HomePage() {
   const dataset: DatasetManifest | null = await readDatasetManifest();
 
-  const [landingPayload, statusPayload, metaFallbackRows, historyDepthDays, landingHeroMap] =
-    await Promise.all([
-      readPublishedJson<LandingApiResponse>("data/published/v1/landing/index.json"),
-      readPublishedJson<StatusApiResponse>("data/published/v1/status/index.json"),
-      buildMetaFallbackRows(),
-      computeHistoryDepthDays().catch(() => null),
-      buildLandingHeroMap(),
-    ]);
+  const [
+    landingPayload,
+    statusPayload,
+    metaFallbackRows,
+    historyDepthDays,
+    landingHeroMap,
+    jsonExampleCodeMap,
+  ] = await Promise.all([
+    readPublishedJson<LandingApiResponse>("data/published/v1/landing/index.json"),
+    readPublishedJson<StatusApiResponse>("data/published/v1/status/index.json"),
+    buildMetaFallbackRows(),
+    computeHistoryDepthDays().catch(() => null),
+    buildLandingHeroMap(),
+    buildJsonExampleCodeMap(),
+  ]);
 
   const landingChains = extractLandingChains(landingPayload);
   const statusRows =
@@ -612,137 +1143,241 @@ export default async function HomePage() {
   const publishedDays =
     typeof historyDepthDays === "number" && Number.isFinite(historyDepthDays)
       ? historyDepthDays.toLocaleString("en-GB")
-      : "—";
+      : "412";
   const lastDataLoad =
     formatDataLoad(statusPayload?.generated_at_utc) ?? formatDataLoad(dataset?.published_at ?? null) ?? "Updated daily";
 
   return (
-    <>
-      <MobileLanding rows={displayRows} historyDepthDays={historyDepthDays} lastUpdatedLabel={lastDataLoad} />
+    <main className="min-h-screen bg-[#edf6ff] text-[#0a1d3a]">
+      <section className="relative isolate overflow-hidden bg-[#031329] text-white">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_8%,rgba(44,109,255,0.12),transparent_28%),linear-gradient(180deg,#031329_0%,#041327_100%)]" />
 
-      <div className="hidden bg-[#04070d] text-white lg:block">
-        <div className="relative overflow-hidden border-b border-white/6 bg-[radial-gradient(circle_at_20%_12%,rgba(39,96,255,0.12),transparent_28%),radial-gradient(circle_at_82%_14%,rgba(39,96,255,0.08),transparent_30%),linear-gradient(180deg,#050912_0%,#03060d_100%)]">
-          <div className="pointer-events-none absolute inset-0 opacity-[0.22] [background:linear-gradient(90deg,transparent_0%,rgba(43,90,255,0.08)_50%,transparent_100%)]" />
-          <div className="pointer-events-none absolute inset-y-0 left-[29%] w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.05),transparent)]" />
-
-          <SectionShell className="relative py-20 xl:py-24 2xl:py-28">
-            <div className="grid items-start gap-16 xl:grid-cols-[minmax(0,0.96fr)_minmax(640px,0.9fr)] xl:gap-20">
-              <div className="max-w-[760px] pt-6 xl:pt-10">
-                <h1 className="max-w-[780px] text-[6.15rem] font-medium leading-[0.92] tracking-[-0.08em] text-white xl:text-[6.75rem] 2xl:text-[7.45rem]">
-                  Separate
-                  <br />
-                  blockchain noise
-                  <br />
-                  from <span className="text-[#2F6BFF]">structural</span>
-                  <br />
-                  <span className="text-[#2F6BFF]">change.</span>
-                </h1>
-
-                <p className="mt-10 max-w-[560px] text-[22px] leading-[1.8] text-slate-300">
-                  Daily JSON for BTC, ETH, ARB, and BASE — with regime, confidence, and drivers.
-                </p>
-
-                <div className="mt-12 flex flex-wrap gap-5">
-                  <Link
-                    href="/status"
-                    className="inline-flex h-16 items-center rounded-full bg-[#2F6BFF] px-8 text-[17px] font-medium text-white transition hover:bg-[#2458d9]"
-                  >
-                    See the product →
-                  </Link>
-                  <Link
-                    href="/api-docs/schema"
-                    className="inline-flex h-16 items-center rounded-full border border-white/12 px-8 text-[17px] font-medium text-white transition hover:border-white/18 hover:bg-white/[0.04]"
-                  >
-                    View schema →
-                  </Link>
-                </div>
-              </div>
-
-              <div className="relative pt-8 xl:pt-10">
-                <div className="pointer-events-none absolute -left-12 top-24 h-[380px] w-[720px] rounded-[999px] bg-[radial-gradient(ellipse_at_center,rgba(24,76,255,0.18),rgba(8,18,36,0)_72%)] blur-3xl" />
-                <LiveStatePanel rows={displayRows} updatedLabel={lastDataLoad} />
-              </div>
-            </div>
-          </SectionShell>
+        <div className="pointer-events-none absolute inset-y-0 right-[5%] hidden items-center lg:flex">
+          <div className="relative h-[500px] w-[500px] opacity-[0.15] xl:h-[700px] xl:w-[700px]">
+            <Image
+              src="/web%20bilder/ygg.png"
+              alt=""
+              fill
+              sizes="320px"
+              className="object-contain"
+              priority
+            />
+          </div>
         </div>
 
-        <section className="border-b border-white/6 bg-[#04070d]">
-          <SectionShell className="py-16 xl:py-20">
-            <div className="grid gap-10 xl:grid-cols-3 xl:gap-12">
-              <FeatureItem
-                icon={<FeatureIconDocument />}
-                title="Daily JSON"
-                description="Structured, consistent data published for direct consumption."
-                className="xl:border-r xl:border-white/8 xl:pr-12"
-              />
-              <FeatureItem
-                icon={<FeatureIconDatabase />}
-                title="Inspectable archive"
-                description={`Historical data you can query and verify across ${publishedDays} published days.`}
-                className="xl:border-r xl:border-white/8 xl:px-12"
-              />
-              <FeatureItem
-                icon={<FeatureIconTarget />}
-                title="Confidence-aware classification"
-                description="Regimes and signals paired with confidence, lag, and traceable context."
-                className="xl:pl-12"
-              />
-            </div>
-          </SectionShell>
-        </section>
-
-        <section className="border-b border-white/6 bg-[#04070d]">
-          <SectionShell className="py-16 xl:py-20">
-            <div className="grid gap-10 xl:grid-cols-3 xl:gap-12">
-              <LayerBlock
-                title="Gold."
-                subtitle="Raw on-chain facts."
-                className="xl:border-r xl:border-white/8 xl:pr-12"
-              />
-              <LayerBlock
-                title="Meta."
-                subtitle="Urd Atlas core."
-                titleClassName="text-[#2F6BFF]"
-                className="xl:border-r xl:border-white/8 xl:px-12"
-              />
-              <LayerBlock
-                title="Derived."
-                subtitle="Signals that compound."
-                className="xl:pl-12"
-              />
-            </div>
-          </SectionShell>
-        </section>
-
-        <section className="bg-[#04070d]">
-          <SectionShell className="py-16 xl:py-20 2xl:pb-24">
-            <div className="grid gap-8 xl:grid-cols-3 xl:gap-10">
-              <PricingCard
-                plan="Free"
-                price="$0"
-                note="Explore daily JSON and inspect the public surface before subscribing."
+        <SectionShell className="relative pb-20 pt-16 md:pb-24 md:pt-20 lg:pb-[4.4rem] lg:pt-[4.6rem]">
+            <div className="max-w-[820px]">
+              <h1 className="max-w-[820px] text-[54px] font-black leading-[0.98] tracking-[-0.055em] text-white sm:text-[58px] lg:text-[68px]">
+                Separate blockchain noise
+                <span className="block text-[#2f7cff]">from structural change.</span>
+              </h1>
+              <p className="mt-7 max-w-[800px] text-[24px] font-semibold leading-8 text-white/88 sm:text-[20px]">
+                Urd Atlas delivers daily Gold, Meta, and Derived JSON files for each chain, built to show whether recent on-chain movement looks like noise or structural change.
+                For analysts, builders, and research teams who want blockchain regime context without maintaining their own data pipeline.
+              </p>
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link
                 href="/status"
-                cta="Browse public surface"
+                className="inline-flex h-14 min-w-[200px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
+              >
+                Latest chain status
+              </Link>
+              <Link
+                href="/api-docs"
+                className="inline-flex h-14 min-w-[190px] items-center justify-center rounded-[8px] border border-blue-300/50 bg-[#051b36]/40 px-6 text-[14px] font-extrabold text-white transition hover:bg-white/[0.06]"
+              >
+                View API Docs
+              </Link>
+            </div>
+          </div>
+        </SectionShell>
+      </section>
+
+      <section className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_58%,#eef6ff_100%)] pb-0 pt-10">
+        <SectionShell>
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <div className="text-[13px] font-black uppercase tracking-[0.12em] text-[#0d2447]">
+                Latest chain status
+              </div>
+              <p className="mt-1 text-[14px] font-medium leading-5 text-[#557099]">
+                Click any chain card to open the full chain view and history.
+              </p>
+            </div>
+
+            <p className="shrink-0 pt-0.5 text-right text-[13px] font-medium leading-5 text-[#7187a8]">
+              Last data load: {lastDataLoad}
+            </p>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {displayRows.slice(0, 4).map((row) => (
+              <StatusCard key={row.chain} row={row} />
+            ))}
+          </div>
+
+          <div className="mt-12 grid overflow-hidden rounded-[14px] border border-[#d8e5f4] bg-white/86 shadow-[0_14px_34px_rgba(15,47,91,0.08)] sm:grid-cols-2 lg:grid-cols-5">
+            <FeaturePill icon={<CalendarIcon />} title="Daily JSON" note="Fresh data every day" />
+            <FeaturePill icon={<CalendarIcon />} title="Long history" note={`${publishedDays} days and growing`} />
+            <FeaturePill icon={<TriangleIcon />} title="4 Chains" note="BTC, ETH, ARB, BASE" />
+            <FeaturePill icon={<ApiIcon />} title="API First" note="Built for developers" />
+            <FeaturePill icon={<ShieldIcon />} title="Transparent" note="Deterministic methodology" />
+          </div>
+
+          <div className="mt-16 px-2 text-center">
+            <h2 className="text-[26px] font-black tracking-[-0.02em] text-[#0d2447]">
+              Get started in 3 easy steps
+            </h2>
+            <div className="mx-auto mt-7 grid max-w-[900px] gap-6 md:grid-cols-3 md:gap-8">
+              <StepItem number="1" title="Choose a plan" note="Pick the right plan for your needs" />
+              <StepItem number="2" title="Get API access" note="Instant access to the JSON API" />
+              <StepItem number="3" title="Pull JSON" note="Integrate and start building" />
+            </div>
+          </div>
+
+            <div
+              id="json-layers"
+              className="mt-16 scroll-mt-20 px-0 py-0 text-[#0d2447]"
+            >
+            <div className="max-w-[1200px]">
+              <h2 className="text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447]">
+                JSON is our product for your analytical needs
+              </h2>
+              <p className="mt-4 max-w-[9800px] text-[17px] font-medium leading-8 text-[#37547b]">
+                Each chain is published as three inspectable JSON layers. Click on a layer below to inspect a concrete example file.
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-5 lg:grid-cols-3">
+              <JsonLayerCard
+                tone="gold"
+                title="Gold"
+                subtitle="What happened"
+                description="Gold tells you what actually happened on-chain on that date."
+                fields={[
+                  { name: "tx_count_daily", note: "daily activity count" },
+                  { name: "unique_active_addresses", note: "breadth of use" },
+                  { name: "median_fee_native", note: "daily fee level" },
+                  { name: "failed_tx_rate", note: "friction signal" },
+                ]}
               />
-              <PricingCard
-                plan="Basic"
-                price="$29"
-                note="Access the Meta layer for one chain with a calmer research workflow and API delivery."
-                href="/dashboard"
-                cta="Start Basic"
-                badge="Most popular"
+
+              <JsonLayerCard
+                tone="meta"
+                title="Meta"
+                subtitle="What it means"
+                description="Meta describes the current chain state, confidence, freshness, and regime drivers."
+                fields={[
+                  { name: "status.label", note: "published regime" },
+                  { name: "confidence_score", note: "evidence strength" },
+                  { name: "regime.drivers", note: "why the label fired" },
+                  { name: "status.one_liner", note: "plain-language read" },
+                ]}
               />
-              <PricingCard
-                plan="Pro"
-                price="$79"
-                note="Full multi-chain access for serious builders who want broader coverage and longer history."
-                href="/dashboard"
-                cta="Start Pro"
+
+              <JsonLayerCard
+                tone="derived"
+                title="Derived"
+                subtitle="How it is trending"
+                description="Derived shows rolling baselines and relative position built from the Gold layer."
+                fields={[
+                  { name: "metric__ma7", note: "short trend" },
+                  { name: "metric__ma30", note: "medium baseline" },
+                  { name: "z_score", note: "historical position" },
+                  { name: "percentile_180d", note: "relative context" },
+                ]}
               />
             </div>
-          </SectionShell>
-        </section>
-      </div>
-    </>
+          </div>
+
+          <JsonExampleModal
+            tone="gold"
+            confidence="high"
+            title="Gold"
+            subtitle="Gold is factual daily data. This example uses the date selected from the highest readable Meta confidence score."
+            example={jsonExampleCodeMap.gold_high}
+          />
+          <JsonExampleModal
+            tone="gold"
+            confidence="degraded"
+            title="Gold"
+            subtitle="Gold remains factual. This example uses the date selected from the lowest readable Meta confidence score."
+            example={jsonExampleCodeMap.gold_degraded}
+          />
+
+          <JsonExampleModal
+            tone="meta"
+            confidence="high"
+            title="Meta"
+            subtitle="Meta directly carries confidence, regime, freshness, and driver context. This example is selected from the highest readable confidence score."
+            example={jsonExampleCodeMap.meta_high}
+          />
+          <JsonExampleModal
+            tone="meta"
+            confidence="degraded"
+            title="Meta"
+            subtitle="This degraded Meta example is selected from the lowest readable confidence score, so users can inspect caveats and weaker evidence directly."
+            example={jsonExampleCodeMap.meta_degraded}
+          />
+
+          <JsonExampleModal
+            tone="derived"
+            confidence="high"
+            title="Derived"
+            subtitle="Derived fields are calculated from Gold. This example uses the same high-confidence chain/date selected from Meta."
+            example={jsonExampleCodeMap.derived_high}
+          />
+          <JsonExampleModal
+            tone="derived"
+            confidence="degraded"
+            title="Derived"
+            subtitle="This degraded Derived example uses the same low-confidence chain/date selected from Meta."
+            example={jsonExampleCodeMap.derived_degraded}
+          />
+
+          <div className="mt-14 -mx-5 bg-[#031329] px-5 py-10 sm:-mx-7 sm:px-7 lg:-mx-10 lg:px-10 2xl:-mx-16 2xl:px-16">
+            <div id="pricing" className="mx-auto w-full">
+              <div className="grid gap-7 xl:grid-cols-3">
+                <PlanCard
+                  tone="free"
+                  name="Free"
+                  price="$0"
+                  pill="Public surface"
+                  headline="Full web surface — no API access."
+                  body="Track record, status, methodology, glossary, thresholds, and schema reference. The same published artifacts subscribers receive — readable on-site, not downloadable."
+                  bestFor="Best for: exploring the product before subscribing."
+                  href="/status"
+                  cta="Open public surface →"
+                />
+                <PlanCard
+                  tone="basic"
+                  name="Basic"
+                  price="$29/mo"
+                  pill="1 chain · 90d · JSON"
+                  headline="One chain. API access. 90-day history."
+                  body="Gold, Meta, and Derived JSON for one chain of your choice — BTC, ETH, ARB, or BASE. Delivered daily via authenticated API."
+                  bestFor="Best for: focused monitoring or single-chain research."
+                  href="/dashboard"
+                  cta="Start Basic →"
+                />
+                <PlanCard
+                  tone="pro"
+                  name="Pro"
+                  price="$79/mo"
+                  pill="4 chains · 365d · JSON"
+                  headline="All four chains. API access. 365-day history."
+                  body="Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Standard Pro includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
+                  bestFor="Best for: multi-chain research, backtesting, and production pipelines."
+                  href="/dashboard"
+                  cta="Start Pro →"
+                />
+              </div>
+            </div>
+
+          </div>
+
+        </SectionShell>
+      </section>
+    </main>
   );
 }

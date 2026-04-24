@@ -15,6 +15,14 @@ const DESKTOP_ITEMS = [
   { href: "/about", label: "About" },
 ] as const;
 
+const HOME_ITEMS = [
+  { href: "/status", label: "Status" },
+  { href: "/about", label: "About" },
+  { href: "/api-docs", label: "API Docs" },
+  { href: "/methodology", label: "Methodology" },
+  { href: "#pricing", label: "Pricing" },
+] as const;
+
 const CLERK_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 function navLinkClass(active: boolean) {
@@ -108,6 +116,86 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, []);
+
+  if (pathname === "/") {
+    return (
+      <header className="relative z-50 -mb-px overflow-hidden bg-[#031329] text-white">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(47,115,255,0.15),transparent_26%),linear-gradient(180deg,#031329_0%,#031329_100%)]" />
+
+        <div className="relative mx-auto flex h-[86px] w-full max-w-[1128px] items-end justify-between gap-5 px-5 pb-5 pt-10 sm:px-7 lg:px-8">
+          <Link
+            href="/"
+            onClick={closeMenus}
+            className="inline-flex min-w-0 items-baseline text-white transition hover:opacity-90"
+            aria-label="Urd Atlas home"
+          >
+            <span className="text-[21px] font-black uppercase tracking-[-0.04em]">
+              URD
+            </span>
+            <span className="ml-1.5 text-[21px] font-black uppercase tracking-[-0.04em] text-blue-400">
+              ATLAS
+            </span>
+          </Link>
+
+          <nav aria-label="Primary" className="hidden items-center gap-8 md:flex">
+            {HOME_ITEMS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={closeMenus}
+                className="text-[12px] font-extrabold text-white/90 transition hover:text-white"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="hidden items-center gap-3 sm:flex">
+            <Link
+              href="/dashboard"
+              className="inline-flex h-10 items-center rounded-[8px] bg-blue-600 px-5 text-[12px] font-extrabold text-white shadow-[0_12px_26px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
+            >
+              Dashboard
+            </Link>
+          </div>
+
+          <button
+            type="button"
+            aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={mobileOpen}
+            onClick={() => setMobileOpen((prev) => !prev)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-[8px] border border-white/12 bg-white/[0.04] text-lg text-white transition hover:bg-white/[0.08] sm:hidden"
+          >
+            {mobileOpen ? "✕" : "☰"}
+          </button>
+        </div>
+
+        {mobileOpen ? (
+          <div className="relative border-t border-white/8 bg-[#031329] px-5 pb-5 sm:hidden">
+            <div className="grid gap-2">
+              {HOME_ITEMS.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={closeMenus}
+                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.05] hover:text-white"
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <Link
+                href="/dashboard"
+                onClick={closeMenus}
+                className="mt-2 inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-extrabold text-white"
+              >
+                Dashboard
+              </Link>
+            </div>
+          </div>
+        ) : null}
+      </header>
+    );
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/8 bg-[#06101b]/92 backdrop-blur-md supports-[backdrop-filter]:bg-[#06101b]/80">
