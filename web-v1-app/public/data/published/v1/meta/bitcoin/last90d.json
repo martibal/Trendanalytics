@@ -2,267 +2,6 @@
   {
     "chain": "bitcoin",
     "confidence": {
-      "asof_date": "2026-01-23",
-      "chain": "bitcoin",
-      "components": {
-        "current_row_coverage": 0.6,
-        "freshness_asof": 1.0,
-        "history_depth": 1.0,
-        "recent_density": 1.0,
-        "recent_metric_coverage": 0.7200000000000003
-      },
-      "confidence_score": 0.7804175985828834,
-      "data_quality_score": 0.8240000000000001,
-      "date": "2026-01-23",
-      "label_confidence_score": 0.7391403254585855,
-      "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 62,
-      "missing": false,
-      "semantics": "combined_data_quality_and_label_stability",
-      "source": "gold_history",
-      "updated_through": "2026-01-23"
-    },
-    "data_confidence": {
-      "components": {
-        "current_row_coverage": 0.6,
-        "freshness_asof": 1.0,
-        "history_depth": 1.0,
-        "recent_density": 1.0,
-        "recent_metric_coverage": 0.7200000000000003
-      },
-      "confidence_score": 0.8240000000000001,
-      "date": "2026-01-23",
-      "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 62,
-      "missing": false,
-      "semantics": "data_quality_and_history_coverage_only"
-    },
-    "date": "2026-01-23",
-    "gold_status": {
-      "chain": "bitcoin",
-      "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-03-25",
-      "missing": false,
-      "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
-    },
-    "methodology_version": "1.0",
-    "missing": false,
-    "profile": {
-      "capacity_proxy": [
-        "avg_block_time_s",
-        "median_fee_native"
-      ],
-      "chain": "bitcoin",
-      "hidden_metrics": [
-        "gas_utilization_pct",
-        "failed_tx_rate",
-        "avg_gas_per_tx",
-        "median_gas_price",
-        "l2_burst_index"
-      ],
-      "id": "btc",
-      "label": "BTC",
-      "note": "BTC does not have EVM gas utilisation/failed-tx semantics; capacity is proxied by block time + fees.",
-      "type": "btc"
-    },
-    "publish_confidence": {
-      "confidence_score": 0.7804175985828834,
-      "eligible": true,
-      "missing": false,
-      "reason": "combined_confidence_threshold",
-      "threshold": 0.4
-    },
-    "publish_lag_days_policy": 1,
-    "regime": {
-      "asof_date": "2026-01-23",
-      "axes": {
-        "capacity": {
-          "band_high": "NORMAL",
-          "band_low": "LOW",
-          "trend": "COOLING"
-        },
-        "demand": {
-          "band_high": "NORMAL",
-          "band_low": "NORMAL",
-          "trend": "COOLING"
-        },
-        "friction": {
-          "band_high": "NORMAL",
-          "band_low": "NORMAL",
-          "trend": "FLAT"
-        }
-      },
-      "chain": "bitcoin",
-      "determinism_hash": "553e77acc8f0",
-      "drivers": [
-        {
-          "axis": "capacity",
-          "current": 462.5,
-          "metric": "avg_block_time_sec",
-          "momentum_7d_vs_30d": -0.9167354721887746,
-          "pct_90d": 16.666666666666664,
-          "trend": "COOLING",
-          "z_robust": -1.9276265618622834
-        },
-        {
-          "axis": "friction",
-          "current": 1.95e-06,
-          "metric": "median_tx_fee_native",
-          "momentum_7d_vs_30d": -0.016500373482726594,
-          "pct_90d": 40.0,
-          "trend": "FLAT",
-          "z_robust": -0.2556928104575164
-        },
-        {
-          "axis": "demand",
-          "current": 436563.0,
-          "metric": "tx_count_daily",
-          "momentum_7d_vs_30d": -0.35255328197355307,
-          "pct_90d": 52.22222222222223,
-          "trend": "COOLING",
-          "z_robust": -0.17175547881978873
-        }
-      ],
-      "gate": {
-        "confidence_score": 0.7804175985828834,
-        "explanation": "OK",
-        "status": "ok",
-        "threshold": 0.4,
-        "type": "confidence_threshold"
-      },
-      "label": "STABLE",
-      "missing": false,
-      "ruleset_id": "btc_v1",
-      "signal_aliases": {
-        "blocktime_instability": "blocktime_instability",
-        "fee_burden_proxy": "median_tx_fee_native",
-        "tx_count": "tx_count_daily"
-      },
-      "signals": {
-        "avg_block_time_sec": {
-          "axis": "capacity",
-          "current": 462.5,
-          "momentum_7d_vs_30d": -0.9167354721887746,
-          "pct_90d": 16.666666666666664,
-          "z_robust": -1.9276265618622834
-        },
-        "blocktime_instability": {
-          "axis": "capacity",
-          "current": 0.106171523894696,
-          "current_raw": 462.5,
-          "momentum_7d_vs_30d": -0.13444622632131908,
-          "pct_90d": 71.11111111111111,
-          "transform": {
-            "formula": "rolling_mean(|bt - median_30| / median_30)",
-            "input_metric": "avg_block_time_sec",
-            "instability_rolling_median_days": 30,
-            "type": "instability_proxy",
-            "window_days": 7
-          },
-          "z_robust": 1.3294879064155236
-        },
-        "median_tx_fee_native": {
-          "axis": "friction",
-          "current": 1.95e-06,
-          "momentum_7d_vs_30d": -0.016500373482726594,
-          "pct_90d": 40.0,
-          "z_robust": -0.2556928104575164
-        },
-        "tx_count_daily": {
-          "axis": "demand",
-          "current": 436563.0,
-          "momentum_7d_vs_30d": -0.35255328197355307,
-          "pct_90d": 52.22222222222223,
-          "z_robust": -0.17175547881978873
-        }
-      },
-      "window_days": 7
-    },
-    "scorecard": {
-      "asof_date": "2026-01-23",
-      "chain": "bitcoin",
-      "confidence_score": 0.7804175985828834,
-      "dimensions": {
-        "capacity": {
-          "components": {
-            "blocktime_instability": {
-              "current": 462.5,
-              "score_raw": 73.11682515148549,
-              "z": 0.989002366300109
-            },
-            "utilization": {
-              "current": null,
-              "score_raw": null,
-              "z": null
-            }
-          },
-          "coverage_factor": 0.5,
-          "effective_confidence": 0.3902087992914417,
-          "level": "Balanced",
-          "score": 59.02038858579135,
-          "score_raw": 73.11682515148549
-        },
-        "demand": {
-          "components": {
-            "active_addresses": {
-              "current": null,
-              "score_raw": null,
-              "z": null
-            },
-            "tx_count": {
-              "current": 436563.0,
-              "score_raw": 36.265629882524536,
-              "z": -0.5368437002019738
-            },
-            "tx_per_user": {
-              "current": null,
-              "score_raw": null,
-              "z": null
-            }
-          },
-          "coverage_factor": 0.3333333333333333,
-          "effective_confidence": 0.26013919952762776,
-          "level": "Normal",
-          "score": 46.42715195162376,
-          "score_raw": 36.265629882524536
-        },
-        "friction": {
-          "components": {
-            "failed_tx_rate": {
-              "current": null,
-              "score_raw": null,
-              "z": null
-            },
-            "fee_burden_proxy": {
-              "current": null,
-              "score_raw": null,
-              "z": null
-            }
-          },
-          "coverage_factor": 0.0,
-          "effective_confidence": 0.0,
-          "level": "Normal",
-          "score": 50.0,
-          "score_raw": null
-        }
-      },
-      "missing": false,
-      "notes": {
-        "interpretation": "Scores are 0–100. 50 is neutral vs the chain's own history. Higher Demand means hotter usage; higher Friction means higher cost/failure; higher Capacity means tighter capacity (pressure). Low confidence pulls scores toward 50."
-      },
-      "window_days": 7
-    },
-    "status": {
-      "color": "green",
-      "label": "STABLE",
-      "one_liner": "Demand: Normal; Friction: Normal; Capacity: Balanced"
-    },
-    "tier_used": "standard",
-    "updated_through": "2026-01-23"
-  },
-  {
-    "chain": "bitcoin",
-    "confidence": {
       "asof_date": "2026-01-24",
       "chain": "bitcoin",
       "components": {
@@ -18514,7 +18253,7 @@
       "date": "2026-04-05",
       "label_confidence_score": 0.6576964697659853,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 19,
+      "lag_days_vs_utc_today": 20,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -18531,7 +18270,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-05",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 19,
+      "lag_days_vs_utc_today": 20,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -18539,7 +18278,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -18767,7 +18506,7 @@
       "date": "2026-04-06",
       "label_confidence_score": 0.42593174773324977,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 18,
+      "lag_days_vs_utc_today": 19,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -18784,7 +18523,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-06",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 18,
+      "lag_days_vs_utc_today": 19,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -18792,7 +18531,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -19020,7 +18759,7 @@
       "date": "2026-04-07",
       "label_confidence_score": 0.541164207103894,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 17,
+      "lag_days_vs_utc_today": 18,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -19037,7 +18776,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-07",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 17,
+      "lag_days_vs_utc_today": 18,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -19045,7 +18784,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -19264,7 +19003,7 @@
       "date": "2026-04-08",
       "label_confidence_score": 0.5844446586217873,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 16,
+      "lag_days_vs_utc_today": 17,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -19281,7 +19020,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-08",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 16,
+      "lag_days_vs_utc_today": 17,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -19289,7 +19028,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -19508,7 +19247,7 @@
       "date": "2026-04-09",
       "label_confidence_score": 0.5379109110951317,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 15,
+      "lag_days_vs_utc_today": 16,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -19525,7 +19264,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-09",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 15,
+      "lag_days_vs_utc_today": 16,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -19533,7 +19272,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -19761,7 +19500,7 @@
       "date": "2026-04-10",
       "label_confidence_score": 0.6216286450390627,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 14,
+      "lag_days_vs_utc_today": 15,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -19778,7 +19517,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-10",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 14,
+      "lag_days_vs_utc_today": 15,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -19786,7 +19525,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -20023,7 +19762,7 @@
       "date": "2026-04-11",
       "label_confidence_score": 0.6129175451670004,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 13,
+      "lag_days_vs_utc_today": 14,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -20040,7 +19779,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-11",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 13,
+      "lag_days_vs_utc_today": 14,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -20048,7 +19787,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -20285,7 +20024,7 @@
       "date": "2026-04-12",
       "label_confidence_score": 0.6435907099840403,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 12,
+      "lag_days_vs_utc_today": 13,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -20302,7 +20041,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-12",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 12,
+      "lag_days_vs_utc_today": 13,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -20310,7 +20049,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -20538,7 +20277,7 @@
       "date": "2026-04-13",
       "label_confidence_score": 0.865988800710753,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 11,
+      "lag_days_vs_utc_today": 12,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -20555,7 +20294,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-13",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 11,
+      "lag_days_vs_utc_today": 12,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -20563,7 +20302,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -20782,7 +20521,7 @@
       "date": "2026-04-14",
       "label_confidence_score": 0.6432290781455228,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 10,
+      "lag_days_vs_utc_today": 11,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -20799,7 +20538,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-14",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 10,
+      "lag_days_vs_utc_today": 11,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -20807,7 +20546,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -21035,7 +20774,7 @@
       "date": "2026-04-15",
       "label_confidence_score": 0.8189512988112775,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 9,
+      "lag_days_vs_utc_today": 10,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -21052,7 +20791,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-15",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 9,
+      "lag_days_vs_utc_today": 10,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -21060,7 +20799,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -21297,7 +21036,7 @@
       "date": "2026-04-16",
       "label_confidence_score": 0.7881848851247618,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 8,
+      "lag_days_vs_utc_today": 9,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -21314,7 +21053,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-16",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 8,
+      "lag_days_vs_utc_today": 9,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -21322,7 +21061,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -21541,7 +21280,7 @@
       "date": "2026-04-17",
       "label_confidence_score": 0.6283436740410259,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 7,
+      "lag_days_vs_utc_today": 8,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -21558,7 +21297,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-17",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 7,
+      "lag_days_vs_utc_today": 8,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -21566,7 +21305,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -21785,7 +21524,7 @@
       "date": "2026-04-18",
       "label_confidence_score": 0.7873627474965375,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 6,
+      "lag_days_vs_utc_today": 7,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -21802,7 +21541,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-18",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 6,
+      "lag_days_vs_utc_today": 7,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -21810,7 +21549,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -22029,7 +21768,7 @@
       "date": "2026-04-19",
       "label_confidence_score": 0.7896892318739552,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 5,
+      "lag_days_vs_utc_today": 6,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -22046,7 +21785,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-19",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 5,
+      "lag_days_vs_utc_today": 6,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -22054,7 +21793,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -22273,7 +22012,7 @@
       "date": "2026-04-20",
       "label_confidence_score": 0.6270876211305186,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 4,
+      "lag_days_vs_utc_today": 5,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -22290,7 +22029,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-20",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 4,
+      "lag_days_vs_utc_today": 5,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -22298,7 +22037,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -22535,7 +22274,7 @@
       "date": "2026-04-21",
       "label_confidence_score": 0.598565584504757,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 3,
+      "lag_days_vs_utc_today": 4,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -22552,7 +22291,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-21",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 3,
+      "lag_days_vs_utc_today": 4,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -22560,7 +22299,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -22797,7 +22536,7 @@
       "date": "2026-04-22",
       "label_confidence_score": 0.6354742055112244,
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 2,
+      "lag_days_vs_utc_today": 3,
       "missing": false,
       "semantics": "combined_data_quality_and_label_stability",
       "source": "gold_history",
@@ -22814,7 +22553,7 @@
       "confidence_score": 0.8,
       "date": "2026-04-22",
       "lag_days_vs_asof_date": 0,
-      "lag_days_vs_utc_today": 2,
+      "lag_days_vs_utc_today": 3,
       "missing": false,
       "semantics": "data_quality_and_history_coverage_only"
     },
@@ -22822,7 +22561,7 @@
     "gold_status": {
       "chain": "bitcoin",
       "features_lag_days_vs_utc_today": null,
-      "features_last_date": "2026-04-22",
+      "features_last_date": "2026-04-23",
       "missing": false,
       "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
     },
@@ -23041,5 +22780,249 @@
     },
     "tier_used": "standard",
     "updated_through": "2026-04-22"
+  },
+  {
+    "chain": "bitcoin",
+    "confidence": {
+      "asof_date": "2026-04-23",
+      "chain": "bitcoin",
+      "components": {
+        "current_row_coverage": 0.6,
+        "freshness_asof": 1.0,
+        "history_depth": 1.0,
+        "recent_density": 1.0,
+        "recent_metric_coverage": 0.6
+      },
+      "confidence_score": 0.6649704475716407,
+      "data_quality_score": 0.8,
+      "date": "2026-04-23",
+      "label_confidence_score": 0.5527321201795352,
+      "lag_days_vs_asof_date": 0,
+      "lag_days_vs_utc_today": 2,
+      "missing": false,
+      "semantics": "combined_data_quality_and_label_stability",
+      "source": "gold_history",
+      "updated_through": "2026-04-23"
+    },
+    "data_confidence": {
+      "components": {
+        "current_row_coverage": 0.6,
+        "freshness_asof": 1.0,
+        "history_depth": 1.0,
+        "recent_density": 1.0,
+        "recent_metric_coverage": 0.6
+      },
+      "confidence_score": 0.8,
+      "date": "2026-04-23",
+      "lag_days_vs_asof_date": 0,
+      "lag_days_vs_utc_today": 2,
+      "missing": false,
+      "semantics": "data_quality_and_history_coverage_only"
+    },
+    "date": "2026-04-23",
+    "gold_status": {
+      "chain": "bitcoin",
+      "features_lag_days_vs_utc_today": null,
+      "features_last_date": "2026-04-23",
+      "missing": false,
+      "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
+    },
+    "methodology_version": "1.0",
+    "missing": false,
+    "profile": {
+      "capacity_proxy": [
+        "avg_block_time_s",
+        "median_fee_native"
+      ],
+      "chain": "bitcoin",
+      "hidden_metrics": [
+        "gas_utilization_pct",
+        "failed_tx_rate",
+        "avg_gas_per_tx",
+        "median_gas_price",
+        "l2_burst_index"
+      ],
+      "id": "btc",
+      "label": "BTC",
+      "note": "BTC does not have EVM gas utilisation/failed-tx semantics; capacity is proxied by block time + fees.",
+      "type": "btc"
+    },
+    "publish_confidence": {
+      "confidence_score": 0.6649704475716407,
+      "eligible": true,
+      "missing": false,
+      "reason": "combined_confidence_threshold",
+      "threshold": 0.4
+    },
+    "publish_lag_days_policy": 1,
+    "regime": {
+      "asof_date": "2026-04-23",
+      "axes": {
+        "capacity": {
+          "band_high": "EXTREME_HIGH",
+          "band_low": "NORMAL",
+          "trend": "FLAT"
+        },
+        "demand": {
+          "band_high": "NORMAL",
+          "band_low": "NORMAL",
+          "trend": "FLAT"
+        },
+        "friction": {
+          "band_high": "NORMAL",
+          "band_low": "NORMAL",
+          "trend": "FLAT"
+        }
+      },
+      "chain": "bitcoin",
+      "determinism_hash": "c79561d2d96e",
+      "drivers": [
+        {
+          "axis": "capacity",
+          "current": 522.5,
+          "metric": "avg_block_time_sec",
+          "momentum_7d_vs_30d": 0.03161859102410475,
+          "pct_90d": 94.44444444444444,
+          "trend": "FLAT",
+          "z_robust": 0.39424430683180184
+        }
+      ],
+      "gate": {
+        "confidence_score": 0.6649704475716407,
+        "explanation": "OK",
+        "status": "ok",
+        "threshold": 0.4,
+        "type": "confidence_threshold"
+      },
+      "label": "CONGESTED",
+      "missing": false,
+      "ruleset_id": "btc_v1",
+      "signal_aliases": {
+        "blocktime_instability": "blocktime_instability",
+        "fee_burden_proxy": "median_tx_fee_native",
+        "tx_count": "tx_count_daily"
+      },
+      "signals": {
+        "avg_block_time_sec": {
+          "axis": "capacity",
+          "current": 522.5,
+          "momentum_7d_vs_30d": 0.03161859102410475,
+          "pct_90d": 94.44444444444444,
+          "z_robust": 0.39424430683180184
+        },
+        "blocktime_instability": {
+          "axis": "capacity",
+          "current": 0.07627382255379123,
+          "current_raw": 522.5,
+          "momentum_7d_vs_30d": -1.130387507584758,
+          "pct_90d": 18.88888888888889,
+          "transform": {
+            "formula": "rolling_mean(|bt - median_30| / median_30)",
+            "input_metric": "avg_block_time_sec",
+            "instability_rolling_median_days": 30,
+            "type": "instability_proxy",
+            "window_days": 7
+          },
+          "z_robust": -0.33984602729740854
+        },
+        "median_tx_fee_native": {
+          "axis": "friction",
+          "current": 1.86e-06,
+          "momentum_7d_vs_30d": 0.09250285714285678,
+          "pct_90d": 58.88888888888889,
+          "z_robust": -0.0863360000000001
+        },
+        "tx_count_daily": {
+          "axis": "demand",
+          "current": 450825.0,
+          "momentum_7d_vs_30d": 0.05860591500383183,
+          "pct_90d": 46.666666666666664,
+          "z_robust": 0.05022390862384954
+        }
+      },
+      "window_days": 7
+    },
+    "revision_id": 41675718,
+    "scorecard": {
+      "asof_date": "2026-04-23",
+      "chain": "bitcoin",
+      "confidence_score": 0.6649704475716407,
+      "dimensions": {
+        "capacity": {
+          "components": {
+            "blocktime_instability": {
+              "current": 522.5,
+              "score_raw": 45.214019625158315,
+              "z": -0.18033814820151817
+            },
+            "utilization": {
+              "current": null,
+              "score_raw": null,
+              "z": null
+            }
+          },
+          "coverage_factor": 0.5,
+          "effective_confidence": 0.33248522378582035,
+          "level": "Balanced",
+          "score": 48.408732244036216,
+          "score_raw": 45.214019625158315
+        },
+        "demand": {
+          "components": {
+            "active_addresses": {
+              "current": null,
+              "score_raw": null,
+              "z": null
+            },
+            "tx_count": {
+              "current": 450825.0,
+              "score_raw": 84.97342653288896,
+              "z": 2.0267964038577713
+            },
+            "tx_per_user": {
+              "current": null,
+              "score_raw": null,
+              "z": null
+            }
+          },
+          "coverage_factor": 0.3333333333333333,
+          "effective_confidence": 0.22165681585721356,
+          "level": "Normal",
+          "score": 57.752098364896355,
+          "score_raw": 84.97342653288896
+        },
+        "friction": {
+          "components": {
+            "failed_tx_rate": {
+              "current": null,
+              "score_raw": null,
+              "z": null
+            },
+            "fee_burden_proxy": {
+              "current": null,
+              "score_raw": null,
+              "z": null
+            }
+          },
+          "coverage_factor": 0.0,
+          "effective_confidence": 0.0,
+          "level": "Normal",
+          "score": 50.0,
+          "score_raw": null
+        }
+      },
+      "missing": false,
+      "notes": {
+        "interpretation": "Scores are 0–100. 50 is neutral vs the chain's own history. Higher Demand means hotter usage; higher Friction means higher cost/failure; higher Capacity means tighter capacity (pressure). Low confidence pulls scores toward 50."
+      },
+      "window_days": 7
+    },
+    "status": {
+      "color": "red",
+      "label": "CONGESTED",
+      "one_liner": "Demand: Normal; Friction: Normal; Capacity: Balanced"
+    },
+    "tier_used": "standard",
+    "updated_through": "2026-04-23"
   }
 ]
