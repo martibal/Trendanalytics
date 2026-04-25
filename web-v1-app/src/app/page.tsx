@@ -1005,7 +1005,7 @@ function StatusCard({
 
         {displayedPrimaryDriver ? (
           <div className="max-w-[170px] shrink-0 text-right">
-            <div className="text-[12px] font-black uppercase tracking-[0.12em] text-[#557099]">
+            <div className="text-[12px] font-black uppercase tracking-[0.12em] text-[#031329]">
               {displayedPrimaryDriver.label ?? "Primary driver"}
             </div>
 
@@ -1714,7 +1714,7 @@ export default async function HomePage() {
             </div>
           </div>
 
-        <SectionShell className="relative pb-20 pt-16 md:pb-24 md:pt-20 lg:pb-[4.4rem] lg:pt-[4.6rem]">
+        <SectionShell className="relative pb-20 pt-[140px] md:pb-24 md:pt-[150px] lg:pb-[4.4rem] lg:pt-[165px]">
             <div className="max-w-[820px]">
               <h1 className="max-w-[820px] text-[54px] font-black leading-[0.98] tracking-[-0.055em] text-white sm:text-[58px] lg:text-[68px]">
                 Separate blockchain noise

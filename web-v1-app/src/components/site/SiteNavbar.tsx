@@ -8,19 +8,27 @@ import { useEffect, useRef, useState } from "react";
 import { CHAIN_LIST } from "@/config/chains";
 
 const DESKTOP_ITEMS = [
-  { href: "/methodology", label: "Methodology" },
-  { href: "/api-docs", label: "API Docs" },
   { href: "/status", label: "Status" },
   { href: "/track-record", label: "Track Record" },
-  { href: "/about", label: "About" },
-] as const;
-
-const HOME_ITEMS = [
-  { href: "/status", label: "Status" },
-  { href: "/about", label: "About" },
+  { href: "/thresholds", label: "Thresholds" },
+  { href: "/glossary", label: "Glossary" },
   { href: "/api-docs", label: "API Docs" },
   { href: "/methodology", label: "Methodology" },
-  { href: "#pricing", label: "Pricing" },
+  { href: "/about", label: "About" },
+  { href: "/faq", label: "FAQ" },
+] as const;
+
+
+const HOME_ITEMS = [
+  { href: "/chains", label: "Chains" },
+  { href: "/status", label: "Status" },
+  { href: "/track-record", label: "Track Record" },
+  { href: "/thresholds", label: "Thresholds" },
+  { href: "/glossary", label: "Glossary" },
+  { href: "/api-docs", label: "API Docs" },
+  { href: "/methodology", label: "Methodology" },
+  { href: "/about", label: "About" },
+  { href: "/faq", label: "FAQ" },
 ] as const;
 
 const CLERK_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
@@ -119,9 +127,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
 
   if (pathname === "/") {
     return (
-      <header className="relative z-50 -mb-px overflow-hidden bg-[#031329] text-white">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(47,115,255,0.15),transparent_26%),linear-gradient(180deg,#031329_0%,#031329_100%)]" />
-
+      <header className="absolute inset-x-0 top-0 z-[80] bg-transparent text-white">
         <div className="relative mx-auto flex h-[86px] w-full max-w-[1128px] items-end justify-between gap-5 px-5 pb-5 pt-10 sm:px-7 lg:px-8">
           <Link
             href="/"
@@ -137,18 +143,64 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
             </span>
           </Link>
 
-          <nav aria-label="Primary" className="hidden items-center gap-8 md:flex">
-            {HOME_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={closeMenus}
-                className="text-[12px] font-extrabold text-white/90 transition hover:text-white"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+            <nav aria-label="Primary" className="hidden items-center gap-8 md:flex">
+              {HOME_ITEMS.map((item) => {
+                if (item.href === "/chains") {
+                  return (
+                    <div key={item.href} ref={chainsRef} className="relative">
+                      <button
+                        type="button"
+                        aria-haspopup="menu"
+                        aria-expanded={chainsOpen}
+                        onClick={() => setChainsOpen((prev) => !prev)}
+                        className="inline-flex items-center text-[12px] font-extrabold text-white/90 transition hover:text-white"
+                      >
+                        Chains
+                        <span className="ml-1.5 text-[10px] text-white/55">▾</span>
+                      </button>
+
+                      {chainsOpen ? (
+                        <div
+                          role="menu"
+                          aria-label="Chains"
+                          className="absolute left-0 top-8 z-[120] min-w-[250px] rounded-2xl border border-white/10 bg-[#07111d]/98 p-2 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur-md"
+                        >
+                          <Link
+                            href="/chains"
+                            onClick={closeMenus}
+                            className="block rounded-xl px-3 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                          >
+                            All chains overview
+                          </Link>
+                          <div className="my-2 h-px bg-white/8" />
+                          {CHAIN_LIST.map((chain) => (
+                            <Link
+                              key={chain.id}
+                              href={`/chains/${chain.id}`}
+                              onClick={closeMenus}
+                              className="block rounded-xl px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white"
+                            >
+                              {chain.label} · {chain.name}
+                            </Link>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={closeMenus}
+                    className="text-[12px] font-extrabold text-white/90 transition hover:text-white"
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
 
           <div className="hidden items-center gap-3 sm:flex">
             <Link
