@@ -10,7 +10,11 @@ export type ExplainContent = {
 };
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-muted px-1 py-0.5 text-xs">{children}</code>;
+  return (
+    <code className="font-mono text-xs font-semibold text-[#0d2447]">
+      {children}
+    </code>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +108,7 @@ export function regimeMixExplanation(windowDays: number): ExplainContent {
       <>
         <p>
           The stacked bars give you a quick visual summary of how the last{" "}
-          <span className="font-medium text-white">{windowDays} days</span> of published labels
+          <span className="font-medium text-[#0d2447]">{windowDays} days</span> of published labels
           break down across regime types. Each coloured segment represents a portion of the total
           published days.
         </p>
@@ -115,7 +119,7 @@ export function regimeMixExplanation(windowDays: number): ExplainContent {
           of what comes next.
         </p>
         <p className="mt-3">
-          The most useful thing to notice is the <span className="font-medium text-white">
+          The most useful thing to notice is the <span className="font-medium text-[#0d2447]">
           proportion of degraded days</span>. If a large share of the published window is grey
           (UNKNOWN/DEGRADED), it means the data quality was insufficient to support a named label
           for much of that period. That context matters when you are trying to use historical
@@ -187,7 +191,7 @@ export function regimeTimelineExplanation(): ExplainContent {
           STABLE, yellow for HEATING, red for CONGESTED, grey for UNKNOWN/DEGRADED.
         </p>
         <p className="mt-3">
-          The most important thing to look for is <span className="font-medium text-white">
+          The most important thing to look for is <span className="font-medium text-[#0d2447]">
           runs of the same colour</span>. A long stretch of green blocks means the network was
           consistently STABLE across many published days — that is persistence. A rapid mix of
           different colours suggests the network was transitioning frequently, or that data quality
@@ -261,16 +265,16 @@ export function confidenceHistoryExplanation(): ExplainContent {
         </p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
-            <span className="font-medium text-white">Above 0.70</span> — Good. The label is
+            <span className="font-medium text-[#0d2447]">Above 0.70</span> — Good. The label is
             well-supported. Read it normally.
           </li>
           <li>
-            <span className="font-medium text-white">Between 0.40 and 0.70</span> — Caution. The
+            <span className="font-medium text-[#0d2447]">Between 0.40 and 0.70</span> — Caution. The
             label is published but with reduced certainty. The scorecard scores were pulled toward
             neutral on these days.
           </li>
           <li>
-            <span className="font-medium text-white">Below 0.40</span> — Degraded. The label is
+            <span className="font-medium text-[#0d2447]">Below 0.40</span> — Degraded. The label is
             UNKNOWN/DEGRADED. The data was not sufficient to support a named regime.
           </li>
         </ul>
@@ -344,7 +348,7 @@ export function transitionMatrixExplanation(): ExplainContent {
         </p>
         <p className="mt-3">
           The diagonal — cells where the regime stayed the same — tells you how often each regime
-          was <span className="font-medium text-white">persistent</span>. A large number in the
+          was <span className="font-medium text-[#0d2447]">persistent</span>. A large number in the
           STABLE → STABLE cell means STABLE was a sticky state: once the network entered it, it
           tended to stay there for multiple days.
         </p>
@@ -419,41 +423,41 @@ export function historicalTableExplanation(): ExplainContent {
         </p>
         <ul className="mt-3 list-disc space-y-2 pl-5">
           <li>
-            <span className="font-medium text-white">Date</span> — the calendar date the row
+            <span className="font-medium text-[#0d2447]">Date</span> — the calendar date the row
             represents.
           </li>
           <li>
-            <span className="font-medium text-white">Chain</span> — which blockchain the row
+            <span className="font-medium text-[#0d2447]">Chain</span> — which blockchain the row
             is for.
           </li>
           <li>
-            <span className="font-medium text-white">Regime</span> — the published label for
+            <span className="font-medium text-[#0d2447]">Regime</span> — the published label for
             that day: STABLE, HEATING, CONGESTED, CHEAP, or UNKNOWN/DEGRADED.
           </li>
           <li>
-            <span className="font-medium text-white">Confidence</span> — how well-supported the
+            <span className="font-medium text-[#0d2447]">Confidence</span> — how well-supported the
             label was by the available data. 0 to 1, where higher is better.
           </li>
           <li>
-            <span className="font-medium text-white">Band</span> — a shorthand for confidence:
+            <span className="font-medium text-[#0d2447]">Band</span> — a shorthand for confidence:
             Good (≥ 0.70), Caution (0.40–0.69), or Degraded (&lt; 0.40).
           </li>
           <li>
-            <span className="font-medium text-white">Lag</span> — how many days old the data was
+            <span className="font-medium text-[#0d2447]">Lag</span> — how many days old the data was
             relative to today when it was published. Usually 1 for Bitcoin and Ethereum, 7 for
             Arbitrum and Base.
           </li>
           <li>
-            <span className="font-medium text-white">As of</span> — the exact date the data
+            <span className="font-medium text-[#0d2447]">As of</span> — the exact date the data
             describes. This can differ slightly from the Date column in edge cases.
           </li>
           <li>
-            <span className="font-medium text-white">Methodology</span> — the version of the
+            <span className="font-medium text-[#0d2447]">Methodology</span> — the version of the
             model that produced this label. If methodology changed between rows, the labels are
             not directly comparable.
           </li>
           <li>
-            <span className="font-medium text-white">Published context</span> — methodology version, updated-through, and named-row determinism hash where applicable.
+            <span className="font-medium text-[#0d2447]">Published context</span> — methodology version, updated-through, and named-row determinism hash where applicable.
           </li>
         </ul>
       </>

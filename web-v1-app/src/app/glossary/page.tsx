@@ -19,9 +19,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border p-6">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="mt-3 space-y-3 text-sm leading-6 text-muted-foreground">
+    <section className="rounded-2xl border border-[#9db8d4] bg-[#e7f1fb] p-6">
+      <h2 className="text-lg font-black text-[#0d2447]">{title}</h2>
+      <div className="mt-3 space-y-3 text-sm leading-7 text-[#27476f]">
         {children}
       </div>
     </section>
@@ -29,7 +29,11 @@ function Section({
 }
 
 function InlineCode({ children }: { children: string }) {
-  return <code className="rounded bg-muted px-1 py-0.5">{children}</code>;
+  return (
+    <code className="rounded bg-[#cfe0f1] px-1.5 py-0.5 text-[#0d2447] font-semibold">
+      {children}
+    </code>
+  );
 }
 
 function normalizeQuery(value?: string): string {
@@ -49,77 +53,72 @@ export default async function GlossaryPage({
   const entries = normalizeGlossaryEntries(apiEntries);
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
-      <header className="mb-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Glossary</h1>
-            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              Public definitions for the product’s published terminology, fields, and interpretation
-              boundaries. The glossary exists to make the product readable without turning it into an
-              advisory or predictive surface.
-            </p>
-          </div>
+    <main className="min-h-screen bg-[#edf6ff]">
+      {/* HERO */}
+      <section className="relative overflow-hidden bg-[#031329] text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(47,115,255,0.12),transparent_30%)]" />
 
-          <div className="rounded-xl border px-4 py-3 text-sm">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Published context
-            </div>
-            <div className="mt-1 font-medium text-foreground">
-              Dataset: {dataset?.version ?? "—"}
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">
+        <div className="mx-auto max-w-5xl px-6 pt-[120px] pb-16">
+          <h1 className="text-[48px] font-black tracking-[-0.04em]">
+            Glossary
+          </h1>
+
+          <p className="mt-4 max-w-3xl text-lg text-white/80">
+            Public definitions for product terminology, fields, and interpretation boundaries.
+            Descriptive only — no advisory meaning.
+          </p>
+
+          <div className="mt-6 inline-block rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm">
+            <div className="text-white/60">Dataset</div>
+            <div className="font-semibold">{dataset?.version ?? "—"}</div>
+            <div className="mt-1 text-white/60 text-xs">
               Methodology: {dataset?.methodology_version ?? "—"}
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Published artifact contract
             </div>
           </div>
         </div>
-      </header>
+      </section>
 
-      <div className="grid gap-6">
+      {/* CONTENT */}
+      <div className="mx-auto max-w-5xl px-6 py-10 space-y-6">
         <Section title="How to use the glossary">
           <p>
-            The glossary explains what published fields and concepts mean inside the product’s
-            descriptive framework. It should be used together with{" "}
-            <Link href="/methodology" className="underline">
+            Definitions describe how terms are used inside Urd Atlas — not universal definitions.
+          </p>
+          <p>
+            Use together with{" "}
+            <Link href="/methodology" className="text-[#0d2447] underline">
               Methodology
             </Link>
             ,{" "}
-            <Link href="/thresholds" className="underline">
+            <Link href="/thresholds" className="text-[#0d2447] underline">
               Thresholds
             </Link>
             ,{" "}
-            <Link href="/status" className="underline">
+            <Link href="/status" className="text-[#0d2447] underline">
               Status
             </Link>
-            , and chain pages.
-          </p>
-          <p>
-            Definitions are product-specific. They describe how the term is used in Urd Atlas,
-            not how every other analytics product necessarily uses the same term.
+            .
           </p>
         </Section>
 
         <Section title="Interpretation boundary">
-          <ul className="list-disc pl-5">
-            <li>No glossary entry should imply a recommendation.</li>
-            <li>No glossary entry should imply future price direction.</li>
-            <li>Definitions should remain descriptive and traceable to published artifacts.</li>
-            <li>
-              Terms should be read in the context of the currently published methodology version.
-            </li>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>No recommendation or prediction.</li>
+            <li>No price implication.</li>
+            <li>Strictly descriptive.</li>
+            <li>Bound to current methodology version.</li>
           </ul>
         </Section>
 
-        <section className="rounded-xl border p-6">
-          <h2 className="text-lg font-semibold">Lookup</h2>
-          <div className="mt-3 text-sm text-muted-foreground">
+        <section className="rounded-2xl border border-[#9db8d4] bg-[#e7f1fb] p-6">
+          <h2 className="text-lg font-black text-[#0d2447]">Lookup</h2>
+
+          <div className="mt-3 text-sm text-[#27476f]">
             <p>
-              Initial query:{" "}
+              Query:{" "}
               <InlineCode>{query.length > 0 ? query : "none"}</InlineCode>
             </p>
+
             <p className="mt-2">
               Examples:{" "}
               <Link href="/glossary?q=confidence" className="underline">
@@ -144,48 +143,25 @@ export default async function GlossaryPage({
         <GlossaryIndexClient entries={entries} initialQuery={query} />
 
         <Section title="Related pages">
-          <ul className="list-disc pl-5">
-            <li>
-              <Link href="/methodology" className="underline">
-                /methodology
-              </Link>
-            </li>
-            <li>
-              <Link href="/methodology/changelog" className="underline">
-                /methodology/changelog
-              </Link>
-            </li>
-            <li>
-              <Link href="/thresholds" className="underline">
-                /thresholds
-              </Link>
-            </li>
-            <li>
-              <Link href="/status" className="underline">
-                /status
-              </Link>
-            </li>
-            <li>
-              <Link href="/chains" className="underline">
-                /chains
-              </Link>
-            </li>
-            <li>
-              <Link href="/api-docs" className="underline">
-                /api-docs
-              </Link>
-            </li>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><Link href="/methodology" className="underline">/methodology</Link></li>
+            <li><Link href="/methodology/changelog" className="underline">/methodology/changelog</Link></li>
+            <li><Link href="/thresholds" className="underline">/thresholds</Link></li>
+            <li><Link href="/status" className="underline">/status</Link></li>
+            <li><Link href="/chains" className="underline">/chains</Link></li>
+            <li><Link href="/api-docs" className="underline">/api-docs</Link></li>
           </ul>
         </Section>
 
-        <section className="rounded-xl border p-6 text-xs text-muted-foreground">
-          <div className="font-medium text-foreground">Traceability</div>
+        <section className="rounded-2xl border border-[#9db8d4] bg-[#dceaf8] p-6 text-sm text-[#27476f]">
+          <div className="font-black text-[#0d2447]">Traceability</div>
+
           <p className="mt-2">
-            This page is a public definitions surface and should remain aligned with methodology,
-            thresholds, status, API docs, and chain interpretation.
+            Definitions must remain aligned with methodology, thresholds, and published outputs.
           </p>
+
           <p className="mt-2">
-            Source route: <InlineCode>/api/v1/glossary</InlineCode>
+            Source: <InlineCode>/api/v1/glossary</InlineCode>
           </p>
         </section>
       </div>

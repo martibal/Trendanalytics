@@ -72,21 +72,21 @@ function chainShort(chain: ChainId) {
 
 function containerClass(state: StalenessState) {
   const base =
-    "rounded-2xl border px-4 py-4 sm:px-5 sm:py-4 shadow-sm backdrop-blur-sm";
+    "rounded-2xl border px-4 py-4 sm:px-5 sm:py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]";
 
   if (state === "FAIL") {
-    return `${base} border-red-500/35 bg-red-500/12`;
+    return `${base} border-red-300 bg-red-50`;
   }
   if (state === "WARN") {
-    return `${base} border-amber-500/35 bg-amber-500/12`;
+    return `${base} border-amber-300 bg-amber-50`;
   }
   if (state === "DEGRADED") {
-    return `${base} border-slate-400/40 bg-slate-500/14`;
+    return `${base} border-slate-300 bg-slate-100`;
   }
   if (state === "UNKNOWN") {
-    return `${base} border-border bg-muted/60`;
+    return `${base} border-[#c9d9ea] bg-[#edf5fb]`;
   }
-  return `${base} border-border bg-muted/30`;
+  return `${base} border-[#c9d9ea] bg-[#edf5fb]`;
 }
 
 function badgeClass(state: StalenessState) {
@@ -109,31 +109,34 @@ function badgeClass(state: StalenessState) {
 }
 
 function titleClass(state: StalenessState) {
-  if (state === "FAIL") return "text-red-100 dark:text-red-100";
-  if (state === "WARN") return "text-amber-100 dark:text-amber-100";
-  if (state === "DEGRADED") return "text-slate-50 dark:text-slate-50";
-  return "text-foreground";
+  if (state === "FAIL") return "text-red-950";
+  if (state === "WARN") return "text-amber-950";
+  if (state === "DEGRADED") return "text-slate-950";
+  return "text-[#0d2447]";
 }
 
 function metaClass(state: StalenessState) {
-  if (state === "FAIL") return "text-red-100/85 dark:text-red-100/85";
-  if (state === "WARN") return "text-amber-100/85 dark:text-amber-100/85";
-  if (state === "DEGRADED") return "text-slate-100/85 dark:text-slate-100/85";
-  return "text-muted-foreground";
+  if (state === "FAIL") return "text-red-800";
+  if (state === "WARN") return "text-amber-800";
+  if (state === "DEGRADED") return "text-slate-700";
+  return "text-[#557099]";
 }
 
 function bodyClass(state: StalenessState) {
-  if (state === "FAIL") return "text-red-50/95 dark:text-red-50/95";
-  if (state === "WARN") return "text-amber-50/95 dark:text-amber-50/95";
-  if (state === "DEGRADED") return "text-slate-50/95 dark:text-slate-50/95";
-  return "text-muted-foreground";
+  if (state === "FAIL") return "text-red-900";
+  if (state === "WARN") return "text-amber-900";
+  if (state === "DEGRADED") return "text-slate-800";
+  return "text-[#557099]";
 }
 
 function codeClass(state: StalenessState) {
-  if (state === "FAIL" || state === "WARN" || state === "DEGRADED") {
-    return "rounded bg-black/20 px-1 py-0.5 text-[11px] text-white/90";
+  if (state === "FAIL") {
+    return "rounded bg-red-100 px-1 py-0.5 text-[11px] text-red-900";
   }
-  return "rounded bg-muted px-1 py-0.5 text-[11px]";
+  if (state === "WARN") {
+    return "rounded bg-amber-100 px-1 py-0.5 text-[11px] text-amber-900";
+  }
+  return "rounded bg-[#dceaf8] px-1 py-0.5 text-[11px] text-[#0d2447]";
 }
 
 function stateLabel(state: StalenessState) {
@@ -248,7 +251,7 @@ export default function StalenessBar({
 
           <div className={`mt-3 text-xs leading-6 ${metaClass(state)}`}>
             <div>
-              <span className="font-medium text-foreground dark:text-white">
+              <span className="font-medium text-white">
                 How to read this:
               </span>{" "}
               freshness and confidence are related but different.
@@ -262,46 +265,36 @@ export default function StalenessBar({
           </div>
         </div>
 
-        <div
-          className={`min-w-[240px] rounded-xl border border-white/10 bg-black/10 px-3 py-3 text-xs ${metaClass(
-            state
-          )}`}
-        >
+        <div className="min-w-[240px] rounded-xl border border-[#0d2a4d]/20 bg-[#031329] px-4 py-4 text-xs leading-6 text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
           <div>
             Data as of{" "}
-            <span className="font-semibold text-foreground dark:text-white">
+            <span className="font-semibold text-white">
               {asOfDate && asOfDate.trim().length > 0 ? asOfDate : "—"}
             </span>
           </div>
-          <div className="mt-1">
-            Observed lag{" "}
-            <span className="font-semibold text-foreground dark:text-white">{obs}</span>
+          <div>
+            Observed lag <span className="font-semibold text-white">{obs}</span>
           </div>
           {typeof confidenceScore === "number" ? (
-            <div className="mt-1">
+            <div>
               Confidence{" "}
-              <span className="font-semibold text-foreground dark:text-white">
+              <span className="font-semibold text-white">
                 {confidenceScore.toFixed(3)}
               </span>
             </div>
           ) : null}
-          <div className="mt-2 border-t border-white/10 pt-2">
+
+          <div className="mt-2 border-t border-white/12 pt-2">
             <div>
-              <span className="font-medium text-foreground dark:text-white">
-                Expected:
-              </span>{" "}
+              <span className="font-semibold text-white">Expected:</span>{" "}
               ~{p.expected_lag_days}d
             </div>
-            <div className="mt-1">
-              <span className="font-medium text-foreground dark:text-white">
-                Soft warning:
-              </span>{" "}
+            <div>
+              <span className="font-semibold text-white">Soft warning:</span>{" "}
               &gt; {p.soft_warn_lag_days}d
             </div>
-            <div className="mt-1">
-              <span className="font-medium text-foreground dark:text-white">
-                Hard fail:
-              </span>{" "}
+            <div>
+              <span className="font-semibold text-white">Hard fail:</span>{" "}
               &gt; {p.hard_fail_lag_days}d
             </div>
           </div>
