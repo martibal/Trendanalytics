@@ -250,7 +250,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/8 bg-[#06101b]/92 backdrop-blur-md supports-[backdrop-filter]:bg-[#06101b]/80">
+    <header className="absolute inset-x-0 top-0 z-[80] bg-transparent text-white">
       <div className="mx-auto flex h-16 w-full items-center justify-between gap-4 px-6 sm:px-8 xl:px-12 2xl:px-16">
         <div className="flex min-w-0 items-center gap-3 xl:gap-8">
           <Link
