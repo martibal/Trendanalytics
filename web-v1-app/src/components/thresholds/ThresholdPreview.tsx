@@ -4,20 +4,31 @@ import { ThresholdControlValues } from "./ThresholdControls";
 
 export default function ThresholdPreview({
   values,
+  isCustom = false,
 }: {
   values: ThresholdControlValues;
+  isCustom?: boolean;
 }) {
   return (
     <section className="rounded-2xl border border-[#9db8d4] bg-[#e7f1fb] p-6">
-      <h2 className="text-lg font-black text-[#0d2447]">
-        Threshold preview
-      </h2>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black text-[#0d2447]">
+            Threshold preview
+          </h2>
 
-      <p className="mt-2 text-sm text-[#27476f]">
-        Human-readable preview of threshold logic.
-      </p>
+          <p className="mt-2 text-sm text-[#27476f]">
+            Human-readable preview of threshold logic.
+          </p>
+        </div>
 
-      {/* REMOVED DARK LABEL */}
+        {isCustom ? (
+          <span className="rounded-full border border-[#9db8d4] bg-[#dceaf8] px-3 py-1 text-xs font-bold text-[#0d2447]">
+            Custom
+          </span>
+        ) : null}
+      </div>
+
       <div className="mt-6 space-y-4">
         <div className="rounded-xl border border-[#9db8d4] bg-[#dceaf8] p-4 text-[#0d2447]">
           <strong>Confidence gate</strong>
