@@ -259,9 +259,9 @@ const dataLayersExplain: ExplainPair = {
   ),
   traceability: (
     <ul className="list-disc pl-5">
-      <li>Gold: <InlineCode>data/published/v1/gold/&lt;chain&gt;/&lt;date&gt;.json</InlineCode></li>
-      <li>Meta: <InlineCode>data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode></li>
-      <li>Derived: <InlineCode>data/published/v1/derived/&lt;chain&gt;/&lt;date&gt;.json</InlineCode></li>
+      <li>Gold: <InlineCode>GET /api/v1/files/gold/[chain]/[window]/latest.json</InlineCode></li>
+      <li>Meta: <InlineCode>GET /api/v1/files/meta/[chain]/[window]/latest.json</InlineCode></li>
+      <li>Derived: <InlineCode>GET /api/v1/files/derived/[chain]/[window]/latest.json</InlineCode></li>
     </ul>
   ),
 };
@@ -336,7 +336,7 @@ const dataAttributionExplain: ExplainPair = {
         blocks for supported chains. Urd Atlas ingests these via a Python-based ETL
         pipeline that aggregates daily features (CANON_COLS), computes the statistical
         processing layer (regime engine, scorecard, confidence), and publishes the results
-        as immutable JSON artifacts to an S3 bucket.
+        as versioned JSON artifacts behind the documented API contract.
       </p>
       <p className="mt-3">
         The pipeline is deterministic and idempotent per (chain, date) — rerunning it for
@@ -500,30 +500,33 @@ export default async function AboutPage() {
           {[
             {
               name: "Gold",
-              color: "border-yellow-500/20 bg-yellow-500/5 text-yellow-300",
-              desc: "Raw daily observations from the blockchain — transaction counts, fees, block times, gas usage, active addresses. Nothing computed. Exactly what the network did.",
-              path: "gold/<chain>/<date>.json",
+              cardClass: "border-yellow-500/20 bg-yellow-500/5",
+              labelClass: "text-yellow-300",
+              desc: "Raw daily observations from the blockchain — transaction counts, fees, block times, gas usage, active addresses. Nothing inferred. Exactly what the network did.",
+              endpoint: "gold / latest JSON",
             },
             {
               name: "Meta",
-              color: "border-purple-500/20 bg-purple-500/5 text-purple-300",
-              desc: "The intelligence layer. Regime label, confidence score, three-axis scorecard, and ranked driver set. This is the primary product output.",
-              path: "meta/<chain>/latest.json",
+              cardClass: "border-purple-500/20 bg-purple-500/5",
+              labelClass: "text-purple-300",
+              desc: "The interpretation layer. Regime label, confidence score, three-axis scorecard, and ranked driver set. This is the primary product output.",
+              endpoint: "meta / latest JSON",
             },
             {
               name: "Derived",
-              color: "border-blue-500/20 bg-blue-500/5 text-blue-300",
+              cardClass: "border-blue-500/20 bg-blue-500/5",
+              labelClass: "text-blue-300",
               desc: "Smoothed 7-day and 30-day moving averages of Gold series. Used in charts to distinguish brief spikes from sustained trends.",
-              path: "derived/<chain>/<date>.json",
+              endpoint: "derived / latest JSON",
             },
-          ].map(({ name, color, desc, path }) => (
-            <div key={name} className={`rounded-2xl border p-5 ${color.split(" ").slice(0, 2).join(" ")} border-opacity-20`}>
-              <div className={`text-xs font-semibold uppercase tracking-[0.14em] ${color.split(" ")[2]}`}>
+          ].map(({ name, cardClass, labelClass, desc, endpoint }) => (
+            <div key={name} className={`rounded-2xl border p-5 ${cardClass}`}>
+              <div className={`text-xs font-semibold uppercase tracking-[0.14em] ${labelClass}`}>
                 {name}
               </div>
               <p className="mt-3 text-sm leading-7 text-slate-300">{desc}</p>
               <div className="mt-4">
-                <InlineCode>{path}</InlineCode>
+                <InlineCode>{endpoint}</InlineCode>
               </div>
             </div>
           ))}
@@ -635,7 +638,7 @@ export default async function AboutPage() {
           Data contract and traceability
         </summary>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-          <div>Dataset manifest: <InlineCode>data/published/v1/dataset.json</InlineCode></div>
+          <div>Dataset manifest: <InlineCode>GET /api/v1/status</InlineCode></div>
           <div>Data source: <InlineCode>published artifact metadata</InlineCode></div>
           <div>Methodology version: <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
           <div>This page is descriptive product documentation and remains aligned with methodology, glossary, status, API docs, and legal pages.</div>
