@@ -18,28 +18,39 @@ export default function MethodologyReferencePage() {
         summary="The canonical public explanation of what each Urd Atlas artifact layer means, how confidence and regime should be interpreted, and where the public methodology intentionally stops."
       />
 
-      <div
-        className={[
-          "mx-auto max-w-6xl px-6 py-10",
-          "[&_nav]:border-[#b6cce3]",
-          "[&_nav]:bg-[#e7f1fb]",
-          "[&_nav_a]:text-[#0d2447]",
-          "[&_nav_a]:font-black",
-          "[&_nav_a:hover]:!text-blue-800",
-          "[&_nav_a:hover]:!bg-[#dceaf8]",
-          "[&_section]:border-[#b6cce3]",
-          "[&_section]:bg-[#e7f1fb]",
-          "[&_section_h2]:text-[#0d2447]",
-          "[&_section_h2]:font-black",
-          "[&_section_p]:text-[#27476f]",
-          "[&_section_li]:text-[#27476f]",
-          "[&_section_td]:text-[#27476f]",
-          "[&_section_th]:text-[#203c63]",
-          "[&_a]:text-[#0d2447]",
-          "[&_a]:font-semibold",
-          "[&_code]:text-[#0d2447]",
-        ].join(" ")}
-      >
+        <div
+          className={[
+            "mx-auto max-w-6xl px-6 py-10",
+            "[&_nav]:border-[#b6cce3]",
+            "[&_nav]:bg-[#e7f1fb]",
+            "[&_nav_a]:text-[#0d2447]",
+            "[&_nav_a]:font-black",
+            "[&_nav_a:hover]:!text-blue-800",
+            "[&_nav_a:hover]:!bg-[#dceaf8]",
+            "[&_section]:border-[#b6cce3]",
+            "[&_section]:bg-[#e7f1fb]",
+            "[&_section_h2]:text-[#0d2447]",
+            "[&_section_h2]:font-black",
+            "[&_section_p]:text-[#27476f]",
+            "[&_section_li]:text-[#27476f]",
+            "[&_section_td]:text-[#27476f]",
+            "[&_section_th]:text-[#203c63]",
+            "[&_a]:text-[#0d2447]",
+            "[&_a]:font-semibold",
+
+            // InlineCode fix
+            "[&_code]:!rounded",
+            "[&_code]:!border",
+            "[&_code]:!border-[#9db8d4]",
+            "[&_code]:!bg-[#f4f9ff]",
+            "[&_code]:!px-1.5",
+            "[&_code]:!py-0.5",
+            "[&_code]:!font-mono",
+            "[&_code]:!text-xs",
+            "[&_code]:!font-bold",
+            "[&_code]:!text-[#0d2447]",
+          ].join(" ")}
+        >
         <MethodologyNav />
 
         <ShortFullContent
