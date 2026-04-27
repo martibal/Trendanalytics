@@ -69,6 +69,9 @@ function ModalStyles() {
   );
 }
 
+
+
+
 function InlineCode({ children }: { children: ReactNode }) {
   return <code className="rounded bg-slate-900/8 px-1 py-0.5 font-mono text-xs text-[#0d2447]">{children}</code>;
 }
@@ -77,7 +80,7 @@ function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
   return (
     <a
       href={`#${id}`}
-      className="inline-flex items-center rounded-full border border-blue-300/40 bg-blue-100/55 px-3 py-1 text-xs font-extrabold text-[#0d2447] transition hover:border-blue-400/60 hover:bg-blue-100"
+      className="inline-flex items-center rounded-full border border-blue-300 bg-[#d8e9fb] px-3 py-1 text-xs font-extrabold text-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition hover:border-blue-500 hover:bg-white hover:text-blue-900"
     >
       {label}
     </a>
@@ -457,6 +460,33 @@ export default async function StatusPage() {
     <main className="min-h-screen bg-[#edf6ff] text-[#0a1d3a]">
       <ModalStyles />
 
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .status-staleness-readable [class*="bg-[#031329]"],
+            .status-staleness-readable [class*="bg-slate-950"],
+            .status-staleness-readable [class*="bg-slate-900"] {
+              background: #e7f1fb !important;
+              border: 1px solid #9db8d4 !important;
+              color: #0d2447 !important;
+            }
+
+            .status-staleness-readable [class*="bg-[#031329]"] *,
+            .status-staleness-readable [class*="bg-slate-950"] *,
+            .status-staleness-readable [class*="bg-slate-900"] * {
+              color: #0d2447 !important;
+            }
+
+            .status-staleness-readable code {
+              background: #f4f9ff !important;
+              border: 1px solid #9db8d4 !important;
+              color: #0d2447 !important;
+            }
+          `,
+        }}
+      />
+
+
       <PageHero
         eyebrow="System health"
         title="Status"
@@ -506,7 +536,31 @@ export default async function StatusPage() {
         </div>
       </PageHero>
 
-      <div className="mx-auto max-w-7xl px-6 py-10">
+      <div
+        className={[
+          "mx-auto max-w-7xl px-6 py-10",
+          "[&_section_*]:!text-[#0d2447]",
+          "[&_p]:!text-[#27476f]",
+          "[&_li]:!text-[#27476f]",
+          "[&_span.text-white]:!text-[#0d2447]",
+          "[&_.text-white]:!text-[#0d2447]",
+          "[&_.text-white\\/55]:!text-[#557099]",
+          "[&_.text-white\\/86]:!text-[#27476f]",
+          "[&_.text-slate-100]:!text-[#0d2447]",
+          "[&_.text-slate-200]:!text-[#27476f]",
+          "[&_.text-slate-300]:!text-[#27476f]",
+          "[&_code]:!rounded",
+          "[&_code]:!border",
+          "[&_code]:!border-[#9db8d4]",
+          "[&_code]:!bg-[#f4f9ff]",
+          "[&_code]:!px-1.5",
+          "[&_code]:!py-0.5",
+          "[&_code]:!font-mono",
+          "[&_code]:!text-xs",
+          "[&_code]:!font-bold",
+          "[&_code]:!text-[#0d2447]",
+        ].join(" ")}
+      >
         <ShortFullContent
           pageKey="status"
           summary={<>This page tells you whether the currently published rows are usable right now, how fresh they are, and whether confidence is holding up independently of freshness.</>}
@@ -518,7 +572,7 @@ export default async function StatusPage() {
           whyItMatters={<>A user should be able to decide quickly whether today&apos;s published rows are operationally safe enough for their workflow before reading the full policy.</>}
           fullContent={
             <>
-              <section className="mb-8 space-y-3">
+              <section className="status-staleness-readable mb-8 space-y-3">
                 {rows.map((row) => (
                   <StalenessBar
                     key={`stale-${row.chain}`}
