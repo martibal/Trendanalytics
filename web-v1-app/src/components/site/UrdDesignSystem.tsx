@@ -4,36 +4,36 @@ import type { ReactNode } from "react";
 
 export const urd = {
   color: {
-    page: "#edf6ff",
+    page: "#e8f2fb",
     hero: "#031329",
     heroAccent: "#2f7cff",
-    text: "#0a1d3a",
-    textStrong: "#0d2447",
-    textBody: "#27476f",
-    textMuted: "#557099",
-    border: "#9db8d4",
-    borderStrong: "#557099",
-    surface: "#eaf3fb",
-    surfaceSoft: "#d9eafb",
-    surfaceRaised: "#f4f9ff",
+    text: "#071d3b",
+    textStrong: "#082247",
+    textBody: "#24466f",
+    textMuted: "#4f6f96",
+    border: "#7fa8cf",
+    borderStrong: "#4f6f96",
+    surface: "#dbeaf7",
+    surfaceSoft: "#d4e6f6",
+    surfaceRaised: "#f7fbff",
     panel: "#dbeafa",
-    panelStrong: "#cfe2f5",
-    ink: "#0a1d3a",
-    inkStrong: "#0d2447",
-    inkBody: "#27476f",
-    link: "#0b58ca",
+    panelStrong: "#c5dcef",
+    ink: "#071d3b",
+    inkStrong: "#082247",
+    inkBody: "#24466f",
+    link: "#0a55c2",
     chipBg: "#dceaf8",
-    infoPanel: "#d9eafb",
-    infoPanelStrong: "#cfe2f5",
-    chartPanel: "#d9eafb",
-    chartPlot: "#f4f9ff",
+    infoPanel: "#d4e6f6",
+    infoPanelStrong: "#c5dcef",
+    chartPanel: "#d4e6f6",
+    chartPlot: "#f7fbff",
     chartGrid: "#7fa3ca",
-    chartRaw: "#b45309",
-    chartMA7: "#0046c7",
+    chartRaw: "#9a5a00",
+    chartMA7: "#003fbd",
     chartMA30: "#031329",
   },
 
-  page: "urd-page min-h-screen bg-[#edf6ff] text-[#0a1d3a]",
+  page: "urd-page min-h-screen bg-[#e8f2fb] text-[#071d3b]",
   container: "mx-auto max-w-6xl px-6 py-10",
 
   heroOuter: "urd-hero relative overflow-hidden bg-[#031329] text-white",
@@ -48,73 +48,73 @@ export const urd = {
     "mt-8 max-w-3xl text-xl font-black leading-9 text-white",
 
   section:
-    "rounded-3xl border border-[#86a9cc] bg-[#d2e4f6] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
-  sectionTitle: "text-2xl font-black tracking-[-0.03em] text-[#0d2447]",
-  sectionBody: "mt-4 text-sm font-medium leading-7 text-[#27476f]",
+    "rounded-3xl border border-[#7fa8cf] bg-gradient-to-br from-[#dbeaf7] via-[#d4e6f6] to-[#c9e0f2] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_44px_rgba(15,47,91,0.12)]",
+  sectionTitle: "text-2xl font-black tracking-[-0.03em] text-[#082247]",
+  sectionBody: "mt-4 text-sm font-medium leading-7 text-[#24466f]",
 
-  nav: "mb-8 overflow-x-auto rounded-2xl border border-[#86a9cc] bg-[#d2e4f6] p-3",
+  nav: "mb-8 overflow-x-auto rounded-2xl border border-[#7fa8cf] bg-[#d4e6f6] p-3",
   navInner: "flex min-w-max flex-wrap gap-2",
   navItem:
-    "rounded-full border border-[#86a9cc] bg-[#f4f9ff] px-3 py-1.5 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+    "rounded-full border border-[#7fa8cf] bg-[#f7fbff] px-3 py-1.5 text-xs font-black text-[#082247] transition hover:bg-white hover:text-blue-800",
 
   button:
-    "inline-flex items-center rounded-full border border-[#86a9cc] bg-[#f4f9ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+    "inline-flex items-center rounded-full border border-[#7fa8cf] bg-[#f7fbff] px-3 py-1 text-xs font-black text-[#082247] transition hover:bg-white hover:text-blue-800",
 
   code:
-    "rounded border border-[#86a9cc] bg-[#f4f9ff] px-1.5 py-0.5 font-mono text-xs font-bold text-[#0d2447]",
+    "rounded border border-[#7fa8cf] bg-[#f7fbff] px-1.5 py-0.5 font-mono text-xs font-bold text-[#082247]",
 
-  tableWrap: "mt-5 overflow-x-auto rounded-2xl border border-[#86a9cc]",
+  tableWrap: "mt-5 overflow-x-auto rounded-2xl border border-[#7fa8cf]",
   table: "w-full text-sm",
-  tableHead: "bg-[#bed8f0]",
+  tableHead: "bg-[#c5dcef]",
   tableTh:
     "px-4 py-3 text-left text-xs font-black uppercase tracking-[0.12em] text-[#203c63]",
-  tableBody: "divide-y divide-[#9db8d4] bg-[#f4f9ff]",
-  tableTd: "px-4 py-3 font-medium text-[#27476f]",
+  tableBody: "divide-y divide-[#7fa8cf] bg-[#f7fbff]",
+  tableTd: "px-4 py-3 font-medium text-[#24466f]",
 
-  callout: "rounded-2xl border border-[#86a9cc] bg-[#d2e4f6] p-5",
+  callout: "rounded-2xl border border-[#7fa8cf] bg-[#d4e6f6] p-5",
   calloutTitle: "text-sm font-black text-blue-700",
-  calloutBody: "mt-3 text-sm font-semibold leading-7 text-[#0d2447]",
+  calloutBody: "mt-3 text-sm font-semibold leading-7 text-[#082247]",
 
   warning: "rounded-2xl border border-amber-400 bg-amber-50 p-5",
   warningTitle: "text-sm font-black text-amber-700",
 
   modalPanel:
-    "relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#86a9cc] bg-[#d2e4f6] text-[#0a1d3a] shadow-2xl shadow-slate-950/30",
+    "relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#7fa8cf] bg-[#d4e6f6] text-[#071d3b] shadow-2xl shadow-slate-950/30",
 
   card:
-    "rounded-3xl border border-[#86a9cc] bg-[#d2e4f6] text-[#0a1d3a] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
+    "rounded-3xl border border-[#7fa8cf] bg-[#d4e6f6] text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
   cardPadded:
-    "rounded-3xl border border-[#86a9cc] bg-[#d2e4f6] p-6 text-[#0a1d3a] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
+    "rounded-3xl border border-[#7fa8cf] bg-[#d4e6f6] p-6 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
   subtlePanel:
-    "rounded-2xl border border-[#86a9cc] bg-[#f4f9ff] text-[#0a1d3a]",
-  darkOnLightText: "text-[#0a1d3a]",
-  darkOnLightBody: "text-[#27476f]",
-  darkOnLightMuted: "text-[#557099]",
+    "rounded-2xl border border-[#7fa8cf] bg-[#f7fbff] text-[#071d3b]",
+  darkOnLightText: "text-[#071d3b]",
+  darkOnLightBody: "text-[#24466f]",
+  darkOnLightMuted: "text-[#4f6f96]",
   lightButton:
-    "inline-flex items-center rounded-full border border-[#86a9cc] bg-[#f4f9ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+    "inline-flex items-center rounded-full border border-[#7fa8cf] bg-[#f7fbff] px-3 py-1 text-xs font-black text-[#082247] transition hover:bg-white hover:text-blue-800",
   chartCard:
-    "rounded-2xl border border-[#86a9cc] bg-[#bed8f0] p-5 text-[#0a1d3a] shadow-sm",
+    "rounded-2xl border border-[#7fa8cf] bg-[#c5dcef] p-5 text-[#071d3b] shadow-sm",
   chartPanel:
-    "rounded-xl border border-[#86a9cc] bg-[#f4f9ff] text-[#0a1d3a]",
+    "rounded-xl border border-[#7fa8cf] bg-[#f7fbff] text-[#071d3b]",
 
   modalBackdrop:
     "absolute inset-0 bg-slate-950/80 backdrop-blur-sm",
   modalHeader:
-    "flex shrink-0 items-start justify-between gap-4 border-b border-[#86a9cc] px-6 py-5",
+    "flex shrink-0 items-start justify-between gap-4 border-b border-[#7fa8cf] px-6 py-5",
   modalClose:
-    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#86a9cc] bg-[#f4f9ff] text-xl text-[#0d2447] hover:bg-white",
+    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#7fa8cf] bg-[#f7fbff] text-xl text-[#082247] hover:bg-white",
   modalGrid:
     "grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
   modalBasicPanel:
-    "rounded-2xl border border-emerald-400 bg-emerald-50 p-5 text-[#0a1d3a]",
+    "rounded-2xl border border-emerald-400 bg-emerald-50 p-5 text-[#071d3b]",
   modalAdvancedPanel:
-    "rounded-2xl border border-[#86a9cc] bg-[#f4f9ff] p-5 text-[#0a1d3a]",
+    "rounded-2xl border border-[#7fa8cf] bg-[#f7fbff] p-5 text-[#071d3b]",
   modalKicker:
     "text-xs font-black uppercase tracking-[0.14em] text-blue-700",
   infoPanel:
-    "rounded-2xl border border-[#86a9cc] bg-[#d2e4f6] p-4 text-[#0a1d3a]",
+    "rounded-2xl border border-[#7fa8cf] bg-[#d4e6f6] p-4 text-[#071d3b]",
   infoPanelStrong:
-    "rounded-2xl border border-[#86a9cc] bg-[#bed8f0] p-4 text-[#0a1d3a]",
+    "rounded-2xl border border-[#7fa8cf] bg-[#c5dcef] p-4 text-[#071d3b]",
 
   topHeader:
     "fixed inset-x-0 top-0 z-[120] border-b border-white/10 bg-[#031329]/96 text-white shadow-[0_10px_32px_rgba(0,0,0,0.22)] backdrop-blur-md",
@@ -205,53 +205,74 @@ export function cx(...classes: Array<string | false | null | undefined>) {
 
 const urdScopedCss = `
 .urd-page {
-  --urd-page: #edf6ff;
+  --urd-page: #e8f2fb;
   --urd-hero: #031329;
-  --urd-text: #0a1d3a;
-  --urd-text-strong: #0d2447;
-  --urd-text-body: #27476f;
-  --urd-text-muted: #557099;
-  --urd-border: #86a9cc;
-  --urd-border-strong: #436889;
-  --urd-panel: #d2e4f6;
-  --urd-panel-strong: #bed8f0;
-  --urd-panel-soft: #e2f0fc;
+  --urd-text: #071d3b;
+  --urd-text-strong: #082247;
+  --urd-text-body: #24466f;
+  --urd-text-muted: #4f6f96;
+  --urd-border: #7fa8cf;
+  --urd-border-strong: #486f97;
+  --urd-panel: #d4e6f6;
+  --urd-panel-mid: #cfe2f4;
+  --urd-panel-strong: #c5dcef;
+  --urd-panel-soft: #e5f1fb;
   --urd-raised: #f7fbff;
-  --urd-link: #0b58ca;
+  --urd-link: #0a55c2;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(255,255,255,0.82), transparent 32rem),
+    linear-gradient(180deg, #e8f2fb 0%, #eaf4fc 42%, #e3eef8 100%);
 }
 
 .urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-white"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-slate-50"],
 .urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-slate-100"],
 .urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-slate-200"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-cyan-50"],
 .urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-cyan-100"],
-.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-cyan-200"] {
-  color: var(--urd-text) !important;
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-cyan-200"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-sky-50"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-sky-100"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-sky-200"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-blue-100"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-blue-200"] {
+  color: var(--urd-text-body) !important;
 }
 
 .urd-page :not(.urd-hero):not(.urd-hero *) :is(h1,h2,h3,h4,strong,b,th)[class*="text-white"],
-.urd-page :not(.urd-hero):not(.urd-hero *) :is(h1,h2,h3,h4,strong,b,th)[class*="text-slate"] {
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(h1,h2,h3,h4,strong,b,th)[class*="text-slate"],
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(h1,h2,h3,h4,strong,b,th)[class*="text-cyan"],
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(h1,h2,h3,h4,strong,b,th)[class*="text-sky"] {
   color: var(--urd-text-strong) !important;
 }
 
-.urd-page :not(.urd-hero):not(.urd-hero *) :is(p,li,td,dd,dt,span,div)[class*="text-white"],
-.urd-page :not(.urd-hero):not(.urd-hero *) :is(p,li,td,dd,dt,span,div)[class*="text-slate"] {
-  color: var(--urd-text-body) !important;
+.urd-page :not(.urd-hero):not(.urd-hero *) a:not(.urd-allow-light-text) {
+  color: var(--urd-link);
 }
 
 .urd-page :not(.urd-hero):not(.urd-hero *) :is(section,article,aside,div)[class*="rounded"][class*="border"]:not(.urd-no-panel):not([role="dialog"]):not([role="menu"]) {
   background-color: var(--urd-panel) !important;
+  background-image: linear-gradient(135deg, #dcebf8 0%, #d4e6f6 50%, #c8dff2 100%) !important;
   border-color: var(--urd-border) !important;
   color: var(--urd-text) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.78), 0 16px 36px rgba(15,47,91,0.10) !important;
 }
 
 .urd-page :not(.urd-hero):not(.urd-hero *) :is(section,article,aside,div)[class*="rounded"][class*="border"] :is(section,article,aside,div)[class*="rounded"][class*="border"]:not(.urd-no-panel):not([role="dialog"]):not([role="menu"]) {
   background-color: var(--urd-panel-strong) !important;
-  border-color: var(--urd-border) !important;
+  background-image: linear-gradient(135deg, #d1e4f5 0%, #c6ddf0 100%) !important;
+  border-color: #76a1c8 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 10px 24px rgba(15,47,91,0.08) !important;
+}
+
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(section,article,aside,div)[class*="rounded"][class*="border"] :is(section,article,aside,div)[class*="rounded"][class*="border"] :is(section,article,aside,div)[class*="rounded"][class*="border"]:not(.urd-no-panel):not([role="dialog"]):not([role="menu"]) {
+  background-color: var(--urd-raised) !important;
+  background-image: linear-gradient(135deg, #f7fbff 0%, #eaf4fd 100%) !important;
 }
 
 .urd-page :not(.urd-hero):not(.urd-hero *) :is(code,kbd,samp) {
   background-color: var(--urd-raised) !important;
-  border-color: var(--urd-border) !important;
+  border: 1px solid var(--urd-border) !important;
   color: var(--urd-text-strong) !important;
 }
 
@@ -262,7 +283,17 @@ const urdScopedCss = `
 .urd-page :not(.urd-hero):not(.urd-hero *) thead {
   background-color: var(--urd-panel-strong) !important;
 }
+
+.urd-page :not(.urd-hero):not(.urd-hero *) tbody {
+  background-color: var(--urd-raised) !important;
+}
+
+.urd-page :not(.urd-hero):not(.urd-hero *) th,
+.urd-page :not(.urd-hero):not(.urd-hero *) td {
+  border-color: #91b2d1 !important;
+}
 `;
+
 
 export function UrdPage({
   children,
@@ -341,7 +372,7 @@ export function UrdSection({
   return (
     <section id={id} className={cx(urd.section, className)}>
       {eyebrow ? (
-        <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">
+        <div className="text-xs font-black uppercase tracking-[0.14em] text-[#4f6f96]">
           {eyebrow}
         </div>
       ) : null}
@@ -352,7 +383,7 @@ export function UrdSection({
         </h2>
       ) : null}
 
-      <div className={title || eyebrow ? urd.sectionBody : "text-sm font-medium leading-7 text-[#27476f]"}>
+      <div className={title || eyebrow ? urd.sectionBody : "text-sm font-medium leading-7 text-[#24466f]"}>
         {children}
       </div>
     </section>
