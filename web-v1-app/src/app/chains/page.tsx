@@ -785,7 +785,7 @@ export default async function ChainPage({
             </div>
           </div>
         </details>
-      </section>
+      </header>
 
       <section className="mt-10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
