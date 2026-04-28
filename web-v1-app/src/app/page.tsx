@@ -2,7 +2,6 @@ import React, { type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
-import { cx, urd } from "@/components/site/UrdDesignSystem";
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { computeHistoryDepthDays } from "@/lib/historyDepth";
@@ -983,79 +982,71 @@ function StatusCard({
   const displayedPrimaryDriver = primaryDriver ?? primaryChange ?? null;
 
   return (
-    <Link href={row.href} className={urd.landingChainCard}>
-      <span className={urd.landingChainCardGlow} />
-      <span className={urd.landingChainCardOrb} />
-      <span className={urd.landingChainCardSheen} />
-
-      <div className={urd.landingChainCardContent}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <ChainLogo chain={row.chain} />
-            <div className="min-w-0 pt-0.5">
-              <div className="text-[21px] font-black tracking-[-0.04em] text-[#071d3b] drop-shadow-[0_1px_0_rgba(255,255,255,0.9)]">
-                {row.name}
-              </div>
-              <div
-                className={`mt-1.5 text-[13px] font-black uppercase tracking-[0.08em] ${regimeTextClass(
-                  row.publishedRegime
-                )}`}
-              >
-                {regime}
-              </div>
-            </div>
-          </div>
-
-          {displayedPrimaryDriver ? (
-            <div className={urd.landingChainDriverPanel}>
-              <div className="text-[11px] font-black uppercase tracking-[0.13em] text-[#082247]">
-                {displayedPrimaryDriver.label ?? "Primary driver"}
-              </div>
-
-              <div
-                className={`mt-1 text-[15px] font-black leading-[1.14] ${primaryDriverValueClass(
-                  displayedPrimaryDriver.tone
-                )}`}
-              >
-                {splitPrimaryDriverValue(displayedPrimaryDriver.value).name}
-              </div>
-
-              <div
-                className={`mt-0.5 text-[15px] font-black leading-[1.14] ${primaryDriverValueClass(
-                  displayedPrimaryDriver.tone
-                )}`}
-              >
-                {splitPrimaryDriverValue(displayedPrimaryDriver.value).change}
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        <div className={urd.landingChainConfidencePanel}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-[12px] font-black uppercase tracking-[0.13em] text-[#4f6f96]">
-              Confidence
+    <Link
+      href={row.href}
+      className="group flex min-h-[262px] flex-col rounded-[13px] border border-[#c9d9ea] bg-[#edf5fb] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.09)] transition hover:-translate-y-0.5 hover:border-[#adc7e4] hover:bg-[#e8f2fb] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_42px_rgba(15,47,91,0.13)]"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <ChainLogo chain={row.chain} />
+          <div className="min-w-0 pt-0.5">
+            <div className="text-[20px] font-extrabold text-[#0d2447]">
+              {row.name}
             </div>
             <div
-              className={cx(
-                "rounded-full border border-white/70 bg-white/54 px-2.5 py-1 text-[13px] font-black leading-none shadow-[0_6px_14px_rgba(8,34,71,0.08)]",
-                confidenceState.valueClass,
-              )}
+              className={`mt-1.5 text-[13px] font-black uppercase tracking-[0.08em] ${regimeTextClass(
+                row.publishedRegime
+              )}`}
             >
-              {confidence !== null ? `${confidence}%` : "—"}
+              {regime}
             </div>
-          </div>
-          <div className={`mt-3 text-[12px] font-semibold leading-5 ${confidenceState.noteClass}`}>
-            {confidenceState.note}
           </div>
         </div>
 
-        <div className={urd.landingChainFooter}>
-          <span>{shortDisplayDate(row.asOf).replace("Updated ", "Data updated through ")}</span>
-          <span className="text-[#0a55c2] transition group-hover:translate-x-0.5">
-            <ArrowIcon />
-          </span>
+        {displayedPrimaryDriver ? (
+          <div className="max-w-[170px] shrink-0 text-right">
+            <div className="text-[12px] font-black uppercase tracking-[0.12em] text-[#031329]">
+              {displayedPrimaryDriver.label ?? "Primary driver"}
+            </div>
+
+            <div
+              className={`mt-1 text-[15px] font-extrabold leading-[1.15] ${primaryDriverValueClass(
+                displayedPrimaryDriver.tone
+              )}`}
+            >
+              {splitPrimaryDriverValue(displayedPrimaryDriver.value).name}
+            </div>
+
+            <div
+              className={`mt-0.5 text-[15px] font-extrabold leading-[1.15] ${primaryDriverValueClass(
+                displayedPrimaryDriver.tone
+              )}`}
+            >
+              {splitPrimaryDriverValue(displayedPrimaryDriver.value).change}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-8">
+        <div className="text-[12px] font-black uppercase tracking-[0.12em] text-[#557099]">
+          Confidence
         </div>
+        <div
+          className={`mt-1 text-[14px] font-semibold leading-none tracking-[-0.04em] ${confidenceState.valueClass}`}
+        >
+          {confidence !== null ? `${confidence}%` : "—"}
+        </div>
+        <div className={`mt-2 text-[12px] font-medium leading-5 ${confidenceState.noteClass}`}>
+          {confidenceState.note}
+        </div>
+      </div>
+
+      <div className="mt-auto flex items-center justify-between gap-3 pt-7 text-[13px] font-medium text-[#557099]">
+        <span>{shortDisplayDate(row.asOf).replace("Updated ", "Data updated through ")}</span>
+        <span className="text-blue-500 transition group-hover:translate-x-0.5">
+          <ArrowIcon />
+        </span>
       </div>
     </Link>
   );
@@ -1466,6 +1457,100 @@ function JsonLayerCard(props: {
   );
 }
 
+function JsonExamplePickerModal() {
+  const layers: Array<{
+    tone: JsonLayerTone;
+    title: string;
+    description: string;
+  }> = [
+    {
+      tone: "gold",
+      title: "Gold",
+      description: "Daily observation data for the selected chain and date.",
+    },
+    {
+      tone: "meta",
+      title: "Meta",
+      description: "Regime label, confidence, freshness, and driver context.",
+    },
+    {
+      tone: "derived",
+      title: "Derived",
+      description: "Rolling baselines and trend context built from Gold.",
+    },
+  ];
+
+  return (
+    <div
+      id="json-example-picker"
+      className="fixed inset-0 z-[100] hidden items-center justify-center bg-[#020817]/82 px-5 py-8 backdrop-blur-sm [&:target]:flex"
+    >
+      <a href="#" className="absolute inset-0" aria-label="Close JSON example picker" />
+
+      <section className="relative w-full max-w-[1040px] rounded-[26px] border border-white/12 bg-[#061426] p-6 text-white shadow-[0_32px_120px_rgba(0,0,0,0.56)] sm:p-8">
+        <div className="flex items-start justify-between gap-5">
+          <div>
+            <div className="inline-flex rounded-full border border-cyan-300/35 bg-cyan-300/10 px-4 py-1.5 text-[13px] font-black uppercase tracking-[0.14em] text-cyan-200">
+              Historical JSON examples
+            </div>
+            <h3 className="mt-5 max-w-[760px] text-[34px] font-black tracking-[-0.045em] text-white">
+              Inspect real Gold, Meta, and Derived files before you read the full page.
+            </h3>
+            <p className="mt-3 max-w-[760px] text-[15px] font-semibold leading-7 text-slate-300">
+              Choose a layer and then compare a high-confidence example with a low-confidence / degraded example.
+              These are read from the published JSON archive, not hardcoded demo snippets.
+            </p>
+          </div>
+
+          <a
+            href="#"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-white/12 px-4 text-[13px] font-black text-white transition hover:bg-white/8"
+          >
+            Close
+          </a>
+        </div>
+
+        <div className="mt-8 grid gap-4 lg:grid-cols-3">
+          {layers.map((layer) => {
+            const tone = jsonLayerToneClasses(layer.tone);
+
+            return (
+              <div key={layer.tone} className={`rounded-[20px] border p-5 ${tone.card}`}>
+                <div className={`inline-flex rounded-full border px-3 py-1 text-[12px] font-black ${tone.badge}`}>
+                  {layer.title}
+                </div>
+                <h4 className={`mt-4 text-[26px] font-black tracking-[-0.035em] ${tone.title}`}>
+                  {layer.title}
+                </h4>
+                <p className="mt-2 min-h-[54px] text-[14px] font-semibold leading-6 text-slate-300">
+                  {layer.description}
+                </p>
+
+                <div className="mt-5 grid gap-3">
+                  <a
+                    href={`#json-${layer.tone}-high`}
+                    className="inline-flex h-11 items-center justify-between rounded-full border border-cyan-300/35 bg-cyan-300/12 px-4 text-[13px] font-black text-cyan-100 transition hover:bg-cyan-300/18"
+                  >
+                    High confidence
+                    <span aria-hidden="true">→</span>
+                  </a>
+                  <a
+                    href={`#json-${layer.tone}-degraded`}
+                    className="inline-flex h-11 items-center justify-between rounded-full border border-amber-300/40 bg-amber-300/12 px-4 text-[13px] font-black text-amber-100 transition hover:bg-amber-300/18"
+                  >
+                    Low confidence / degraded
+                    <span aria-hidden="true">→</span>
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function JsonExampleModal(props: {
   tone: JsonLayerTone;
   confidence: JsonExampleConfidence;
@@ -1733,12 +1818,12 @@ export default async function HomePage() {
                 Daily Gold, Meta, and Derived JSON for BTC, ETH, ARB, and BASE. Regime context without maintaining your own pipeline
               </p>
             <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/status"
-                className="inline-flex h-14 min-w-[200px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
+              <a
+                href="#json-example-picker"
+                className="inline-flex h-14 min-w-[260px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
               >
-                Latest chain status
-              </Link>
+                View historical example JSONs
+              </a>
               <Link
                 href="/api-docs"
                 className="inline-flex h-14 min-w-[190px] items-center justify-center rounded-[8px] border border-blue-300/50 bg-[#051b36]/40 px-6 text-[14px] font-extrabold text-white transition hover:bg-white/[0.06]"
@@ -1850,6 +1935,8 @@ export default async function HomePage() {
               />
             </div>
           </div>
+
+          <JsonExamplePickerModal />
 
           <JsonExampleModal
             tone="gold"
