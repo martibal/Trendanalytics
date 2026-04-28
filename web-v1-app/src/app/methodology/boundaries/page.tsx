@@ -23,7 +23,7 @@ export default function MethodologyBoundariesPage() {
         fullContent={
           <div className="grid gap-6">
         <Section title="What the public methodology discloses">
-          <ul className="list-disc pl-5 text-sm leading-7 text-[#27476f]">
+          <ul className="list-disc pl-5 text-sm leading-7 text-[var(--urd-text-body)]">
             <li>Field meaning and artifact ownership</li>
             <li>Interpretation of confidence, scorecard, regime, and freshness</li>
             <li>Publicly relevant thresholds and gates</li>
@@ -32,7 +32,7 @@ export default function MethodologyBoundariesPage() {
         </Section>
 
         <Section title="What the public methodology does not disclose">
-          <ul className="list-disc pl-5 text-sm leading-7 text-[#27476f]">
+          <ul className="list-disc pl-5 text-sm leading-7 text-[var(--urd-text-body)]">
             <li>Exact upstream AWS schemas or join logic</li>
             <li>Intermediate feature tables and ingestion repair rules</li>
             <li>Enough implementation detail to reconstruct raw source rows</li>
@@ -41,7 +41,7 @@ export default function MethodologyBoundariesPage() {
         </Section>
 
         <Section title="Analytical interpretation boundaries">
-          <ul className="list-disc pl-5 text-sm leading-7 text-[#27476f]">
+          <ul className="list-disc pl-5 text-sm leading-7 text-[var(--urd-text-body)]">
             <li>
               Labels and scores are chain-relative. A <InlineCode>CONGESTED</InlineCode> label on
               Arbitrum says nothing by itself about Ethereum.

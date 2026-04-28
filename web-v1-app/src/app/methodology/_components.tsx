@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   UrdCallout,
   UrdHero,
+  UrdPage,
   UrdInlineCode,
   UrdPillLink,
   UrdSection,
@@ -102,7 +103,7 @@ export function MethodologyPageShell({ children }: { children: ReactNode }) {
 }
 
 export function MethodologyContent({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("mx-auto max-w-6xl px-6 py-10", className)}>{children}</div>;
+  return <div className={cx(urd.container, className)}>{children}</div>;
 }
 
 export function MethodologyLink({ href, children }: { href: string; children: ReactNode }) {

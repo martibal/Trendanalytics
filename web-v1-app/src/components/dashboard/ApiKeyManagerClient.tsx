@@ -69,7 +69,7 @@ function apiKeyBadgeClass(status: ApiKeyRow["status"]) {
 
 function mutedBadge(text: string) {
   return (
-    <span className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#557099]">
+    <span className="inline-flex items-center rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[var(--urd-text-muted)]">
       {text}
     </span>
   );
@@ -271,13 +271,13 @@ export default function ApiKeyManagerClient({
   }
 
   return (
-    <section className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+    <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-black tracking-[-0.03em] text-[#0d2447]">
+          <h2 className="text-2xl font-black tracking-[-0.03em] text-[var(--urd-text-strong)]">
             API keys
           </h2>
-          <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-[#27476f]">
+          <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-[var(--urd-text-body)]">
             Create, rotate, and revoke delivery keys for authenticated JSON access.
             Secret values are shown exactly once at creation and only partial
             identifiers are displayed afterward.
@@ -285,7 +285,7 @@ export default function ApiKeyManagerClient({
         </div>
         <div className="flex items-center gap-2">
           {mutedBadge("db-backed")}
-          <span className="rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-2 text-sm font-black text-[#557099]">
+          <span className="rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] px-3 py-2 text-sm font-black text-[var(--urd-text-muted)]">
             {activeOrSuspendedCount}/2 non-revoked keys
           </span>
         </div>
@@ -315,10 +315,10 @@ export default function ApiKeyManagerClient({
         </div>
       ) : null}
 
-      <form onSubmit={handleCreate} className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
+      <form onSubmit={handleCreate} className="mt-5 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <div className="min-w-0 flex-1">
-            <label htmlFor="api-key-label" className="text-sm font-black text-[#0d2447]">
+            <label htmlFor="api-key-label" className="text-sm font-black text-[var(--urd-text-strong)]">
               Key label
             </label>
             <input
@@ -328,10 +328,10 @@ export default function ApiKeyManagerClient({
               onChange={(event) => setLabel(event.target.value)}
               placeholder="Example: local dev / staging / laptop"
               maxLength={64}
-              className="mt-2 w-full rounded-xl border border-[#9db8d4] bg-[#f4f9ff] px-3 py-2 text-sm font-semibold text-[#0d2447] outline-none ring-0 transition placeholder:text-[#557099] focus:border-blue-500"
+              className="mt-2 w-full rounded-xl border border-[var(--urd-border)] bg-[var(--urd-raised)] px-3 py-2 text-sm font-semibold text-[var(--urd-text-strong)] outline-none ring-0 transition placeholder:text-[var(--urd-text-muted)] focus:border-blue-500"
               disabled={!canMutate || activeOrSuspendedCount >= 2}
             />
-            <p className="mt-2 text-xs font-semibold leading-6 text-[#557099]">
+            <p className="mt-2 text-xs font-semibold leading-6 text-[var(--urd-text-muted)]">
               Optional label for identification in rotation workflows.
             </p>
           </div>
@@ -340,10 +340,10 @@ export default function ApiKeyManagerClient({
             type="submit"
             disabled={!canMutate || activeOrSuspendedCount >= 2}
             className={[
-              "rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-2 text-sm font-black transition",
+              "rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] px-3 py-2 text-sm font-black transition",
               !canMutate || activeOrSuspendedCount >= 2
-                ? "cursor-not-allowed text-[#557099] opacity-60"
-                : "text-[#0d2447] hover:bg-white",
+                ? "cursor-not-allowed text-[var(--urd-text-muted)] opacity-60"
+                : "text-[var(--urd-text-strong)] hover:bg-white",
             ].join(" ")}
           >
             {isPending ? "Working..." : "Create API key"}
@@ -365,14 +365,14 @@ export default function ApiKeyManagerClient({
           <p className="mt-2 text-sm font-semibold leading-7 text-emerald-900">
             Copy this secret now. It will not be shown again after you leave or refresh this state.
           </p>
-          <div className="mt-3 overflow-x-auto rounded-xl border border-emerald-300 bg-white/70 p-3 font-mono text-sm font-bold text-[#0d2447]">
+          <div className="mt-3 overflow-x-auto rounded-xl border border-emerald-300 bg-white/70 p-3 font-mono text-sm font-bold text-[var(--urd-text-strong)]">
             {createdSecret}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleCopySecret}
-              className="rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-2 text-sm font-black text-[#0d2447] transition hover:bg-white"
+              className="rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] px-3 py-2 text-sm font-black text-[var(--urd-text-strong)] transition hover:bg-white"
             >
               {copied ? "Copied" : "Copy secret"}
             </button>
@@ -384,25 +384,25 @@ export default function ApiKeyManagerClient({
       ) : null}
 
       {keys.length === 0 ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-[#9db8d4] bg-[#eef6ff] p-4 text-sm font-semibold text-[#557099]">
+        <div className="mt-5 rounded-2xl border border-dashed border-[var(--urd-border)] bg-[var(--urd-raised)] p-4 text-sm font-semibold text-[var(--urd-text-muted)]">
           No API keys are connected to this account yet.
         </div>
       ) : (
         <div className="mt-5 space-y-3">
           {keys.map((keyRow) => (
-            <div key={keyRow.id} className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
+            <div key={keyRow.id} className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="font-black text-[#0d2447]">
+                  <div className="font-black text-[var(--urd-text-strong)]">
                     {keyRow.prefix}
                     ••••
                     {keyRow.last4 ?? "—"}
                   </div>
-                  <div className="mt-1 text-xs font-semibold text-[#557099]">
+                  <div className="mt-1 text-xs font-semibold text-[var(--urd-text-muted)]">
                     Created: {formatDateTime(keyRow.createdAt)} · Last used:{" "}
                     {formatDateTime(keyRow.lastUsedAt)}
                   </div>
-                  <div className="mt-1 text-xs font-semibold text-[#557099]">
+                  <div className="mt-1 text-xs font-semibold text-[var(--urd-text-muted)]">
                     Tier: {keyRow.tier} · Chain: {keyRow.entitledChain ?? "all"} · Max window:{" "}
                     {keyRow.maxWindowDays}d
                   </div>
@@ -415,10 +415,10 @@ export default function ApiKeyManagerClient({
                     disabled={!canMutate || keyRow.status === "revoked"}
                     onClick={() => handleRevoke(keyRow.id)}
                     className={[
-                      "rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1.5 text-sm font-black transition",
+                      "rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] px-3 py-1.5 text-sm font-black transition",
                       !canMutate || keyRow.status === "revoked"
-                        ? "cursor-not-allowed text-[#557099] opacity-60"
-                        : "text-[#0d2447] hover:bg-white",
+                        ? "cursor-not-allowed text-[var(--urd-text-muted)] opacity-60"
+                        : "text-[var(--urd-text-strong)] hover:bg-white",
                     ].join(" ")}
                   >
                     {busyKeyId === keyRow.id && isPending ? "Revoking..." : "Revoke"}
@@ -427,7 +427,7 @@ export default function ApiKeyManagerClient({
               </div>
 
               {keyRow.label ? (
-                <div className="mt-2 text-xs font-semibold text-[#557099]">Label: {keyRow.label}</div>
+                <div className="mt-2 text-xs font-semibold text-[var(--urd-text-muted)]">Label: {keyRow.label}</div>
               ) : null}
             </div>
           ))}
@@ -441,27 +441,27 @@ export default function ApiKeyManagerClient({
       ) : null}
 
       <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm">
-          <div className="font-black text-[#0d2447]">ACTIVE</div>
-          <p className="mt-2 font-semibold leading-7 text-[#27476f]">
+        <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4 text-sm">
+          <div className="font-black text-[var(--urd-text-strong)]">ACTIVE</div>
+          <p className="mt-2 font-semibold leading-7 text-[var(--urd-text-body)]">
             Valid for authenticated file delivery within the account&apos;s entitlement scope.
           </p>
         </div>
-        <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm">
-          <div className="font-black text-[#0d2447]">SUSPENDED</div>
-          <p className="mt-2 font-semibold leading-7 text-[#27476f]">
+        <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4 text-sm">
+          <div className="font-black text-[var(--urd-text-strong)]">SUSPENDED</div>
+          <p className="mt-2 font-semibold leading-7 text-[var(--urd-text-body)]">
             Used for inactive subscription state. Key exists, but delivery is blocked.
           </p>
         </div>
-        <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm">
-          <div className="font-black text-[#0d2447]">REVOKED</div>
-          <p className="mt-2 font-semibold leading-7 text-[#27476f]">
+        <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4 text-sm">
+          <div className="font-black text-[var(--urd-text-strong)]">REVOKED</div>
+          <p className="mt-2 font-semibold leading-7 text-[var(--urd-text-body)]">
             Permanently disabled after user or admin revocation. Cannot be reactivated.
           </p>
         </div>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm font-semibold leading-7 text-[#27476f]">
+      <div className="mt-5 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4 text-sm font-semibold leading-7 text-[var(--urd-text-body)]">
         Only partial identifiers are displayed after creation. The full secret is intentionally not retrievable later.
       </div>
     </section>

@@ -62,7 +62,7 @@ export function UrdHashModal({
       id={id}
       className={cx(
         open ? "flex" : "hidden",
-        "fixed inset-0 z-[80] items-center justify-center p-4",
+        "fixed inset-0 z-[180] items-center justify-center p-4",
         className,
       )}
     >

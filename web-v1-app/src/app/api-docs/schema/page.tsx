@@ -37,7 +37,7 @@ function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
   return (
     <a
       href={`#${id}`}
-      className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-black text-[#0d2447] hover:bg-white hover:text-blue-800"
+      className="inline-flex items-center rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] px-3 py-1 text-xs font-black text-[var(--urd-text-strong)] hover:bg-white hover:text-blue-800"
     >
       {label}
     </a>
@@ -55,26 +55,26 @@ function ExplainModal({ id, title, subtitle, pair }: {
       <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] shadow-2xl shadow-slate-950/30">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#b6cce3] px-6 py-5">
           <div>
-            <h3 className="text-2xl font-black text-[#0d2447]">{title}</h3>
-            {subtitle ? <div className="mt-2 text-sm font-semibold leading-6 text-[#27476f]">{subtitle}</div> : null}
+            <h3 className="text-2xl font-black text-[var(--urd-text-strong)]">{title}</h3>
+            {subtitle ? <div className="mt-2 text-sm font-semibold leading-6 text-[var(--urd-text-body)]">{subtitle}</div> : null}
           </div>
-          <a href="#" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#9db8d4] bg-[#eef6ff] text-xl font-black text-[#0d2447] hover:bg-white" aria-label="Close dialog">×</a>
+          <a href="#" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] text-xl font-black text-[var(--urd-text-strong)] hover:bg-white" aria-label="Close dialog">×</a>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <section className="rounded-2xl border border-[#9db8d4] bg-[#eef6ff] p-5">
+            <section className="rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-raised)] p-5">
               <div className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Basic</div>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.basic}</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.basic}</div>
             </section>
-            <details className="rounded-2xl border border-[#9db8d4] bg-[#eef6ff] p-5" open>
+            <details className="rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-raised)] p-5" open>
               <summary className="cursor-pointer list-none text-xs font-black uppercase tracking-[0.14em] text-blue-700">Advanced</summary>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.advanced}</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.advanced}</div>
             </details>
           </div>
           {pair.traceability ? (
-            <div className="mt-4 rounded-2xl border border-[#9db8d4] bg-[#eef6ff] p-5">
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">Traceability</div>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.traceability}</div>
+            <div className="mt-4 rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-raised)] p-5">
+              <div className="text-xs font-black uppercase tracking-[0.14em] text-[var(--urd-text-muted)]">Traceability</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.traceability}</div>
             </div>
           ) : null}
         </div>
@@ -100,11 +100,11 @@ type FieldRowProps = {
 function FieldRow({ field, type, nullable, chains, basic, advanced, traceability }: FieldRowProps) {
   const id = `field-${field.replace(/[^a-zA-Z0-9]/g, "-")}`;
   return (
-    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] transition-colors hover:border-[#9db8d4]">
+    <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] transition-colors hover:border-[var(--urd-border)]">
       <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
         <div className="flex flex-wrap items-center gap-2">
           <IC>{field}</IC>
-          <span className="rounded-full border border-[#9db8d4] bg-[#e7f1fb] px-2 py-0.5 font-mono text-[10px] font-bold text-[#27476f]">
+          <span className="rounded-full border border-[var(--urd-border)] bg-[#e7f1fb] px-2 py-0.5 font-mono text-[10px] font-bold text-[var(--urd-text-body)]">
             {type}
           </span>
           {nullable ? (
@@ -113,14 +113,14 @@ function FieldRow({ field, type, nullable, chains, basic, advanced, traceability
             </span>
           ) : null}
           {chains ? (
-            <span className="rounded-full border border-[#9db8d4] bg-[#e7f1fb] px-2 py-0.5 text-[10px] font-bold text-[#27476f]">
+            <span className="rounded-full border border-[var(--urd-border)] bg-[#e7f1fb] px-2 py-0.5 text-[10px] font-bold text-[var(--urd-text-body)]">
               {chains}
             </span>
           ) : null}
         </div>
         <MoreLink id={id} label="Explain" />
       </div>
-      <div className="border-t border-[#c9d9ea] px-5 py-3 text-sm font-medium leading-7 text-[#27476f]">
+      <div className="border-t border-[var(--urd-border-soft)] px-5 py-3 text-sm font-medium leading-7 text-[var(--urd-text-body)]">
         {basic}
       </div>
       <ExplainModal
@@ -164,7 +164,7 @@ export default async function SchemaPage() {
             <a
               key={label}
               href={href}
-              className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-4 py-1.5 text-sm font-black text-[#0d2447] hover:bg-white"
+              className="inline-flex items-center rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] px-4 py-1.5 text-sm font-black text-[var(--urd-text-strong)] hover:bg-white"
             >
               {label}
             </a>
@@ -172,20 +172,20 @@ export default async function SchemaPage() {
         </div>
       </PageHero>
       <UrdContainer className="max-w-7xl">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4 text-sm font-semibold text-[#27476f]">
-          <Link href="/api-docs" className="text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4 text-sm font-semibold text-[var(--urd-text-body)]">
+          <Link href="/api-docs" className="text-[var(--urd-text-strong)] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">
             ← API Docs
           </Link>
           {dataset ? (
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-xs font-black uppercase tracking-[0.12em] text-[#557099]">Dataset</span>
+              <span className="text-xs font-black uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">Dataset</span>
               {dataset.methodology_version ? <span>Methodology <IC>{dataset.methodology_version}</IC></span> : null}
               <span>Published artifact contract</span>
             </div>
           ) : null}
         </div>
-        <div className="mb-6 rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4 text-sm font-semibold leading-7 text-[#27476f]">
-          Each entry shows: the field name, type, whether it can be null, which chains it applies to, a plain-language description, and an <span className="font-black text-[#0d2447]">Explain</span> button for full Basic + Advanced + Traceability detail.
+        <div className="mb-6 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4 text-sm font-semibold leading-7 text-[var(--urd-text-body)]">
+          Each entry shows: the field name, type, whether it can be null, which chains it applies to, a plain-language description, and an <span className="font-black text-[var(--urd-text-strong)]">Explain</span> button for full Basic + Advanced + Traceability detail.
         </div>
       <ShortFullContent
         pageKey="schema-reference"
@@ -202,15 +202,15 @@ export default async function SchemaPage() {
       {/* GOLD                                                              */}
       {/* ══════════════════════════════════════════════════════════════════ */}
       <section id="gold" className="mb-12 scroll-mt-8">
-        <div className="mb-5 rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-sm">
+        <div className="mb-5 rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-sm">
           <div className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Layer 1</div>
-          <h2 className="mt-2 text-3xl font-black text-[#0d2447]">Gold</h2>
-          <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-[#27476f]">
+          <h2 className="mt-2 text-3xl font-black text-[var(--urd-text-strong)]">Gold</h2>
+          <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-[var(--urd-text-body)]">
             Raw daily aggregates from the blockchain — exactly what the network did on each
             day, in native units, with no statistical transformation applied. This is the
             authoritative source that all Meta and Derived computations are built from.
           </p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs text-[#557099]">
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--urd-text-muted)]">
             <IC>gold/&lt;chain&gt;/latest.json</IC>
             <IC>gold/&lt;chain&gt;/last90d.json</IC>
             <IC>gold/&lt;chain&gt;/YYYY-MM-DD.json</IC>
@@ -313,15 +313,15 @@ export default async function SchemaPage() {
       {/* META                                                              */}
       {/* ══════════════════════════════════════════════════════════════════ */}
       <section id="meta" className="mb-12 scroll-mt-8">
-        <div className="mb-5 rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-sm">
+        <div className="mb-5 rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-sm">
           <div className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Layer 2</div>
-          <h2 className="mt-2 text-3xl font-black text-[#0d2447]">Meta</h2>
-          <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-[#27476f]">
+          <h2 className="mt-2 text-3xl font-black text-[var(--urd-text-strong)]">Meta</h2>
+          <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-[var(--urd-text-body)]">
             The intelligence layer — regime classification, confidence scoring, three-axis
             scorecard, and ranked driver set. This is the primary product output and the
             layer most subscribers use for quantitative research.
           </p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs text-[#557099]">
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--urd-text-muted)]">
             <IC>meta/&lt;chain&gt;/latest.json</IC>
             <IC>meta/&lt;chain&gt;/last90d.json</IC>
             <IC>meta/&lt;chain&gt;/YYYY-MM-DD.json</IC>
@@ -331,8 +331,8 @@ export default async function SchemaPage() {
         <div className="space-y-3">
 
           {/* Top-level */}
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-5 py-3">
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">Top-level fields</div>
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-5 py-3">
+            <div className="text-xs font-black uppercase tracking-[0.14em] text-[var(--urd-text-muted)]">Top-level fields</div>
           </div>
 
           <FieldRow field="date" type="string (YYYY-MM-DD)" basic="The as-of date this meta row describes." advanced="Canonical date field — matches the Gold row this meta output was computed over. Used as the primary key for row-level lookups and time-series ordering." />
@@ -342,8 +342,8 @@ export default async function SchemaPage() {
           <FieldRow field="revision_id" type="number" nullable basic="This field is not currently part of the canonical public provenance model for archived Meta outputs. Public provenance is instead anchored in date, updated_through, methodology_version, dataset revision, and regime.determinism_hash where applicable." advanced="Public provenance should be read via methodology_version, updated_through, dataset revision, and regime.determinism_hash. Do not treat revision_id as the sole or required public traceability anchor." />
 
           {/* status */}
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-5 py-3">
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">status — the published regime label</div>
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-5 py-3">
+            <div className="text-xs font-black uppercase tracking-[0.14em] text-[var(--urd-text-muted)]">status — the published regime label</div>
           </div>
 
           <FieldRow field="status.label" type="string (enum)" basic={<>The headline regime label: <IC>STABLE</IC>, <IC>HEATING</IC>, <IC>CONGESTED</IC>, <IC>CHEAP</IC>, or <IC>UNKNOWN/DEGRADED</IC>. The top-line answer to &quot;what state is the network in right now?&quot;</>} advanced={<>Deterministic output of the regime classification rule tree, applied after confidence gating. Rule evaluation order: (1) <IC>confidence &lt; 0.40</IC> → UNKNOWN/DEGRADED; (2) Capacity EXTREME_HIGH or (Capacity HIGH and Friction HIGH) → CONGESTED; (3) Friction LOW and Capacity LOW → CHEAP; (4) Demand HIGH and any axis HEATING → HEATING; (5) default → STABLE. The UI reads this field directly — it never recomputes the label.</>} traceability={<IC>main.py → status object → status.label</IC>} />
@@ -351,8 +351,8 @@ export default async function SchemaPage() {
           <FieldRow field="status.one_liner" type="string" nullable basic="A short human-readable summary of the current state, e.g. 'Demand: High; Friction: Normal; Capacity: Normal'. Auto-generated by the pipeline." advanced="Pipeline-authored descriptive copy that compresses regime, scorecard levels, and chain context into one sentence ≤80 chars. Rendered directly on chain pages. Not an independent inference layer — it restates the scorecard levels in prose." />
 
           {/* confidence */}
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-5 py-3">
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">confidence — evidence quality for this row</div>
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-5 py-3">
+            <div className="text-xs font-black uppercase tracking-[0.14em] text-[var(--urd-text-muted)]">confidence — evidence quality for this row</div>
           </div>
 
           <FieldRow field="confidence.confidence_score" type="number (0–1)" nullable basic="How well-supported the current regime label is by the available data. Think of it as the strength of the weather forecast — closer to 1 means stronger, more consistent evidence." advanced={<>Geometric mean of data_quality_score and label_confidence_score: <IC>√(dq × lc)</IC>. The geometric mean ensures weakness in either component suppresses the composite. Hard gate: if score &lt; 0.40 then status.label is forced to UNKNOWN/DEGRADED. Caution band 0.40–0.69: scorecard scores are degraded toward 50 via <IC>score = 50 + (score−50) × effective_confidence</IC>.</>} traceability={<IC>confidence.confidence_score</IC>} />
@@ -363,8 +363,8 @@ export default async function SchemaPage() {
           <FieldRow field="confidence.semantics" type="string" basic={<>A machine-readable label of what the confidence score means. Currently always <IC>evidence_sufficiency_asof_date</IC>.</>} advanced="Exists to prevent semantic drift — as the confidence model evolves, this field signals what definition was in effect when the row was computed. Not intended for display; intended for programmatic consumers who need to distinguish confidence models across methodology versions." />
 
           {/* scorecard */}
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-5 py-3">
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">scorecard.dimensions — three-axis structural decomposition</div>
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-5 py-3">
+            <div className="text-xs font-black uppercase tracking-[0.14em] text-[var(--urd-text-muted)]">scorecard.dimensions — three-axis structural decomposition</div>
           </div>
 
           <FieldRow field="scorecard.dimensions.demand.score" type="number (0–100)" basic="How strong current network usage looks relative to this chain's own recent history. 50 is neutral. Above 67 is High. Below 33 is Low." advanced={<>Computed as <IC>50 + 40 × tanh(z / 1.5)</IC> over the combined demand z-signal, then degraded toward 50 by <IC>effective_confidence = base_confidence × coverage_factor</IC>. Input metrics: tx_count_daily (log-normalised), unique_active_addresses, and tx_per_user ratio. Demand coverage factor is 3/3 when all inputs are present.</>} traceability={<IC>scorecard.dimensions.demand.score</IC>} />
@@ -376,8 +376,8 @@ export default async function SchemaPage() {
           <FieldRow field="scorecard.dimensions.capacity.score" type="number (0–100)" basic="How close the network is to its operational limits. High means stretched. Low means plenty of room. The specific metrics used depend on which chain — Bitcoin, Ethereum, and L2s each use different capacity proxies." advanced="Input metrics vary by chain profile: ETH L1 uses gas_utilization_pct and blocktime_instability; BTC uses blocktime_instability only (no gas); L2s use capacity_util_pct and blocktime_instability. The chain-specific profile prevents L1 gas semantics from being applied to non-L1 chains." traceability={<IC>scorecard.dimensions.capacity.score</IC>} />
 
           {/* regime */}
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-5 py-3">
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">regime — classification evidence and reproducibility</div>
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-5 py-3">
+            <div className="text-xs font-black uppercase tracking-[0.14em] text-[var(--urd-text-muted)]">regime — classification evidence and reproducibility</div>
           </div>
 
           <FieldRow field="regime.label" type="string (enum)" basic={<>Redundant copy of <IC>status.label</IC>. The primary field is status.label; regime.label is kept for historical compatibility.</>} advanced="Fallback field used when status.label is unavailable. The UI resolution order is: status.label → regime.label → UNKNOWN/DEGRADED. In well-formed rows both are identical." />
@@ -421,15 +421,15 @@ export default async function SchemaPage() {
       {/* DERIVED                                                           */}
       {/* ══════════════════════════════════════════════════════════════════ */}
       <section id="derived" className="mb-12 scroll-mt-8">
-        <div className="mb-5 rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-sm">
+        <div className="mb-5 rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-sm">
           <div className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Layer 3</div>
-          <h2 className="mt-2 text-3xl font-black text-[#0d2447]">Derived</h2>
-          <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-[#27476f]">
+          <h2 className="mt-2 text-3xl font-black text-[var(--urd-text-strong)]">Derived</h2>
+          <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-[var(--urd-text-body)]">
             Smoothed rolling averages of Gold metrics — 7-day (MA7) and 30-day (MA30) —
             used to draw the trend charts on chain pages. Useful for distinguishing
             brief spikes from sustained structural changes.
           </p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs text-[#557099]">
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--urd-text-muted)]">
             <IC>derived/&lt;chain&gt;/latest.json</IC>
             <IC>derived/&lt;chain&gt;/last90d.json</IC>
             <IC>derived/&lt;chain&gt;/YYYY-MM-DD.json</IC>
@@ -485,22 +485,22 @@ export default async function SchemaPage() {
             { href: "/methodology", label: "Methodology", desc: "How the model works" },
             { href: "/thresholds", label: "Thresholds", desc: "Classification parameters" },
           ].map(({ href, label, desc }) => (
-            <Link key={href} href={href} className="group flex items-center justify-between rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-4 py-3 transition hover:border-[#9db8d4] hover:bg-white">
+            <Link key={href} href={href} className="group flex items-center justify-between rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-3 transition hover:border-[var(--urd-border)] hover:bg-white">
               <div>
-                <div className="text-sm font-black text-[#0d2447]">{label}</div>
-                <div className="mt-0.5 text-xs font-medium text-[#557099]">{desc}</div>
+                <div className="text-sm font-black text-[var(--urd-text-strong)]">{label}</div>
+                <div className="mt-0.5 text-xs font-medium text-[var(--urd-text-muted)]">{desc}</div>
               </div>
-              <span className="text-xs font-bold text-[#557099] transition group-hover:text-blue-800">→</span>
+              <span className="text-xs font-bold text-[var(--urd-text-muted)] transition group-hover:text-blue-800">→</span>
             </Link>
           ))}
         </div>
       </section>
 
-      <details className="mt-8 rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5">
-        <summary className="cursor-pointer text-sm font-black text-[#0d2447] hover:text-blue-800">
+      <details className="mt-8 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-5">
+        <summary className="cursor-pointer text-sm font-black text-[var(--urd-text-strong)] hover:text-blue-800">
           Data contract and traceability
         </summary>
-        <div className="mt-4 grid gap-2 text-sm font-medium text-[#27476f]">
+        <div className="mt-4 grid gap-2 text-sm font-medium text-[var(--urd-text-body)]">
           <div>Gold source: <IC>feature_daily_agg.py → build_gold_timeseries.py → published JSON</IC></div>
           <div>Meta source: <IC>main.py (regime_engine + market_scorecard + confidence) → published JSON</IC></div>
           <div>Derived source: <IC>publish_artifacts.py (rolling_mean, windows=[7,30]) → published JSON</IC></div>

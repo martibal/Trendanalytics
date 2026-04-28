@@ -59,9 +59,9 @@ export default async function MethodologyProvenancePage() {
               </Callout>
               <Section title="Where to read related public policies">
                 <ul className="list-disc pl-5">
-                  <li><Link href="/methodology/integrity" className="font-semibold text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Release Integrity & Determinism</Link></li>
-                  <li><Link href="/methodology/changelog" className="font-semibold text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Methodology Changelog</Link></li>
-                  <li><Link href="/service" className="font-semibold text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Service Expectations, Support & Revisions</Link></li>
+                  <li><Link href="/methodology/integrity" className="font-semibold text-[var(--urd-text-strong)] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Release Integrity & Determinism</Link></li>
+                  <li><Link href="/methodology/changelog" className="font-semibold text-[var(--urd-text-strong)] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Methodology Changelog</Link></li>
+                  <li><Link href="/service" className="font-semibold text-[var(--urd-text-strong)] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Service Expectations, Support & Revisions</Link></li>
                 </ul>
               </Section>
             </div>

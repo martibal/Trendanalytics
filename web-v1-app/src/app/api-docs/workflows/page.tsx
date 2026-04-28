@@ -10,7 +10,7 @@ import {
 } from "@/components/site/UrdDesignSystem";
 
 function Code({ children }: { children: string }) {
-  return <pre className="overflow-x-auto rounded-2xl border border-[#9db8d4] bg-[#0d2447] p-5 text-xs leading-6 text-[#eef6ff]"><code>{children}</code></pre>;
+  return <pre className="overflow-x-auto rounded-2xl border border-[var(--urd-border)] bg-[#0d2447] p-5 text-xs leading-6 text-[#eef6ff]"><code>{children}</code></pre>;
 }
 
 export default function WorkflowsPage() {
@@ -65,15 +65,15 @@ pprint(rows)`}</Code>
                 </div>
               </UrdSection>
               <UrdSection title="Workflow 2 — verify a determinism hash">
-                <p>Use the example on <Link href="/methodology/verification" className="font-semibold text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Verification & Evidence Pack</Link> to prove that the named regime payload is internally consistent.</p>
+                <p>Use the example on <Link href="/methodology/verification" className="font-semibold text-[var(--urd-text-strong)] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Verification & Evidence Pack</Link> to prove that the named regime payload is internally consistent.</p>
               </UrdSection>
               <UrdSection title="Workflow 3 — parse confidence-aware state changes">
                 <p>Treat <UrdInlineCode>UNKNOWN/DEGRADED</UrdInlineCode> as a first-class state, not as a missing row, and keep freshness and confidence separate from label interpretation.</p>
               </UrdSection>
               <UrdSection title="Downloads">
                 <ul className="list-disc pl-5">
-                  <li><a href="/examples/urd-atlas-pro-workflow.ipynb" className="font-semibold text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Python quickstart notebook</a></li>
-                  <li><Link href="/api-docs/samples" className="font-semibold text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Public sample pack</Link></li>
+                  <li><a href="/examples/urd-atlas-pro-workflow.ipynb" className="font-semibold text-[var(--urd-text-strong)] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Python quickstart notebook</a></li>
+                  <li><Link href="/api-docs/samples" className="font-semibold text-[var(--urd-text-strong)] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">Public sample pack</Link></li>
                 </ul>
               </UrdSection>
             </div>

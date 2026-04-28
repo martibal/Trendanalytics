@@ -33,10 +33,10 @@ export const urd = {
     chartMA30: "#031329",
   },
 
-  page: "min-h-screen bg-[#edf6ff] text-[#0a1d3a]",
+  page: "urd-page min-h-screen bg-[#edf6ff] text-[#0a1d3a]",
   container: "mx-auto max-w-6xl px-6 py-10",
 
-  heroOuter: "relative overflow-hidden bg-[#031329] text-white",
+  heroOuter: "urd-hero relative overflow-hidden bg-[#031329] text-white",
   heroContainer:
     "relative mx-auto max-w-7xl px-6 pb-28 pt-24 sm:px-8 lg:px-10 lg:pb-32 lg:pt-28",
   heroEyebrow:
@@ -48,30 +48,30 @@ export const urd = {
     "mt-8 max-w-3xl text-xl font-black leading-9 text-white",
 
   section:
-    "rounded-3xl border border-[#9db8d4] bg-[#dbeafa] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
+    "rounded-3xl border border-[#86a9cc] bg-[#d2e4f6] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
   sectionTitle: "text-2xl font-black tracking-[-0.03em] text-[#0d2447]",
   sectionBody: "mt-4 text-sm font-medium leading-7 text-[#27476f]",
 
-  nav: "mb-8 overflow-x-auto rounded-2xl border border-[#9db8d4] bg-[#d9eafb] p-3",
+  nav: "mb-8 overflow-x-auto rounded-2xl border border-[#86a9cc] bg-[#d2e4f6] p-3",
   navInner: "flex min-w-max flex-wrap gap-2",
   navItem:
-    "rounded-full border border-[#7fa3ca] bg-[#f4f9ff] px-3 py-1.5 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+    "rounded-full border border-[#86a9cc] bg-[#f4f9ff] px-3 py-1.5 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
 
   button:
-    "inline-flex items-center rounded-full border border-[#7fa3ca] bg-[#f4f9ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+    "inline-flex items-center rounded-full border border-[#86a9cc] bg-[#f4f9ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
 
   code:
-    "rounded border border-[#9db8d4] bg-[#f4f9ff] px-1.5 py-0.5 font-mono text-xs font-bold text-[#0d2447]",
+    "rounded border border-[#86a9cc] bg-[#f4f9ff] px-1.5 py-0.5 font-mono text-xs font-bold text-[#0d2447]",
 
-  tableWrap: "mt-5 overflow-x-auto rounded-2xl border border-[#7fa3ca]",
+  tableWrap: "mt-5 overflow-x-auto rounded-2xl border border-[#86a9cc]",
   table: "w-full text-sm",
-  tableHead: "bg-[#cfe2f5]",
+  tableHead: "bg-[#bed8f0]",
   tableTh:
     "px-4 py-3 text-left text-xs font-black uppercase tracking-[0.12em] text-[#203c63]",
   tableBody: "divide-y divide-[#9db8d4] bg-[#f4f9ff]",
   tableTd: "px-4 py-3 font-medium text-[#27476f]",
 
-  callout: "rounded-2xl border border-[#7fa3ca] bg-[#d9eafb] p-5",
+  callout: "rounded-2xl border border-[#86a9cc] bg-[#d2e4f6] p-5",
   calloutTitle: "text-sm font-black text-blue-700",
   calloutBody: "mt-3 text-sm font-semibold leading-7 text-[#0d2447]",
 
@@ -79,47 +79,47 @@ export const urd = {
   warningTitle: "text-sm font-black text-amber-700",
 
   modalPanel:
-    "relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#7fa3ca] bg-[#d9eafb] text-[#0a1d3a] shadow-2xl shadow-slate-950/30",
+    "relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#86a9cc] bg-[#d2e4f6] text-[#0a1d3a] shadow-2xl shadow-slate-950/30",
 
   card:
-    "rounded-3xl border border-[#9db8d4] bg-[#dbeafa] text-[#0a1d3a] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
+    "rounded-3xl border border-[#86a9cc] bg-[#d2e4f6] text-[#0a1d3a] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
   cardPadded:
-    "rounded-3xl border border-[#9db8d4] bg-[#dbeafa] p-6 text-[#0a1d3a] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
+    "rounded-3xl border border-[#86a9cc] bg-[#d2e4f6] p-6 text-[#0a1d3a] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
   subtlePanel:
-    "rounded-2xl border border-[#9db8d4] bg-[#f4f9ff] text-[#0a1d3a]",
+    "rounded-2xl border border-[#86a9cc] bg-[#f4f9ff] text-[#0a1d3a]",
   darkOnLightText: "text-[#0a1d3a]",
   darkOnLightBody: "text-[#27476f]",
   darkOnLightMuted: "text-[#557099]",
   lightButton:
-    "inline-flex items-center rounded-full border border-[#7fa3ca] bg-[#f4f9ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+    "inline-flex items-center rounded-full border border-[#86a9cc] bg-[#f4f9ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
   chartCard:
-    "rounded-2xl border border-[#9db8d4] bg-[#cfe2f5] p-5 text-[#0a1d3a] shadow-sm",
+    "rounded-2xl border border-[#86a9cc] bg-[#bed8f0] p-5 text-[#0a1d3a] shadow-sm",
   chartPanel:
-    "rounded-xl border border-[#7fa3ca] bg-[#f4f9ff] text-[#0a1d3a]",
+    "rounded-xl border border-[#86a9cc] bg-[#f4f9ff] text-[#0a1d3a]",
 
   modalBackdrop:
     "absolute inset-0 bg-slate-950/80 backdrop-blur-sm",
   modalHeader:
-    "flex shrink-0 items-start justify-between gap-4 border-b border-[#9db8d4] px-6 py-5",
+    "flex shrink-0 items-start justify-between gap-4 border-b border-[#86a9cc] px-6 py-5",
   modalClose:
-    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#9db8d4] bg-[#f4f9ff] text-xl text-[#0d2447] hover:bg-white",
+    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#86a9cc] bg-[#f4f9ff] text-xl text-[#0d2447] hover:bg-white",
   modalGrid:
     "grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
   modalBasicPanel:
     "rounded-2xl border border-emerald-400 bg-emerald-50 p-5 text-[#0a1d3a]",
   modalAdvancedPanel:
-    "rounded-2xl border border-[#7fa3ca] bg-[#f4f9ff] p-5 text-[#0a1d3a]",
+    "rounded-2xl border border-[#86a9cc] bg-[#f4f9ff] p-5 text-[#0a1d3a]",
   modalKicker:
     "text-xs font-black uppercase tracking-[0.14em] text-blue-700",
   infoPanel:
-    "rounded-2xl border border-[#9db8d4] bg-[#d9eafb] p-4 text-[#0a1d3a]",
+    "rounded-2xl border border-[#86a9cc] bg-[#d2e4f6] p-4 text-[#0a1d3a]",
   infoPanelStrong:
-    "rounded-2xl border border-[#7fa3ca] bg-[#cfe2f5] p-4 text-[#0a1d3a]",
+    "rounded-2xl border border-[#86a9cc] bg-[#bed8f0] p-4 text-[#0a1d3a]",
 
   topHeader:
-    "absolute inset-x-0 top-0 z-[80] bg-transparent text-white",
+    "fixed inset-x-0 top-0 z-[120] border-b border-white/10 bg-[#031329]/96 text-white shadow-[0_10px_32px_rgba(0,0,0,0.22)] backdrop-blur-md",
   topHeaderShell:
-    "relative mx-auto flex h-[112px] w-full max-w-[1220px] items-end justify-between gap-8 px-6 pb-8 pt-12 sm:px-8 lg:px-10",
+    "relative mx-auto flex min-h-[96px] w-full max-w-[1260px] items-center justify-between gap-10 px-6 py-6 sm:px-8 lg:px-10",
   topHeaderBrand:
     "inline-flex min-w-0 items-center text-white transition hover:opacity-90",
   brandText:
@@ -139,7 +139,7 @@ export function UrdTreeLogo({
     <span
       className={cx(
         "pointer-events-none relative inline-flex shrink-0 opacity-55",
-        className ?? "h-12 w-12",
+        className ?? "h-8 w-8",
       )}
       aria-hidden="true"
     >
@@ -163,16 +163,16 @@ export function UrdBrand({
   compact?: boolean;
   className?: string;
 }) {
-  const textSize = compact ? "text-[25px]" : "text-[25px]";
-  const logoSize = compact ? "h-10 w-10" : "h-10 w-10";
+  const textSize = compact ? "text-[24px]" : "text-[25px]";
+  const logoSize = compact ? "h-8 w-8" : "h-9 w-9";
 
   return (
-    <span className={cx("relative inline-flex min-w-0 items-center gap-3 pr-3", className)}>
+    <span className={cx("relative inline-flex min-w-0 shrink-0 items-center gap-2.5 pr-6", className)}>
       <span className="relative z-10 inline-flex min-w-0 items-baseline">
         <span className={cx(textSize, urd.brandText)}>URD</span>
         <span className={cx(textSize, urd.brandAccent)}>ATLAS</span>
       </span>
-      <UrdTreeLogo className={cx("relative z-0 -ml-0.5", logoSize)} priority={compact} />
+      <UrdTreeLogo className={cx("relative z-0", logoSize)} priority={compact} />
     </span>
   );
 }
@@ -202,6 +202,68 @@ export function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+
+const urdScopedCss = `
+.urd-page {
+  --urd-page: #edf6ff;
+  --urd-hero: #031329;
+  --urd-text: #0a1d3a;
+  --urd-text-strong: #0d2447;
+  --urd-text-body: #27476f;
+  --urd-text-muted: #557099;
+  --urd-border: #86a9cc;
+  --urd-border-strong: #436889;
+  --urd-panel: #d2e4f6;
+  --urd-panel-strong: #bed8f0;
+  --urd-panel-soft: #e2f0fc;
+  --urd-raised: #f7fbff;
+  --urd-link: #0b58ca;
+}
+
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-white"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-slate-100"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-slate-200"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-cyan-100"],
+.urd-page :not(.urd-hero):not(.urd-hero *):not(.urd-allow-light-text)[class*="text-cyan-200"] {
+  color: var(--urd-text) !important;
+}
+
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(h1,h2,h3,h4,strong,b,th)[class*="text-white"],
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(h1,h2,h3,h4,strong,b,th)[class*="text-slate"] {
+  color: var(--urd-text-strong) !important;
+}
+
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(p,li,td,dd,dt,span,div)[class*="text-white"],
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(p,li,td,dd,dt,span,div)[class*="text-slate"] {
+  color: var(--urd-text-body) !important;
+}
+
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(section,article,aside,div)[class*="rounded"][class*="border"]:not(.urd-no-panel):not([role="dialog"]):not([role="menu"]) {
+  background-color: var(--urd-panel) !important;
+  border-color: var(--urd-border) !important;
+  color: var(--urd-text) !important;
+}
+
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(section,article,aside,div)[class*="rounded"][class*="border"] :is(section,article,aside,div)[class*="rounded"][class*="border"]:not(.urd-no-panel):not([role="dialog"]):not([role="menu"]) {
+  background-color: var(--urd-panel-strong) !important;
+  border-color: var(--urd-border) !important;
+}
+
+.urd-page :not(.urd-hero):not(.urd-hero *) :is(code,kbd,samp) {
+  background-color: var(--urd-raised) !important;
+  border-color: var(--urd-border) !important;
+  color: var(--urd-text-strong) !important;
+}
+
+.urd-page :not(.urd-hero):not(.urd-hero *) table {
+  color: var(--urd-text) !important;
+}
+
+.urd-page :not(.urd-hero):not(.urd-hero *) thead {
+  background-color: var(--urd-panel-strong) !important;
+}
+`;
+
 export function UrdPage({
   children,
   className,
@@ -209,7 +271,12 @@ export function UrdPage({
   children: ReactNode;
   className?: string;
 }) {
-  return <main className={cx(urd.page, className)}>{children}</main>;
+  return (
+    <main className={cx(urd.page, className)}>
+      <style dangerouslySetInnerHTML={{ __html: urdScopedCss }} />
+      {children}
+    </main>
+  );
 }
 
 export function UrdContainer({

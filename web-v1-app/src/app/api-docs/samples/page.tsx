@@ -46,13 +46,13 @@ export default function SamplePackPage() {
             </ul>
           </UrdSection>
           <UrdSection title="Download files">
-            <div>You can download individual files below or grab the entire <a href="/sample-pack/urd-atlas-public-sample-pack.zip" className="font-semibold text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">sample pack zip</a>.</div>
+            <div>You can download individual files below or grab the entire <a href="/sample-pack/urd-atlas-public-sample-pack.zip" className="font-semibold text-[var(--urd-text-strong)] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">sample pack zip</a>.</div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {SAMPLE_FILES.map((file) => (
                 <a
                   key={file.href}
                   href={file.href}
-                  className="rounded-xl border border-[#9db8d4] bg-[#eef6ff] px-4 py-3 text-sm font-bold text-[#0d2447] transition hover:bg-white hover:text-blue-800"
+                  className="rounded-xl border border-[var(--urd-border)] bg-[var(--urd-raised)] px-4 py-3 text-sm font-bold text-[var(--urd-text-strong)] transition hover:bg-white hover:text-blue-800"
                 >
                   {file.label}
                 </a>
@@ -67,7 +67,7 @@ export default function SamplePackPage() {
             </ul>
           </UrdSection>
           <div>
-            <Link href="/api-docs" className="font-semibold text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">
+            <Link href="/api-docs" className="font-semibold text-[var(--urd-text-strong)] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">
               ← API Docs
             </Link>
           </div>

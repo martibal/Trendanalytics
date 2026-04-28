@@ -36,7 +36,7 @@ const CANONICAL_DEFAULTS: ThresholdControlValues = {
 // ---------------------------------------------------------------------------
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return <code className="rounded border border-[#9db8d4] bg-[#f4f9ff] px-1 py-0.5 text-[#0d2447] text-xs font-mono">{children}</code>;
+  return <code className="rounded border border-[var(--urd-border)] bg-[var(--urd-raised)] px-1 py-0.5 text-[var(--urd-text-strong)] text-xs font-mono">{children}</code>;
 }
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
@@ -66,9 +66,9 @@ function ExplainModal({
       <div className={urd.modalPanel}>
         <div className={urd.modalHeader}>
           <div>
-            <h3 className="text-2xl font-black text-[#0d2447]">{title}</h3>
+            <h3 className="text-2xl font-black text-[var(--urd-text-strong)]">{title}</h3>
             {subtitle ? (
-              <div className="mt-2 text-sm font-semibold leading-6 text-[#27476f]">{subtitle}</div>
+              <div className="mt-2 text-sm font-semibold leading-6 text-[var(--urd-text-body)]">{subtitle}</div>
             ) : null}
           </div>
           <UrdHashModalClose className={urd.modalClose}>×</UrdHashModalClose>
@@ -77,17 +77,17 @@ function ExplainModal({
           <div className={urd.modalGrid}>
             <section className={urd.modalBasicPanel}>
               <div className={cx(urd.modalKicker, "text-emerald-800")}>Basic</div>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.basic}</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.basic}</div>
             </section>
             <details className={urd.modalAdvancedPanel} open>
               <summary className={cx(urd.modalKicker, "cursor-pointer list-none")}>Advanced</summary>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.advanced}</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.advanced}</div>
             </details>
           </div>
           {traceability ? (
-            <div className="mt-4 rounded-2xl border border-[#9db8d4] bg-[#f4f9ff] p-5">
+            <div className="mt-4 rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-raised)] p-5">
               <div className={urd.modalKicker}>Traceability</div>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{traceability}</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{traceability}</div>
             </div>
           ) : null}
         </div>
@@ -121,7 +121,7 @@ const whatAreThresholdsExplain: ExplainPair = {
         exactly which thresholds were crossed to produce that label.
       </p>
       <p className="mt-3">
-        The thresholds on this page are the <span className="font-medium text-[#0d2447]">
+        The thresholds on this page are the <span className="font-medium text-[var(--urd-text-strong)]">
         canonical defaults</span> — the values the model actually uses every day. You can
         also use the simulator below to explore what would happen if you moved them, but
         that simulation stays in your browser and never changes what the product publishes.
@@ -166,7 +166,7 @@ const confidenceThresholdExplain: ExplainPair = {
     <>
       <p>
         The confidence threshold is the most important single number on this page. It is set
-        to <span className="font-medium text-[#0d2447]">0.40</span>.
+        to <span className="font-medium text-[var(--urd-text-strong)]">0.40</span>.
       </p>
       <p className="mt-3">
         If a chain&apos;s confidence score falls below 0.40, the model will not publish a
@@ -241,24 +241,24 @@ const bandThresholdsExplain: ExplainPair = {
       </p>
       <ul className="mt-2 list-disc space-y-2 pl-5">
         <li>
-          <span className="font-medium text-[#0d2447]">High</span> — the metric is above the
+          <span className="font-medium text-[var(--urd-text-strong)]">High</span> — the metric is above the
           80th percentile of the last 90 days, or its z-score is above +1.5. Either
           condition is enough.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">Extreme high</span> — above the 95th
+          <span className="font-medium text-[var(--urd-text-strong)]">Extreme high</span> — above the 95th
           percentile, or z-score above +2.5. A stronger signal than merely high.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">Low</span> — below the 20th percentile,
+          <span className="font-medium text-[var(--urd-text-strong)]">Low</span> — below the 20th percentile,
           or z-score below −1.5.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">Extreme low</span> — below the 5th
+          <span className="font-medium text-[var(--urd-text-strong)]">Extreme low</span> — below the 5th
           percentile, or z-score below −2.5.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">Normal</span> — everything in between.
+          <span className="font-medium text-[var(--urd-text-strong)]">Normal</span> — everything in between.
           No band condition fires.
         </li>
       </ul>
@@ -312,24 +312,24 @@ const regimeRulesExplain: ExplainPair = {
       </p>
       <ol className="mt-3 list-decimal space-y-2 pl-5">
         <li>
-          <span className="font-medium text-[#0d2447]">UNKNOWN/DEGRADED</span> — checked first.
+          <span className="font-medium text-[var(--urd-text-strong)]">UNKNOWN/DEGRADED</span> — checked first.
           If confidence is below 0.40, this label is assigned and no further rules are
           evaluated.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">CONGESTED</span> — capacity is extreme
+          <span className="font-medium text-[var(--urd-text-strong)]">CONGESTED</span> — capacity is extreme
           high, or both capacity and friction are high at the same time.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">CHEAP</span> — both friction and capacity
+          <span className="font-medium text-[var(--urd-text-strong)]">CHEAP</span> — both friction and capacity
           are low.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">HEATING</span> — demand is high, and at
+          <span className="font-medium text-[var(--urd-text-strong)]">HEATING</span> — demand is high, and at
           least one axis is trending upward (momentum positive).
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">STABLE</span> — none of the above apply.
+          <span className="font-medium text-[var(--urd-text-strong)]">STABLE</span> — none of the above apply.
           The chain looks roughly normal.
         </li>
       </ol>
@@ -476,17 +476,17 @@ export default async function ThresholdsPage() {
       
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="mb-10 rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+      <section className="mb-10 rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
         <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="max-w-3xl">
               <div className="text-xs font-medium uppercase tracking-[0.18em] text-blue-700">
                 Classification rules
               </div>
-              <h1 className="mt-3 text-4xl font-semibold leading-tight text-[#0d2447] sm:text-5xl">
+              <h1 className="mt-3 text-4xl font-semibold leading-tight text-[var(--urd-text-strong)] sm:text-5xl">
                 Thresholds
               </h1>
-              <p className="mt-4 text-lg leading-8 text-[#27476f]">
+              <p className="mt-4 text-lg leading-8 text-[var(--urd-text-body)]">
                 The exact values that decide when a metric is "high", when confidence is
                 "good enough", and which regime label a chain receives. Published openly so
                 every classification can be traced and understood.
@@ -497,7 +497,7 @@ export default async function ThresholdsPage() {
                 <MoreLink id="boundary-modal" label="Interpretation boundary" />
                 <Link
                   href="/methodology"
-                  className="inline-flex items-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] px-3 py-1 text-xs font-medium text-[#0d2447] hover:bg-white"
+                  className="inline-flex items-center rounded-full border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-3 py-1 text-xs font-medium text-[var(--urd-text-strong)] hover:bg-white"
                 >
                   Methodology
                 </Link>
@@ -505,14 +505,14 @@ export default async function ThresholdsPage() {
             </div>
 
             {dataset ? (
-              <div className="min-w-[200px] rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-4 py-4 text-xs text-[#27476f]">
-                <div className="font-medium uppercase tracking-[0.12em] text-[#557099]">
+              <div className="min-w-[200px] rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-4 text-xs text-[var(--urd-text-body)]">
+                <div className="font-medium uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">
                   Dataset
                 </div>
                 {dataset.version ? (
                   <div className="mt-2">
                     Revision{" "}
-                    <span className="font-semibold text-[#0d2447]">{dataset.version}</span>
+                    <span className="font-semibold text-[var(--urd-text-strong)]">{dataset.version}</span>
                   </div>
                 ) : null}
                 {dataset.methodology_version ? (
@@ -521,7 +521,7 @@ export default async function ThresholdsPage() {
                     <InlineCode>{dataset.methodology_version}</InlineCode>
                   </div>
                 ) : null}
-                <div className="mt-2 border-t border-[#c9d9ea] pt-2 text-[#557099]">
+                <div className="mt-2 border-t border-[var(--urd-border-soft)] pt-2 text-[var(--urd-text-muted)]">
                   Published artifact contract
                 </div>
               </div>
@@ -529,13 +529,13 @@ export default async function ThresholdsPage() {
           </div>
 
           {/* Reading map */}
-          <div className="mt-6 rounded-2xl border border-[#c9d9ea] bg-[#d9eafb] p-4">
+          <div className="mt-6 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                   How to read this page
                 </div>
-                <div className="mt-2 text-sm text-[#0d2447]">
+                <div className="mt-2 text-sm text-[var(--urd-text-strong)]">
                   Canonical values → Confidence gate → Band thresholds → Regime rules → Simulator
                 </div>
               </div>
@@ -553,7 +553,7 @@ export default async function ThresholdsPage() {
               Canonical defaults
             </div>
             <h2 className="mt-1 text-3xl font-semibold">The values the model uses today</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-[var(--urd-text-body)]">
               These are the exact threshold values in the currently published methodology.
               Every regime label on every chain page was produced using these numbers.
             </p>
@@ -570,23 +570,23 @@ export default async function ThresholdsPage() {
               </div>
               <MoreLink id="confidence-modal" />
             </div>
-            <div className="mt-4 text-5xl font-semibold text-[#0d2447]">0.40</div>
-            <p className="mt-3 text-sm leading-7 text-[#27476f]">
+            <div className="mt-4 text-5xl font-semibold text-[var(--urd-text-strong)]">0.40</div>
+            <p className="mt-3 text-sm leading-7 text-[var(--urd-text-body)]">
               Below this value, the regime label becomes UNKNOWN/DEGRADED regardless of
               axis structure. The most important single threshold on the site.
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
               <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-2 py-2">
                 <div className="font-semibold text-red-300">&lt; 0.40</div>
-                <div className="mt-1 text-[#27476f]">Degraded</div>
+                <div className="mt-1 text-[var(--urd-text-body)]">Degraded</div>
               </div>
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-2 py-2">
                 <div className="font-semibold text-amber-300">0.40–0.69</div>
-                <div className="mt-1 text-[#27476f]">Caution</div>
+                <div className="mt-1 text-[var(--urd-text-body)]">Caution</div>
               </div>
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2 py-2">
                 <div className="font-semibold text-emerald-300">≥ 0.70</div>
-                <div className="mt-1 text-[#27476f]">Good</div>
+                <div className="mt-1 text-[var(--urd-text-body)]">Good</div>
               </div>
             </div>
           </div>
@@ -601,16 +601,16 @@ export default async function ThresholdsPage() {
             </div>
             <div className="mt-4 flex items-end gap-3">
               <div>
-                <div className="text-xs text-[#27476f]">Percentile</div>
-                <div className="text-4xl font-semibold text-[#0d2447]">≥ 80</div>
+                <div className="text-xs text-[var(--urd-text-body)]">Percentile</div>
+                <div className="text-4xl font-semibold text-[var(--urd-text-strong)]">≥ 80</div>
               </div>
-              <div className="mb-1 text-[#27476f]">or</div>
+              <div className="mb-1 text-[var(--urd-text-body)]">or</div>
               <div>
-                <div className="text-xs text-[#27476f]">Z-score</div>
-                <div className="text-4xl font-semibold text-[#0d2447]">≥ 1.5</div>
+                <div className="text-xs text-[var(--urd-text-body)]">Z-score</div>
+                <div className="text-4xl font-semibold text-[var(--urd-text-strong)]">≥ 1.5</div>
               </div>
             </div>
-            <p className="mt-3 text-sm leading-7 text-[#27476f]">
+            <p className="mt-3 text-sm leading-7 text-[var(--urd-text-body)]">
               Either criterion fires the HIGH band. Extreme high: ≥ 95th percentile or
               z ≥ 2.5. Low mirrors these values on the negative side.
             </p>
@@ -627,32 +627,32 @@ export default async function ThresholdsPage() {
             <ul className="mt-4 space-y-2 text-sm">
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 shrink-0 font-mono text-xs text-red-400">①</span>
-                <span className="text-[#27476f]">
-                  <span className="font-medium text-[#0d2447]">UNKNOWN/DEGRADED</span> — confidence &lt; 0.40
+                <span className="text-[var(--urd-text-body)]">
+                  <span className="font-medium text-[var(--urd-text-strong)]">UNKNOWN/DEGRADED</span> — confidence &lt; 0.40
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 shrink-0 font-mono text-xs text-red-400">②</span>
-                <span className="text-[#27476f]">
-                  <span className="font-medium text-[#0d2447]">CONGESTED</span> — capacity extreme high, or capacity+friction both high
+                <span className="text-[var(--urd-text-body)]">
+                  <span className="font-medium text-[var(--urd-text-strong)]">CONGESTED</span> — capacity extreme high, or capacity+friction both high
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 shrink-0 font-mono text-xs text-blue-400">③</span>
-                <span className="text-[#27476f]">
-                  <span className="font-medium text-[#0d2447]">CHEAP</span> — friction+capacity both low
+                <span className="text-[var(--urd-text-body)]">
+                  <span className="font-medium text-[var(--urd-text-strong)]">CHEAP</span> — friction+capacity both low
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 shrink-0 font-mono text-xs text-amber-400">④</span>
-                <span className="text-[#27476f]">
-                  <span className="font-medium text-[#0d2447]">HEATING</span> — demand high + any axis trending up
+                <span className="text-[var(--urd-text-body)]">
+                  <span className="font-medium text-[var(--urd-text-strong)]">HEATING</span> — demand high + any axis trending up
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 shrink-0 font-mono text-xs text-emerald-400">⑤</span>
-                <span className="text-[#27476f]">
-                  <span className="font-medium text-[#0d2447]">STABLE</span> — none of the above
+                <span className="text-[var(--urd-text-body)]">
+                  <span className="font-medium text-[var(--urd-text-strong)]">STABLE</span> — none of the above
                 </span>
               </li>
             </ul>
@@ -672,13 +672,13 @@ export default async function ThresholdsPage() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b bg-[#dceaf8] text-left">
+              <thead className="border-b bg-[var(--urd-panel-strong)] text-left">
                 <tr>
-                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Band</th>
-                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Percentile criterion</th>
-                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Z-score criterion</th>
-                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Logic</th>
-                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Role in regime</th>
+                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Band</th>
+                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Percentile criterion</th>
+                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Z-score criterion</th>
+                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Logic</th>
+                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Role in regime</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -705,7 +705,7 @@ export default async function ThresholdsPage() {
                     z: "−1.5 to +1.5",
                     logic: "—",
                     role: "Default — no band condition fires",
-                    color: "text-[#27476f]",
+                    color: "text-[var(--urd-text-body)]",
                   },
                   {
                     band: "LOW",
@@ -724,20 +724,20 @@ export default async function ThresholdsPage() {
                     color: "text-blue-700",
                   },
                 ].map((row) => (
-                  <tr key={row.band} className="hover:bg-[#eef6ff]/10">
+                  <tr key={row.band} className="hover:bg-[var(--urd-raised)]/10">
                     <td className={`px-5 py-3 font-mono text-xs font-semibold ${row.color}`}>
                       {row.band}
                     </td>
-                    <td className="px-5 py-3 font-mono text-xs text-[#27476f]">{row.pct}</td>
-                    <td className="px-5 py-3 font-mono text-xs text-[#27476f]">{row.z}</td>
-                    <td className="px-5 py-3 text-xs text-[#27476f]">{row.logic}</td>
-                    <td className="px-5 py-3 text-xs text-[#27476f]">{row.role}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-[var(--urd-text-body)]">{row.pct}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-[var(--urd-text-body)]">{row.z}</td>
+                    <td className="px-5 py-3 text-xs text-[var(--urd-text-body)]">{row.logic}</td>
+                    <td className="px-5 py-3 text-xs text-[var(--urd-text-body)]">{row.role}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="border-t px-5 py-3 text-xs text-[#27476f]">
+          <div className="border-t px-5 py-3 text-xs text-[var(--urd-text-body)]">
             Source: <InlineCode>regime_engine.py</InlineCode> ·{" "}
             <InlineCode>market_scorecard.py</InlineCode> · Methodology version{" "}
             <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode>
@@ -753,7 +753,7 @@ export default async function ThresholdsPage() {
               Local exploration
             </div>
             <h2 className="mt-1 text-3xl font-semibold">Threshold simulator</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-[var(--urd-text-body)]">
               Adjust the sliders to explore how different threshold values would change the
               classification rules. Everything here runs in your browser — nothing changes
               what the product actually publishes.
@@ -788,13 +788,13 @@ export default async function ThresholdsPage() {
             <Link
               key={href}
               href={href}
-              className="group flex items-center justify-between rounded-2xl border bg-background/40 px-4 py-3 transition hover:border-cyan-500/30 hover:bg-[#eef6ff]/30"
+              className="group flex items-center justify-between rounded-2xl border bg-background/40 px-4 py-3 transition hover:border-cyan-500/30 hover:bg-[var(--urd-raised)]/30"
             >
               <div>
-                <div className="text-sm font-medium text-[#0d2447]">{label}</div>
-                <div className="mt-0.5 text-xs text-[#27476f]">{desc}</div>
+                <div className="text-sm font-medium text-[var(--urd-text-strong)]">{label}</div>
+                <div className="mt-0.5 text-xs text-[var(--urd-text-body)]">{desc}</div>
               </div>
-              <span className="text-xs text-[#27476f] transition group-hover:text-blue-700">
+              <span className="text-xs text-[var(--urd-text-body)] transition group-hover:text-blue-700">
                 →
               </span>
             </Link>
@@ -804,10 +804,10 @@ export default async function ThresholdsPage() {
 
       {/* ── Data contract ─────────────────────────────────────────────────── */}
       <details className="mt-8 rounded-2xl border p-5">
-        <summary className="cursor-pointer text-sm font-medium text-[#27476f] hover:text-[#0d2447]">
+        <summary className="cursor-pointer text-sm font-medium text-[var(--urd-text-body)] hover:text-[var(--urd-text-strong)]">
           Data contract and traceability
         </summary>
-        <div className="mt-4 grid gap-2 text-sm text-[#27476f]">
+        <div className="mt-4 grid gap-2 text-sm text-[var(--urd-text-body)]">
           <div>Published artifact contract</div>
           <div>
             Dataset manifest:{" "}
@@ -816,7 +816,7 @@ export default async function ThresholdsPage() {
           <div>
             Threshold values are fixed per methodology version. Changes to thresholds
             require a methodology version bump and are documented in{" "}
-            <Link href="/methodology/changelog" className="underline hover:text-[#0d2447]">
+            <Link href="/methodology/changelog" className="underline hover:text-[var(--urd-text-strong)]">
               /methodology/changelog
             </Link>
             .

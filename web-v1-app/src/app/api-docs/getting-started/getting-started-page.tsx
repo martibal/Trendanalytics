@@ -2,12 +2,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-[#eef6ff] px-1 py-0.5 font-mono text-xs">{children}</code>;
+  return <code className="rounded bg-[var(--urd-raised)] px-1 py-0.5 font-mono text-xs">{children}</code>;
 }
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-2xl border bg-[#dceaf8] p-5 text-xs leading-6 text-[#27476f]">
+    <pre className="overflow-x-auto rounded-2xl border bg-[var(--urd-panel-strong)] p-5 text-xs leading-6 text-[var(--urd-text-body)]">
       <code>{children}</code>
     </pre>
   );
@@ -33,9 +33,9 @@ function Section({
           {eyebrow}
         </div>
       ) : null}
-      <h2 className="mt-1 text-2xl font-semibold text-[#0d2447]">{title}</h2>
+      <h2 className="mt-1 text-2xl font-semibold text-[var(--urd-text-strong)]">{title}</h2>
       {subtitle ? (
-        <div className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">{subtitle}</div>
+        <div className="mt-2 max-w-4xl text-sm leading-7 text-[var(--urd-text-body)]">{subtitle}</div>
       ) : null}
       <div className="mt-5">{children}</div>
     </section>
@@ -44,12 +44,12 @@ function Section({
 
 function QA({ question, children }: { question: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-white/6 bg-[#eef6ff] p-5">
+    <div className="rounded-2xl border border-white/6 bg-[var(--urd-raised)] p-5">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 shrink-0 text-cyan-400 font-black text-sm">Q</span>
-        <h3 className="text-sm font-bold text-[#0d2447]">{question}</h3>
+        <h3 className="text-sm font-bold text-[var(--urd-text-strong)]">{question}</h3>
       </div>
-      <div className="mt-3 pl-6 text-sm leading-7 text-[#27476f]">{children}</div>
+      <div className="mt-3 pl-6 text-sm leading-7 text-[var(--urd-text-body)]">{children}</div>
     </div>
   );
 }
@@ -64,21 +64,21 @@ function StepCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border bg-[#eef6ff] p-5">
+    <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
       <div className="flex items-center gap-3">
         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-500/25 bg-cyan-500/10 text-xs font-semibold text-blue-700">
           {number}
         </span>
-        <h3 className="text-base font-semibold text-[#0d2447]">{title}</h3>
+        <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">{title}</h3>
       </div>
-      <div className="mt-4 text-sm leading-7 text-[#27476f]">{children}</div>
+      <div className="mt-4 text-sm leading-7 text-[var(--urd-text-body)]">{children}</div>
     </div>
   );
 }
 
 function BulletList({ items }: { items: ReactNode[] }) {
   return (
-    <ul className="list-disc space-y-2 pl-5 text-sm leading-7 text-[#27476f]">
+    <ul className="list-disc space-y-2 pl-5 text-sm leading-7 text-[var(--urd-text-body)]">
       {items.map((item, index) => (
         <li key={index}>{item}</li>
       ))}
@@ -99,18 +99,18 @@ function PlanCard({
 }) {
   return (
     <div className={`rounded-3xl border p-6 ${accent}`}>
-      <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#27476f]">{title}</div>
-      <div className="mt-2 text-3xl font-semibold text-[#0d2447]">{price}</div>
-      <div className="mt-5 text-sm leading-7 text-[#27476f]">{children}</div>
+      <div className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--urd-text-body)]">{title}</div>
+      <div className="mt-2 text-3xl font-semibold text-[var(--urd-text-strong)]">{price}</div>
+      <div className="mt-5 text-sm leading-7 text-[var(--urd-text-body)]">{children}</div>
     </div>
   );
 }
 
 function Callout({ children, color = "cyan" }: { children: ReactNode; color?: "cyan" | "amber" | "emerald" }) {
   const styles = {
-    cyan: "border-cyan-500/20 bg-cyan-500/5 text-[#27476f]",
-    amber: "border-amber-500/20 bg-amber-500/5 text-[#27476f]",
-    emerald: "border-emerald-500/20 bg-emerald-500/5 text-[#27476f]",
+    cyan: "border-cyan-500/20 bg-cyan-500/5 text-[var(--urd-text-body)]",
+    amber: "border-amber-500/20 bg-amber-500/5 text-[var(--urd-text-body)]",
+    emerald: "border-emerald-500/20 bg-emerald-500/5 text-[var(--urd-text-body)]",
   };
   return (
     <div className={`rounded-2xl border p-5 text-sm leading-7 ${styles[color]}`}>
@@ -124,10 +124,10 @@ export default function GettingStartedJsonApiPage() {
     <main className="mx-auto max-w-7xl px-6 py-10">
 
       {/* Breadcrumb */}
-      <div className="mb-6 flex items-center gap-2 text-sm text-[#557099]">
+      <div className="mb-6 flex items-center gap-2 text-sm text-[var(--urd-text-muted)]">
         <Link href="/api-docs" className="hover:text-cyan-400 transition-colors">← API Docs</Link>
         <span>/</span>
-        <span className="text-[#557099]">Getting started</span>
+        <span className="text-[var(--urd-text-muted)]">Getting started</span>
       </div>
 
       {/* Header */}
@@ -137,10 +137,10 @@ export default function GettingStartedJsonApiPage() {
             <div className="text-xs font-medium uppercase tracking-[0.18em] text-blue-700">
               Getting started
             </div>
-            <h1 className="mt-3 text-4xl font-semibold leading-tight text-[#0d2447] sm:text-5xl">
+            <h1 className="mt-3 text-4xl font-semibold leading-tight text-[var(--urd-text-strong)] sm:text-5xl">
               Getting started with the JSON API
             </h1>
-            <p className="mt-4 text-lg leading-8 text-[#27476f]">
+            <p className="mt-4 text-lg leading-8 text-[var(--urd-text-body)]">
               This page is for subscribers who are completely new to JSON and API access.
               Read this before anything else. By the end you will have made your first
               successful request and understand exactly how the daily delivery works.
@@ -148,22 +148,22 @@ export default function GettingStartedJsonApiPage() {
           </div>
 
           <div className="mt-6 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-              <div className="text-xs uppercase tracking-[0.12em] text-[#557099]">What this covers</div>
-              <div className="mt-2 text-sm leading-6 text-[#27476f]">
+            <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4">
+              <div className="text-xs uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">What this covers</div>
+              <div className="mt-2 text-sm leading-6 text-[var(--urd-text-body)]">
                 What JSON is, what API access means, how daily delivery works, and how to
                 get your first file working in under 10 minutes.
               </div>
             </div>
-            <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-              <div className="text-xs uppercase tracking-[0.12em] text-[#557099]">Your first goal</div>
-              <div className="mt-2 text-sm leading-6 text-[#27476f]">
+            <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4">
+              <div className="text-xs uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">Your first goal</div>
+              <div className="mt-2 text-sm leading-6 text-[var(--urd-text-body)]">
                 Get one authenticated request working for <InlineCode>latest.json</InlineCode>.
                 Everything else — history, automation, multi-chain — comes after that.
               </div>
             </div>
-            <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-              <div className="text-xs uppercase tracking-[0.12em] text-[#557099]">Related pages</div>
+            <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4">
+              <div className="text-xs uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">Related pages</div>
               <div className="mt-2 flex flex-col gap-2 text-sm">
                 <Link href="/api-docs" className="text-blue-700 underline">API Docs — technical reference</Link>
                 <Link href="/api-docs/schema" className="text-blue-700 underline">JSON Schema — every field explained</Link>
@@ -186,16 +186,16 @@ export default function GettingStartedJsonApiPage() {
           subtitle="Urd Atlas is not only a website. The product is the published JSON output."
         >
           <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
-              <h3 className="text-base font-semibold text-[#0d2447]">The website (free)</h3>
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">The website (free)</h3>
               <BulletList items={[
                 "Lets you inspect the current regime, confidence, and freshness for each chain.",
                 "Shows you what the data means in plain language.",
                 "Available to anyone — no account required.",
               ]} />
             </div>
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
-              <h3 className="text-base font-semibold text-[#0d2447]">The subscriber product (paid)</h3>
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">The subscriber product (paid)</h3>
               <BulletList items={[
                 "Lets your own tools fetch the same data as structured JSON directly.",
                 "Makes the output reusable in spreadsheets, scripts, dashboards, and workflows.",
@@ -204,7 +204,7 @@ export default function GettingStartedJsonApiPage() {
             </div>
           </div>
           <Callout color="cyan">
-            <span className="font-semibold text-[#0d2447]">Simple mental model:</span>{" "}
+            <span className="font-semibold text-[var(--urd-text-strong)]">Simple mental model:</span>{" "}
             the website explains the output. The JSON API delivers the same output in a form
             your own tools can read and use automatically.
           </Callout>
@@ -218,7 +218,7 @@ export default function GettingStartedJsonApiPage() {
           subtitle="This is the question almost every new subscriber asks first."
         >
           <Callout color="amber">
-            <span className="font-semibold text-[#0d2447]">Short answer:</span>{" "}
+            <span className="font-semibold text-[var(--urd-text-strong)]">Short answer:</span>{" "}
             Urd Atlas publishes new JSON files every day automatically. But your tools do not
             receive them automatically — you or your script must fetch them. Think of it like
             a newspaper: the paper is printed and ready every morning, but you still have to
@@ -226,8 +226,8 @@ export default function GettingStartedJsonApiPage() {
           </Callout>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
-              <h3 className="text-base font-semibold text-[#0d2447]">What Urd Atlas does automatically</h3>
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">What Urd Atlas does automatically</h3>
               <BulletList items={[
                 "Runs the classification pipeline every day.",
                 "Publishes new Gold, Meta, and Derived JSON files for each chain.",
@@ -235,8 +235,8 @@ export default function GettingStartedJsonApiPage() {
                 "Makes the new files available on the API immediately after publication.",
               ]} />
             </div>
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
-              <h3 className="text-base font-semibold text-[#0d2447]">What you do</h3>
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">What you do</h3>
               <BulletList items={[
                 "Send a request to the API with your API key.",
                 "Receive the JSON file in the response.",
@@ -246,20 +246,20 @@ export default function GettingStartedJsonApiPage() {
             </div>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
-            <h3 className="text-sm font-bold text-[#0d2447] mb-3">The two ways subscribers work</h3>
+          <div className="mt-5 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-5">
+            <h3 className="text-sm font-bold text-[var(--urd-text-strong)] mb-3">The two ways subscribers work</h3>
             <div className="grid gap-3 lg:grid-cols-2">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-[#557099] mb-2">Manual (beginner)</div>
-                <div className="text-sm leading-6 text-[#27476f]">
+                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--urd-text-muted)] mb-2">Manual (beginner)</div>
+                <div className="text-sm leading-6 text-[var(--urd-text-body)]">
                   You open a terminal, run one curl or Python command, and save the file.
                   You repeat this whenever you want the newest data. No setup required.
                   Good for: checking once a day, doing occasional analysis.
                 </div>
               </div>
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-[#557099] mb-2">Automated (next step)</div>
-                <div className="text-sm leading-6 text-[#27476f]">
+                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--urd-text-muted)] mb-2">Automated (next step)</div>
+                <div className="text-sm leading-6 text-[var(--urd-text-body)]">
                   You write a small script and schedule it to run daily. The script checks
                   whether a new file is available, and if so, downloads and saves it.
                   Good for: keeping a local archive, feeding a dashboard, or running analysis
@@ -278,9 +278,9 @@ export default function GettingStartedJsonApiPage() {
           subtitle="You do not need to be a developer to understand this."
         >
           <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
-              <h3 className="text-base font-semibold text-[#0d2447]">JSON</h3>
-              <p className="mt-3 text-sm leading-7 text-[#27476f]">
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">JSON</h3>
+              <p className="mt-3 text-sm leading-7 text-[var(--urd-text-body)]">
                 JSON is just structured text. It is a clean way of writing data — labels,
                 numbers, dates, and nested fields — so that software can read it easily.
                 A JSON file looks like this:
@@ -293,22 +293,22 @@ export default function GettingStartedJsonApiPage() {
   "confidence_score": 0.82
 }`}</CodeBlock>
               </div>
-              <p className="mt-3 text-sm leading-6 text-[#557099]">
+              <p className="mt-3 text-sm leading-6 text-[var(--urd-text-muted)]">
                 You can open a JSON file in any text editor. You can also load it into
                 Python, Excel, or any other tool that reads structured data.
               </p>
             </div>
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
-              <h3 className="text-base font-semibold text-[#0d2447]">API access</h3>
-              <p className="mt-3 text-sm leading-7 text-[#27476f]">
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">API access</h3>
+              <p className="mt-3 text-sm leading-7 text-[var(--urd-text-body)]">
                 API access means your computer can request the JSON file directly from
                 Urd Atlas instead of you opening a page and copying values by hand.
               </p>
-              <div className="mt-4 rounded-xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm leading-7 text-[#27476f]">
-                <div><span className="font-semibold text-[#0d2447]">Without API:</span> open page → read screen → copy values manually → repeat daily</div>
-                <div className="mt-2"><span className="font-semibold text-[#0d2447]">With API:</span> your script sends request → receives JSON → saves it → done</div>
+              <div className="mt-4 rounded-xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4 text-sm leading-7 text-[var(--urd-text-body)]">
+                <div><span className="font-semibold text-[var(--urd-text-strong)]">Without API:</span> open page → read screen → copy values manually → repeat daily</div>
+                <div className="mt-2"><span className="font-semibold text-[var(--urd-text-strong)]">With API:</span> your script sends request → receives JSON → saves it → done</div>
               </div>
-              <p className="mt-3 text-sm leading-6 text-[#557099]">
+              <p className="mt-3 text-sm leading-6 text-[var(--urd-text-muted)]">
                 An API key is just a password that identifies you. You include it in your
                 request so the server knows you are a subscriber.
               </p>
@@ -369,7 +369,7 @@ export default function GettingStartedJsonApiPage() {
           </div>
 
           <Callout color="emerald">
-            <span className="font-semibold text-[#0d2447]">That is it.</span>{" "}
+            <span className="font-semibold text-[var(--urd-text-strong)]">That is it.</span>{" "}
             Steps 1–6 take less than 10 minutes. Once you have one file working manually,
             you can add automation, history bundles, and additional chains at your own pace.
           </Callout>
@@ -385,13 +385,13 @@ export default function GettingStartedJsonApiPage() {
           <div className="grid gap-4 xl:grid-cols-2">
             <PlanCard title="Basic" price="$29/month" accent="border-cyan-500/20 bg-cyan-500/5">
               <BulletList items={[
-                <><span className="font-semibold text-[#0d2447]">One chain</span> of your choice: bitcoin, ethereum, arbitrum, or base</>,
+                <><span className="font-semibold text-[var(--urd-text-strong)]">One chain</span> of your choice: bitcoin, ethereum, arbitrum, or base</>,
                 <>All three file types: <InlineCode>gold</InlineCode>, <InlineCode>meta</InlineCode>, and <InlineCode>derived</InlineCode></>,
-                <>History up to <span className="font-semibold text-[#0d2447]">90 days</span></>,
-                <>Up to <span className="font-semibold text-[#0d2447]">2 API keys</span></>,
+                <>History up to <span className="font-semibold text-[var(--urd-text-strong)]">90 days</span></>,
+                <>Up to <span className="font-semibold text-[var(--urd-text-strong)]">2 API keys</span></>,
               ]} />
-              <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-                <div className="text-xs uppercase tracking-[0.12em] text-[#557099] mb-2">Example — if your chain is bitcoin</div>
+              <div className="mt-5 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4">
+                <div className="text-xs uppercase tracking-[0.12em] text-[var(--urd-text-muted)] mb-2">Example — if your chain is bitcoin</div>
                 <CodeBlock>{`/api/v1/files/gold/bitcoin/latest.json
 /api/v1/files/meta/bitcoin/latest.json
 /api/v1/files/derived/bitcoin/latest.json`}</CodeBlock>
@@ -400,13 +400,13 @@ export default function GettingStartedJsonApiPage() {
 
             <PlanCard title="Pro" price="$79/month" accent="border-purple-500/20 bg-purple-500/5">
               <BulletList items={[
-                <><span className="font-semibold text-[#0d2447]">All four chains:</span> bitcoin, ethereum, arbitrum, and base</>,
+                <><span className="font-semibold text-[var(--urd-text-strong)]">All four chains:</span> bitcoin, ethereum, arbitrum, and base</>,
                 <>All three file types: <InlineCode>gold</InlineCode>, <InlineCode>meta</InlineCode>, and <InlineCode>derived</InlineCode></>,
-                <>History up to <span className="font-semibold text-[#0d2447]">365 days</span></>,
-                <>Up to <span className="font-semibold text-[#0d2447]">2 API keys</span></>,
+                <>History up to <span className="font-semibold text-[var(--urd-text-strong)]">365 days</span></>,
+                <>Up to <span className="font-semibold text-[var(--urd-text-strong)]">2 API keys</span></>,
               ]} />
-              <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-                <div className="text-xs uppercase tracking-[0.12em] text-[#557099] mb-2">Example — all four chains, Meta only</div>
+              <div className="mt-5 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-4">
+                <div className="text-xs uppercase tracking-[0.12em] text-[var(--urd-text-muted)] mb-2">Example — all four chains, Meta only</div>
                 <CodeBlock>{`/api/v1/files/meta/bitcoin/latest.json
 /api/v1/files/meta/ethereum/latest.json
 /api/v1/files/meta/arbitrum/latest.json
@@ -415,9 +415,9 @@ export default function GettingStartedJsonApiPage() {
             </PlanCard>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
-            <h3 className="text-base font-semibold text-[#0d2447]">History Add-on</h3>
-            <p className="mt-3 text-sm leading-7 text-[#27476f]">
+          <div className="mt-5 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-5">
+            <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">History Add-on</h3>
+            <p className="mt-3 text-sm leading-7 text-[var(--urd-text-body)]">
               Standard subscriber scope stays explicit: Basic includes up to 90 days and
               Pro includes up to 365 days. Where a separate History Add-on is offered, it
               unlocks the full currently available archive beyond those default API windows.
@@ -435,39 +435,39 @@ export default function GettingStartedJsonApiPage() {
           subtitle="Both Basic and Pro get all three. The difference is scope, not format."
         >
           <div className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
               <div className="text-lg font-semibold text-amber-800">Gold</div>
-              <p className="mt-2 text-sm leading-6 text-[#557099]">
+              <p className="mt-2 text-sm leading-6 text-[var(--urd-text-muted)]">
                 The raw source layer. Transaction counts, fees, block times, gas utilization,
                 active addresses — exactly as published. In native units, unmodified.
               </p>
-              <div className="mt-3 text-xs text-[#557099]">
+              <div className="mt-3 text-xs text-[var(--urd-text-muted)]">
                 Use Gold when you want raw facts and plan to do your own calculations.
               </div>
             </div>
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
               <div className="text-lg font-semibold text-violet-300">Meta</div>
-              <p className="mt-2 text-sm leading-6 text-[#557099]">
+              <p className="mt-2 text-sm leading-6 text-[var(--urd-text-muted)]">
                 The interpretation layer. Regime label (STABLE / HEATING / CONGESTED / CHEAP),
                 confidence score, scorecard across three axes, and ranked driver signals.
               </p>
-              <div className="mt-3 text-xs text-[#557099]">
+              <div className="mt-3 text-xs text-[var(--urd-text-muted)]">
                 Use Meta when you want the shortest route to &quot;what is happening now?&quot;
               </div>
             </div>
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
               <div className="text-lg font-semibold text-sky-300">Derived</div>
-              <p className="mt-2 text-sm leading-6 text-[#557099]">
+              <p className="mt-2 text-sm leading-6 text-[var(--urd-text-muted)]">
                 Smoothed trend series built from Gold. 7-day and 30-day rolling averages
                 for every Gold metric — useful for separating structural shifts from noise.
               </p>
-              <div className="mt-3 text-xs text-[#557099]">
+              <div className="mt-3 text-xs text-[var(--urd-text-muted)]">
                 Use Derived when you want cleaner trend data for charts or analysis.
               </div>
             </div>
           </div>
           <Callout>
-            <span className="font-semibold text-[#0d2447]">Start with Meta.</span>{" "}
+            <span className="font-semibold text-[var(--urd-text-strong)]">Start with Meta.</span>{" "}
             It contains the regime label and confidence score — the two fields most
             new subscribers care about first. Add Gold and Derived once you know what
             you want to do with them.
@@ -545,7 +545,7 @@ export default function GettingStartedJsonApiPage() {
           subtitle="Do not automate until the manual version works. This is the correct order."
         >
           <Callout>
-            <span className="font-semibold text-[#0d2447]">Recommended beginner pattern:</span>{" "}
+            <span className="font-semibold text-[var(--urd-text-strong)]">Recommended beginner pattern:</span>{" "}
             check the public status endpoint for your chain → compare the as_of date
             with what you last downloaded → if new, fetch the authenticated file → save it.
             This avoids unnecessary requests and only downloads when something is actually new.
@@ -553,11 +553,11 @@ export default function GettingStartedJsonApiPage() {
 
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
             <div>
-              <h3 className="text-base font-semibold text-[#0d2447] mb-3">Install dependency once</h3>
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)] mb-3">Install dependency once</h3>
               <CodeBlock>{`pip install requests`}</CodeBlock>
             </div>
             <div>
-              <h3 className="text-base font-semibold text-[#0d2447] mb-3">Set your API key as an environment variable</h3>
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)] mb-3">Set your API key as an environment variable</h3>
               <CodeBlock>{`# Windows
 set URD_ATLAS_API_KEY=your_key_here
 
@@ -567,7 +567,7 @@ export URD_ATLAS_API_KEY=your_key_here`}</CodeBlock>
           </div>
 
           <div className="mt-5">
-            <h3 className="text-base font-semibold text-[#0d2447] mb-3">Complete automation script</h3>
+            <h3 className="text-base font-semibold text-[var(--urd-text-strong)] mb-3">Complete automation script</h3>
             <CodeBlock>{`import json
 import os
 from pathlib import Path
@@ -631,8 +631,8 @@ if __name__ == "__main__":
           </div>
 
           <div className="mt-5 grid gap-4 xl:grid-cols-2">
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
-              <h3 className="text-base font-semibold text-[#0d2447]">Schedule on Windows (Task Scheduler)</h3>
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">Schedule on Windows (Task Scheduler)</h3>
               <BulletList items={[
                 "Save the script as fetch_urdatlas.py",
                 "Open Task Scheduler → Create Basic Task",
@@ -644,8 +644,8 @@ if __name__ == "__main__":
 Argument: C:\\scripts\\fetch_urdatlas.py`}</CodeBlock>
               </div>
             </div>
-            <div className="rounded-2xl border bg-[#eef6ff] p-5">
-              <h3 className="text-base font-semibold text-[#0d2447]">Schedule on macOS / Linux (cron)</h3>
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">Schedule on macOS / Linux (cron)</h3>
               <BulletList items={[
                 "Open terminal and type: crontab -e",
                 "Add a line that runs the script every 5 minutes",
@@ -675,10 +675,10 @@ Argument: C:\\scripts\\fetch_urdatlas.py`}</CodeBlock>
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-2xl border bg-[#eef6ff] p-4 transition hover:border-cyan-500/30 hover:bg-white/[0.04]"
+                className="rounded-2xl border bg-[var(--urd-raised)] p-4 transition hover:border-cyan-500/30 hover:bg-white/[0.04]"
               >
-                <div className="text-base font-semibold text-[#0d2447]">{item.title}</div>
-                <div className="mt-2 text-sm leading-6 text-[#27476f]">{item.desc}</div>
+                <div className="text-base font-semibold text-[var(--urd-text-strong)]">{item.title}</div>
+                <div className="mt-2 text-sm leading-6 text-[var(--urd-text-body)]">{item.desc}</div>
               </Link>
             ))}
           </div>

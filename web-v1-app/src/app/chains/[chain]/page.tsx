@@ -159,7 +159,7 @@ function landingRegimeAsOf(hero?: LandingHero | null): string | null {
 
 
 function InlineCode({ children }: { children: React.ReactNode }) {
-  return <code className="rounded border border-[#9db8d4] bg-[#f4f9ff] px-1 py-0.5 !text-[#0d2447]">{children}</code>;
+  return <code className="rounded border border-[var(--urd-border)] bg-[var(--urd-raised)] px-1 py-0.5 !text-[var(--urd-text-strong)]">{children}</code>;
 }
 
 function ModalStyles() {
@@ -183,7 +183,7 @@ function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
   return (
     <a
       href={`#${id}`}
-      className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-black !text-[#0d2447] hover:bg-white hover:text-blue-800"
+      className="inline-flex items-center rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] px-3 py-1 text-xs font-black !text-[var(--urd-text-strong)] hover:bg-white hover:text-blue-800"
     >
       {label}
     </a>
@@ -212,16 +212,16 @@ function ExplainModal({
       />
       <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] shadow-2xl shadow-slate-950/30">
         {/* Sticky header — always visible, never scrolls away */}
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#c9d9ea] px-6 py-5">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--urd-border-soft)] px-6 py-5">
           <div>
-            <h3 className="text-2xl font-semibold !text-[#0d2447]">{title}</h3>
+            <h3 className="text-2xl font-semibold !text-[var(--urd-text-strong)]">{title}</h3>
             {subtitle ? (
-              <div className="mt-2 text-sm leading-6 !text-[#27476f]">{subtitle}</div>
+              <div className="mt-2 text-sm leading-6 !text-[var(--urd-text-body)]">{subtitle}</div>
             ) : null}
           </div>
           <a
             href="#"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] text-xl !text-[#0d2447] hover:bg-white"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] text-xl !text-[var(--urd-text-strong)] hover:bg-white"
             aria-label="Close dialog"
           >
             ×
@@ -235,23 +235,23 @@ function ExplainModal({
               <div className="text-xs font-medium uppercase tracking-[0.14em] !text-emerald-700">
                 Basic
               </div>
-              <div className="mt-3 text-sm leading-7 !text-[#27476f]">{pair.basic}</div>
+              <div className="mt-3 text-sm leading-7 !text-[var(--urd-text-body)]">{pair.basic}</div>
             </section>
 
-            <details className="rounded-2xl border border-[#9db8d4] bg-cyan-500/5 p-5" open>
+            <details className="rounded-2xl border border-[var(--urd-border)] bg-cyan-500/5 p-5" open>
               <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
                 Advanced
               </summary>
-              <div className="mt-3 text-sm leading-7 !text-[#27476f]">{pair.advanced}</div>
+              <div className="mt-3 text-sm leading-7 !text-[var(--urd-text-body)]">{pair.advanced}</div>
             </details>
           </div>
 
           {traceability ? (
-            <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
+            <div className="mt-4 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-5">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[var(--urd-text-body)]">
                 Traceability
               </div>
-              <div className="mt-3 text-sm leading-7 !text-[#0d2447]">{traceability}</div>
+              <div className="mt-3 text-sm leading-7 !text-[var(--urd-text-strong)]">{traceability}</div>
             </div>
           ) : null}
         </div>
@@ -297,7 +297,7 @@ function pillClass(kind: "neutral" | "good" | "warn" | "bad") {
   if (kind === "bad") {
     return `${base} border-rose-500/25 bg-rose-500/10 text-rose-200`;
   }
-  return `${base} border-[#c9d9ea] bg-[#eef6ff] !text-[#0d2447]`;
+  return `${base} border-[var(--urd-border-soft)] bg-[var(--urd-raised)] !text-[var(--urd-text-strong)]`;
 }
 
 function confidencePill(v?: number) {
@@ -334,12 +334,12 @@ function confidenceNotice(v?: number) {
 
 function confidenceNoticeClass(tone: "caution" | "degraded") {
   return tone === "degraded"
-    ? "border-[#9db8d4] bg-[#e7f1fb] !text-[#0d2447]"
+    ? "border-[var(--urd-border)] bg-[#e7f1fb] !text-[var(--urd-text-strong)]"
     : "border-amber-500/30 bg-amber-500/12 !text-[#8a5b00]";
 }
 
 function confidenceNoticeMetaClass(tone: "caution" | "degraded") {
-  return tone === "degraded" ? "!text-[#0d2447]/85" : "!text-[#8a5b00]";
+  return tone === "degraded" ? "!text-[var(--urd-text-strong)]/85" : "!text-[#8a5b00]";
 }
 
 function sortDrivers(drivers: Driver[]) {
@@ -1939,7 +1939,7 @@ export default async function ChainPage({
         summary="Descriptive chain-level regime classification, freshness, confidence, scorecard dimensions, drivers, and metric history."
       />
 
-      <UrdContainer className="py-10 !text-[#0d2447] [&_p]:!text-[#27476f] [&_li]:!text-[#27476f] [&_h1]:!text-[#0d2447] [&_h2]:!text-[#0d2447] [&_h3]:!text-[#0d2447]">
+      <UrdContainer className="py-10 !text-[var(--urd-text-strong)] [&_p]:!text-[var(--urd-text-body)] [&_li]:!text-[var(--urd-text-body)] [&_h1]:!text-[var(--urd-text-strong)] [&_h2]:!text-[var(--urd-text-strong)] [&_h3]:!text-[var(--urd-text-strong)]">
       <ModalStyles />
 
       <StalenessBar
@@ -1962,7 +1962,7 @@ export default async function ChainPage({
               Source: <InlineCode>confidence.confidence_score</InlineCode>
               {typeof conf === "number" ? (
                 <>
-                  {" "}· Current value <span className="font-medium !text-[#0d2447]">{conf.toFixed(3)}</span>
+                  {" "}· Current value <span className="font-medium !text-[var(--urd-text-strong)]">{conf.toFixed(3)}</span>
                 </>
               ) : null}
             </div>
@@ -1972,7 +1972,7 @@ export default async function ChainPage({
 
       <header className="mb-8 space-y-5">
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-sm">
+          <div className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-3">
@@ -1983,11 +1983,11 @@ export default async function ChainPage({
                   />
                   <div className="min-w-0">
                     <h1 className="truncate text-3xl font-semibold">{displayName}</h1>
-                    <div className="mt-1 text-sm !text-[#27476f]">{cfg.subtitle}</div>
+                    <div className="mt-1 text-sm !text-[var(--urd-text-body)]">{cfg.subtitle}</div>
                   </div>
                 </div>
 
-                <div className="mt-5 max-w-3xl text-base leading-8 !text-[#27476f] [&_p]:!text-[#27476f]">
+                <div className="mt-5 max-w-3xl text-base leading-8 !text-[var(--urd-text-body)] [&_p]:!text-[var(--urd-text-body)]">
                   {chainProfilePair.basic}
                 </div>
               </div>
@@ -1998,58 +1998,58 @@ export default async function ChainPage({
             </div>
 
             {oneLiner ? (
-              <div className="mt-5 rounded-2xl border bg-[#eef6ff] p-4">
-                <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
+              <div className="mt-5 rounded-2xl border bg-[var(--urd-raised)] p-4">
+                <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[var(--urd-text-body)]">
                   Current summary
                 </div>
-                <div className="mt-2 text-sm font-medium leading-7 !text-[#0d2447]">{oneLiner}</div>
+                <div className="mt-2 text-sm font-medium leading-7 !text-[var(--urd-text-strong)]">{oneLiner}</div>
               </div>
             ) : null}
 
-            <div className="mt-5 flex flex-wrap items-center gap-3 text-sm !text-[#27476f]">
-              <Link href={`/chains/${chainId}/history`} className="rounded-full border px-4 py-2 hover:!text-[#0d2447]">
+            <div className="mt-5 flex flex-wrap items-center gap-3 text-sm !text-[var(--urd-text-body)]">
+              <Link href={`/chains/${chainId}/history`} className="rounded-full border px-4 py-2 hover:!text-[var(--urd-text-strong)]">
                 View history
               </Link>
-              <Link href="/methodology" className="hover:!text-[#0d2447] hover:underline">
+              <Link href="/methodology" className="hover:!text-[var(--urd-text-strong)] hover:underline">
                 Methodology
               </Link>
               <span>·</span>
-              <Link href="/glossary" className="hover:!text-[#0d2447] hover:underline">
+              <Link href="/glossary" className="hover:!text-[var(--urd-text-strong)] hover:underline">
                 Glossary
               </Link>
               <span>·</span>
-              <Link href="/thresholds" className="hover:!text-[#0d2447] hover:underline">
+              <Link href="/thresholds" className="hover:!text-[var(--urd-text-strong)] hover:underline">
                 Thresholds
               </Link>
             </div>
           </div>
 
-          <aside className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+          <aside className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
                 Chain profile
               </div>
               <MoreLink id={`profile-${chainId}`} />
             </div>
-            <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+            <div className="mt-4 text-sm leading-7 !text-[var(--urd-text-body)] [&_p]:!text-[var(--urd-text-body)]">
               {chainId === "bitcoin"
                 ? "BTC is different because it does not expose the same execution and gas fields as Ethereum-style chains."
                 : "This page uses a chain-specific profile so each chain is explained through the metrics that actually make descriptive sense for that network."}
             </div>
-            <div className="mt-4 rounded-2xl border bg-[#eef6ff] p-4 text-sm leading-7 !text-[#0d2447]">
+            <div className="mt-4 rounded-2xl border bg-[var(--urd-raised)] p-4 text-sm leading-7 !text-[var(--urd-text-strong)]">
               This page therefore emphasizes the visible evidence that is most useful for understanding
               how busy, costly, or constrained the chain currently looks.
             </div>
           </aside>
         </section>
 
-        <section className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
+        <section className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
                 Fast interpretation map
               </div>
-              <div className="mt-2 text-sm !text-[#27476f]">
+              <div className="mt-2 text-sm !text-[var(--urd-text-body)]">
                 Freshness → Confidence → Regime → Scorecard → Drivers → Charts
               </div>
             </div>
@@ -2058,7 +2058,7 @@ export default async function ChainPage({
         </section>
 
         <section className="grid gap-4 lg:grid-cols-5">
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
                 Published regime
@@ -2068,12 +2068,12 @@ export default async function ChainPage({
             <div className="mt-4">
               <RegimeBadge label={regimeLabel} statusColor={meta.status?.color} />
             </div>
-            <p className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+            <p className="mt-4 text-sm leading-7 !text-[var(--urd-text-body)] [&_p]:!text-[var(--urd-text-body)]">
               Top-line descriptive state for the current published row.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
                 Confidence
@@ -2084,13 +2084,13 @@ export default async function ChainPage({
               </div>
             </div>
             <div className="mt-4 text-5xl font-semibold">{typeof conf === "number" ? conf.toFixed(3) : "—"}</div>
-            <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+            <div className="mt-4 text-sm leading-7 !text-[var(--urd-text-body)] [&_p]:!text-[var(--urd-text-body)]">
               Data quality {fmtNum(meta.confidence?.data_quality_score, 3)} · Label support{" "}
               {fmtNum(meta.confidence?.label_confidence_score, 3)}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
                 Data as of
@@ -2100,12 +2100,12 @@ export default async function ChainPage({
             <div className="mt-4 break-words text-5xl font-semibold leading-none">
               {fmtDate(asOf)}
             </div>
-            <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+            <div className="mt-4 text-sm leading-7 !text-[var(--urd-text-body)] [&_p]:!text-[var(--urd-text-body)]">
               Check this before interpreting any label too strongly.
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
                 Observed lag
@@ -2115,12 +2115,12 @@ export default async function ChainPage({
               <div className="mt-4 text-5xl font-semibold">
                 {typeof observedLagDays === "number" ? `${observedLagDays}d` : "—"}
               </div>
-            <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+            <div className="mt-4 text-sm leading-7 !text-[var(--urd-text-body)] [&_p]:!text-[var(--urd-text-body)]">
               Freshness is shown separately from confidence.
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
                 Determinism
@@ -2130,7 +2130,7 @@ export default async function ChainPage({
             <div className="mt-4 break-all text-base font-semibold">
               {meta.regime?.determinism_hash ?? "—"}
             </div>
-            <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+            <div className="mt-4 text-sm leading-7 !text-[var(--urd-text-body)] [&_p]:!text-[var(--urd-text-body)]">
               Window days: <span className="font-medium">{meta.regime?.window_days ?? meta.scorecard?.window_days ?? "—"}</span>
             </div>
           </div>
@@ -2144,13 +2144,13 @@ export default async function ChainPage({
               Top of page
             </div>
             <h2 className="mt-1 text-3xl font-semibold">Latest signal view</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 !text-[#27476f]">
+            <p className="mt-2 max-w-4xl text-sm leading-7 !text-[var(--urd-text-body)]">
               You are looking at the metrics driving the current regime classification —
               transaction demand, fee levels, and capacity signals — plotted against their
               own recent history. Use the window selector to change the time range.
               Click any chart for a full explanation of what it measures and why it is shown.
             </p>
-            <p className="mt-2 text-xs !text-[#0d2447]">
+            <p className="mt-2 text-xs !text-[var(--urd-text-strong)]">
               All chart windows are public. Paid plans give you the JSON files and API access behind these views.
             </p>
           </div>
@@ -2158,38 +2158,38 @@ export default async function ChainPage({
         </div>
 
         {/* Upsell — raw data */}
-        <div className="mt-2 flex flex-wrap items-center gap-3 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-4 py-3">
-          <span className="text-xs !text-[#0d2447]">Want the raw data and regime signals behind these charts?</span>
-          <Link href="/#plans" className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-semibold !text-blue-700 hover:bg-white transition-colors">See plans →</Link>
-          <Link href="/sign-in" className="inline-flex items-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] px-3 py-1 text-xs font-medium !text-[#557099] hover:!text-[#0d2447] transition-colors">Sign in free →</Link>
+        <div className="mt-2 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-3">
+          <span className="text-xs !text-[var(--urd-text-strong)]">Want the raw data and regime signals behind these charts?</span>
+          <Link href="/#plans" className="inline-flex items-center rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] px-3 py-1 text-xs font-semibold !text-blue-700 hover:bg-white transition-colors">See plans →</Link>
+          <Link href="/sign-in" className="inline-flex items-center rounded-full border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-3 py-1 text-xs font-medium !text-[var(--urd-text-muted)] hover:!text-[var(--urd-text-strong)] transition-colors">Sign in free →</Link>
         </div>
 
         {!derivedPayload ? (
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 text-sm !text-[#27476f]">
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 text-sm !text-[var(--urd-text-body)]">
             No derived source found at <InlineCode>{derivedPath}</InlineCode>.
           </div>
         ) : charts.length === 0 ? (
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 text-sm !text-[#27476f]">
+          <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 text-sm !text-[var(--urd-text-body)]">
             Derived loaded from <InlineCode>{derivedPath}</InlineCode>, but no chartable series were
             found for the selected metrics.
           </div>
         ) : (
           <div className="space-y-6">
             {charts.map((c, index) => (
-              <section key={c.metric} id={`chart-${safeId(c.metric)}`} className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+              <section key={c.metric} id={`chart-${safeId(c.metric)}`} className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-5 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
                       Chart {index + 1}
                     </div>
                     <h3 className="mt-2 text-2xl font-semibold">{labelForMetric(c.metric)}</h3>
-                    <div className="mt-2 text-sm leading-7 !text-[#27476f]">
+                    <div className="mt-2 text-sm leading-7 !text-[var(--urd-text-body)]">
                       {topLineMetricNote(chainId, c.metric)}
                     </div>
                   </div>
 
                   <div className="flex flex-col items-end gap-2">
-                    <div className="text-xs !text-[#27476f]">Units: {c.unitLabel ?? "—"}</div>
+                    <div className="text-xs !text-[var(--urd-text-body)]">Units: {c.unitLabel ?? "—"}</div>
                     {/* Per-chart window selector */}
                     <nav className="flex flex-wrap items-center gap-1.5" aria-label={`Window for ${c.metric}`}>
                       {[
@@ -2216,8 +2216,8 @@ export default async function ChainPage({
                             className={[
                               "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition select-none",
                               isActive
-                                ? "border-[#2f7cff] bg-[#dbeafe] !text-[#0d2447]"
-                                : "border-[#9db8d4] bg-[#eef6ff] !text-[#557099] hover:!text-[#0d2447]",
+                                ? "border-[#2f7cff] bg-[#dbeafe] !text-[var(--urd-text-strong)]"
+                                : "border-[var(--urd-border)] bg-[var(--urd-raised)] !text-[var(--urd-text-muted)] hover:!text-[var(--urd-text-strong)]",
                             ].join(" ")}
                           >
                             {label}
@@ -2239,23 +2239,23 @@ export default async function ChainPage({
                 </div>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
+                  <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="text-base font-medium">How to read this chart</div>
                       <MoreLink id={`chart-read-${safeId(chainId)}-${safeId(c.metric)}`} />
                     </div>
-                    <div className="mt-2 text-sm leading-7 !text-[#27476f]">
+                    <div className="mt-2 text-sm leading-7 !text-[var(--urd-text-body)]">
                       Use raw for day-to-day movement, MA7 for short smoothing, and MA30 for broader
                       baseline.
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
+                  <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="text-base font-medium">Why {c.metric} is shown</div>
                       <MoreLink id={`chart-why-${safeId(chainId)}-${safeId(c.metric)}`} />
                     </div>
-                    <div className="mt-2 text-sm leading-7 !text-[#27476f]">
+                    <div className="mt-2 text-sm leading-7 !text-[var(--urd-text-body)]">
                       {chartWhyShownOneLiner(c.metric, c.axis, regimeLabel)}
                     </div>
                   </div>
@@ -2304,20 +2304,20 @@ export default async function ChainPage({
           Deeper decomposition
         </div>
         <h2 className="mt-1 text-3xl font-semibold">Scorecard</h2>
-        <p className="mt-2 max-w-5xl text-sm leading-7 !text-[#27476f]">
+        <p className="mt-2 max-w-5xl text-sm leading-7 !text-[var(--urd-text-body)]">
           The scorecard breaks the present state into Demand, Friction, and Capacity. This is where
           the user should go when the top-line regime label feels too compressed or too blunt.
         </p>
 
         {meta.scorecard?.notes?.interpretation ? (
-          <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 text-sm leading-7 !text-[#27476f]">
-            <span className="font-medium !text-[#0d2447]">Published interpretation note:</span>{" "}
+          <div className="mt-4 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-5 text-sm leading-7 !text-[var(--urd-text-body)]">
+            <span className="font-medium !text-[var(--urd-text-strong)]">Published interpretation note:</span>{" "}
             {meta.scorecard.notes.interpretation}
           </div>
         ) : null}
 
         {!dims ? (
-          <div className="mt-4 rounded-2xl border p-6 text-sm !text-[#27476f]">
+          <div className="mt-4 rounded-2xl border p-6 text-sm !text-[var(--urd-text-body)]">
             No scorecard dimensions found in <InlineCode>scorecard.dimensions</InlineCode>.
           </div>
         ) : (
@@ -2331,7 +2331,7 @@ export default async function ChainPage({
               return (
                 <div key={key} className="rounded-3xl border p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm !text-[#27476f]">{label}</div>
+                    <div className="text-sm !text-[var(--urd-text-body)]">{label}</div>
                     <div className="flex items-center gap-2">
                       <span className={pillClass("neutral")}>{dim?.level ?? "—"}</span>
                       <MoreLink id={modalId} />
@@ -2342,16 +2342,16 @@ export default async function ChainPage({
                     {typeof dim?.score === "number" && Number.isFinite(dim.score) ? (
                       <ScoreGauge score={dim.score} label={label} note={String(dim.level ?? "—")} />
                     ) : (
-                      <div className="py-10 text-sm !text-[#27476f]">Score not available</div>
+                      <div className="py-10 text-sm !text-[var(--urd-text-body)]">Score not available</div>
                     )}
                   </div>
 
                   <div className="mt-3 text-center text-2xl font-semibold">
                     {fmtScore100(dim?.score)}
-                    <span className="ml-2 text-sm font-normal !text-[#27476f]">/ 100</span>
+                    <span className="ml-2 text-sm font-normal !text-[var(--urd-text-body)]">/ 100</span>
                   </div>
 
-                  <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+                  <div className="mt-4 text-sm leading-7 !text-[var(--urd-text-body)] [&_p]:!text-[var(--urd-text-body)]">
                     Coverage: {fmtNum(dim?.coverage_factor, 3)} · Effective conf:{" "}
                     {fmtNum(dim?.effective_confidence, 3)}
                   </div>
@@ -2384,13 +2384,13 @@ export default async function ChainPage({
 
       <section className="mt-10">
         <h2 className="text-3xl font-semibold">Drivers</h2>
-        <p className="mt-2 max-w-5xl text-sm leading-7 !text-[#27476f]">
+        <p className="mt-2 max-w-5xl text-sm leading-7 !text-[var(--urd-text-body)]">
           Drivers are the “because” behind the visible regime. They show which published metrics are
           currently doing the most work in explaining the present state.
         </p>
 
         {topDrivers.length === 0 ? (
-          <div className="mt-4 rounded-2xl border p-6 text-sm !text-[#27476f]">
+          <div className="mt-4 rounded-2xl border p-6 text-sm !text-[var(--urd-text-body)]">
             No drivers found in <InlineCode>regime.drivers[]</InlineCode>.
           </div>
         ) : (
@@ -2401,7 +2401,7 @@ export default async function ChainPage({
                 <section key={`${d.metric ?? "driver"}-${index}`} className="rounded-3xl border p-6 shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <div className="text-sm uppercase tracking-[0.14em] !text-[#27476f]">
+                      <div className="text-sm uppercase tracking-[0.14em] !text-[var(--urd-text-body)]">
                         {d.axis ?? "—"}
                       </div>
                       <h3 className="mt-2 text-2xl font-semibold">{d.metric ?? "—"}</h3>
@@ -2410,9 +2410,9 @@ export default async function ChainPage({
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
+                    <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
+                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[var(--urd-text-body)]">
                           z robust
                         </div>
                         <MoreLink id={`driver-z-${metricId}`} />
@@ -2420,9 +2420,9 @@ export default async function ChainPage({
                       <div className="mt-3 text-3xl font-semibold">{fmtNum(d.z_robust, 2)}</div>
                     </div>
 
-                    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
+                    <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
+                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[var(--urd-text-body)]">
                           90d percentile
                         </div>
                         <MoreLink id={`driver-pct-${metricId}`} />
@@ -2430,9 +2430,9 @@ export default async function ChainPage({
                       <div className="mt-3 text-3xl font-semibold">{fmtPct0to100(d.pct_90d)}</div>
                     </div>
 
-                    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
+                    <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
+                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[var(--urd-text-body)]">
                           Momentum 7d vs 30d
                         </div>
                         <MoreLink id={`driver-mom-${metricId}`} />
@@ -2440,9 +2440,9 @@ export default async function ChainPage({
                       <div className="mt-3 text-3xl font-semibold">{fmtNum(d.momentum_7d_vs_30d, 3)}</div>
                     </div>
 
-                    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
+                    <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
+                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[var(--urd-text-body)]">
                           Current value
                         </div>
                         <MoreLink id={`driver-current-${metricId}`} />
@@ -2458,12 +2458,12 @@ export default async function ChainPage({
                       <div className="text-base font-medium">Why {d.metric ?? "this metric"} is shown here</div>
                       <MoreLink id={`driver-why-${metricId}`} />
                     </div>
-                    <div className="mt-2 text-sm leading-7 !text-[#27476f]">
+                    <div className="mt-2 text-sm leading-7 !text-[var(--urd-text-body)]">
                       This row is being used as visible evidence for the current descriptive state.
                     </div>
                   </div>
 
-                  <div className="mt-4 text-xs !text-[#27476f]">
+                  <div className="mt-4 text-xs !text-[var(--urd-text-body)]">
                     Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> →{" "}
                     <InlineCode>regime.drivers[]</InlineCode>
                   </div>
@@ -2518,7 +2518,7 @@ export default async function ChainPage({
 
       <details className="mt-10 rounded-2xl border p-5">
         <summary className="cursor-pointer text-sm font-medium">Data contract & traceability</summary>
-        <div className="mt-4 grid gap-2 text-sm !text-[#27476f]">
+        <div className="mt-4 grid gap-2 text-sm !text-[var(--urd-text-body)]">
           <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
           <div>Meta path: <InlineCode>{metaPath}</InlineCode></div>
           <div>Gold path: <InlineCode>{goldPath}</InlineCode></div>

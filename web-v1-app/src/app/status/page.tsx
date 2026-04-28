@@ -74,7 +74,7 @@ function ModalStyles() {
 }
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return <code className="rounded border border-[#9db8d4] bg-[#f4f9ff] px-1 py-0.5 text-[#0d2447] font-mono text-xs">{children}</code>;
+  return <code className="rounded border border-[var(--urd-border)] bg-[var(--urd-raised)] px-1 py-0.5 text-[var(--urd-text-strong)] font-mono text-xs">{children}</code>;
 }
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
@@ -102,8 +102,8 @@ function ExplainModal({
       <div className={urd.modalPanel}>
         <div className={urd.modalHeader}>
           <div>
-            <h3 className="text-2xl font-black text-[#0d2447]">{title}</h3>
-            {subtitle ? <div className="mt-2 text-sm font-semibold leading-6 text-[#27476f]">{subtitle}</div> : null}
+            <h3 className="text-2xl font-black text-[var(--urd-text-strong)]">{title}</h3>
+            {subtitle ? <div className="mt-2 text-sm font-semibold leading-6 text-[var(--urd-text-body)]">{subtitle}</div> : null}
           </div>
           <UrdHashModalClose className={urd.modalClose}>×</UrdHashModalClose>
         </div>
@@ -111,17 +111,17 @@ function ExplainModal({
           <div className={urd.modalGrid}>
             <section className={urd.modalBasicPanel}>
               <div className={cx(urd.modalKicker, "text-emerald-800")}>Basic</div>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.basic}</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.basic}</div>
             </section>
             <details className={urd.modalAdvancedPanel} open>
               <summary className={cx(urd.modalKicker, "cursor-pointer list-none")}>Advanced</summary>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.advanced}</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.advanced}</div>
             </details>
           </div>
           {pair.traceability ? (
-            <div className="mt-4 rounded-2xl border border-[#9db8d4] bg-[#f4f9ff] p-5">
+            <div className="mt-4 rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-raised)] p-5">
               <div className={urd.modalKicker}>Traceability</div>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.traceability}</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.traceability}</div>
             </div>
           ) : null}
         </div>
@@ -192,7 +192,7 @@ function bandChipClass(band: string) {
   if (band === "Good") return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-800`;
   if (band === "Caution") return `${base} border-amber-500/25 bg-amber-500/10 text-amber-800`;
   if (band === "Degraded") return `${base} border-red-500/25 bg-red-500/10 text-red-800`;
-  return `${base} border-[#c9d9ea] bg-[#eef6ff] text-[#27476f]`;
+  return `${base} border-[var(--urd-border-soft)] bg-[var(--urd-raised)] text-[var(--urd-text-body)]`;
 }
 
 function healthChipClass(kind: "ok" | "warn" | "fail" | "unknown") {
@@ -200,7 +200,7 @@ function healthChipClass(kind: "ok" | "warn" | "fail" | "unknown") {
   if (kind === "ok") return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-800`;
   if (kind === "warn") return `${base} border-amber-500/25 bg-amber-500/10 text-amber-800`;
   if (kind === "fail") return `${base} border-red-500/25 bg-red-500/10 text-red-800`;
-  return `${base} border-[#c9d9ea] bg-[#eef6ff] text-[#27476f]`;
+  return `${base} border-[var(--urd-border-soft)] bg-[var(--urd-raised)] text-[var(--urd-text-body)]`;
 }
 
 function healthText(kind: "ok" | "warn" | "fail" | "unknown") {
@@ -269,7 +269,7 @@ const howToReadExplain: ExplainPair = {
   basic: (
     <>
       <p>
-        This page answers one question: <span className="font-medium text-[#0d2447]">are
+        This page answers one question: <span className="font-medium text-[var(--urd-text-strong)]">are
         the published data files current and usable right now?</span> It does not say
         anything about what markets are doing or what you should do.
       </p>
@@ -278,14 +278,14 @@ const howToReadExplain: ExplainPair = {
       </p>
       <ul className="mt-2 list-disc space-y-2 pl-5">
         <li>
-          <span className="font-medium text-[#0d2447]">Health</span> is about freshness —
+          <span className="font-medium text-[var(--urd-text-strong)]">Health</span> is about freshness —
           how old is the published row compared to what we expect? Bitcoin and Ethereum
           should update roughly daily. Arbitrum and Base update roughly weekly by design.
           If a chain falls behind its expected schedule, health degrades from OK to WARN
           to FAIL.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">Confidence</span> is about evidence
+          <span className="font-medium text-[var(--urd-text-strong)]">Confidence</span> is about evidence
           quality — how strongly does the available data support the published regime
           label? A row can be perfectly fresh but still have low confidence if the
           underlying data is patchy or ambiguous.
@@ -341,12 +341,12 @@ const cadenceExplain: ExplainPair = {
       </p>
       <ul className="mt-3 list-disc space-y-2 pl-5">
         <li>
-          <span className="font-medium text-[#0d2447]">Bitcoin and Ethereum</span> — expected
+          <span className="font-medium text-[var(--urd-text-strong)]">Bitcoin and Ethereum</span> — expected
           to update roughly every day. If the data is more than 2 days behind, you will
           see a yellow WARN. More than 4 days behind shows a red FAIL.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">Arbitrum and Base</span> — published
+          <span className="font-medium text-[var(--urd-text-strong)]">Arbitrum and Base</span> — published
           with an expected 7-day delay by design. Seeing "7 days lag" for these chains is
           completely normal. WARN only shows above 10 days, FAIL above 15 days.
         </li>
@@ -401,17 +401,17 @@ const confidenceExplain: ExplainPair = {
       </p>
       <ul className="mt-3 list-disc space-y-2 pl-5">
         <li>
-          <span className="font-medium text-[#0d2447]">Good (≥ 0.70)</span> — strong
+          <span className="font-medium text-[var(--urd-text-strong)]">Good (≥ 0.70)</span> — strong
           evidence. The regime label is well-supported and the scorecard can be read
           normally.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">Caution (0.40–0.69)</span> — moderate
+          <span className="font-medium text-[var(--urd-text-strong)]">Caution (0.40–0.69)</span> — moderate
           evidence. The label is still published but scorecard scores are pulled toward
           neutral to avoid over-interpretation.
         </li>
         <li>
-          <span className="font-medium text-[#0d2447]">Degraded (&lt; 0.40)</span> — weak
+          <span className="font-medium text-[var(--urd-text-strong)]">Degraded (&lt; 0.40)</span> — weak
           evidence. The published label is UNKNOWN/DEGRADED regardless of what the raw
           metrics show.
         </li>
@@ -464,17 +464,17 @@ export default async function StatusPage() {
       <ModalStyles />
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="mb-10 rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+      <section className="mb-10 rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
         <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="max-w-3xl">
               <div className="text-xs font-medium uppercase tracking-[0.18em] text-blue-700">
                 System health
               </div>
-              <h1 className="mt-3 text-4xl font-semibold leading-tight text-[#0d2447] sm:text-5xl">
+              <h1 className="mt-3 text-4xl font-semibold leading-tight text-[var(--urd-text-strong)] sm:text-5xl">
                 Status
               </h1>
-              <p className="mt-4 text-lg leading-8 text-[#27476f]">
+              <p className="mt-4 text-lg leading-8 text-[var(--urd-text-body)]">
                 Freshness and confidence for every published chain. This page answers
                 whether the published artifacts are current and usable right now — not
                 what to do about it. Expected refresh windows are around 09:00 and 21:00
@@ -489,9 +489,9 @@ export default async function StatusPage() {
 
             {/* Overall health + dataset card */}
             <div className="min-w-[220px] space-y-3">
-              <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-4 py-4 text-xs text-[#27476f]">
+              <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-4 text-xs text-[var(--urd-text-body)]">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium uppercase tracking-[0.12em] text-[#557099]">
+                  <div className="font-medium uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">
                     Overall
                   </div>
                   <span className={healthChipClass(overallHealth)}>
@@ -501,53 +501,53 @@ export default async function StatusPage() {
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                   <div>
                     <div className="text-xl font-semibold text-emerald-800">{okCount}</div>
-                    <div className="text-[#27476f]">OK</div>
+                    <div className="text-[var(--urd-text-body)]">OK</div>
                   </div>
                   <div>
                     <div className="text-xl font-semibold text-amber-800">{warnCount}</div>
-                    <div className="text-[#27476f]">WARN</div>
+                    <div className="text-[var(--urd-text-body)]">WARN</div>
                   </div>
                   <div>
                     <div className="text-xl font-semibold text-red-800">{failCount}</div>
-                    <div className="text-[#27476f]">FAIL</div>
+                    <div className="text-[var(--urd-text-body)]">FAIL</div>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-4 py-4 text-xs text-[#27476f]">
-                <div className="font-medium uppercase tracking-[0.12em] text-[#557099]">Dataset</div>
+              <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-4 text-xs text-[var(--urd-text-body)]">
+                <div className="font-medium uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">Dataset</div>
                 {dataset?.version ? (
-                  <div className="mt-2">Revision <span className="font-semibold text-[#0d2447]">{dataset.version}</span></div>
+                  <div className="mt-2">Revision <span className="font-semibold text-[var(--urd-text-strong)]">{dataset.version}</span></div>
                 ) : null}
                 {dataset?.published_at ? (
-                  <div className="mt-1">Published <span className="font-semibold text-[#0d2447]">{dataset.published_at.slice(0, 10)}</span></div>
+                  <div className="mt-1">Published <span className="font-semibold text-[var(--urd-text-strong)]">{dataset.published_at.slice(0, 10)}</span></div>
                 ) : null}
                 {dataset?.methodology_version ? (
                   <div className="mt-1">Methodology <InlineCode>{dataset.methodology_version}</InlineCode></div>
                 ) : null}
                 <div className="mt-1">
-                  Expected windows <span className="font-semibold text-[#0d2447]">~09:00 / ~21:00 Europe/Oslo</span>
+                  Expected windows <span className="font-semibold text-[var(--urd-text-strong)]">~09:00 / ~21:00 Europe/Oslo</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Reading map */}
-          <div className="mt-6 rounded-2xl border border-[#c9d9ea] bg-[#d9eafb] p-4">
+          <div className="mt-6 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                   Two separate dimensions
                 </div>
-                <div className="mt-2 text-sm text-[#0d2447]">
-                  <span className="font-medium text-[#0d2447]">Health</span> = freshness relative to expected cadence ·{" "}
-                  <span className="font-medium text-[#0d2447]">Confidence</span> = evidence quality for the published label
+                <div className="mt-2 text-sm text-[var(--urd-text-strong)]">
+                  <span className="font-medium text-[var(--urd-text-strong)]">Health</span> = freshness relative to expected cadence ·{" "}
+                  <span className="font-medium text-[var(--urd-text-strong)]">Confidence</span> = evidence quality for the published label
                 </div>
               </div>
               <MoreLink id="how-to-read-modal" label="Full explanation" />
             </div>
           </div>
-          <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-[#d9eafb] p-4 text-sm leading-7 text-[#27476f]">
+          <div className="mt-4 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4 text-sm leading-7 text-[var(--urd-text-body)]">
             Operational expectations, support response target, and revision / correction policy are documented at <Link href="/service" className="underline text-blue-700">/service</Link>.
           </div>
         </div>
@@ -579,14 +579,14 @@ export default async function StatusPage() {
       </section>
 
       {/* ── Status table ─────────────────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border border-[#9db8d4] bg-[#dbeafa] shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#9db8d4] px-6 py-5">
+      <section className="mb-8 rounded-3xl border border-[var(--urd-border)] bg-[var(--urd-panel)] shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--urd-border)] px-6 py-5">
           <div>
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
               Current state
             </div>
             <h2 className="mt-1 text-3xl font-semibold">Per-chain overview</h2>
-            <p className="mt-2 text-sm leading-7 text-[#27476f]">
+            <p className="mt-2 text-sm leading-7 text-[var(--urd-text-body)]">
               Regime, confidence, and freshness for each chain from the latest published
               meta artifact.
             </p>
@@ -596,23 +596,23 @@ export default async function StatusPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b bg-[#dceaf8] text-left">
+            <thead className="border-b bg-[var(--urd-panel-strong)] text-left">
               <tr>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Chain</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Regime</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Confidence</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Band</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Lag</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">As of</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Expected delay</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Health</th>
+                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Chain</th>
+                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Regime</th>
+                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Confidence</th>
+                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Band</th>
+                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Lag</th>
+                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">As of</th>
+                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Expected delay</th>
+                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Health</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {rows.map((row) => {
                 const band = confidenceBand(row.confidence_score);
                 return (
-                  <tr key={row.chain} className="hover:bg-[#eef6ff]">
+                  <tr key={row.chain} className="hover:bg-[var(--urd-raised)]">
                     <td className="px-5 py-4">
                       <Link
                         href={`/chains/${row.chain}`}
@@ -652,14 +652,14 @@ export default async function StatusPage() {
           </table>
         </div>
 
-        <div className="border-t border-[#9db8d4] px-5 py-3 text-xs text-[#27476f]">
+        <div className="border-t border-[var(--urd-border)] px-5 py-3 text-xs text-[var(--urd-text-body)]">
           Source: latest published Meta artifact per chain ·
           Health is derived at render time from lag vs expected cadence
         </div>
       </section>
 
       {/* ── Cadence reference ────────────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border border-[#9db8d4] bg-[#dbeafa] p-6 shadow-sm">
+      <section className="mb-8 rounded-3xl border border-[var(--urd-border)] bg-[var(--urd-panel)] p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
@@ -690,20 +690,20 @@ export default async function StatusPage() {
             },
           ].map(({ chains, expected, warn, fail, note, color }) => (
             <div key={chains} className={`rounded-2xl border p-5 ${color}`}>
-              <div className="text-sm font-semibold text-[#0d2447]">{chains}</div>
-              <p className="mt-1 text-xs leading-5 text-[#27476f]">{note}</p>
+              <div className="text-sm font-semibold text-[var(--urd-text-strong)]">{chains}</div>
+              <p className="mt-1 text-xs leading-5 text-[var(--urd-text-body)]">{note}</p>
               <div className="mt-4 grid grid-cols-3 gap-3 text-center text-xs">
-                <div className="rounded-xl border border-emerald-500/20 bg-[#eef6ff] px-2 py-2">
+                <div className="rounded-xl border border-emerald-500/20 bg-[var(--urd-raised)] px-2 py-2">
                   <div className="font-semibold text-emerald-800">OK</div>
-                  <div className="mt-1 text-[#27476f]">≤ {expected}</div>
+                  <div className="mt-1 text-[var(--urd-text-body)]">≤ {expected}</div>
                 </div>
-                <div className="rounded-xl border border-amber-500/20 bg-[#eef6ff] px-2 py-2">
+                <div className="rounded-xl border border-amber-500/20 bg-[var(--urd-raised)] px-2 py-2">
                   <div className="font-semibold text-amber-800">WARN</div>
-                  <div className="mt-1 text-[#27476f]">{warn}</div>
+                  <div className="mt-1 text-[var(--urd-text-body)]">{warn}</div>
                 </div>
-                <div className="rounded-xl border border-red-500/20 bg-[#eef6ff] px-2 py-2">
+                <div className="rounded-xl border border-red-500/20 bg-[var(--urd-raised)] px-2 py-2">
                   <div className="font-semibold text-red-800">FAIL</div>
-                  <div className="mt-1 text-[#27476f]">{fail}</div>
+                  <div className="mt-1 text-[var(--urd-text-body)]">{fail}</div>
                 </div>
               </div>
             </div>
@@ -717,7 +717,7 @@ export default async function StatusPage() {
           <div className="text-xs font-medium uppercase tracking-[0.14em] text-amber-800">
             Dataset notes
           </div>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[#0d2447]">
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[var(--urd-text-strong)]">
             {notes.map((note) => (
               <li key={note}>{note}</li>
             ))}
@@ -726,7 +726,7 @@ export default async function StatusPage() {
       ) : null}
 
       {/* ── Navigation strip ─────────────────────────────────────────────── */}
-      <section className="mt-10 rounded-3xl border border-[#9db8d4] bg-[#dbeafa] p-6 shadow-sm">
+      <section className="mt-10 rounded-3xl border border-[var(--urd-border)] bg-[var(--urd-panel)] p-6 shadow-sm">
         <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">Related</div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -738,24 +738,24 @@ export default async function StatusPage() {
             <Link
               key={href}
               href={href}
-              className="group flex items-center justify-between rounded-2xl border bg-[#eef6ff] px-4 py-3 transition hover:border-cyan-500/30 hover:bg-white"
+              className="group flex items-center justify-between rounded-2xl border bg-[var(--urd-raised)] px-4 py-3 transition hover:border-cyan-500/30 hover:bg-white"
             >
               <div>
-                <div className="text-sm font-medium text-[#0d2447]">{label}</div>
-                <div className="mt-0.5 text-xs text-[#27476f]">{desc}</div>
+                <div className="text-sm font-medium text-[var(--urd-text-strong)]">{label}</div>
+                <div className="mt-0.5 text-xs text-[var(--urd-text-body)]">{desc}</div>
               </div>
-              <span className="text-xs text-[#27476f] transition group-hover:text-blue-700">→</span>
+              <span className="text-xs text-[var(--urd-text-body)] transition group-hover:text-blue-700">→</span>
             </Link>
           ))}
         </div>
       </section>
 
       {/* ── Data contract ─────────────────────────────────────────────────── */}
-      <details className="mt-8 rounded-2xl border border-[#9db8d4] bg-[#d9eafb] p-5">
-        <summary className="cursor-pointer text-sm font-medium text-[#27476f] hover:text-[#0d2447]">
+      <details className="mt-8 rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-panel)] p-5">
+        <summary className="cursor-pointer text-sm font-medium text-[var(--urd-text-body)] hover:text-[var(--urd-text-strong)]">
           Data contract and traceability
         </summary>
-        <div className="mt-4 grid gap-2 text-sm text-[#27476f]">
+        <div className="mt-4 grid gap-2 text-sm text-[var(--urd-text-body)]">
           <div>Public provenance anchors: date / updated_through / methodology_version / published revision / regime.determinism_hash</div>
           <div>Health classification is derived at render time — not read from a pre-computed status field.</div>
           <div>Operational expectations and correction policy are documented on the service and provenance pages.</div>

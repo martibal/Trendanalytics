@@ -2,7 +2,7 @@ import ShortFullContent from "@/components/site/ShortFullContent";
 import { Callout, InlineCode, MethodologyContent, MethodologyHeader, MethodologyNav, MethodologyPageShell, Section, SimpleTable, WarningCallout } from "../_components";
 
 function CodeBlock({ children }: { children: string }) {
-  return <pre className="overflow-x-auto rounded-2xl border border-[#9db8d4] bg-[#0d2447] p-5 text-xs leading-6 text-[#eef6ff]"><code>{children}</code></pre>;
+  return <pre className="overflow-x-auto rounded-2xl border border-[var(--urd-border)] bg-[#0d2447] p-5 text-xs leading-6 text-[#eef6ff]"><code>{children}</code></pre>;
 }
 
 export default async function MethodologyVerificationPage() {

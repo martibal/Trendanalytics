@@ -27,7 +27,7 @@ function InlineCode({ children }: { children: ReactNode }) {
 }
 
 function CodeBlock({ children }: { children: string }) {
-  return <pre className="overflow-x-auto rounded-2xl border border-[#9db8d4] bg-[#f4f9ff] p-5 text-xs leading-6 text-[#0d2447]"><code>{children}</code></pre>;
+  return <pre className="overflow-x-auto rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-raised)] p-5 text-xs leading-6 text-[var(--urd-text-strong)]"><code>{children}</code></pre>;
 }
 
 export default async function ApiDocsPage() {
@@ -46,11 +46,11 @@ export default async function ApiDocsPage() {
           <UrdButtonLink href="/api-docs/workflows">Common workflows</UrdButtonLink>
         </div>
 
-        <div className="mt-6 max-w-xl rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-xs text-slate-200">
-          <div className="font-medium uppercase tracking-[0.12em] text-cyan-200">Published context</div>
+        <div className="mt-6 max-w-xl rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-4 text-xs text-[var(--urd-text-body)]">
+          <div className="font-medium uppercase tracking-[0.12em] text-blue-700">Published context</div>
           <div className="mt-2">Published revision <InlineCode>{dataset?.version ?? "—"}</InlineCode></div>
           <div className="mt-1">Methodology <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
-          <div className="mt-2 text-slate-300">Public provenance is anchored in date, updated_through, methodology_version, published revision, and regime.determinism_hash.</div>
+          <div className="mt-2 text-[var(--urd-text-body)]">Public provenance is anchored in date, updated_through, methodology_version, published revision, and regime.determinism_hash.</div>
         </div>
       </PageHero>
 
@@ -67,37 +67,37 @@ export default async function ApiDocsPage() {
         whyItMatters={<>A technical buyer should immediately know where to start, what the API returns, and how to validate the product before purchase.</>}
         fullContent={
           <div className="grid gap-6">
-        <section className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
-          <h2 className="text-xl font-semibold text-[#0d2447]">Before you buy</h2>
-          <div className="mt-4 grid gap-4 lg:grid-cols-3 text-sm leading-7 text-[#27476f]">
-            <div className="rounded-xl border bg-[#eef6ff] p-4"><div className="font-semibold text-[#0d2447]">1. Download sample artifacts</div><p className="mt-2">Use the <Link href="/api-docs/samples" className="underline">public sample pack</Link> to inspect real Gold, Derived, and Meta files.</p></div>
-            <div className="rounded-xl border bg-[#eef6ff] p-4"><div className="font-semibold text-[#0d2447]">2. Validate methodology and provenance</div><p className="mt-2">Use the <Link href="/methodology/reference" className="underline">reference</Link>, <Link href="/methodology/verification" className="underline">verification pack</Link>, and <Link href="/methodology/provenance" className="underline">provenance page</Link>.</p></div>
-            <div className="rounded-xl border bg-[#eef6ff] p-4"><div className="font-semibold text-[#0d2447]">3. See operational expectations</div><p className="mt-2">Read the <Link href="/service" className="underline">service expectations and revision policy</Link> before subscribing.</p></div>
+        <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+          <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">Before you buy</h2>
+          <div className="mt-4 grid gap-4 lg:grid-cols-3 text-sm leading-7 text-[var(--urd-text-body)]">
+            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">1. Download sample artifacts</div><p className="mt-2">Use the <Link href="/api-docs/samples" className="underline">public sample pack</Link> to inspect real Gold, Derived, and Meta files.</p></div>
+            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">2. Validate methodology and provenance</div><p className="mt-2">Use the <Link href="/methodology/reference" className="underline">reference</Link>, <Link href="/methodology/verification" className="underline">verification pack</Link>, and <Link href="/methodology/provenance" className="underline">provenance page</Link>.</p></div>
+            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">3. See operational expectations</div><p className="mt-2">Read the <Link href="/service" className="underline">service expectations and revision policy</Link> before subscribing.</p></div>
           </div>
         </section>
 
-        <section className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
-          <h2 className="text-xl font-semibold text-[#0d2447]">Authentication model</h2>
-          <p className="mt-4 text-sm leading-7 text-[#27476f]">Public endpoints require no key. Authenticated file delivery uses <InlineCode>X-API-Key</InlineCode>. Keys are created from the dashboard after purchase. Billing endpoints remain documented but inactive until business registration is completed.</p>
+        <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+          <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">Authentication model</h2>
+          <p className="mt-4 text-sm leading-7 text-[var(--urd-text-body)]">Public endpoints require no key. Authenticated file delivery uses <InlineCode>X-API-Key</InlineCode>. Keys are created from the dashboard after purchase. Billing endpoints remain documented but inactive until business registration is completed.</p>
           <CodeBlock>{`curl -H "X-API-Key: ta_live_xxxxxxxxx" https://www.urdatlas.com/api/v1/files/meta/bitcoin/90d/latest.json`}</CodeBlock>
         </section>
 
-        <section className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
-          <h2 className="text-xl font-semibold text-[#0d2447]">Public endpoints</h2>
+        <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+          <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">Public endpoints</h2>
           <div className="mt-4 overflow-x-auto rounded-2xl border">
             <table className="w-full text-left text-sm">
-              <thead className="border-b bg-[#dceaf8] text-[#27476f]"><tr><th className="px-4 py-3">Method</th><th className="px-4 py-3">Path</th><th className="px-4 py-3">Purpose</th></tr></thead>
-              <tbody>{PUBLIC_ENDPOINTS.map(([m,p,d]) => <tr key={p} className="border-b last:border-b-0 align-top"><td className="px-4 py-3 text-[#27476f]">{m}</td><td className="px-4 py-3"><InlineCode>{p}</InlineCode></td><td className="px-4 py-3 text-[#27476f]">{d}</td></tr>)}</tbody>
+              <thead className="border-b bg-[var(--urd-panel-strong)] text-[var(--urd-text-body)]"><tr><th className="px-4 py-3">Method</th><th className="px-4 py-3">Path</th><th className="px-4 py-3">Purpose</th></tr></thead>
+              <tbody>{PUBLIC_ENDPOINTS.map(([m,p,d]) => <tr key={p} className="border-b last:border-b-0 align-top"><td className="px-4 py-3 text-[var(--urd-text-body)]">{m}</td><td className="px-4 py-3"><InlineCode>{p}</InlineCode></td><td className="px-4 py-3 text-[var(--urd-text-body)]">{d}</td></tr>)}</tbody>
             </table>
           </div>
         </section>
 
-        <section className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
-          <h2 className="text-xl font-semibold text-[#0d2447]">Authenticated endpoints</h2>
+        <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+          <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">Authenticated endpoints</h2>
           <div className="mt-4 overflow-x-auto rounded-2xl border">
             <table className="w-full text-left text-sm">
-              <thead className="border-b bg-[#dceaf8] text-[#27476f]"><tr><th className="px-4 py-3">Method</th><th className="px-4 py-3">Path</th><th className="px-4 py-3">Purpose</th></tr></thead>
-              <tbody>{AUTH_ENDPOINTS.map(([m,p,d]) => <tr key={p} className="border-b last:border-b-0 align-top"><td className="px-4 py-3 text-[#27476f]">{m}</td><td className="px-4 py-3"><InlineCode>{p}</InlineCode></td><td className="px-4 py-3 text-[#27476f]">{d}</td></tr>)}</tbody>
+              <thead className="border-b bg-[var(--urd-panel-strong)] text-[var(--urd-text-body)]"><tr><th className="px-4 py-3">Method</th><th className="px-4 py-3">Path</th><th className="px-4 py-3">Purpose</th></tr></thead>
+              <tbody>{AUTH_ENDPOINTS.map(([m,p,d]) => <tr key={p} className="border-b last:border-b-0 align-top"><td className="px-4 py-3 text-[var(--urd-text-body)]">{m}</td><td className="px-4 py-3"><InlineCode>{p}</InlineCode></td><td className="px-4 py-3 text-[var(--urd-text-body)]">{d}</td></tr>)}</tbody>
             </table>
           </div>
         </section>
