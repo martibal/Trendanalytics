@@ -54,22 +54,22 @@ function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
 
 function apiKeyBadgeClass(status: ApiKeyRow["status"]) {
   const base =
-    "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide";
+    "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-black uppercase tracking-wide";
 
   if (status === "active") {
-    return `${base} border-emerald-500/30 bg-emerald-500/10 text-emerald-300`;
+    return `${base} border-emerald-500 bg-emerald-50 text-emerald-700`;
   }
 
   if (status === "suspended") {
-    return `${base} border-amber-500/30 bg-amber-500/10 text-amber-300`;
+    return `${base} border-amber-400 bg-amber-50 text-amber-800`;
   }
 
-  return `${base} border-rose-500/30 bg-rose-500/10 text-rose-300`;
+  return `${base} border-rose-400 bg-rose-50 text-rose-700`;
 }
 
 function mutedBadge(text: string) {
   return (
-    <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <span className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#557099]">
       {text}
     </span>
   );
@@ -99,7 +99,7 @@ function normalizeCreatedKeyIntoRow(
   created: CreatedKeyResponse["key"],
   fallbackTier: string,
   fallbackEntitledChain: string | null,
-  fallbackMaxWindowDays: number
+  fallbackMaxWindowDays: number,
 ): ApiKeyRow {
   return {
     id: created.id,
@@ -135,7 +135,7 @@ export default function ApiKeyManagerClient({
 
   const activeOrSuspendedCount = useMemo(
     () => keys.filter((key) => key.status !== "revoked").length,
-    [keys]
+    [keys],
   );
 
   const canMutate =
@@ -177,7 +177,9 @@ export default function ApiKeyManagerClient({
               ? payload.message
               : "API key creation failed.";
           const detail =
-            isApiErrorResponse(payload) && typeof payload.detail === "string" && payload.detail.length > 0
+            isApiErrorResponse(payload) &&
+            typeof payload.detail === "string" &&
+            payload.detail.length > 0
               ? ` ${payload.detail}`
               : "";
           setCreateError(`${message}${detail}`);
@@ -192,7 +194,7 @@ export default function ApiKeyManagerClient({
             created.key,
             fallbackTier,
             fallbackEntitledChain,
-            fallbackMaxWindowDays
+            fallbackMaxWindowDays,
           ),
           ...current,
         ]);
@@ -200,7 +202,7 @@ export default function ApiKeyManagerClient({
         router.refresh();
       } catch (error) {
         setCreateError(
-          error instanceof Error ? error.message : "Unknown API key creation error."
+          error instanceof Error ? error.message : "Unknown API key creation error.",
         );
       }
     });
@@ -229,7 +231,9 @@ export default function ApiKeyManagerClient({
               ? payload.message
               : "API key revoke failed.";
           const detail =
-            isApiErrorResponse(payload) && typeof payload.detail === "string" && payload.detail.length > 0
+            isApiErrorResponse(payload) &&
+            typeof payload.detail === "string" &&
+            payload.detail.length > 0
               ? ` ${payload.detail}`
               : "";
           setRevokeError(`${message}${detail}`);
@@ -238,14 +242,14 @@ export default function ApiKeyManagerClient({
 
         setKeys((current) =>
           current.map((key) =>
-            key.id === keyId ? { ...key, status: "revoked" } : key
-          )
+            key.id === keyId ? { ...key, status: "revoked" } : key,
+          ),
         );
 
         router.refresh();
       } catch (error) {
         setRevokeError(
-          error instanceof Error ? error.message : "Unknown API key revoke error."
+          error instanceof Error ? error.message : "Unknown API key revoke error.",
         );
       } finally {
         setBusyKeyId(null);
@@ -267,11 +271,13 @@ export default function ApiKeyManagerClient({
   }
 
   return (
-    <section className="rounded-2xl border p-6">
+    <section className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">API keys</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h2 className="text-2xl font-black tracking-[-0.03em] text-[#0d2447]">
+            API keys
+          </h2>
+          <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-[#27476f]">
             Create, rotate, and revoke delivery keys for authenticated JSON access.
             Secret values are shown exactly once at creation and only partial
             identifiers are displayed afterward.
@@ -279,40 +285,40 @@ export default function ApiKeyManagerClient({
         </div>
         <div className="flex items-center gap-2">
           {mutedBadge("db-backed")}
-          <span className="rounded-lg border px-3 py-2 text-sm text-muted-foreground">
+          <span className="rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-2 text-sm font-black text-[#557099]">
             {activeOrSuspendedCount}/2 non-revoked keys
           </span>
         </div>
       </div>
 
       {!authConfigured ? (
-        <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <div className="mt-5 rounded-2xl border border-amber-400 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
           Clerk is not configured yet, so key mutations are unavailable in this environment.
         </div>
       ) : null}
 
       {authConfigured && !isAuthenticated ? (
-        <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <div className="mt-5 rounded-2xl border border-amber-400 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
           Sign in to create or revoke API keys.
         </div>
       ) : null}
 
       {authConfigured && isAuthenticated && !hasLinkedAccount ? (
-        <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <div className="mt-5 rounded-2xl border border-amber-400 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
           Your authenticated user is not yet linked to an account row, so key lifecycle actions are blocked.
         </div>
       ) : null}
 
       {authConfigured && isAuthenticated && hasLinkedAccount && !subscriptionActive ? (
-        <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <div className="mt-5 rounded-2xl border border-amber-400 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
           An active subscription is required before API keys can be created.
         </div>
       ) : null}
 
-      <form onSubmit={handleCreate} className="mt-5 rounded-xl border p-4">
+      <form onSubmit={handleCreate} className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <div className="min-w-0 flex-1">
-            <label htmlFor="api-key-label" className="text-sm font-medium">
+            <label htmlFor="api-key-label" className="text-sm font-black text-[#0d2447]">
               Key label
             </label>
             <input
@@ -322,10 +328,10 @@ export default function ApiKeyManagerClient({
               onChange={(event) => setLabel(event.target.value)}
               placeholder="Example: local dev / staging / laptop"
               maxLength={64}
-              className="mt-2 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none ring-0 transition placeholder:text-muted-foreground focus:border-foreground/30"
+              className="mt-2 w-full rounded-xl border border-[#9db8d4] bg-[#f4f9ff] px-3 py-2 text-sm font-semibold text-[#0d2447] outline-none ring-0 transition placeholder:text-[#557099] focus:border-blue-500"
               disabled={!canMutate || activeOrSuspendedCount >= 2}
             />
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="mt-2 text-xs font-semibold leading-6 text-[#557099]">
               Optional label for identification in rotation workflows.
             </p>
           </div>
@@ -334,10 +340,10 @@ export default function ApiKeyManagerClient({
             type="submit"
             disabled={!canMutate || activeOrSuspendedCount >= 2}
             className={[
-              "rounded-lg border px-3 py-2 text-sm transition",
+              "rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-2 text-sm font-black transition",
               !canMutate || activeOrSuspendedCount >= 2
-                ? "cursor-not-allowed text-muted-foreground opacity-60"
-                : "text-foreground hover:bg-muted",
+                ? "cursor-not-allowed text-[#557099] opacity-60"
+                : "text-[#0d2447] hover:bg-white",
             ].join(" ")}
           >
             {isPending ? "Working..." : "Create API key"}
@@ -345,32 +351,32 @@ export default function ApiKeyManagerClient({
         </div>
 
         {createError ? (
-          <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
+          <div className="mt-3 rounded-xl border border-rose-400 bg-rose-50 p-3 text-sm font-semibold text-rose-800">
             {createError}
           </div>
         ) : null}
       </form>
 
       {createdSecret ? (
-        <div className="mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-          <div className="text-sm font-medium text-emerald-200">
+        <div className="mt-5 rounded-2xl border border-emerald-500 bg-emerald-50 p-4">
+          <div className="text-sm font-black text-emerald-800">
             New API key created
           </div>
-          <p className="mt-2 text-sm text-emerald-100/90">
+          <p className="mt-2 text-sm font-semibold leading-7 text-emerald-900">
             Copy this secret now. It will not be shown again after you leave or refresh this state.
           </p>
-          <div className="mt-3 overflow-x-auto rounded-lg border border-emerald-500/20 bg-background/60 p-3 font-mono text-sm text-foreground">
+          <div className="mt-3 overflow-x-auto rounded-xl border border-emerald-300 bg-white/70 p-3 font-mono text-sm font-bold text-[#0d2447]">
             {createdSecret}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleCopySecret}
-              className="rounded-lg border px-3 py-2 text-sm text-foreground transition hover:bg-background/80"
+              className="rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-2 text-sm font-black text-[#0d2447] transition hover:bg-white"
             >
               {copied ? "Copied" : "Copy secret"}
             </button>
-            <span className="text-xs text-emerald-100/80">
+            <span className="text-xs font-semibold text-emerald-900">
               Store it in your integration before revoking any older key.
             </span>
           </div>
@@ -378,25 +384,25 @@ export default function ApiKeyManagerClient({
       ) : null}
 
       {keys.length === 0 ? (
-        <div className="mt-5 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+        <div className="mt-5 rounded-2xl border border-dashed border-[#9db8d4] bg-[#eef6ff] p-4 text-sm font-semibold text-[#557099]">
           No API keys are connected to this account yet.
         </div>
       ) : (
         <div className="mt-5 space-y-3">
           {keys.map((keyRow) => (
-            <div key={keyRow.id} className="rounded-xl border p-4">
+            <div key={keyRow.id} className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="font-medium text-foreground">
+                  <div className="font-black text-[#0d2447]">
                     {keyRow.prefix}
                     ••••
                     {keyRow.last4 ?? "—"}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 text-xs font-semibold text-[#557099]">
                     Created: {formatDateTime(keyRow.createdAt)} · Last used:{" "}
                     {formatDateTime(keyRow.lastUsedAt)}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 text-xs font-semibold text-[#557099]">
                     Tier: {keyRow.tier} · Chain: {keyRow.entitledChain ?? "all"} · Max window:{" "}
                     {keyRow.maxWindowDays}d
                   </div>
@@ -409,10 +415,10 @@ export default function ApiKeyManagerClient({
                     disabled={!canMutate || keyRow.status === "revoked"}
                     onClick={() => handleRevoke(keyRow.id)}
                     className={[
-                      "rounded-lg border px-3 py-1.5 text-sm transition",
+                      "rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1.5 text-sm font-black transition",
                       !canMutate || keyRow.status === "revoked"
-                        ? "cursor-not-allowed text-muted-foreground opacity-60"
-                        : "text-foreground hover:bg-muted",
+                        ? "cursor-not-allowed text-[#557099] opacity-60"
+                        : "text-[#0d2447] hover:bg-white",
                     ].join(" ")}
                   >
                     {busyKeyId === keyRow.id && isPending ? "Revoking..." : "Revoke"}
@@ -421,7 +427,7 @@ export default function ApiKeyManagerClient({
               </div>
 
               {keyRow.label ? (
-                <div className="mt-2 text-xs text-muted-foreground">Label: {keyRow.label}</div>
+                <div className="mt-2 text-xs font-semibold text-[#557099]">Label: {keyRow.label}</div>
               ) : null}
             </div>
           ))}
@@ -429,33 +435,33 @@ export default function ApiKeyManagerClient({
       )}
 
       {revokeError ? (
-        <div className="mt-5 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
+        <div className="mt-5 rounded-xl border border-rose-400 bg-rose-50 p-3 text-sm font-semibold text-rose-800">
           {revokeError}
         </div>
       ) : null}
 
       <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <div className="rounded-xl border p-4 text-sm">
-          <div className="font-medium">ACTIVE</div>
-          <p className="mt-2 text-muted-foreground">
+        <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm">
+          <div className="font-black text-[#0d2447]">ACTIVE</div>
+          <p className="mt-2 font-semibold leading-7 text-[#27476f]">
             Valid for authenticated file delivery within the account&apos;s entitlement scope.
           </p>
         </div>
-        <div className="rounded-xl border p-4 text-sm">
-          <div className="font-medium">SUSPENDED</div>
-          <p className="mt-2 text-muted-foreground">
+        <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm">
+          <div className="font-black text-[#0d2447]">SUSPENDED</div>
+          <p className="mt-2 font-semibold leading-7 text-[#27476f]">
             Used for inactive subscription state. Key exists, but delivery is blocked.
           </p>
         </div>
-        <div className="rounded-xl border p-4 text-sm">
-          <div className="font-medium">REVOKED</div>
-          <p className="mt-2 text-muted-foreground">
+        <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm">
+          <div className="font-black text-[#0d2447]">REVOKED</div>
+          <p className="mt-2 font-semibold leading-7 text-[#27476f]">
             Permanently disabled after user or admin revocation. Cannot be reactivated.
           </p>
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl border p-4 text-sm text-muted-foreground">
+      <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm font-semibold leading-7 text-[#27476f]">
         Only partial identifiers are displayed after creation. The full secret is intentionally not retrievable later.
       </div>
     </section>

@@ -43,9 +43,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border p-6">
+    <section className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
       <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="mt-3 text-sm leading-6 text-muted-foreground">{children}</div>
+      <div className="mt-3 text-sm leading-6 text-[#27476f]">{children}</div>
     </section>
   );
 }
@@ -112,13 +112,13 @@ function bandClass(band: string) {
   if (band === "Degraded") {
     return `${base} border-red-500/25 bg-red-500/10 text-red-300`;
   }
-  return `${base} border-border bg-muted text-muted-foreground`;
+  return `${base} border-[#c9d9ea] bg-[#eef6ff] text-[#27476f]`;
 }
 
 function regimeBadgeClass(label?: string | null) {
   const base =
     "inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium";
-  if (!label) return `${base} border-border bg-muted text-muted-foreground`;
+  if (!label) return `${base} border-[#c9d9ea] bg-[#eef6ff] text-[#27476f]`;
   if (label === "CONGESTED") {
     return `${base} border-red-500/25 bg-red-500/10 text-red-300`;
   }
@@ -132,9 +132,9 @@ function regimeBadgeClass(label?: string | null) {
     return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-300`;
   }
   if (label === "UNKNOWN/DEGRADED") {
-    return `${base} border-slate-400/25 bg-slate-400/10 text-slate-300`;
+    return `${base} border-slate-400/25 bg-slate-400/10 text-[#27476f]`;
   }
-  return `${base} border-border bg-muted text-muted-foreground`;
+  return `${base} border-[#c9d9ea] bg-[#eef6ff] text-[#27476f]`;
 }
 
 export default async function ChainHistoryPage({
@@ -188,7 +188,7 @@ export default async function ChainHistoryPage({
       <header className="mb-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-[#27476f]">
               <Link href="/chains" className="hover:underline">
                 Chains
               </Link>
@@ -204,7 +204,7 @@ export default async function ChainHistoryPage({
               {chainId} history
             </h1>
 
-            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            <p className="mt-2 max-w-3xl text-sm text-[#27476f]">
               This page reads one canonical published history bundle for regime/status
               context. It does not search for alternate files and does not repair missing
               windows at runtime.
@@ -212,14 +212,14 @@ export default async function ChainHistoryPage({
           </div>
 
           <div className="rounded-xl border px-4 py-3 text-sm">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs uppercase tracking-wide text-[#27476f]">
               Traceability
             </div>
-            <div className="mt-1 font-medium text-foreground">
+            <div className="mt-1 font-medium text-[#0d2447]">
               Published artifact contract
             </div>
-            <div className="mt-1 text-xs text-muted-foreground">{canonicalPath}</div>
-            <div className="mt-2 text-xs text-muted-foreground">
+            <div className="mt-1 text-xs text-[#27476f]">{canonicalPath}</div>
+            <div className="mt-2 text-xs text-[#27476f]">
               Expected delay: {expectedDelayDays(chainId)}d
             </div>
           </div>
@@ -229,7 +229,7 @@ export default async function ChainHistoryPage({
           <>
             <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-xl border p-4 text-sm">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="text-xs uppercase tracking-wide text-[#27476f]">
                   Latest regime
                 </div>
                 <div className="mt-2">
@@ -240,7 +240,7 @@ export default async function ChainHistoryPage({
               </div>
 
               <div className="rounded-xl border p-4 text-sm">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="text-xs uppercase tracking-wide text-[#27476f]">
                   Latest confidence
                 </div>
                 <div className="mt-2 text-2xl font-semibold">
@@ -254,7 +254,7 @@ export default async function ChainHistoryPage({
               </div>
 
               <div className="rounded-xl border p-4 text-sm">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="text-xs uppercase tracking-wide text-[#27476f]">
                   Latest lag
                 </div>
                 <div className="mt-2 text-2xl font-semibold">
@@ -263,7 +263,7 @@ export default async function ChainHistoryPage({
               </div>
 
               <div className="rounded-xl border p-4 text-sm">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="text-xs uppercase tracking-wide text-[#27476f]">
                   Rows loaded
                 </div>
                 <div className="mt-2 text-2xl font-semibold">{rows.length}</div>
@@ -272,21 +272,21 @@ export default async function ChainHistoryPage({
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border p-4 text-sm">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="text-xs uppercase tracking-wide text-[#27476f]">
                   Good confidence rows
                 </div>
                 <div className="mt-2 text-2xl font-semibold">{goodCount}</div>
               </div>
 
               <div className="rounded-xl border p-4 text-sm">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="text-xs uppercase tracking-wide text-[#27476f]">
                   Caution rows
                 </div>
                 <div className="mt-2 text-2xl font-semibold">{cautionCount}</div>
               </div>
 
               <div className="rounded-xl border p-4 text-sm">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="text-xs uppercase tracking-wide text-[#27476f]">
                   Degraded rows
                 </div>
                 <div className="mt-2 text-2xl font-semibold">{degradedCount}</div>
@@ -310,14 +310,14 @@ export default async function ChainHistoryPage({
         <section className="rounded-2xl border">
           <div className="border-b px-5 py-4">
             <h2 className="text-lg font-semibold">Last 90 published rows</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-[#27476f]">
               Rows are rendered directly from the canonical published history bundle.
             </p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left text-muted-foreground">
+              <thead className="border-b bg-[#dceaf8] text-left text-[#27476f]">
                 <tr>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">As of</th>
@@ -428,10 +428,10 @@ export default async function ChainHistoryPage({
       {/* ── Upsell ── */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cyan-500/15 bg-cyan-500/5 px-5 py-4">
         <div>
-          <div className="text-sm font-semibold text-white">
+          <div className="text-sm font-semibold text-[#0d2447]">
             Want the JSON behind this track record?
           </div>
-          <p className="mt-1 text-xs leading-5 text-slate-400">
+          <p className="mt-1 text-xs leading-5 text-[#557099]">
             Every label here is backed by a determinism hash and a full confidence score.
             A Basic or Pro subscription gives you API access to the complete Meta JSON —
             the data you see here, structured and ready to use in your own tools.
@@ -439,7 +439,7 @@ export default async function ChainHistoryPage({
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
           <Link href="/sign-up"
-            className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10 transition-colors">
+            className="inline-flex items-center rounded-full border border-white/15 bg-[#eef6ff] px-4 py-2 text-xs font-semibold text-[#27476f] hover:bg-white transition-colors">
             Sign up free →
           </Link>
           <Link href="/#plans"
@@ -447,6 +447,7 @@ export default async function ChainHistoryPage({
             See plans
           </Link>
         </div>
+      </div>
       </div>
     </main>
   );

@@ -1,6 +1,8 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
 // src/app/terms/page.tsx
 import Link from "next/link";
+import PageHero from "@/components/site/PageHero";
+import { UrdContainer, UrdInlineCode, UrdPage, UrdSection } from "@/components/site/UrdDesignSystem";
 
 function Section({
   title,
@@ -10,63 +12,31 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border p-6">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="mt-3 space-y-3 text-sm leading-6 text-muted-foreground">
-        {children}
-      </div>
-    </section>
+    <UrdSection title={title}>
+      <div className="space-y-3">{children}</div>
+    </UrdSection>
   );
 }
 
 function InlineCode({ children }: { children: string }) {
-  return <code className="rounded bg-muted px-1 py-0.5">{children}</code>;
+  return <UrdInlineCode>{children}</UrdInlineCode>;
 }
 
 export default function TermsPage() {
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10">
-      <header className="mb-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Terms of Service</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              These Terms govern access to the Urd Atlas public website, subscriber dashboard,
-              and authenticated JSON delivery API.
-            </p>
-          </div>
-
-          <div className="rounded-xl border px-4 py-3 text-sm">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Status
-            </div>
-            <div className="mt-1 font-medium text-foreground">
-              Current terms version
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Applies to the current public site, dashboard, and authenticated delivery API.
-            </div>
-          </div>
+    <UrdPage>
+      <PageHero
+        eyebrow="Terms of Service"
+        title="Terms of Service"
+        summary="These Terms govern access to the Urd Atlas public website, subscriber dashboard, and authenticated JSON delivery API."
+      >
+        <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/5 p-5 text-sm leading-7 text-slate-200">
+          <div className="text-xs font-black uppercase tracking-[0.12em] text-cyan-200">Current terms version</div>
+          <p className="mt-2">Applies to the current public site, dashboard, and authenticated delivery API.</p>
         </div>
+      </PageHero>
 
-        <div className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground">
-          <div className="font-medium text-foreground">Important</div>
-          <p className="mt-2">
-            These Terms apply to the current public website, subscriber dashboard, and
-            authenticated JSON delivery API. By creating an account, purchasing a subscription,
-            generating or using an API key, or otherwise using authenticated features of the
-            service, you agree to be bound by these Terms.
-          </p>
-          <p className="mt-2">
-            Urd Atlas is descriptive only. It does not provide investment advice, trading advice,
-            forecasts, or recommendations.
-          </p>
-          <p className="mt-2">
-            Public operational expectations, support handling, and revision / correction policy are documented at <Link href="/service" className="underline">/service</Link>.
-          </p>
-        </div>
-      </header>
-
+      <UrdContainer className="max-w-4xl">
       <ShortFullContent
         pageKey="terms"
         summary={<>This page defines the legal terms for using the public website, subscriber dashboard, authenticated file delivery, and related product surfaces.</>}
@@ -361,6 +331,7 @@ export default function TermsPage() {
           </div>
         }
       />
-    </main>
+      </UrdContainer>
+    </UrdPage>
   );
 }

@@ -7,7 +7,9 @@ import { type ThresholdControlValues } from "@/components/thresholds/ThresholdCo
 import ThresholdControlsClient from "@/components/thresholds/ThresholdControlsClient";
 
 import ShortFullContent from "@/components/site/ShortFullContent";
+
 import PageHero from "@/components/site/PageHero";
+import { UrdContainer, UrdPage } from "@/components/site/UrdDesignSystem";
 
 import "server-only";
 
@@ -46,22 +48,17 @@ function ModalStyles() {
 }
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return (
-    <code className="font-mono text-xs font-semibold text-[#0d2447]">
-      {children}
-    </code>
-  );
+  return <code className="rounded border border-[#9db8d4] bg-[#f4f9ff] px-1 py-0.5 text-[#0d2447] text-xs font-mono">{children}</code>;
 }
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
   return (
-    <Link
-      href={`?modal=${id}`}
-      scroll={false}
-      className="inline-flex items-center rounded-full border border-blue-200/70 bg-[#d8e9fb] px-3 py-1 text-xs font-extrabold text-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition hover:border-white hover:bg-white"
+    <a
+      href={`#${id}`}
+      className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-black text-[#0d2447] hover:bg-white hover:text-blue-800"
     >
       {label}
-    </Link>
+    </a>
   );
 }
 
@@ -73,78 +70,57 @@ function ExplainModal({
   subtitle,
   pair,
   traceability,
-  active,
 }: {
   id: string;
   title: string;
   subtitle?: ReactNode;
   pair: ExplainPair;
   traceability?: ReactNode;
-  active: boolean;
 }) {
   return (
-    <div
-      className={`${active ? "flex" : "hidden"} fixed inset-0 z-[999] items-center justify-center p-4`}
-    >
-      <Link
-        href="?"
-        scroll={false}
-        className="absolute inset-0 bg-[#031329]/78 backdrop-blur-sm"
+    <div id={id} className="ta-modal fixed inset-0 z-[80] items-center justify-center p-4">
+      <a
+        href="#"
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
         aria-label="Close dialog"
       />
-
-      <div className="relative z-10 flex max-h-[88vh] w-full max-w-5xl flex-col rounded-[28px] border border-[#b6cce3] bg-[#e7f1fb] shadow-[0_30px_90px_rgba(3,19,41,0.42)]">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#b6cce3] px-6 py-5">
+      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] shadow-2xl shadow-slate-950/30">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#c9d9ea] px-6 py-5">
           <div>
-            <h3 className="text-3xl font-black tracking-[-0.035em] text-[#0d2447]">
-              {title}
-            </h3>
+            <h3 className="text-2xl font-semibold text-[#0d2447]">{title}</h3>
             {subtitle ? (
-              <div className="mt-2 text-sm font-semibold leading-6 text-[#27476f]">
-                {subtitle}
-              </div>
+              <div className="mt-2 text-sm leading-6 text-[#27476f]">{subtitle}</div>
             ) : null}
           </div>
-
-          <Link
-            href="?"
-            scroll={false}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#b6cce3] bg-[#dceaf8] text-xl font-bold text-[#0d2447] transition hover:bg-white"
+          <a
+            href="#"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] text-xl text-[#0d2447] hover:bg-white"
             aria-label="Close dialog"
           >
             ×
-          </Link>
+          </a>
         </div>
-
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <section className="rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-5">
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-emerald-200">
                 Basic
               </div>
-              <div className="mt-3 text-sm font-medium leading-7 text-[#0d2447]">
-                {pair.basic}
-              </div>
+              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.basic}</div>
             </section>
-
-            <section className="rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-5">
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+            <details className="rounded-2xl border border-[#9db8d4] bg-cyan-500/5 p-5" open>
+              <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                 Advanced
-              </div>
-              <div className="mt-3 text-sm font-medium leading-7 text-[#0d2447]">
-                {pair.advanced}
-              </div>
-            </section>
+              </summary>
+              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.advanced}</div>
+            </details>
           </div>
-
-          {(traceability ?? pair.traceability) ? (
-            <div className="mt-4 rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-5">
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+          {traceability ? (
+            <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#27476f]">
                 Traceability
               </div>
-              <div className="mt-3 text-sm font-medium leading-7 text-[#0d2447]">
-                {traceability ?? pair.traceability}
-              </div>
+              <div className="mt-3 text-sm leading-7 text-[#0d2447]">{traceability}</div>
             </div>
           ) : null}
         </div>
@@ -518,80 +494,98 @@ const interpretationBoundaryExplain: ExplainPair = {
 // Page
 // ---------------------------------------------------------------------------
 
-type ThresholdsSearchParams = { modal?: string };
-
-export default async function ThresholdsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<ThresholdsSearchParams>;
-}) {
-  const resolvedSearchParams = (await searchParams) ?? {};
-  const activeModal = resolvedSearchParams.modal ?? null;
+export default async function ThresholdsPage() {
   const dataset: DatasetManifest | null = await readDatasetManifest();
 
   return (
-    <main className="min-h-screen bg-[#edf6ff] text-[#0a1d3a]">
-      <ModalStyles />
-
+    <UrdPage>
       <PageHero
         eyebrow="Classification rules"
         title="Thresholds"
-        summary="The exact values that decide when a metric is high, when confidence is good enough, and which regime label a chain receives. Published openly so every classification can be traced and understood."
-      >
-        <div className="flex flex-wrap gap-3">
-          <MoreLink id="what-are-modal" label="What are thresholds?" />
-          <MoreLink id="regime-rules-modal" label="Regime classification rules" />
-          <MoreLink id="boundary-modal" label="Interpretation boundary" />
-          <Link
-            href="/methodology"
-            className="inline-flex items-center rounded-full border border-blue-200/70 bg-[#d8e9fb] px-3 py-1 text-xs font-extrabold text-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition hover:border-white hover:bg-white"
-          >
-            Methodology
-          </Link>
-        </div>
+        summary="The exact values that decide when a metric is high, when confidence is good enough, and which regime label a chain receives."
+      />
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-blue-200">
-              How to read this page
+      <UrdContainer className="py-10">
+      <ModalStyles />
+
+      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      <section className="mb-10 rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="max-w-3xl">
+              <div className="text-xs font-medium uppercase tracking-[0.18em] text-blue-700">
+                Classification rules
+              </div>
+              <h1 className="mt-3 text-4xl font-semibold leading-tight text-[#0d2447] sm:text-5xl">
+                Thresholds
+              </h1>
+              <p className="mt-4 text-lg leading-8 text-[#27476f]">
+                The exact values that decide when a metric is "high", when confidence is
+                "good enough", and which regime label a chain receives. Published openly so
+                every classification can be traced and understood.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <MoreLink id="what-are-modal" label="What are thresholds?" />
+                <MoreLink id="regime-rules-modal" label="Regime classification rules" />
+                <MoreLink id="boundary-modal" label="Interpretation boundary" />
+                <Link
+                  href="/methodology"
+                  className="inline-flex items-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] px-3 py-1 text-xs font-medium text-[#0d2447] hover:bg-white"
+                >
+                  Methodology
+                </Link>
+              </div>
             </div>
-            <div className="mt-2 text-sm font-semibold leading-7 text-white/86">
-              Canonical values → Confidence gate → Band thresholds → Regime rules → Simulator
-            </div>
+
+            {dataset ? (
+              <div className="min-w-[200px] rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-4 py-4 text-xs text-[#27476f]">
+                <div className="font-medium uppercase tracking-[0.12em] text-[#557099]">
+                  Dataset
+                </div>
+                {dataset.version ? (
+                  <div className="mt-2">
+                    Revision{" "}
+                    <span className="font-semibold text-[#0d2447]">{dataset.version}</span>
+                  </div>
+                ) : null}
+                {dataset.methodology_version ? (
+                  <div className="mt-1">
+                    Methodology{" "}
+                    <InlineCode>{dataset.methodology_version}</InlineCode>
+                  </div>
+                ) : null}
+                <div className="mt-2 border-t border-[#c9d9ea] pt-2 text-[#557099]">
+                  Published artifact contract
+                </div>
+              </div>
+            ) : null}
           </div>
 
-          {dataset ? (
-            <div className="rounded-2xl border border-white/12 bg-white/[0.06] p-5 text-xs text-white/78">
-              <div className="font-black uppercase tracking-[0.12em] text-blue-200">
-                Dataset
-              </div>
-              {dataset.version ? (
-                <div className="mt-2">
-                  Revision <span className="font-semibold text-white">{dataset.version}</span>
+          {/* Reading map */}
+          <div className="mt-6 rounded-2xl border border-[#c9d9ea] bg-white/3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
+                  How to read this page
                 </div>
-              ) : null}
-              {dataset.methodology_version ? (
-                <div className="mt-1">
-                  Methodology <span className="font-semibold text-white">{dataset.methodology_version}</span>
+                <div className="mt-2 text-sm text-slate-100">
+                  Canonical values → Confidence gate → Band thresholds → Regime rules → Simulator
                 </div>
-              ) : null}
-              <div className="mt-2 border-t border-white/10 pt-2 text-white/58">
-                Published artifact contract
               </div>
+              <MoreLink id="what-are-modal" label="Full explanation" />
             </div>
-          ) : null}
+          </div>
         </div>
-      </PageHero>
+      </section>
 
-      <div className="mx-auto max-w-7xl px-6 py-10">
       {/* ── Canonical values at a glance ─────────────────────────────────── */}
       <section className="mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
               Canonical defaults
             </div>
-            <h2 className="mt-1 text-3xl font-black tracking-[-0.03em] text-[#0d2447]">The values the model uses today</h2>
+            <h2 className="mt-1 text-3xl font-semibold">The values the model uses today</h2>
             <p className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">
               These are the exact threshold values in the currently published methodology.
               Every regime label on every chain page was produced using these numbers.
@@ -602,38 +596,38 @@ export default async function ThresholdsPage({
         <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 
           {/* Confidence gate */}
-          <div className="rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+          <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6 shadow-sm">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#a66f00]">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-amber-300">
                 Confidence gate
               </div>
               <MoreLink id="confidence-modal" />
             </div>
-            <div className="mt-4 text-5xl font-black tracking-[-0.04em] text-[#0d2447]">0.40</div>
+            <div className="mt-4 text-5xl font-semibold text-[#0d2447]">0.40</div>
             <p className="mt-3 text-sm leading-7 text-[#27476f]">
               Below this value, the regime label becomes UNKNOWN/DEGRADED regardless of
               axis structure. The most important single threshold on the site.
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
               <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-2 py-2">
-                <div className="font-semibold text-[#b94f4f]">&lt; 0.40</div>
+                <div className="font-semibold text-red-300">&lt; 0.40</div>
                 <div className="mt-1 text-[#27476f]">Degraded</div>
               </div>
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-2 py-2">
-                <div className="font-semibold text-[#a66f00]">0.40–0.69</div>
+                <div className="font-semibold text-amber-300">0.40–0.69</div>
                 <div className="mt-1 text-[#27476f]">Caution</div>
               </div>
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2 py-2">
-                <div className="font-semibold text-[#2f8f6b]">≥ 0.70</div>
+                <div className="font-semibold text-emerald-300">≥ 0.70</div>
                 <div className="mt-1 text-[#27476f]">Good</div>
               </div>
             </div>
           </div>
 
           {/* High band */}
-          <div className="rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+          <div className="rounded-3xl border p-6 shadow-sm">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                 High band
               </div>
               <MoreLink id="bands-modal" />
@@ -641,12 +635,12 @@ export default async function ThresholdsPage({
             <div className="mt-4 flex items-end gap-3">
               <div>
                 <div className="text-xs text-[#27476f]">Percentile</div>
-                <div className="text-4xl font-black tracking-[-0.04em] text-[#0d2447]">≥ 80</div>
+                <div className="text-4xl font-semibold text-[#0d2447]">≥ 80</div>
               </div>
               <div className="mb-1 text-[#27476f]">or</div>
               <div>
                 <div className="text-xs text-[#27476f]">Z-score</div>
-                <div className="text-4xl font-black tracking-[-0.04em] text-[#0d2447]">≥ 1.5</div>
+                <div className="text-4xl font-semibold text-[#0d2447]">≥ 1.5</div>
               </div>
             </div>
             <p className="mt-3 text-sm leading-7 text-[#27476f]">
@@ -656,9 +650,9 @@ export default async function ThresholdsPage({
           </div>
 
           {/* Regime rules summary */}
-          <div className="rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+          <div className="rounded-3xl border p-6 shadow-sm">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                 Regime rules
               </div>
               <MoreLink id="regime-rules-modal" />
@@ -699,28 +693,28 @@ export default async function ThresholdsPage({
         </div>
 
         {/* Full band table */}
-        <div className="mt-4 rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#b6cce3] px-6 py-5">
+        <div className="mt-4 rounded-3xl border shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-5">
             <div>
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                 All band thresholds
               </div>
-              <h3 className="mt-1 text-xl font-black tracking-[-0.03em] text-[#0d2447]">Complete canonical values</h3>
+              <h3 className="mt-1 text-xl font-semibold">Complete canonical values</h3>
             </div>
             <MoreLink id="bands-modal" label="How bands work" />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-[#b6cce3] bg-[#dceaf8] text-left">
+              <thead className="border-b bg-[#dceaf8] text-left">
                 <tr>
-                  <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#27476f]">Band</th>
-                  <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#27476f]">Percentile criterion</th>
-                  <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#27476f]">Z-score criterion</th>
-                  <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#27476f]">Logic</th>
-                  <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#27476f]">Role in regime</th>
+                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Band</th>
+                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Percentile criterion</th>
+                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Z-score criterion</th>
+                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Logic</th>
+                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[#27476f]">Role in regime</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#b6cce3]">
+              <tbody className="divide-y divide-border">
                 {[
                   {
                     band: "EXTREME_HIGH",
@@ -728,7 +722,7 @@ export default async function ThresholdsPage({
                     z: "≥ +2.5",
                     logic: "OR",
                     role: "Triggers CONGESTED alone (capacity axis)",
-                    color: "text-[#b94f4f]",
+                    color: "text-red-300",
                   },
                   {
                     band: "HIGH",
@@ -736,7 +730,7 @@ export default async function ThresholdsPage({
                     z: "≥ +1.5",
                     logic: "OR",
                     role: "CONGESTED (capacity+friction), HEATING (demand)",
-                    color: "text-[#a66f00]",
+                    color: "text-amber-300",
                   },
                   {
                     band: "NORMAL",
@@ -752,7 +746,7 @@ export default async function ThresholdsPage({
                     z: "≤ −1.5",
                     logic: "OR",
                     role: "CHEAP (friction+capacity both low)",
-                    color: "text-[#426fb8]",
+                    color: "text-blue-300",
                   },
                   {
                     band: "EXTREME_LOW",
@@ -763,7 +757,7 @@ export default async function ThresholdsPage({
                     color: "text-blue-700",
                   },
                 ].map((row) => (
-                  <tr key={row.band} className="hover:bg-[#dceaf8]/70">
+                  <tr key={row.band} className="hover:bg-[#eef6ff]/10">
                     <td className={`px-5 py-3 font-mono text-xs font-semibold ${row.color}`}>
                       {row.band}
                     </td>
@@ -776,7 +770,7 @@ export default async function ThresholdsPage({
               </tbody>
             </table>
           </div>
-          <div className="border-t border-[#b6cce3] px-5 py-3 text-xs text-[#27476f]">
+          <div className="border-t px-5 py-3 text-xs text-[#27476f]">
             Source: <InlineCode>regime_engine.py</InlineCode> ·{" "}
             <InlineCode>market_scorecard.py</InlineCode> · Methodology version{" "}
             <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode>
@@ -785,13 +779,13 @@ export default async function ThresholdsPage({
       </section>
 
       {/* ── Simulator ────────────────────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+      <section className="mb-8 rounded-3xl border p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
               Local exploration
             </div>
-            <h2 className="mt-1 text-3xl font-black tracking-[-0.03em] text-[#0d2447]">Threshold simulator</h2>
+            <h2 className="mt-1 text-3xl font-semibold">Threshold simulator</h2>
             <p className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">
               Adjust the sliders to explore how different threshold values would change the
               classification rules. Everything here runs in your browser — nothing changes
@@ -801,7 +795,7 @@ export default async function ThresholdsPage({
           <MoreLink id="simulator-modal" label="How the simulator works" />
         </div>
 
-        <div className="rounded-2xl border border-[#b6cce3] bg-[#dceaf8] px-5 py-3 text-sm text-[#0d2447] mb-6">
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm text-amber-200 mb-6">
           <span className="font-medium">Local simulation only.</span> Adjusting these
           controls does not overwrite canonical published methodology, public regime labels,
           or default API outputs. All changes are local to your browser session.
@@ -811,8 +805,8 @@ export default async function ThresholdsPage({
       </section>
 
       {/* ── Navigation strip ─────────────────────────────────────────────── */}
-      <section className="mt-10 rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
-        <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+      <section className="mt-10 rounded-3xl border p-6 shadow-sm">
+        <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
           Related
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -827,13 +821,13 @@ export default async function ThresholdsPage({
             <Link
               key={href}
               href={href}
-              className="group flex items-center justify-between rounded-2xl border border-[#b6cce3] bg-[#dceaf8] px-4 py-3 transition hover:border-blue-300 hover:bg-[#cfe0f1]"
+              className="group flex items-center justify-between rounded-2xl border bg-background/40 px-4 py-3 transition hover:border-cyan-500/30 hover:bg-[#eef6ff]/30"
             >
               <div>
                 <div className="text-sm font-medium text-[#0d2447]">{label}</div>
                 <div className="mt-0.5 text-xs text-[#27476f]">{desc}</div>
               </div>
-              <span className="text-xs text-[#27476f] transition group-hover:text-[#203c63]">
+              <span className="text-xs text-[#27476f] transition group-hover:text-blue-700">
                 →
               </span>
             </Link>
@@ -842,7 +836,7 @@ export default async function ThresholdsPage({
       </section>
 
       {/* ── Data contract ─────────────────────────────────────────────────── */}
-      <details className="mt-8 rounded-2xl border border-[#b6cce3] bg-[#e7f1fb] p-5">
+      <details className="mt-8 rounded-2xl border p-5">
         <summary className="cursor-pointer text-sm font-medium text-[#27476f] hover:text-[#0d2447]">
           Data contract and traceability
         </summary>
@@ -867,12 +861,9 @@ export default async function ThresholdsPage({
         </div>
       </details>
 
-      </div>
-
       {/* ── All modals ────────────────────────────────────────────────────── */}
       <ExplainModal
         id="what-are-modal"
-        active={activeModal === "what-are-modal"}
         title="What are thresholds?"
         subtitle="How classification rules work and why they are published openly."
         pair={whatAreThresholdsExplain}
@@ -880,7 +871,6 @@ export default async function ThresholdsPage({
 
       <ExplainModal
         id="confidence-modal"
-        active={activeModal === "confidence-modal"}
         title="The confidence gate — 0.40"
         subtitle="The most important threshold on the site and how it works."
         pair={confidenceThresholdExplain}
@@ -889,7 +879,6 @@ export default async function ThresholdsPage({
 
       <ExplainModal
         id="bands-modal"
-        active={activeModal === "bands-modal"}
         title="Band thresholds"
         subtitle="How metrics are classified as high, low, extreme, or normal."
         pair={bandThresholdsExplain}
@@ -898,7 +887,6 @@ export default async function ThresholdsPage({
 
       <ExplainModal
         id="regime-rules-modal"
-        active={activeModal === "regime-rules-modal"}
         title="Regime classification rules"
         subtitle="The exact rules that produce STABLE, HEATING, CONGESTED, CHEAP, and UNKNOWN/DEGRADED."
         pair={regimeRulesExplain}
@@ -906,7 +894,6 @@ export default async function ThresholdsPage({
 
       <ExplainModal
         id="simulator-modal"
-        active={activeModal === "simulator-modal"}
         title="How the threshold simulator works"
         subtitle="What the interactive controls do and what they do not do."
         pair={simulatorExplain}
@@ -914,11 +901,11 @@ export default async function ThresholdsPage({
 
       <ExplainModal
         id="boundary-modal"
-        active={activeModal === "boundary-modal"}
         title="Interpretation boundary"
         subtitle="What thresholds are and are not for."
         pair={interpretationBoundaryExplain}
       />
-    </main>
+      </UrdContainer>
+    </UrdPage>
   );
 }

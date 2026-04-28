@@ -1,6 +1,8 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
 // src/app/privacy/page.tsx
 import Link from "next/link";
+import PageHero from "@/components/site/PageHero";
+import { UrdContainer, UrdInlineCode, UrdPage, UrdSection } from "@/components/site/UrdDesignSystem";
 
 function Section({
   title,
@@ -10,35 +12,26 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border p-6">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="mt-3 space-y-3 text-sm leading-6 text-muted-foreground">
-        {children}
-      </div>
-    </section>
+    <UrdSection title={title}>
+      <div className="space-y-3">{children}</div>
+    </UrdSection>
   );
 }
 
 function InlineCode({ children }: { children: string }) {
-  return <code className="rounded bg-muted px-1 py-0.5">{children}</code>;
+  return <UrdInlineCode>{children}</UrdInlineCode>;
 }
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10">
-      <header className="mb-8">
-        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.06),transparent_40%)] p-8">
-          <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">Privacy Policy</div>
-          <h1 className="mt-3 text-4xl font-semibold leading-tight text-white sm:text-5xl">
-            How your data is handled
-          </h1>
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
-            This page describes how Urd Atlas handles account, billing, usage, and
-            authenticated access data across the public website, subscriber dashboard, and API.
-          </p>
-        </div>
-      </header>
+    <UrdPage>
+      <PageHero
+        eyebrow="Privacy Policy"
+        title="How your data is handled"
+        summary="This page describes how Urd Atlas handles account, billing, usage, and authenticated access data across the public website, subscriber dashboard, and API."
+      />
 
+      <UrdContainer className="max-w-4xl">
       <ShortFullContent
         pageKey="privacy"
         summary={<>This page explains what kinds of user data Urd Atlas may handle across the public website, subscriber system, dashboard, billing, and authenticated file delivery.</>}
@@ -253,6 +246,7 @@ export default function PrivacyPage() {
           </div>
         }
       />
-    </main>
+      </UrdContainer>
+    </UrdPage>
   );
 }

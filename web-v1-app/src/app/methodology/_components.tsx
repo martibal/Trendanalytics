@@ -1,5 +1,15 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import {
+  UrdCallout,
+  UrdHero,
+  UrdInlineCode,
+  UrdPillLink,
+  UrdSection,
+  UrdTable,
+  cx,
+  urd,
+} from "@/components/site/UrdDesignSystem";
 
 const NAV_ITEMS = [
   { href: "/methodology", label: "Overview" },
@@ -14,11 +24,7 @@ const NAV_ITEMS = [
 ];
 
 export function InlineCode({ children }: { children: ReactNode }) {
-  return (
-    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground">
-      {children}
-    </code>
-  );
+  return <UrdInlineCode>{children}</UrdInlineCode>;
 }
 
 export function MethodologyHeader({
@@ -28,31 +34,17 @@ export function MethodologyHeader({
   title: string;
   description: string;
 }) {
-  return (
-    <header className="mb-8 border-b border-border pb-6">
-      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-        Urd Atlas methodology
-      </div>
-      <h1 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">{title}</h1>
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-        {description}
-      </p>
-    </header>
-  );
+  return <UrdHero eyebrow="Urd Atlas methodology" title={title} summary={description} />;
 }
 
 export function MethodologyNav() {
   return (
-    <nav className="mb-8 overflow-x-auto rounded-2xl border border-white/10 bg-white/5 p-3">
-      <div className="flex min-w-max flex-wrap gap-2">
+    <nav className={urd.nav}>
+      <div className={urd.navInner}>
         {NAV_ITEMS.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-400/40 hover:text-white"
-          >
+          <UrdPillLink key={item.href} href={item.href}>
             {item.label}
-          </Link>
+          </UrdPillLink>
         ))}
       </div>
     </nav>
@@ -69,10 +61,9 @@ export function Section({
   id?: string;
 }) {
   return (
-    <section id={id} className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm">
-      <h2 className="text-xl font-semibold text-white">{title}</h2>
-      <div className="mt-4 space-y-4 text-sm leading-7 text-slate-300">{children}</div>
-    </section>
+    <UrdSection id={id} title={title}>
+      {children}
+    </UrdSection>
   );
 }
 
@@ -83,12 +74,7 @@ export function Callout({
   title: string;
   children: ReactNode;
 }) {
-  return (
-    <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4">
-      <div className="text-sm font-semibold text-cyan-200">{title}</div>
-      <div className="mt-2 space-y-3 text-sm leading-7 text-slate-300">{children}</div>
-    </div>
-  );
+  return <UrdCallout title={title}>{children}</UrdCallout>;
 }
 
 export function WarningCallout({
@@ -98,12 +84,7 @@ export function WarningCallout({
   title: string;
   children: ReactNode;
 }) {
-  return (
-    <div className="rounded-2xl border border-amber-400/25 bg-amber-400/5 p-4">
-      <div className="text-sm font-semibold text-amber-200">{title}</div>
-      <div className="mt-2 space-y-3 text-sm leading-7 text-slate-300">{children}</div>
-    </div>
-  );
+  return <UrdCallout title={title} tone="warning">{children}</UrdCallout>;
 }
 
 export function SimpleTable({
@@ -113,30 +94,21 @@ export function SimpleTable({
   headers: string[];
   rows: ReactNode[][];
 }) {
+  return <UrdTable headers={headers} rows={rows} />;
+}
+
+export function MethodologyPageShell({ children }: { children: ReactNode }) {
+  return <main className="min-h-screen bg-[#edf6ff] text-[#0a1d3a]">{children}</main>;
+}
+
+export function MethodologyContent({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cx("mx-auto max-w-6xl px-6 py-10", className)}>{children}</div>;
+}
+
+export function MethodologyLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10">
-      <table className="min-w-full border-collapse text-left text-sm text-slate-300">
-        <thead className="bg-white/5 text-xs uppercase tracking-[0.14em] text-slate-400">
-          <tr>
-            {headers.map((header) => (
-              <th key={header} className="border-b border-white/10 px-4 py-3 font-semibold">
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, idx) => (
-            <tr key={idx} className="align-top">
-              {row.map((cell, cellIdx) => (
-                <td key={cellIdx} className="border-b border-white/5 px-4 py-3 last:border-b-0">
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Link href={href} className="font-semibold text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800">
+      {children}
+    </Link>
   );
 }

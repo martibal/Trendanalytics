@@ -23,7 +23,9 @@ import {
 } from "@/lib/content/trackRecordExplanations";
 
 import ShortFullContent from "@/components/site/ShortFullContent";
+
 import PageHero from "@/components/site/PageHero";
+import { UrdContainer, UrdPage } from "@/components/site/UrdDesignSystem";
 
 import "server-only";
 
@@ -85,7 +87,7 @@ type ChainStackSummary = {
 type TrackRecordChainFilter = ChainId | "all";
 type TrackRecordWindowFilter = 30 | 90;
 
-type TrackRecordSearchParams = { chain?: string; window?: string; modal?: string };
+type TrackRecordSearchParams = { chain?: string; window?: string };
 
 type ChainArchiveSummary = {
   chain: ChainId;
@@ -114,24 +116,20 @@ function ModalStyles() {
 }
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return (
-    <code className="font-mono text-xs font-semibold text-[#0d2447]">
-      {children}
-    </code>
-  );
+  return <code className="rounded border border-[#9db8d4] bg-[#f4f9ff] px-1 py-0.5 text-[#0d2447] text-xs">{children}</code>;
 }
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
   return (
-    <Link
-      href={`?modal=${id}`}
-      scroll={false}
-      className="inline-flex items-center rounded-full border border-blue-300 bg-[#d8e9fb] px-3 py-1 text-xs font-extrabold text-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition hover:border-blue-500 hover:bg-white"
+    <a
+      href={`#${id}`}
+      className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-black text-[#0d2447] hover:bg-white hover:text-blue-800"
     >
       {label}
-    </Link>
+    </a>
   );
 }
+
 type ExplainPair = { basic: ReactNode; advanced: ReactNode };
 
 function ExplainModal({
@@ -140,78 +138,57 @@ function ExplainModal({
   subtitle,
   pair,
   traceability,
-  active,
 }: {
   id: string;
   title: string;
   subtitle?: ReactNode;
   pair: ExplainPair;
   traceability?: ReactNode;
-  active: boolean;
 }) {
   return (
-    <div
-      className={`${active ? "flex" : "hidden"} fixed inset-0 z-[999] items-center justify-center p-4`}
-    >
-      <Link
-        href="?"
-        scroll={false}
-        className="absolute inset-0 bg-[#031329]/78 backdrop-blur-sm"
+    <div id={id} className="ta-modal fixed inset-0 z-[80] items-center justify-center p-4">
+      <a
+        href="#"
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
         aria-label="Close dialog"
       />
-
-      <div className="relative z-10 flex max-h-[88vh] w-full max-w-5xl flex-col rounded-[28px] border border-[#b6cce3] bg-[#e7f1fb] shadow-[0_30px_90px_rgba(3,19,41,0.42)]">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#b6cce3] px-6 py-5">
+      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] shadow-2xl shadow-slate-950/30">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#c9d9ea] px-6 py-5">
           <div>
-            <h3 className="text-3xl font-black tracking-[-0.035em] text-[#0d2447]">
-              {title}
-            </h3>
+            <h3 className="text-2xl font-semibold text-[#0d2447]">{title}</h3>
             {subtitle ? (
-              <div className="mt-2 text-sm font-semibold leading-6 text-[#27476f]">
-                {subtitle}
-              </div>
+              <div className="mt-2 text-sm leading-6 text-[#27476f]">{subtitle}</div>
             ) : null}
           </div>
-
-          <Link
-            href="?"
-            scroll={false}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#b6cce3] bg-[#dceaf8] text-xl font-bold text-[#0d2447] transition hover:bg-white"
+          <a
+            href="#"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] text-xl text-[#0d2447] hover:bg-white"
             aria-label="Close dialog"
           >
             ×
-          </Link>
+          </a>
         </div>
-
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <section className="rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-5">
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-emerald-200">
                 Basic
               </div>
-              <div className="mt-3 text-sm font-medium leading-7 text-[#0d2447]">
-                {pair.basic}
-              </div>
+              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.basic}</div>
             </section>
-
-            <section className="rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-5">
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+            <details className="rounded-2xl border border-[#9db8d4] bg-cyan-500/5 p-5" open>
+              <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                 Advanced
-              </div>
-              <div className="mt-3 text-sm font-medium leading-7 text-[#0d2447]">
-                {pair.advanced}
-              </div>
-            </section>
+              </summary>
+              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.advanced}</div>
+            </details>
           </div>
-
           {traceability ? (
-            <div className="mt-4 rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-5">
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#203c63]">
+            <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#27476f]">
                 Traceability
               </div>
-              <div className="mt-3 text-sm font-medium leading-7 text-[#0d2447]">
-                {traceability}
-              </div>
+              <div className="mt-3 text-sm leading-7 text-[#0d2447]">{traceability}</div>
             </div>
           ) : null}
         </div>
@@ -219,6 +196,7 @@ function ExplainModal({
     </div>
   );
 }
+
 // ---------------------------------------------------------------------------
 // Data helpers (unchanged from original)
 // ---------------------------------------------------------------------------
@@ -289,7 +267,7 @@ function bandClass(band: string) {
     return `${base} border-amber-500/25 bg-amber-500/10 text-amber-300`;
   if (band === "Degraded")
     return `${base} border-red-500/25 bg-red-500/10 text-red-300`;
-  return `${base} border-[#b6cce3] bg-muted text-[#1f3f68]`;
+  return `${base} border-[#c9d9ea] bg-[#eef6ff] text-[#27476f]`;
 }
 
 function toCsv(rows: TrackRow[]): string {
@@ -506,7 +484,7 @@ function StackLegendItem({
   bucket: RegimeBucket;
 }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-[#1f3f68]">
+    <div className="flex items-center gap-2 text-xs text-[#27476f]">
       <span
         className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${stackSegmentClass(bucket)}`}
       />
@@ -535,7 +513,6 @@ export default async function TrackRecordPage({
 
   const selectedChain = normalizeChain(resolvedSearchParams.chain);
   const selectedWindow = normalizeWindow(resolvedSearchParams.window);
-  const activeModal = resolvedSearchParams.modal ?? null;
 
   const chainIds: ChainId[] =
     selectedChain === "all"
@@ -595,53 +572,93 @@ export default async function TrackRecordPage({
   const boundaryExplain = trackRecordBoundaryExplanation();
 
   return (
-    <main className="min-h-screen bg-[#edf6ff] text-[#0a1d3a]">
-      <ModalStyles />
-
+    <UrdPage>
       <PageHero
         eyebrow="Historical record"
         title="Track Record"
-        summary="A public log of every regime label and confidence score Urd Atlas has published day by day. What you see here is what was actually published — not reconstructed, not adjusted, and not a backtest."
-      >
-        <div className="flex flex-wrap gap-3">
-          <MoreLink id="what-is-modal" label="What is this page?" />
-          <MoreLink id="boundary-modal" label="Interpretation boundary" />
-          <Link
-            href="/methodology"
-            className="inline-flex items-center rounded-full border border-blue-200/70 bg-[#d8e9fb] px-3 py-1 text-xs font-extrabold text-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition hover:border-white hover:bg-white"
-          >
-            Methodology
-          </Link>
-        </div>
+        summary="Published regime labels, confidence, revisions, transitions, and chain-level history, shown as a traceable descriptive record."
+      />
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-blue-200">
-              How to read this page
+      <UrdContainer className="py-10">
+      <ModalStyles />
+
+      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      <section className="mb-10 rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="max-w-3xl">
+              <div className="text-xs font-medium uppercase tracking-[0.18em] text-blue-700">
+                Historical record
+              </div>
+              <h1 className="mt-3 text-4xl font-semibold leading-tight text-[#0d2447] sm:text-5xl">
+                Track Record
+              </h1>
+              <p className="mt-4 text-lg leading-8 text-[#27476f]">
+                A public log of every regime label and confidence score this product has published,
+                day by day. What you see here is what was actually published — not reconstructed,
+                not adjusted, not a backtest.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <MoreLink id="what-is-modal" label="What is this page?" />
+                <MoreLink id="boundary-modal" label="Interpretation boundary" />
+                <Link
+                  href="/methodology"
+                  className="inline-flex items-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] px-3 py-1 text-xs font-medium text-[#0d2447] hover:bg-white"
+                >
+                  Methodology
+                </Link>
+              </div>
             </div>
-            <div className="mt-2 text-sm leading-7 text-white/86">
-              Regime mix → Timeline → Confidence history → Transition matrix → Full table.
-            </div>
+
+            {dataset ? (
+              <div className="min-w-[200px] rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-4 py-4 text-xs text-[#27476f]">
+                <div className="font-medium uppercase tracking-[0.12em] text-[#557099]">
+                  Dataset
+                </div>
+                {dataset.version ? (
+                  <div className="mt-2">
+                    Revision{" "}
+                    <span className="font-semibold text-[#0d2447]">{dataset.version}</span>
+                  </div>
+                ) : null}
+                {dataset.published_at ? (
+                  <div className="mt-1">
+                    Published{" "}
+                    <span className="font-semibold text-[#0d2447]">
+                      {dataset.published_at.slice(0, 10)}
+                    </span>
+                  </div>
+                ) : null}
+                {dataset.methodology_version ? (
+                  <div className="mt-1">
+                    Methodology{" "}
+                    <InlineCode>{dataset.methodology_version}</InlineCode>
+                  </div>
+                ) : null}
+                <div className="mt-2 border-t border-[#c9d9ea] pt-2 text-[#557099]">
+                  Public provenance uses <InlineCode>date</InlineCode>, <InlineCode>updated_through</InlineCode>, <InlineCode>methodology_version</InlineCode>, dataset revision, and <InlineCode>regime.determinism_hash</InlineCode>.
+                </div>
+              </div>
+            ) : null}
           </div>
 
-          {dataset ? (
-            <div className="rounded-2xl border border-white/12 bg-white/[0.06] p-5 text-xs text-white/78">
-              <div className="font-black uppercase tracking-[0.12em] text-blue-200">Dataset</div>
-              {dataset.version ? (
-                <div className="mt-2">Revision <span className="font-semibold text-white">{dataset.version}</span></div>
-              ) : null}
-              {dataset.published_at ? (
-                <div className="mt-1">Published <span className="font-semibold text-white">{dataset.published_at.slice(0, 10)}</span></div>
-              ) : null}
-              {dataset.methodology_version ? (
-                <div className="mt-1">Methodology <span className="font-semibold text-white">{dataset.methodology_version}</span></div>
-              ) : null}
+          {/* Reading map */}
+          <div className="mt-6 rounded-2xl border border-[#c9d9ea] bg-white/3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
+                  How to read this page
+                </div>
+                <div className="mt-2 text-sm text-slate-100">
+                  Regime mix → Timeline → Confidence history → Transition matrix → Full table
+                </div>
+              </div>
+              <MoreLink id="what-is-modal" label="Full explanation" />
             </div>
-          ) : null}
+          </div>
         </div>
-      </PageHero>
+      </section>
 
-      <div className="mx-auto max-w-7xl px-6 py-10">
       <ShortFullContent
         pageKey="track-record"
         summary={<>This page shows what Urd Atlas actually published through time. It is an archive view, not a reconstructed backtest.</>}
@@ -654,42 +671,42 @@ export default async function TrackRecordPage({
         fullContent={
           <>
       {/* ── Since inception summary ────────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+      <section className="mb-8 rounded-3xl border p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#0d2447]">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
               Since inception
             </div>
-            <h2 className="mt-1 text-3xl font-black tracking-[-0.03em] text-[#0d2447]">Public archive summary</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-[#1f3f68]">
+            <h2 className="mt-1 text-3xl font-semibold">Public archive summary</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">
               The interactive views below focus on 30d and 90d windows for quick analysis. This
               summary shows the longer publication record behind the product so a buyer can see
               both short-window behaviour and long-running operational continuity on the same page.
             </p>
           </div>
-          <div className="rounded-2xl border border-[#b6cce3] bg-[#dceaf8] px-4 py-4 text-xs text-[#1f3f68]">
-            <div className="font-black uppercase tracking-[0.12em] text-[#0d2447]">Archive overview</div>
+          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-4 py-4 text-xs text-[#27476f]">
+            <div className="font-medium uppercase tracking-[0.12em] text-[#557099]">Archive overview</div>
             <div className="mt-2">Visible rows since inception <span className="font-semibold text-[#0d2447]">{totalArchiveRows || "—"}</span></div>
-            <div className="mt-1">First published day <span className="font-semibold text-[#0d2447]">{earliestArchiveDate ?? "—"}</span></div>
-            <div className="mt-1">Latest published day <span className="font-semibold text-[#0d2447]">{latestArchiveDate ?? "—"}</span></div>
+            <div className="mt-1">First published day <InlineCode>{earliestArchiveDate ?? "—"}</InlineCode></div>
+            <div className="mt-1">Latest published day <InlineCode>{latestArchiveDate ?? "—"}</InlineCode></div>
           </div>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {archiveSummaries.map((summary) => (
-            <div key={summary.chain} className="rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-5">
+            <div key={summary.chain} className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
               <div className="flex items-center gap-3">
                 <ChainIcon chain={summary.chain} className="h-8 w-8 text-xs" label={`${summary.chainLabel} icon`} />
                 <div>
                   <div className="text-sm font-medium text-[#0d2447]">{summary.chainName}</div>
-                  <div className="text-xs text-[#1f3f68]">{summary.chainLabel}</div>
+                  <div className="text-xs text-[#27476f]">{summary.chainLabel}</div>
                 </div>
               </div>
-              <div className="mt-4 text-2xl font-black text-[#0d2447]">{summary.count ?? "—"}</div>
-              <div className="text-xs uppercase tracking-[0.12em] text-[#0d2447]">Published days since inception</div>
-              <div className="mt-3 space-y-1 text-xs text-[#1f3f68]">
-                <div>First row <span className="font-semibold text-[#0d2447]">{summary.firstDate ?? "—"}</span></div>
-                <div>Latest row <span className="font-semibold text-[#0d2447]">{summary.lastDate ?? "—"}</span></div>
+              <div className="mt-4 text-2xl font-semibold text-[#0d2447]">{summary.count ?? "—"}</div>
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Published days since inception</div>
+              <div className="mt-3 space-y-1 text-xs text-[#27476f]">
+                <div>First row <InlineCode>{summary.firstDate ?? "—"}</InlineCode></div>
+                <div>Latest row <InlineCode>{summary.lastDate ?? "—"}</InlineCode></div>
               </div>
             </div>
           ))}
@@ -697,10 +714,10 @@ export default async function TrackRecordPage({
       </section>
 
       {/* ── Filters and summary counts ────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+      <section className="mb-8 rounded-3xl border p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#0d2447]">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
               Filters
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -721,8 +738,8 @@ export default async function TrackRecordPage({
                     className={[
                       "rounded-full border px-4 py-1.5 text-sm transition",
                       active
-                        ? "border-cyan-500/40 bg-cyan-500/10 text-[#0d2447]"
-                        : "border-[#b6cce3] bg-[#dceaf8]/60 text-[#1f3f68] hover:bg-[#dceaf8] hover:text-[#0d2447]",
+                        ? "border-cyan-500/40 bg-cyan-500/10 text-blue-700"
+                        : "border-[#c9d9ea] bg-transparent text-[#27476f] hover:text-[#0d2447]",
                     ].join(" ")}
                   >
                     {option.label}
@@ -741,8 +758,8 @@ export default async function TrackRecordPage({
                     className={[
                       "rounded-full border px-4 py-1.5 text-sm transition",
                       active
-                        ? "border-cyan-500/40 bg-cyan-500/10 text-[#0d2447]"
-                        : "border-[#b6cce3] bg-[#dceaf8]/60 text-[#1f3f68] hover:bg-[#dceaf8] hover:text-[#0d2447]",
+                        ? "border-cyan-500/40 bg-cyan-500/10 text-blue-700"
+                        : "border-[#c9d9ea] bg-transparent text-[#27476f] hover:text-[#0d2447]",
                     ].join(" ")}
                   >
                     {w}d
@@ -755,7 +772,7 @@ export default async function TrackRecordPage({
           <a
             href={csvHref}
             download={`urdatlas-track-record-${selectedChain}-${selectedWindow}d.csv`}
-            className="inline-flex items-center rounded-full border border-[#b6cce3] bg-[#dceaf8] px-4 py-1.5 text-xs font-bold text-[#0d2447] hover:bg-[#dceaf8]"
+            className="inline-flex items-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] px-4 py-1.5 text-xs font-medium text-[#0d2447] hover:bg-white"
           >
             Export CSV →
           </a>
@@ -766,21 +783,21 @@ export default async function TrackRecordPage({
             { label: "Stable", count: stableCount, color: "text-emerald-300" },
             { label: "Heating", count: heatingCount, color: "text-amber-300" },
             { label: "Congested", count: congestedCount, color: "text-red-300" },
-            { label: "Degraded", count: degradedCount, color: "text-[#0d2447]" },
+            { label: "Degraded", count: degradedCount, color: "text-[#557099]" },
           ].map(({ label, count, color }) => (
-            <div key={label} className="rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.64)]">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#1f3f68]">
+            <div key={label} className="rounded-2xl border p-4 shadow-sm">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#27476f]">
                 {label} rows
               </div>
               <div className={`mt-2 text-3xl font-semibold ${color}`}>{count}</div>
-              <div className="mt-1 text-xs text-[#1f3f68]">
+              <div className="mt-1 text-xs text-[#27476f]">
                 {formatPct(count, filteredRows.length)} of window
               </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-4 text-sm leading-7 text-[#1f3f68]">
+        <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-white/3 p-4 text-sm leading-7 text-[#27476f]">
           These counts show how many published rows in the selected{" "}
           <span className="font-medium text-[#0d2447]">{selectedWindow}-day window</span> fell into
           each regime bucket. They describe frequency of published labels — not whether one
@@ -790,14 +807,14 @@ export default async function TrackRecordPage({
       </section>
 
       {/* ── Regime mix ───────────────────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+      <section className="mb-8 rounded-3xl border p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#0d2447]">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
               Distribution
             </div>
-            <h2 className="mt-1 text-3xl font-black tracking-[-0.03em] text-[#0d2447]">Cross-chain regime mix</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-[#1f3f68]">
+            <h2 className="mt-1 text-3xl font-semibold">Cross-chain regime mix</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">
               Stacked bars show how often each published regime appeared in the selected window.
               Longer segments mean more published days in that state.
             </p>
@@ -806,23 +823,23 @@ export default async function TrackRecordPage({
         </div>
 
         {/* Overall bar */}
-        <div className="mt-6 rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-5">
+        <div className="mt-6 rounded-2xl border p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-sm font-bold text-[#0d2447]">Overall — all visible chains</div>
-              <div className="mt-1 text-xs text-[#1f3f68]">
+              <div className="text-sm font-medium text-[#0d2447]">Overall — all visible chains</div>
+              <div className="mt-1 text-xs text-[#27476f]">
                 Aggregate across{" "}
                 {selectedChain === "all" ? "all four chains" : "the selected chain"} for the last{" "}
                 {selectedWindow} published daily rows
               </div>
             </div>
-            <div className="text-sm text-[#1f3f68]">
+            <div className="text-sm text-[#27476f]">
               Total rows:{" "}
               <span className="font-medium text-[#0d2447]">{overallStackSummary.total}</span>
             </div>
           </div>
 
-          <div className="mt-4 h-5 w-full overflow-hidden rounded-full border border-[#b6cce3] bg-[#cfe0f1]">
+          <div className="mt-4 h-5 w-full overflow-hidden rounded-full border bg-[#eef6ff]">
             <div className="flex h-full w-full">
               {(
                 [
@@ -855,29 +872,29 @@ export default async function TrackRecordPage({
         {/* Per-chain bars */}
         <div className="mt-4 grid gap-4">
           {chainStackSummaries.map((summary) => (
-            <div key={summary.chain} className="rounded-2xl border border-[#b6cce3] bg-[#dceaf8] p-5">
+            <div key={summary.chain} className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <ChainIcon chain={summary.chain} className="h-8 w-8 text-xs" label={`${summary.chainLabel} icon`} />
                   <div>
                     <div className="text-sm font-medium text-[#0d2447]">{summary.chainName}</div>
-                    <div className="text-xs text-[#1f3f68]">{summary.chainLabel}</div>
+                    <div className="text-xs text-[#27476f]">{summary.chainLabel}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="text-sm text-[#1f3f68]">
-                    Rows: <span className="font-bold text-[#0d2447]">{summary.total}</span>
+                  <div className="text-sm text-[#27476f]">
+                    Rows: <span className="font-medium text-[#0d2447]">{summary.total}</span>
                   </div>
                   <Link
                     href={`/chains/${summary.chain}/history`}
-                    className="text-xs text-[#0d2447] hover:underline"
+                    className="text-xs text-blue-700 hover:underline"
                   >
                     Full history →
                   </Link>
                 </div>
               </div>
 
-              <div className="mt-4 h-5 w-full overflow-hidden rounded-full border border-[#b6cce3] bg-[#cfe0f1]">
+              <div className="mt-4 h-5 w-full overflow-hidden rounded-full border bg-[#eef6ff]">
                 <div className="flex h-full w-full">
                   {(
                     [
@@ -908,7 +925,7 @@ export default async function TrackRecordPage({
           ))}
         </div>
 
-        <div className="mt-4 text-xs text-[#1f3f68]">
+        <div className="mt-4 text-xs text-[#27476f]">
           Source:{" "}
           <InlineCode>
             {selectedChain === "all"
@@ -920,14 +937,14 @@ export default async function TrackRecordPage({
 
       {/* ── Regime Timeline ───────────────────────────────────────────────── */}
       {visualRows.length > 0 && (
-        <section className="mb-8 rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+        <section className="mb-8 rounded-3xl border p-6 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#0d2447]">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                 Sequential view
               </div>
-              <h2 className="mt-1 text-3xl font-black tracking-[-0.03em] text-[#0d2447]">Regime Timeline</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-7 text-[#1f3f68]">
+              <h2 className="mt-1 text-3xl font-semibold">Regime Timeline</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">
                 Each block is one published day. Look for long runs of the same colour — they show
                 persistence. Frequent colour changes show instability or transitions.
               </p>
@@ -948,14 +965,14 @@ export default async function TrackRecordPage({
 
       {/* ── Confidence History ────────────────────────────────────────────── */}
       {visualRows.length > 1 && (
-        <section className="mb-8 rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+        <section className="mb-8 rounded-3xl border p-6 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#0d2447]">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                 Evidence quality over time
               </div>
-              <h2 className="mt-1 text-3xl font-black tracking-[-0.03em] text-[#0d2447]">Confidence History</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-7 text-[#1f3f68]">
+              <h2 className="mt-1 text-3xl font-semibold">Confidence History</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">
                 How much evidential support backed the published labels on each day. Labels from
                 periods above 0.70 are the most reliable. Below 0.40, the label is UNKNOWN/DEGRADED.
               </p>
@@ -975,14 +992,14 @@ export default async function TrackRecordPage({
 
       {/* ── Transition Matrix ─────────────────────────────────────────────── */}
       {transitions.length > 0 && (
-        <section className="mb-8 rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+        <section className="mb-8 rounded-3xl border p-6 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#0d2447]">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                 State changes
               </div>
-              <h2 className="mt-1 text-3xl font-black tracking-[-0.03em] text-[#0d2447]">Transition Matrix</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-7 text-[#1f3f68]">
+              <h2 className="mt-1 text-3xl font-semibold">Transition Matrix</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">
                 How often each regime transitioned to another on consecutive published days. The
                 diagonal shows persistence — how often a regime stayed the same.
               </p>
@@ -999,11 +1016,11 @@ export default async function TrackRecordPage({
       <section className="mb-8 rounded-3xl border shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-5">
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#0d2447]">
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
               Full record
             </div>
-            <h2 className="mt-1 text-3xl font-black tracking-[-0.03em] text-[#0d2447]">Historical regime table</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-[#1f3f68]">
+            <h2 className="mt-1 text-3xl font-semibold">Historical regime table</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">
               Every published daily row in the selected window. Confidence is evidence strength
               for that day&apos;s label — not a forecast of what came next.
             </p>
@@ -1015,13 +1032,13 @@ export default async function TrackRecordPage({
         </div>
 
         {filteredRows.length === 0 ? (
-          <div className="px-6 py-8 text-sm text-[#1f3f68]">
+          <div className="px-6 py-8 text-sm text-[#27476f]">
             No published history rows were available for the selected chain and window.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-[#0d2447]">
-              <thead className="border-b border-[#8fb0d1] bg-[#cfe0f1] text-left text-[#0d2447]">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-[#dceaf8] text-left text-[#27476f]">
                 <tr>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Chain</th>
@@ -1042,13 +1059,13 @@ export default async function TrackRecordPage({
                   return (
                     <tr
                       key={`${row.chain}-${row.date ?? "row"}-${index}`}
-                      className="border-b border-[#9db8d4] last:border-b-0 hover:bg-[#cfe0f1]/75"
+                      className="border-b last:border-b-0 hover:bg-[#eef6ff]/20"
                     >
                       <td className="px-4 py-3 font-mono text-xs">{fmtDate(row.date)}</td>
                       <td className="px-4 py-3">
                         <Link
                           href={`/chains/${row.chain}/history`}
-                          className="inline-flex items-center gap-2 font-semibold text-[#0d2447] hover:text-blue-700"
+                          className="inline-flex items-center gap-2 hover:text-blue-700"
                         >
                           <ChainIcon chain={row.chain} className="h-6 w-6 text-xs" label={`${row.chainLabel} icon`} />
                           <span>{row.chainLabel}</span>
@@ -1058,7 +1075,7 @@ export default async function TrackRecordPage({
                         {row.regimeLabel ? (
                           <RegimeBadge label={row.regimeLabel} />
                         ) : (
-                          <span className="text-[#1f3f68]">—</span>
+                          <span className="text-[#27476f]">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">
@@ -1087,7 +1104,7 @@ export default async function TrackRecordPage({
           </div>
         )}
 
-        <div className="border-t border-[#b6cce3] px-6 py-3 text-xs text-[#1f3f68]">
+        <div className="border-t px-6 py-3 text-xs text-[#27476f]">
           <span>Displayed rows: {filteredRows.length} · </span>
           Source:{" "}
           <InlineCode>
@@ -1099,8 +1116,8 @@ export default async function TrackRecordPage({
       </section>
 
       {/* ── Navigation strip ─────────────────────────────────────────────── */}
-      <section className="mt-10 rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
-        <div className="text-xs font-black uppercase tracking-[0.14em] text-[#0d2447]">
+      <section className="mt-10 rounded-3xl border p-6 shadow-sm">
+        <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
           Related
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1113,13 +1130,13 @@ export default async function TrackRecordPage({
             <Link
               key={href}
               href={href}
-              className="group flex items-center justify-between rounded-2xl border bg-background/40 px-4 py-3 transition hover:border-cyan-500/30 hover:bg-muted/30"
+              className="group flex items-center justify-between rounded-2xl border bg-background/40 px-4 py-3 transition hover:border-cyan-500/30 hover:bg-[#eef6ff]/30"
             >
               <div>
-                <div className="text-sm font-bold text-[#0d2447]">{label}</div>
-                <div className="mt-0.5 text-xs text-[#1f3f68]">{desc}</div>
+                <div className="text-sm font-medium text-[#0d2447]">{label}</div>
+                <div className="mt-0.5 text-xs text-[#27476f]">{desc}</div>
               </div>
-              <span className="text-xs text-[#1f3f68] transition group-hover:text-[#0d2447]">
+              <span className="text-xs text-[#27476f] transition group-hover:text-blue-700">
                 →
               </span>
             </Link>
@@ -1128,11 +1145,11 @@ export default async function TrackRecordPage({
       </section>
 
       {/* ── Data contract ─────────────────────────────────────────────────── */}
-      <details className="mt-8 rounded-2xl border border-[#b6cce3] bg-[#e7f1fb] p-5">
-        <summary className="cursor-pointer text-sm font-medium text-[#1f3f68] hover:text-[#0d2447]">
+      <details className="mt-8 rounded-2xl border p-5">
+        <summary className="cursor-pointer text-sm font-medium text-[#27476f] hover:text-[#0d2447]">
           Data contract and traceability
         </summary>
-        <div className="mt-4 grid gap-2 text-sm text-[#1f3f68]">
+        <div className="mt-4 grid gap-2 text-sm text-[#27476f]">
           <div>
             History bundles: <InlineCode>{selectedChain === "all" ? "data/published/v1/meta/&lt;chain&gt;/last90d.json" : `data/published/v1/meta/${selectedChain}/last90d.json`}</InlineCode>
           </div>
@@ -1153,11 +1170,8 @@ export default async function TrackRecordPage({
       />
 
       {/* ── All modals ────────────────────────────────────────────────────── */}
-      </div>
-
       <ExplainModal
         id="what-is-modal"
-        active={activeModal === "what-is-modal"}
         title={whatIsExplain.title}
         subtitle={whatIsExplain.subtitle}
         pair={{ basic: whatIsExplain.basic, advanced: whatIsExplain.advanced }}
@@ -1165,7 +1179,6 @@ export default async function TrackRecordPage({
       />
       <ExplainModal
         id="regime-mix-modal"
-        active={activeModal === "regime-mix-modal"}
         title={regimeMixExplain.title}
         subtitle={regimeMixExplain.subtitle}
         pair={{ basic: regimeMixExplain.basic, advanced: regimeMixExplain.advanced }}
@@ -1173,7 +1186,6 @@ export default async function TrackRecordPage({
       />
       <ExplainModal
         id="timeline-modal"
-        active={activeModal === "timeline-modal"}
         title={timelineExplain.title}
         subtitle={timelineExplain.subtitle}
         pair={{ basic: timelineExplain.basic, advanced: timelineExplain.advanced }}
@@ -1181,7 +1193,6 @@ export default async function TrackRecordPage({
       />
       <ExplainModal
         id="confidence-modal"
-        active={activeModal === "confidence-modal"}
         title={confidenceExplain.title}
         subtitle={confidenceExplain.subtitle}
         pair={{ basic: confidenceExplain.basic, advanced: confidenceExplain.advanced }}
@@ -1189,7 +1200,6 @@ export default async function TrackRecordPage({
       />
       <ExplainModal
         id="matrix-modal"
-        active={activeModal === "matrix-modal"}
         title={matrixExplain.title}
         subtitle={matrixExplain.subtitle}
         pair={{ basic: matrixExplain.basic, advanced: matrixExplain.advanced }}
@@ -1197,7 +1207,6 @@ export default async function TrackRecordPage({
       />
       <ExplainModal
         id="table-modal"
-        active={activeModal === "table-modal"}
         title={tableExplain.title}
         subtitle={tableExplain.subtitle}
         pair={{ basic: tableExplain.basic, advanced: tableExplain.advanced }}
@@ -1205,7 +1214,6 @@ export default async function TrackRecordPage({
       />
       <ExplainModal
         id="revision-modal"
-        active={activeModal === "revision-modal"}
         title={revisionExplain.title}
         subtitle={revisionExplain.subtitle}
         pair={{ basic: revisionExplain.basic, advanced: revisionExplain.advanced }}
@@ -1213,12 +1221,11 @@ export default async function TrackRecordPage({
       />
       <ExplainModal
         id="boundary-modal"
-        active={activeModal === "boundary-modal"}
         title={boundaryExplain.title}
         subtitle={boundaryExplain.subtitle}
         pair={{ basic: boundaryExplain.basic, advanced: boundaryExplain.advanced }}
-        traceability={boundaryExplain.traceability}
       />
-    </main>
+      </UrdContainer>
+    </UrdPage>
   );
 }

@@ -1,22 +1,29 @@
 // src/app/sign-in/[[...sign-in]]/page.tsx
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { SignIn } from "@clerk/nextjs";
+
+import PageHero from "@/components/site/PageHero";
+import {
+  UrdButtonLink,
+  UrdCallout,
+  UrdContainer,
+  UrdInlineCode,
+  UrdPage,
+  UrdPillLink,
+  UrdSection,
+  cx,
+  urd,
+} from "@/components/site/UrdDesignSystem";
 
 function Section({
   title,
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
-  return (
-    <section className="rounded-xl border p-5">
-      <h2 className="text-base font-semibold">{title}</h2>
-      <div className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
-        {children}
-      </div>
-    </section>
-  );
+  return <UrdSection title={title}>{children}</UrdSection>;
 }
 
 function isClerkConfigured() {
@@ -35,126 +42,117 @@ export default function SignInPage() {
   const clerkConfigured = isClerkConfigured();
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-        <div className="space-y-6">
-          <header>
-            <div className="text-sm text-muted-foreground">Subscriber access</div>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Sign in</h1>
-            <p className="mt-3 text-sm leading-7 text-muted-foreground">
-              Sign in to access the subscriber dashboard, entitlement-aware JSON delivery,
-              API key management, and account-linked billing state. The public descriptive
-              website remains separate from this subscriber surface.
-            </p>
-          </header>
-
-          <Section title="What sign-in is for">
-            <ul className="list-disc pl-5">
-              <li>Subscriber dashboard access</li>
-              <li>Account-linked entitlement inspection</li>
-              <li>Authenticated API key lifecycle</li>
-              <li>JSON file delivery within subscription scope</li>
-            </ul>
-          </Section>
-
-          <Section title="What sign-in is not required for">
-            <ul className="list-disc pl-5">
-              <li>
-                <Link href="/" className="underline">
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link href="/chains" className="underline">
-                  Chains
-                </Link>
-              </li>
-              <li>
-                <Link href="/status" className="underline">
-                  Status
-                </Link>
-              </li>
-              <li>
-                <Link href="/track-record" className="underline">
-                  Track Record
-                </Link>
-              </li>
-              <li>
-                <Link href="/methodology" className="underline">
-                  Methodology
-                </Link>
-              </li>
-              <li>
-                <Link href="/glossary" className="underline">
-                  Glossary
-                </Link>
-              </li>
-            </ul>
-          </Section>
-
-          <Section title="Interpretation boundary">
-            <p>
-              Signing in does not unlock advice, forecasts, or price targets. Subscriber access
-              extends delivery and account functionality around the same descriptive product.
-            </p>
-          </Section>
-
-          <Section title="Related pages">
-            <div className="flex flex-col gap-2">
-              <Link href="/sign-up" className="underline">
-                Create account
-              </Link>
-              <Link href="/dashboard" className="underline">
-                Dashboard
-              </Link>
-              <Link href="/api-docs" className="underline">
-                API Docs
-              </Link>
-              <Link href="/terms" className="underline">
-                Terms
-              </Link>
-              <Link href="/privacy" className="underline">
-                Privacy
-              </Link>
-            </div>
-          </Section>
+    <UrdPage>
+      <PageHero
+        eyebrow="Subscriber access"
+        title="Sign in"
+        highlight="to Urd Atlas"
+        summary="Access the subscriber dashboard, entitlement-aware JSON delivery, API key management, and account-linked billing state."
+      >
+        <div className="flex flex-wrap gap-3">
+          <UrdButtonLink href="/sign-up">Create account</UrdButtonLink>
+          <UrdButtonLink href="/dashboard">Dashboard</UrdButtonLink>
+          <UrdButtonLink href="/api-docs">API Docs</UrdButtonLink>
         </div>
+      </PageHero>
 
-        <section className="rounded-2xl border p-6">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold">Account sign-in</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Continue with the configured identity provider to access subscriber-only features.
-            </p>
+      <UrdContainer>
+        <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="space-y-6">
+            <UrdSection title="Subscriber surface" eyebrow="Account boundary">
+              <p>
+                Sign in to access the subscriber dashboard, entitlement-aware JSON delivery,
+                API key management, and account-linked billing state. The public descriptive
+                website remains separate from this subscriber surface.
+              </p>
+            </UrdSection>
+
+            <Section title="What sign-in is for">
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Subscriber dashboard access</li>
+                <li>Account-linked entitlement inspection</li>
+                <li>Authenticated API key lifecycle</li>
+                <li>JSON file delivery within subscription scope</li>
+              </ul>
+            </Section>
+
+            <Section title="What sign-in is not required for">
+              <div className="flex flex-wrap gap-2">
+                <UrdPillLink href="/">Home</UrdPillLink>
+                <UrdPillLink href="/chains">Chains</UrdPillLink>
+                <UrdPillLink href="/status">Status</UrdPillLink>
+                <UrdPillLink href="/track-record">Track Record</UrdPillLink>
+                <UrdPillLink href="/methodology">Methodology</UrdPillLink>
+                <UrdPillLink href="/glossary">Glossary</UrdPillLink>
+              </div>
+            </Section>
+
+            <UrdCallout title="Interpretation boundary">
+              <p>
+                Signing in does not unlock advice, forecasts, or price targets. Subscriber access
+                extends delivery and account functionality around the same descriptive product.
+              </p>
+            </UrdCallout>
+
+            <Section title="Related pages">
+              <div className="flex flex-wrap gap-2">
+                <UrdPillLink href="/sign-up">Create account</UrdPillLink>
+                <UrdPillLink href="/dashboard">Dashboard</UrdPillLink>
+                <UrdPillLink href="/api-docs">API Docs</UrdPillLink>
+                <UrdPillLink href="/terms">Terms</UrdPillLink>
+                <UrdPillLink href="/privacy">Privacy</UrdPillLink>
+              </div>
+            </Section>
           </div>
 
-          {clerkConfigured ? (
-            <div className="flex justify-center">
-              <SignIn
-                routing="path"
-                path="/sign-in"
-                signUpUrl="/sign-up"
-                fallbackRedirectUrl="/dashboard"
-              />
-            </div>
-          ) : (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5">
-              <div className="text-sm font-medium text-amber-200">
-                Clerk is not configured in this environment.
+          <section className={cx(urd.section, "self-start")}> 
+            <div className="mb-5">
+              <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">
+                Identity provider
               </div>
-              <p className="mt-2 text-sm text-amber-100/90">
-                The sign-in route is available, but the identity provider is not fully wired in this
-                runtime yet. Add valid Clerk environment variables before rendering the embedded
-                sign-in component.
+              <h2 className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#0d2447]">
+                Account sign-in
+              </h2>
+              <p className="mt-3 text-sm font-medium leading-7 text-[#27476f]">
+                Continue with the configured identity provider to access subscriber-only features.
               </p>
-              <div className="mt-4 text-xs text-amber-100/80">
-                Required keys: <code className="rounded bg-black/20 px-1 py-0.5">NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code>{" "}
-                and <code className="rounded bg-black/20 px-1 py-0.5">CLERK_SECRET_KEY</code>
-              </div>
             </div>
-          )}
-        </section>
-      </div>
-    </main>
+
+            {clerkConfigured ? (
+              <div className="rounded-3xl border border-[#c9d9ea] bg-[#eef6ff] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+                <div className="flex justify-center">
+                  <SignIn
+                    routing="path"
+                    path="/sign-in"
+                    signUpUrl="/sign-up"
+                    fallbackRedirectUrl="/dashboard"
+                  />
+                </div>
+              </div>
+            ) : (
+              <UrdCallout title="Clerk is not configured in this environment." tone="warning">
+                <p>
+                  The sign-in route is available, but the identity provider is not fully wired in this
+                  runtime yet. Add valid Clerk environment variables before rendering the embedded
+                  sign-in component.
+                </p>
+                <p className="mt-4 text-xs font-black text-amber-800">
+                  Required keys: <UrdInlineCode>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</UrdInlineCode>{" "}
+                  and <UrdInlineCode>CLERK_SECRET_KEY</UrdInlineCode>
+                </p>
+              </UrdCallout>
+            )}
+
+            <div className="mt-6 border-t border-[#c9d9ea] pt-5 text-sm font-semibold leading-7 text-[#27476f]">
+              New subscriber?{" "}
+              <Link href="/sign-up" className="font-black text-blue-700 underline underline-offset-4">
+                Create an account
+              </Link>
+              .
+            </div>
+          </section>
+        </div>
+      </UrdContainer>
+    </UrdPage>
   );
 }

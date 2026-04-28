@@ -1,5 +1,9 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
 import PageHero from "@/components/site/PageHero";
+import {
+  UrdPage,
+  UrdContainer,
+} from "@/components/site/UrdDesignSystem";
 import Link from "next/link";
 import {
   Callout,
@@ -11,46 +15,14 @@ import {
 
 export default function MethodologyReferencePage() {
   return (
-    <main className="min-h-screen bg-[#edf6ff] text-[#0a1d3a]">
+    <UrdPage>
       <PageHero
-        eyebrow="Methodology reference"
+        eyebrow="Urd Atlas Methodology"
         title="Public Methodology Reference"
-        summary="The canonical public explanation of what each Urd Atlas artifact layer means, how confidence and regime should be interpreted, and where the public methodology intentionally stops."
+        summary="Canonical public explanation of what each Urd Atlas artifact layer means, how confidence and regime should be interpreted, and where the public methodology intentionally stops."
       />
 
-        <div
-          className={[
-            "mx-auto max-w-6xl px-6 py-10",
-            "[&_nav]:border-[#b6cce3]",
-            "[&_nav]:bg-[#e7f1fb]",
-            "[&_nav_a]:text-[#0d2447]",
-            "[&_nav_a]:font-black",
-            "[&_nav_a:hover]:!text-blue-800",
-            "[&_nav_a:hover]:!bg-[#dceaf8]",
-            "[&_section]:border-[#b6cce3]",
-            "[&_section]:bg-[#e7f1fb]",
-            "[&_section_h2]:text-[#0d2447]",
-            "[&_section_h2]:font-black",
-            "[&_section_p]:text-[#27476f]",
-            "[&_section_li]:text-[#27476f]",
-            "[&_section_td]:text-[#27476f]",
-            "[&_section_th]:text-[#203c63]",
-            "[&_a]:text-[#0d2447]",
-            "[&_a]:font-semibold",
-
-            // InlineCode fix
-            "[&_code]:!rounded",
-            "[&_code]:!border",
-            "[&_code]:!border-[#9db8d4]",
-            "[&_code]:!bg-[#f4f9ff]",
-            "[&_code]:!px-1.5",
-            "[&_code]:!py-0.5",
-            "[&_code]:!font-mono",
-            "[&_code]:!text-xs",
-            "[&_code]:!font-bold",
-            "[&_code]:!text-[#0d2447]",
-          ].join(" ")}
-        >
+      <UrdContainer className="max-w-6xl">
         <MethodologyNav />
 
         <ShortFullContent
@@ -67,18 +39,18 @@ export default function MethodologyReferencePage() {
               transform layer, and Meta is the analytical regime layer.
             </>,
             <>
-              Confidence publishes how strong the current evidence is. Rows
-              below the public 0.40 gate are shown as UNKNOWN/DEGRADED instead
-              of being presented as strong labels.
+              Confidence publishes how strong the current evidence is. Rows below
+              the public 0.40 gate are shown as UNKNOWN/DEGRADED instead of being
+              presented as strong labels.
             </>,
             <>
               Regime labels are descriptive interpretations of chain-relative
               conditions, not forecasts or trading signals.
             </>,
             <>
-              Public methodology is meant to explain meaning and behavior
-              without exposing enough detail to reconstruct source data or clone
-              the private pipeline.
+              Public methodology is meant to explain meaning and behavior without
+              exposing enough detail to reconstruct source data or clone the
+              private pipeline.
             </>,
           ]}
           whyItMatters={
@@ -103,13 +75,19 @@ export default function MethodologyReferencePage() {
               <Section title="Global interpretation rules">
                 <ul className="list-disc pl-5">
                   <li>All dates are UTC calendar dates.</li>
-                  <li>All analytical interpretation is chain-relative, not cross-chain absolute.</li>
+                  <li>
+                    All analytical interpretation is chain-relative, not
+                    cross-chain absolute.
+                  </li>
                   <li>No price conversion is applied inside these artifacts.</li>
                   <li>
                     Unsupported or unreliable fields are published as{" "}
                     <InlineCode>null</InlineCode>.
                   </li>
-                  <li>If field meaning changes materially, the methodology version must change.</li>
+                  <li>
+                    If field meaning changes materially, the methodology version
+                    must change.
+                  </li>
                 </ul>
               </Section>
 
@@ -120,17 +98,25 @@ export default function MethodologyReferencePage() {
                     [
                       <strong key="gold">Gold</strong>,
                       <>Daily observation layer for a chain and UTC date.</>,
-                      <>Direct daily chain aggregates or robust daily summaries. No regime interpretation.</>,
+                      <>
+                        Direct daily chain aggregates or robust daily summaries.
+                        No regime interpretation.
+                      </>,
                     ],
                     [
                       <strong key="derived">Derived</strong>,
                       <>Deterministic trend layer built from Gold.</>,
-                      <>Rolling transforms used for charting and trend context.</>,
+                      <>
+                        Rolling transforms used for charting and trend context.
+                      </>,
                     ],
                     [
                       <strong key="meta">Meta</strong>,
                       <>Analytical layer.</>,
-                      <>Publishes regime, confidence, scorecard, drivers, freshness context, and presentation helpers.</>,
+                      <>
+                        Publishes regime, confidence, scorecard, drivers,
+                        freshness context, and presentation helpers.
+                      </>,
                     ],
                   ]}
                 />
@@ -145,10 +131,35 @@ export default function MethodologyReferencePage() {
                 <SimpleTable
                   headers={["Field family", "Public meaning", "Verification class"]}
                   rows={[
-                    [<>Daily counts</>, <>Daily transaction volume and block production activity.</>, <>B</>],
-                    [<>Native value and fee fields</>, <>Native-denominated transfer throughput and typical same-day transaction magnitude / fee burden.</>, <>B</>],
-                    [<>Execution-quality or capacity fields</>, <>Daily failure burden or capacity usage where those semantics are meaningful.</>, <>B</>],
-                    [<>Breadth and cadence fields</>, <>Participation breadth and typical inter-block interval behavior.</>, <>B</>],
+                    [
+                      <>Daily counts</>,
+                      <>Daily transaction volume and block production activity.</>,
+                      <>B</>,
+                    ],
+                    [
+                      <>Native value and fee fields</>,
+                      <>
+                        Native-denominated transfer throughput and typical
+                        same-day transaction magnitude / fee burden.
+                      </>,
+                      <>B</>,
+                    ],
+                    [
+                      <>Execution-quality or capacity fields</>,
+                      <>
+                        Daily failure burden or capacity usage where those
+                        semantics are meaningful.
+                      </>,
+                      <>B</>,
+                    ],
+                    [
+                      <>Breadth and cadence fields</>,
+                      <>
+                        Participation breadth and typical inter-block interval
+                        behavior.
+                      </>,
+                      <>B</>,
+                    ],
                   ]}
                 />
               </Section>
@@ -173,12 +184,13 @@ export default function MethodologyReferencePage() {
                 <p>
                   Confidence combines data sufficiency and freshness with label
                   clarity. The current public confidence score is the geometric
-                  mean <InlineCode>{`sqrt(data_quality × label_clarity)`}</InlineCode>.
+                  mean{" "}
+                  <InlineCode>{`sqrt(data_quality × label_clarity)`}</InlineCode>.
                 </p>
                 <p>
-                  The current public confidence gate is <InlineCode>0.40</InlineCode>.
-                  Below that threshold, the product publishes{" "}
-                  <InlineCode>UNKNOWN/DEGRADED</InlineCode> instead of a
+                  The current public confidence gate is{" "}
+                  <InlineCode>0.40</InlineCode>. Below that threshold, the product
+                  publishes <InlineCode>UNKNOWN/DEGRADED</InlineCode> instead of a
                   normal-confidence regime label.
                 </p>
               </Section>
@@ -187,14 +199,15 @@ export default function MethodologyReferencePage() {
                 <p>
                   The scorecard compresses current chain conditions into three
                   axes: demand, friction, and capacity. Scores are chain-relative
-                  and bounded to a 0–100 display scale with 50 as the neutral point.
+                  and bounded to a 0–100 display scale with 50 as the neutral
+                  point.
                 </p>
                 <p>
-                  Score construction uses robust normalization against each chain’s
-                  own historical baseline. The currently implemented score family
-                  applies 7-day smoothing before historical comparison, excludes
-                  the most recent 14 days from the baseline, and maps robust
-                  z-scores into a bounded display score via{" "}
+                  Score construction uses robust normalization against each
+                  chain’s own historical baseline. The currently implemented
+                  score family applies 7-day smoothing before historical
+                  comparison, excludes the most recent 14 days from the baseline,
+                  and maps robust z-scores into a bounded display score via{" "}
                   <InlineCode>{`50 + 40 × tanh(z / 1.5)`}</InlineCode>.
                 </p>
                 <p>
@@ -204,15 +217,15 @@ export default function MethodologyReferencePage() {
 
                 <Callout title="Important distinction: regime z-scores vs scorecard normalization">
                   <p>
-                    <InlineCode>regime.drivers[].z_robust</InlineCode> is computed
-                    from 180-day raw daily values using the formula{" "}
+                    <InlineCode>regime.drivers[].z_robust</InlineCode> is
+                    computed from 180-day raw daily values using the formula{" "}
                     <InlineCode>0.6745 × (x − median) / MAD</InlineCode>.
                     Scorecard dimension scores are computed from 7-day rolling
                     averages against a 365-day baseline using the formula{" "}
                     <InlineCode>(x − median) / (1.4826 × MAD)</InlineCode>.
-                    These are two separate calculations with separate purposes and
-                    separate input series. They will not produce identical values
-                    for the same metric on the same day.
+                    These are two separate calculations with separate purposes
+                    and separate input series. They will not produce identical
+                    values for the same metric on the same day.
                   </p>
                 </Callout>
 
@@ -227,24 +240,25 @@ export default function MethodologyReferencePage() {
                   <p>
                     This instability index measures deviation from the chain&apos;s
                     own recent block-time norm in both directions. A period of
-                    consistently fast block production and a period of consistently
-                    slow block production will both produce low instability and
-                    therefore a low capacity score. A high capacity score on
-                    Bitcoin means block timing is unusually erratic relative to
-                    recent history — not that blocks are slow.
+                    consistently fast block production and a period of
+                    consistently slow block production will both produce low
+                    instability and therefore a low capacity score. A high
+                    capacity score on Bitcoin means block timing is unusually
+                    erratic relative to recent history — not that blocks are slow.
                   </p>
                   <p>
-                    Consumers using BTC capacity scores should interpret them as a
-                    block-time volatility signal, not a congestion-in-the-traditional-sense signal.
+                    Consumers using BTC capacity scores should interpret them as
+                    a block-time volatility signal, not a
+                    congestion-in-the-traditional-sense signal.
                   </p>
                 </Callout>
               </Section>
 
               <Section title="Regime methodology" id="regime">
                 <p>
-                  Regime is the product’s categorical interpretation layer. It maps
-                  chain-relative analytical conditions into one of five public
-                  states: <InlineCode>STABLE</InlineCode>,{" "}
+                  Regime is the product’s categorical interpretation layer. It
+                  maps chain-relative analytical conditions into one of five
+                  public states: <InlineCode>STABLE</InlineCode>,{" "}
                   <InlineCode>HEATING</InlineCode>,{" "}
                   <InlineCode>CONGESTED</InlineCode>, <InlineCode>CHEAP</InlineCode>,
                   and <InlineCode>UNKNOWN/DEGRADED</InlineCode>.
@@ -253,22 +267,29 @@ export default function MethodologyReferencePage() {
                 <ul className="list-disc pl-5">
                   <li>robust z-score based on 180-day raw daily history</li>
                   <li>90-day percentile rank for banding support</li>
-                  <li><strong>OR logic</strong> for threshold-triggered band assignment</li>
-                  <li>momentum epsilon <InlineCode>0.15</InlineCode> for heating/cooling trend state</li>
+                  <li>
+                    <strong>OR logic</strong> for threshold-triggered band
+                    assignment
+                  </li>
+                  <li>
+                    momentum epsilon <InlineCode>0.15</InlineCode> for
+                    heating/cooling trend state
+                  </li>
                   <li>
                     label evaluation order:{" "}
                     <InlineCode>CONGESTED → CHEAP → HEATING → STABLE</InlineCode>
                   </li>
                 </ul>
                 <p>
-                  Urd Atlas does not apply a universal fixed multi-day confirmation
-                  rule across all regime labels. Persistence is label-specific.{" "}
-                  <InlineCode>HEATING</InlineCode> depends in part on a trend
-                  condition derived from short-vs-medium horizon behaviour, which
-                  introduces implicit persistence. <InlineCode>CONGESTED</InlineCode>{" "}
-                  and <InlineCode>CHEAP</InlineCode> are state-triggered
-                  classifications and do not require separate trend confirmation or
-                  a fixed multi-day confirmation window before publication.
+                  Urd Atlas does not apply a universal fixed multi-day
+                  confirmation rule across all regime labels. Persistence is
+                  label-specific. <InlineCode>HEATING</InlineCode> depends in part
+                  on a trend condition derived from short-vs-medium horizon
+                  behaviour, which introduces implicit persistence.{" "}
+                  <InlineCode>CONGESTED</InlineCode> and{" "}
+                  <InlineCode>CHEAP</InlineCode> are state-triggered
+                  classifications and do not require separate trend confirmation
+                  or a fixed multi-day confirmation window before publication.
                 </p>
 
                 <Callout title="Label stability for downstream consumers">
@@ -277,22 +298,23 @@ export default function MethodologyReferencePage() {
                       <InlineCode>HEATING</InlineCode> requires directional trend
                       confirmation: the short-term moving average must be running
                       ahead of the medium-term average before the label fires.{" "}
-                      <InlineCode>HEATING</InlineCode> will therefore not appear on
-                      a single-day elevation alone.
+                      <InlineCode>HEATING</InlineCode> will therefore not appear
+                      on a single-day elevation alone.
                     </li>
                     <li>
                       <InlineCode>CONGESTED</InlineCode> and{" "}
                       <InlineCode>CHEAP</InlineCode> do not require trend
-                      confirmation. Either label can fire on a single-day threshold
-                      crossing if the relevant axis signals are sufficiently
-                      elevated or depressed.
+                      confirmation. Either label can fire on a single-day
+                      threshold crossing if the relevant axis signals are
+                      sufficiently elevated or depressed.
                     </li>
                     <li>
                       Labels can therefore change day to day in response to daily
                       evidence. Consumers who use regime labels as period
                       classifiers for backtesting or segmentation should be aware
                       of this and apply their own minimum-duration filter to the
-                      label series if multi-day stability is required for their use case.
+                      label series if multi-day stability is required for their
+                      use case.
                     </li>
                   </ul>
                 </Callout>
@@ -300,19 +322,22 @@ export default function MethodologyReferencePage() {
 
               <Section title="Derived metric consequences that matter for interpretation">
                 <p>
-                  Some analytical components are intentionally derived rather than
-                  directly copied from a Gold field. This is methodologically
-                  valid, but it changes what the published score means.
+                  Some analytical components are intentionally derived rather
+                  than directly copied from a Gold field. This is
+                  methodologically valid, but it changes what the published score
+                  means.
                 </p>
                 <ul className="list-disc pl-5">
                   <li>
                     <InlineCode>fee_burden_proxy</InlineCode> inside friction is
-                    a ratio of median fee to median transferred value, not a native fee field.
+                    a ratio of median fee to median transferred value, not a
+                    native fee field.
                   </li>
                   <li>
                     For BTC, <InlineCode>blocktime_instability</InlineCode> is
                     the only capacity component. It is an instability proxy around
-                    the recent block-time norm, not a directional “slow blocks only” measure.
+                    the recent block-time norm, not a directional “slow blocks
+                    only” measure.
                   </li>
                 </ul>
                 <p>
@@ -335,7 +360,8 @@ export default function MethodologyReferencePage() {
                     <InlineCode>methodology_version</InlineCode>
                   </li>
                   <li>
-                    Named regime rows: <InlineCode>regime.determinism_hash</InlineCode>
+                    Named regime rows:{" "}
+                    <InlineCode>regime.determinism_hash</InlineCode>
                   </li>
                   <li>
                     Gated rows: <InlineCode>updated_through</InlineCode>,{" "}
@@ -347,10 +373,21 @@ export default function MethodologyReferencePage() {
 
               <Section title="What this page intentionally does not disclose">
                 <ul className="list-disc pl-5">
-                  <li>Exact upstream AWS schemas, join logic, or source repair rules</li>
-                  <li>Intermediate feature tables and internal parquet structures</li>
-                  <li>Full proprietary calibration constants required to clone the classifier end to end</li>
-                  <li>Enough implementation detail to reconstruct raw source rows from published aggregates</li>
+                  <li>
+                    Exact upstream AWS schemas, join logic, or source repair
+                    rules
+                  </li>
+                  <li>
+                    Intermediate feature tables and internal parquet structures
+                  </li>
+                  <li>
+                    Full proprietary calibration constants required to clone the
+                    classifier end to end
+                  </li>
+                  <li>
+                    Enough implementation detail to reconstruct raw source rows
+                    from published aggregates
+                  </li>
                 </ul>
                 <p>
                   The public methodology is designed to make the product auditable
@@ -374,7 +411,7 @@ export default function MethodologyReferencePage() {
             </div>
           }
         />
-      </div>
-    </main>
+      </UrdContainer>
+    </UrdPage>
   );
 }
