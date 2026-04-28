@@ -2,6 +2,7 @@ import React, { type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
+import { cx, urd } from "@/components/site/UrdDesignSystem";
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { computeHistoryDepthDays } from "@/lib/historyDepth";
@@ -982,71 +983,79 @@ function StatusCard({
   const displayedPrimaryDriver = primaryDriver ?? primaryChange ?? null;
 
   return (
-    <Link
-      href={row.href}
-      className="group flex min-h-[262px] flex-col rounded-[13px] border border-[#c9d9ea] bg-[#edf5fb] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.09)] transition hover:-translate-y-0.5 hover:border-[#adc7e4] hover:bg-[#e8f2fb] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_42px_rgba(15,47,91,0.13)]"
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <ChainLogo chain={row.chain} />
-          <div className="min-w-0 pt-0.5">
-            <div className="text-[20px] font-extrabold text-[#0d2447]">
-              {row.name}
+    <Link href={row.href} className={urd.landingChainCard}>
+      <span className={urd.landingChainCardGlow} />
+      <span className={urd.landingChainCardOrb} />
+      <span className={urd.landingChainCardSheen} />
+
+      <div className={urd.landingChainCardContent}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <ChainLogo chain={row.chain} />
+            <div className="min-w-0 pt-0.5">
+              <div className="text-[21px] font-black tracking-[-0.04em] text-[#071d3b] drop-shadow-[0_1px_0_rgba(255,255,255,0.9)]">
+                {row.name}
+              </div>
+              <div
+                className={`mt-1.5 text-[13px] font-black uppercase tracking-[0.08em] ${regimeTextClass(
+                  row.publishedRegime
+                )}`}
+              >
+                {regime}
+              </div>
+            </div>
+          </div>
+
+          {displayedPrimaryDriver ? (
+            <div className={urd.landingChainDriverPanel}>
+              <div className="text-[11px] font-black uppercase tracking-[0.13em] text-[#082247]">
+                {displayedPrimaryDriver.label ?? "Primary driver"}
+              </div>
+
+              <div
+                className={`mt-1 text-[15px] font-black leading-[1.14] ${primaryDriverValueClass(
+                  displayedPrimaryDriver.tone
+                )}`}
+              >
+                {splitPrimaryDriverValue(displayedPrimaryDriver.value).name}
+              </div>
+
+              <div
+                className={`mt-0.5 text-[15px] font-black leading-[1.14] ${primaryDriverValueClass(
+                  displayedPrimaryDriver.tone
+                )}`}
+              >
+                {splitPrimaryDriverValue(displayedPrimaryDriver.value).change}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className={urd.landingChainConfidencePanel}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[12px] font-black uppercase tracking-[0.13em] text-[#4f6f96]">
+              Confidence
             </div>
             <div
-              className={`mt-1.5 text-[13px] font-black uppercase tracking-[0.08em] ${regimeTextClass(
-                row.publishedRegime
-              )}`}
+              className={cx(
+                "rounded-full border border-white/70 bg-white/54 px-2.5 py-1 text-[13px] font-black leading-none shadow-[0_6px_14px_rgba(8,34,71,0.08)]",
+                confidenceState.valueClass,
+              )}
             >
-              {regime}
+              {confidence !== null ? `${confidence}%` : "—"}
             </div>
+          </div>
+          <div className={`mt-3 text-[12px] font-semibold leading-5 ${confidenceState.noteClass}`}>
+            {confidenceState.note}
           </div>
         </div>
 
-        {displayedPrimaryDriver ? (
-          <div className="max-w-[170px] shrink-0 text-right">
-            <div className="text-[12px] font-black uppercase tracking-[0.12em] text-[#031329]">
-              {displayedPrimaryDriver.label ?? "Primary driver"}
-            </div>
-
-            <div
-              className={`mt-1 text-[15px] font-extrabold leading-[1.15] ${primaryDriverValueClass(
-                displayedPrimaryDriver.tone
-              )}`}
-            >
-              {splitPrimaryDriverValue(displayedPrimaryDriver.value).name}
-            </div>
-
-            <div
-              className={`mt-0.5 text-[15px] font-extrabold leading-[1.15] ${primaryDriverValueClass(
-                displayedPrimaryDriver.tone
-              )}`}
-            >
-              {splitPrimaryDriverValue(displayedPrimaryDriver.value).change}
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-8">
-        <div className="text-[12px] font-black uppercase tracking-[0.12em] text-[#557099]">
-          Confidence
+        <div className={urd.landingChainFooter}>
+          <span>{shortDisplayDate(row.asOf).replace("Updated ", "Data updated through ")}</span>
+          <span className="text-[#0a55c2] transition group-hover:translate-x-0.5">
+            <ArrowIcon />
+          </span>
         </div>
-        <div
-          className={`mt-1 text-[14px] font-semibold leading-none tracking-[-0.04em] ${confidenceState.valueClass}`}
-        >
-          {confidence !== null ? `${confidence}%` : "—"}
-        </div>
-        <div className={`mt-2 text-[12px] font-medium leading-5 ${confidenceState.noteClass}`}>
-          {confidenceState.note}
-        </div>
-      </div>
-
-      <div className="mt-auto flex items-center justify-between gap-3 pt-7 text-[13px] font-medium text-[#557099]">
-        <span>{shortDisplayDate(row.asOf).replace("Updated ", "Data updated through ")}</span>
-        <span className="text-blue-500 transition group-hover:translate-x-0.5">
-          <ArrowIcon />
-        </span>
       </div>
     </Link>
   );

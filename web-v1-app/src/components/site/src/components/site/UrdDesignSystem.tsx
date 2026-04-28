@@ -128,21 +128,21 @@ export const urd = {
     "ml-1.5 font-black uppercase tracking-[-0.04em] text-blue-400",
 
   landingChainCard:
-    "group relative isolate flex min-h-[286px] overflow-hidden rounded-[22px] border border-[#78a8d8] bg-[radial-gradient(circle_at_18%_10%,rgba(255,255,255,0.98)_0%,rgba(247,251,255,0.88)_24%,transparent_48%),linear-gradient(145deg,#f7fbff_0%,#dcecff_38%,#c1d9f1_100%)] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),inset_0_-1px_0_rgba(73,112,153,0.15),0_18px_36px_rgba(8,34,71,0.15),0_3px_10px_rgba(8,34,71,0.08)] ring-1 ring-white/70 transition duration-200 hover:-translate-y-1 hover:border-[#4f91d8] hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(73,112,153,0.16),0_24px_52px_rgba(8,34,71,0.22),0_8px_20px_rgba(47,124,255,0.16)]",
+    "group relative isolate flex min-h-[292px] overflow-hidden rounded-[24px] border border-[#5f96cc] bg-[radial-gradient(circle_at_17%_9%,rgba(255,255,255,0.98)_0%,rgba(241,248,255,0.92)_22%,transparent_46%),radial-gradient(circle_at_86%_14%,rgba(47,124,255,0.24)_0%,rgba(47,124,255,0.10)_26%,transparent_54%),linear-gradient(145deg,#f9fcff_0%,#d7eaff_33%,#b7d5f0_68%,#9dc1e5_100%)] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-2px_0_rgba(55,97,143,0.22),0_24px_48px_rgba(8,34,71,0.22),0_8px_18px_rgba(8,34,71,0.12)] ring-1 ring-white/80 transition duration-200 hover:-translate-y-1.5 hover:scale-[1.012] hover:border-[#2f7cff] hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-2px_0_rgba(55,97,143,0.24),0_32px_66px_rgba(8,34,71,0.30),0_12px_28px_rgba(47,124,255,0.22)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2f7cff]",
   landingChainCardGlow:
-    "pointer-events-none absolute inset-x-6 top-0 z-0 h-px bg-gradient-to-r from-transparent via-white/95 to-transparent",
+    "pointer-events-none absolute inset-x-5 top-0 z-0 h-[2px] bg-gradient-to-r from-transparent via-white/95 to-transparent",
   landingChainCardOrb:
-    "pointer-events-none absolute -right-16 -top-16 z-0 h-44 w-44 rounded-full bg-[#2f7cff]/14 blur-2xl transition group-hover:bg-[#2f7cff]/22",
+    "pointer-events-none absolute -right-14 -top-16 z-0 h-52 w-52 rounded-full bg-[#2f7cff]/24 blur-2xl transition duration-300 group-hover:bg-[#2f7cff]/34",
   landingChainCardSheen:
-    "pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.42)_26%,transparent_52%)] opacity-0 transition duration-300 group-hover:translate-x-6 group-hover:opacity-100",
+    "pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.52)_24%,transparent_50%)] opacity-0 transition duration-300 group-hover:translate-x-8 group-hover:opacity-100",
   landingChainCardContent:
-    "relative z-10 flex h-full min-h-[246px] w-full flex-col",
+    "relative z-10 flex h-full min-h-[252px] w-full flex-col",
   landingChainDriverPanel:
-    "max-w-[178px] shrink-0 rounded-2xl border border-white/70 bg-white/48 px-3 py-2 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_8px_18px_rgba(8,34,71,0.08)] backdrop-blur-sm",
+    "max-w-[182px] shrink-0 rounded-2xl border border-[#75a9db] bg-[linear-gradient(145deg,rgba(255,255,255,0.82)_0%,rgba(223,238,253,0.76)_100%)] px-3 py-2 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_10px_22px_rgba(8,34,71,0.13)] backdrop-blur-sm",
   landingChainConfidencePanel:
-    "mt-7 rounded-2xl border border-[#9bc2e8] bg-white/42 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_8px_18px_rgba(8,34,71,0.07)]",
+    "mt-7 rounded-2xl border border-[#6f9fcd] bg-[linear-gradient(145deg,rgba(255,255,255,0.76)_0%,rgba(219,235,251,0.72)_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_12px_24px_rgba(8,34,71,0.12)]",
   landingChainFooter:
-    "mt-auto flex items-center justify-between gap-3 pt-6 text-[13px] font-bold text-[#31577f]",
+    "mt-auto flex items-center justify-between gap-3 pt-6 text-[13px] font-black text-[#24466f]",
 } as const;
 
 export function UrdTreeLogo({
