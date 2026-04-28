@@ -1,18 +1,19 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
-import { Callout, InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable, WarningCallout } from "../_components";
+import { Callout, InlineCode, MethodologyContent, MethodologyHeader, MethodologyNav, MethodologyPageShell, Section, SimpleTable, WarningCallout } from "../_components";
 
 function CodeBlock({ children }: { children: string }) {
-  return <pre className="overflow-x-auto rounded-2xl border bg-black/30 p-5 text-xs leading-6 text-slate-200"><code>{children}</code></pre>;
+  return <pre className="overflow-x-auto rounded-2xl border border-[#9db8d4] bg-[#0d2447] p-5 text-xs leading-6 text-[#eef6ff]"><code>{children}</code></pre>;
 }
 
 export default async function MethodologyVerificationPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <MethodologyPageShell>
       <MethodologyHeader
         title="Verification & Evidence Pack v2"
         description="Worked examples showing what a careful reader can recompute from published artifacts, what should instead be checked against public chain evidence, and how to interpret edge cases that look inconsistent until the methodology is understood."
       />
-      <MethodologyNav />
+      <MethodologyContent>
+        <MethodologyNav />
       <ShortFullContent
         pageKey="methodology-verification"
         summary={<>This page tells you how much of the published output you can verify yourself in practice.</>}
@@ -164,6 +165,7 @@ print({
           </div>
         }
       />
-    </main>
+      </MethodologyContent>
+    </MethodologyPageShell>
   );
 }

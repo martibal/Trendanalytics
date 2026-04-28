@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -64,7 +65,88 @@ export const urd = {
 
   modalPanel:
     "relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] shadow-2xl shadow-slate-950/30",
+
+  topHeader:
+    "absolute inset-x-0 top-0 z-[80] bg-transparent text-white",
+  topHeaderShell:
+    "relative mx-auto flex h-[98px] w-full max-w-[1180px] items-end justify-between gap-7 px-5 pb-6 pt-11 sm:px-7 lg:px-8",
+  topHeaderBrand:
+    "inline-flex min-w-0 items-center text-white transition hover:opacity-90",
+  brandText:
+    "font-black uppercase tracking-[-0.04em] text-white",
+  brandAccent:
+    "ml-1.5 font-black uppercase tracking-[-0.04em] text-blue-400",
 } as const;
+
+export function UrdTreeLogo({
+  className,
+  priority = false,
+}: {
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    <span
+      className={cx(
+        "pointer-events-none relative inline-flex shrink-0 opacity-55",
+        className ?? "h-12 w-12",
+      )}
+      aria-hidden="true"
+    >
+      <Image
+        src="/web-bilder/ygg-transparent.png"
+        alt=""
+        width={64}
+        height={64}
+        sizes="32px"
+        className="h-full w-full object-contain"
+        priority={priority}
+      />
+    </span>
+  );
+}
+
+export function UrdBrand({
+  compact = false,
+  className,
+}: {
+  compact?: boolean;
+  className?: string;
+}) {
+  const textSize = compact ? "text-[23px]" : "text-[23px]";
+  const logoSize = compact ? "h-9 w-9" : "h-9 w-9";
+
+  return (
+    <span className={cx("relative inline-flex min-w-0 items-center gap-3 pr-3", className)}>
+      <span className="relative z-10 inline-flex min-w-0 items-baseline">
+        <span className={cx(textSize, urd.brandText)}>URD</span>
+        <span className={cx(textSize, urd.brandAccent)}>ATLAS</span>
+      </span>
+      <UrdTreeLogo className={cx("relative z-0 -ml-0.5", logoSize)} priority={compact} />
+    </span>
+  );
+}
+
+export function UrdBrandLink({
+  compact = false,
+  onClick,
+  className,
+}: {
+  compact?: boolean;
+  onClick?: () => void;
+  className?: string;
+}) {
+  return (
+    <Link
+      href="/"
+      onClick={onClick}
+      className={cx(urd.topHeaderBrand, className)}
+      aria-label="Urd Atlas home"
+    >
+      <UrdBrand compact={compact} />
+    </Link>
+  );
+}
 
 export function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
