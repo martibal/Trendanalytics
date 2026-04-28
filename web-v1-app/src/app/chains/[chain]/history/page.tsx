@@ -448,7 +448,6 @@ export default async function ChainHistoryPage({
           </Link>
         </div>
       </div>
-      </div>
     </main>
   );
 }
