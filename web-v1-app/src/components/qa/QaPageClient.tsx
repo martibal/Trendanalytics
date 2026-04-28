@@ -1,8 +1,8 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import ExplanationLevelToggle, { type ExplanationLevel } from "@/components/ExplanationLevelToggle";
+import { cx } from "@/components/site/UrdDesignSystem";
 import { qaCategories, qaEntries, type QaCategory, type QaEntry } from "@/lib/qa";
 
 type ActiveCategory = QaCategory | "All";
@@ -57,13 +57,13 @@ export default function QaPageClient() {
 
   return (
     <>
-      <section className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.08),transparent_40%)] p-6 shadow-sm">
-        <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
+      <section className="rounded-3xl border border-[#9db8d4] bg-[#eaf3fb] p-6 text-[#0a1d3a] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
+        <div className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">
           Search and filter
         </div>
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
-            <label htmlFor="qa-search" className="text-sm font-medium text-white">
+            <label htmlFor="qa-search" className="text-sm font-black text-[#0d2447]">
               Search questions and answers
             </label>
             <input
@@ -71,10 +71,10 @@ export default function QaPageClient() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search for confidence, baseline, Meta, thresholds, drivers..."
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-500/40"
+              className="mt-2 w-full rounded-2xl border border-[#b6cce3] bg-[#eef6ff] px-4 py-3 text-sm font-semibold text-[#0d2447] outline-none placeholder:text-[#557099] focus:border-blue-500 focus:bg-white"
             />
           </div>
-          <div className="text-sm text-slate-400 lg:text-right">
+          <div className="text-sm font-semibold text-[#557099] lg:text-right">
             {filtered.length} {filtered.length === 1 ? "answer" : "answers"} visible
           </div>
         </div>
@@ -83,9 +83,12 @@ export default function QaPageClient() {
           <button
             type="button"
             onClick={() => setCategory("All")}
-            className={category === "All"
-              ? "rounded-full border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-200"
-              : "rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-400 hover:text-slate-200"}
+            className={cx(
+              "rounded-full border px-4 py-2 text-sm font-black transition",
+              category === "All"
+                ? "border-blue-300 bg-cyan-100 text-blue-800"
+                : "border-[#b6cce3] bg-[#eef6ff] text-[#557099] hover:border-blue-300 hover:bg-white hover:text-blue-800",
+            )}
           >
             All
           </button>
@@ -94,9 +97,12 @@ export default function QaPageClient() {
               key={item.key}
               type="button"
               onClick={() => setCategory(item.key)}
-              className={category === item.key
-                ? "rounded-full border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-200"
-                : "rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-400 hover:text-slate-200"}
+              className={cx(
+                "rounded-full border px-4 py-2 text-sm font-black transition",
+                category === item.key
+                  ? "border-blue-300 bg-cyan-100 text-blue-800"
+                  : "border-[#b6cce3] bg-[#eef6ff] text-[#557099] hover:border-blue-300 hover:bg-white hover:text-blue-800",
+              )}
             >
               {item.label}
             </button>
@@ -106,13 +112,18 @@ export default function QaPageClient() {
 
       <section className="mt-8 grid gap-4">
         {filtered.map((entry) => (
-          <article key={entry.id} className="rounded-3xl border bg-card/50 p-6 shadow-sm">
+          <article
+            key={entry.id}
+            className="rounded-3xl border border-[#9db8d4] bg-[#eaf3fb] p-6 text-[#0a1d3a] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]"
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+                <div className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">
                   {entry.category}
                 </div>
-                <h2 className="mt-2 text-xl font-semibold text-white">{entry.question}</h2>
+                <h2 className="mt-2 text-xl font-black tracking-[-0.02em] text-[#0d2447]">
+                  {entry.question}
+                </h2>
               </div>
               <button
                 type="button"
@@ -120,19 +131,19 @@ export default function QaPageClient() {
                   setOpenId(entry.id);
                   setLevel("Basic");
                 }}
-                className="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/5 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/10"
+                className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-4 py-2 text-sm font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800"
               >
                 Read full answer →
               </button>
             </div>
-            <div className="mt-4 rounded-2xl border border-white/8 bg-white/3 px-4 py-4 text-sm leading-7 text-slate-300">
+            <div className="mt-4 rounded-2xl border border-[#b6cce3] bg-[#eef6ff] px-4 py-4 text-sm font-semibold leading-7 text-[#27476f]">
               {entry.basic[0]}
             </div>
           </article>
         ))}
 
         {filtered.length === 0 ? (
-          <div className="rounded-3xl border border-dashed p-8 text-center text-sm text-slate-400">
+          <div className="rounded-3xl border border-dashed border-[#9db8d4] bg-[#eaf3fb] p-8 text-center text-sm font-semibold text-[#557099]">
             No Q&amp;A entries matched your current search and category filter.
           </div>
         ) : null}
@@ -140,46 +151,48 @@ export default function QaPageClient() {
 
       {activeEntry ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#031329]/75 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label={activeEntry.question}
           onClick={() => setOpenId(null)}
         >
           <div
-            className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-cyan-500/20 bg-[#071322] p-6 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-[#9db8d4] bg-[#eaf3fb] p-6 text-[#0a1d3a] shadow-2xl shadow-slate-950/30"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
+                <div className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">
                   {activeEntry.category}
                 </div>
-                <h3 className="mt-2 text-2xl font-semibold text-white">{activeEntry.question}</h3>
+                <h3 className="mt-2 text-2xl font-black tracking-[-0.03em] text-[#0d2447]">
+                  {activeEntry.question}
+                </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setOpenId(null)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl text-slate-200 hover:bg-white/10"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#9db8d4] bg-[#eef6ff] text-xl font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800"
                 aria-label="Close answer"
               >
                 ×
               </button>
             </div>
 
-            <div className="mt-5">
+            <div className="mt-5 rounded-2xl border border-[#b6cce3] bg-[#eef6ff] p-4 text-[#0d2447]">
               <ExplanationLevelToggle level={level} onChange={setLevel} label="Answer depth" />
             </div>
 
-            <div className="mt-5 rounded-2xl border border-white/8 bg-white/3 p-5">
-              <div className="space-y-4 text-sm leading-7 text-slate-100">
+            <div className="mt-5 rounded-2xl border border-[#b6cce3] bg-[#eef6ff] p-5">
+              <div className="space-y-4 text-sm font-semibold leading-7 text-[#27476f]">
                 {visibleParagraphs.map((paragraph, index) => (
                   <p key={`${activeEntry.id}-${level}-${index}`}>{paragraph}</p>
                 ))}
               </div>
             </div>
 
-            <div className="mt-5 text-xs text-slate-400">
+            <div className="mt-5 text-xs font-semibold text-[#557099]">
               Descriptive only. These answers explain the product and published artifacts; they do not constitute forecasts or recommendations.
             </div>
           </div>
