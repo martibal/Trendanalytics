@@ -1,15 +1,16 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
-import { Callout, MethodologyHeader, MethodologyNav, Section } from "../_components";
+import { Callout, MethodologyHeader, MethodologyNav, Section, MethodologyContent, MethodologyPageShell } from "../_components";
 
 export default async function MethodologyAiControlsPage() {
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <MethodologyPageShell>
       <MethodologyHeader
         title="AI Use & Quality Controls"
         description="How AI-assisted development relates to trust in the published product."
       />
 
-      <MethodologyNav />
+      <MethodologyContent>
+        <MethodologyNav />
 
       <ShortFullContent
         pageKey="methodology-ai-controls"
@@ -43,6 +44,7 @@ export default async function MethodologyAiControlsPage() {
           </div>
         }
       />
-    </main>
+      </MethodologyContent>
+    </MethodologyPageShell>
   );
 }

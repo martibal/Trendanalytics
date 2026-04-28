@@ -1,14 +1,16 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
-import { MethodologyHeader, MethodologyNav, Section, SimpleTable } from "../_components";
+import { MethodologyHeader, MethodologyNav, Section, SimpleTable, MethodologyContent, MethodologyPageShell } from "../_components";
 
 export default async function MethodologyChangelogPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <MethodologyPageShell>
       <MethodologyHeader
         title="Methodology Changelog"
         description="Public customer change log for methodology, interpretation, thresholds, contracts, and historical corrections."
       />
-      <MethodologyNav />
+
+      <MethodologyContent>
+        <MethodologyNav />
       <ShortFullContent
         pageKey="methodology-changelog"
         summary={<>This page records customer-facing changes to methodology, interpretation, contracts, and historical corrections.</>}
@@ -69,6 +71,7 @@ export default async function MethodologyChangelogPage() {
           </div>
         }
       />
-    </main>
+      </MethodologyContent>
+    </MethodologyPageShell>
   );
 }

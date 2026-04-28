@@ -12,7 +12,8 @@ import ChainIcon from "@/components/ChainIcon";
 import ShortFullContent from "@/components/site/ShortFullContent";
 
 import PageHero from "@/components/site/PageHero";
-import { UrdContainer, UrdPage } from "@/components/site/UrdDesignSystem";
+import { UrdContainer, UrdPage, urd, cx } from "@/components/site/UrdDesignSystem";
+import { UrdHashModal, UrdHashModalClose, UrdHashModalTrigger } from "@/components/site/UrdHashModal";
 
 import "server-only";
 
@@ -77,14 +78,7 @@ function InlineCode({ children }: { children: ReactNode }) {
 }
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
-  return (
-    <a
-      href={`#${id}`}
-      className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-black text-[#0d2447] hover:bg-white hover:text-blue-800"
-    >
-      {label}
-    </a>
-  );
+  return <UrdHashModalTrigger id={id}>{label}</UrdHashModalTrigger>;
 }
 
 type ExplainPair = { basic: ReactNode; advanced: ReactNode; traceability?: ReactNode };
@@ -101,36 +95,38 @@ function ExplainModal({
   pair: ExplainPair;
 }) {
   return (
-    <div id={id} className="ta-modal fixed inset-0 z-[80] items-center justify-center p-4">
-      <a href="#" className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" aria-label="Close dialog" />
-      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] shadow-2xl shadow-slate-950/30">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#c9d9ea] px-6 py-5">
+    <UrdHashModal id={id}>
+      <UrdHashModalClose className={urd.modalBackdrop} ariaLabel="Close dialog">
+        <span className="sr-only">Close dialog</span>
+      </UrdHashModalClose>
+      <div className={urd.modalPanel}>
+        <div className={urd.modalHeader}>
           <div>
-            <h3 className="text-2xl font-semibold text-[#0d2447]">{title}</h3>
-            {subtitle ? <div className="mt-2 text-sm leading-6 text-[#27476f]">{subtitle}</div> : null}
+            <h3 className="text-2xl font-black text-[#0d2447]">{title}</h3>
+            {subtitle ? <div className="mt-2 text-sm font-semibold leading-6 text-[#27476f]">{subtitle}</div> : null}
           </div>
-          <a href="#" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] text-xl text-[#0d2447] hover:bg-white" aria-label="Close dialog">×</a>
+          <UrdHashModalClose className={urd.modalClose}>×</UrdHashModalClose>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <section className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-emerald-200">Basic</div>
-              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.basic}</div>
+          <div className={urd.modalGrid}>
+            <section className={urd.modalBasicPanel}>
+              <div className={cx(urd.modalKicker, "text-emerald-800")}>Basic</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.basic}</div>
             </section>
-            <details className="rounded-2xl border border-[#9db8d4] bg-cyan-500/5 p-5" open>
-              <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-[0.14em] text-blue-700">Advanced</summary>
-              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.advanced}</div>
+            <details className={urd.modalAdvancedPanel} open>
+              <summary className={cx(urd.modalKicker, "cursor-pointer list-none")}>Advanced</summary>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.advanced}</div>
             </details>
           </div>
           {pair.traceability ? (
-            <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#27476f]">Traceability</div>
-              <div className="mt-3 text-sm leading-7 text-[#0d2447]">{pair.traceability}</div>
+            <div className="mt-4 rounded-2xl border border-[#9db8d4] bg-[#f4f9ff] p-5">
+              <div className={urd.modalKicker}>Traceability</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.traceability}</div>
             </div>
           ) : null}
         </div>
       </div>
-    </div>
+    </UrdHashModal>
   );
 }
 
@@ -193,17 +189,17 @@ function confidenceBand(v?: number | null) {
 
 function bandChipClass(band: string) {
   const base = "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium";
-  if (band === "Good") return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-300`;
-  if (band === "Caution") return `${base} border-amber-500/25 bg-amber-500/10 text-amber-300`;
-  if (band === "Degraded") return `${base} border-red-500/25 bg-red-500/10 text-red-300`;
+  if (band === "Good") return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-800`;
+  if (band === "Caution") return `${base} border-amber-500/25 bg-amber-500/10 text-amber-800`;
+  if (band === "Degraded") return `${base} border-red-500/25 bg-red-500/10 text-red-800`;
   return `${base} border-[#c9d9ea] bg-[#eef6ff] text-[#27476f]`;
 }
 
 function healthChipClass(kind: "ok" | "warn" | "fail" | "unknown") {
   const base = "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide";
-  if (kind === "ok") return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-300`;
-  if (kind === "warn") return `${base} border-amber-500/25 bg-amber-500/10 text-amber-300`;
-  if (kind === "fail") return `${base} border-red-500/25 bg-red-500/10 text-red-300`;
+  if (kind === "ok") return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-800`;
+  if (kind === "warn") return `${base} border-amber-500/25 bg-amber-500/10 text-amber-800`;
+  if (kind === "fail") return `${base} border-red-500/25 bg-red-500/10 text-red-800`;
   return `${base} border-[#c9d9ea] bg-[#eef6ff] text-[#27476f]`;
 }
 
@@ -504,15 +500,15 @@ export default async function StatusPage() {
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                   <div>
-                    <div className="text-xl font-semibold text-emerald-300">{okCount}</div>
+                    <div className="text-xl font-semibold text-emerald-800">{okCount}</div>
                     <div className="text-[#27476f]">OK</div>
                   </div>
                   <div>
-                    <div className="text-xl font-semibold text-amber-300">{warnCount}</div>
+                    <div className="text-xl font-semibold text-amber-800">{warnCount}</div>
                     <div className="text-[#27476f]">WARN</div>
                   </div>
                   <div>
-                    <div className="text-xl font-semibold text-red-300">{failCount}</div>
+                    <div className="text-xl font-semibold text-red-800">{failCount}</div>
                     <div className="text-[#27476f]">FAIL</div>
                   </div>
                 </div>
@@ -537,13 +533,13 @@ export default async function StatusPage() {
           </div>
 
           {/* Reading map */}
-          <div className="mt-6 rounded-2xl border border-[#c9d9ea] bg-white/3 p-4">
+          <div className="mt-6 rounded-2xl border border-[#c9d9ea] bg-[#d9eafb] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                   Two separate dimensions
                 </div>
-                <div className="mt-2 text-sm text-slate-100">
+                <div className="mt-2 text-sm text-[#0d2447]">
                   <span className="font-medium text-[#0d2447]">Health</span> = freshness relative to expected cadence ·{" "}
                   <span className="font-medium text-[#0d2447]">Confidence</span> = evidence quality for the published label
                 </div>
@@ -551,7 +547,7 @@ export default async function StatusPage() {
               <MoreLink id="how-to-read-modal" label="Full explanation" />
             </div>
           </div>
-          <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-white/3 p-4 text-sm leading-7 text-[#27476f]">
+          <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-[#d9eafb] p-4 text-sm leading-7 text-[#27476f]">
             Operational expectations, support response target, and revision / correction policy are documented at <Link href="/service" className="underline text-blue-700">/service</Link>.
           </div>
         </div>
@@ -583,8 +579,8 @@ export default async function StatusPage() {
       </section>
 
       {/* ── Status table ─────────────────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-5">
+      <section className="mb-8 rounded-3xl border border-[#9db8d4] bg-[#dbeafa] shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#9db8d4] px-6 py-5">
           <div>
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
               Current state
@@ -616,7 +612,7 @@ export default async function StatusPage() {
               {rows.map((row) => {
                 const band = confidenceBand(row.confidence_score);
                 return (
-                  <tr key={row.chain} className="hover:bg-[#eef6ff]/10">
+                  <tr key={row.chain} className="hover:bg-[#eef6ff]">
                     <td className="px-5 py-4">
                       <Link
                         href={`/chains/${row.chain}`}
@@ -656,14 +652,14 @@ export default async function StatusPage() {
           </table>
         </div>
 
-        <div className="border-t px-5 py-3 text-xs text-[#27476f]">
+        <div className="border-t border-[#9db8d4] px-5 py-3 text-xs text-[#27476f]">
           Source: latest published Meta artifact per chain ·
           Health is derived at render time from lag vs expected cadence
         </div>
       </section>
 
       {/* ── Cadence reference ────────────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border p-6 shadow-sm">
+      <section className="mb-8 rounded-3xl border border-[#9db8d4] bg-[#dbeafa] p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
@@ -698,15 +694,15 @@ export default async function StatusPage() {
               <p className="mt-1 text-xs leading-5 text-[#27476f]">{note}</p>
               <div className="mt-4 grid grid-cols-3 gap-3 text-center text-xs">
                 <div className="rounded-xl border border-emerald-500/20 bg-[#eef6ff] px-2 py-2">
-                  <div className="font-semibold text-emerald-300">OK</div>
+                  <div className="font-semibold text-emerald-800">OK</div>
                   <div className="mt-1 text-[#27476f]">≤ {expected}</div>
                 </div>
                 <div className="rounded-xl border border-amber-500/20 bg-[#eef6ff] px-2 py-2">
-                  <div className="font-semibold text-amber-300">WARN</div>
+                  <div className="font-semibold text-amber-800">WARN</div>
                   <div className="mt-1 text-[#27476f]">{warn}</div>
                 </div>
                 <div className="rounded-xl border border-red-500/20 bg-[#eef6ff] px-2 py-2">
-                  <div className="font-semibold text-red-300">FAIL</div>
+                  <div className="font-semibold text-red-800">FAIL</div>
                   <div className="mt-1 text-[#27476f]">{fail}</div>
                 </div>
               </div>
@@ -718,7 +714,7 @@ export default async function StatusPage() {
       {/* Dataset notes */}
       {notes.length > 0 ? (
         <section className="mb-8 rounded-3xl border border-amber-300 bg-amber-50 p-6 shadow-sm">
-          <div className="text-xs font-medium uppercase tracking-[0.14em] text-amber-300">
+          <div className="text-xs font-medium uppercase tracking-[0.14em] text-amber-800">
             Dataset notes
           </div>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[#0d2447]">
@@ -730,7 +726,7 @@ export default async function StatusPage() {
       ) : null}
 
       {/* ── Navigation strip ─────────────────────────────────────────────── */}
-      <section className="mt-10 rounded-3xl border p-6 shadow-sm">
+      <section className="mt-10 rounded-3xl border border-[#9db8d4] bg-[#dbeafa] p-6 shadow-sm">
         <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">Related</div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -742,7 +738,7 @@ export default async function StatusPage() {
             <Link
               key={href}
               href={href}
-              className="group flex items-center justify-between rounded-2xl border bg-background/40 px-4 py-3 transition hover:border-cyan-500/30 hover:bg-[#eef6ff]/30"
+              className="group flex items-center justify-between rounded-2xl border bg-[#eef6ff] px-4 py-3 transition hover:border-cyan-500/30 hover:bg-white"
             >
               <div>
                 <div className="text-sm font-medium text-[#0d2447]">{label}</div>
@@ -755,7 +751,7 @@ export default async function StatusPage() {
       </section>
 
       {/* ── Data contract ─────────────────────────────────────────────────── */}
-      <details className="mt-8 rounded-2xl border p-5">
+      <details className="mt-8 rounded-2xl border border-[#9db8d4] bg-[#d9eafb] p-5">
         <summary className="cursor-pointer text-sm font-medium text-[#27476f] hover:text-[#0d2447]">
           Data contract and traceability
         </summary>

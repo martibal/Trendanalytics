@@ -1,6 +1,6 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
 import PageHero from "@/components/site/PageHero";
-import { UrdContainer, UrdInlineCode, UrdPage } from "@/components/site/UrdDesignSystem";
+import { UrdButtonLink, UrdContainer, UrdInlineCode, UrdPage } from "@/components/site/UrdDesignSystem";
 // src/app/api-docs/schema/page.tsx
 // JSON Schema Reference — complete field-level documentation for Gold, Meta, and Derived
 // artifacts. This page exists to let potential subscribers understand exactly what they
@@ -153,6 +153,9 @@ export default async function SchemaPage() {
         summary="Every field in every published JSON file — defined at two levels. This page exists so you know exactly what a subscription delivers before you subscribe."
       >
         <div className="flex flex-wrap gap-2">
+          <UrdButtonLink href="/api-docs" className="border-white/15 bg-white/8 text-white hover:bg-white/12 hover:text-white">
+            ← Back to API Docs
+          </UrdButtonLink>
           {[
             { href: "#gold", label: "Gold" },
             { href: "#meta", label: "Meta" },
@@ -161,7 +164,7 @@ export default async function SchemaPage() {
             <a
               key={label}
               href={href}
-              className="inline-flex items-center rounded-full border border-white/15 bg-white/8 px-4 py-1.5 text-sm font-black text-white hover:bg-white/12"
+              className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-4 py-1.5 text-sm font-black text-[#0d2447] hover:bg-white"
             >
               {label}
             </a>

@@ -1,15 +1,16 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
-import { Callout, InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable } from "../_components";
+import { Callout, InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable, MethodologyContent, MethodologyPageShell } from "../_components";
 
 export default async function MethodologyIntegrityPage() {
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <MethodologyPageShell>
       <MethodologyHeader
         title="Release Integrity & Determinism"
         description="How archived Meta rows are identified, what determinism hashes mean, and how historical outputs should be interpreted through time."
       />
 
-      <MethodologyNav />
+      <MethodologyContent>
+        <MethodologyNav />
 
       <ShortFullContent
         pageKey="methodology-integrity"
@@ -56,6 +57,7 @@ export default async function MethodologyIntegrityPage() {
           </div>
         }
       />
-    </main>
+      </MethodologyContent>
+    </MethodologyPageShell>
   );
 }

@@ -5,14 +5,14 @@ import type { ReactNode } from "react";
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">{children}</code>;
+  return <code className="rounded bg-[#eef6ff] px-1 py-0.5 font-mono text-xs">{children}</code>;
 }
 
 function CodeBlock({ children, label }: { children: string; label?: string }) {
   return (
     <div>
-      {label && <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</div>}
-      <pre className="overflow-x-auto rounded-2xl border bg-black/30 p-5 text-xs leading-6 text-slate-200">
+      {label && <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#557099]">{label}</div>}
+      <pre className="overflow-x-auto rounded-2xl border bg-[#dceaf8] p-5 text-xs leading-6 text-[#27476f]">
         <code>{children}</code>
       </pre>
     </div>
@@ -24,9 +24,9 @@ function Section({ eyebrow, title, subtitle, children, id }: {
 }) {
   return (
     <section id={id} className="scroll-mt-24 rounded-3xl border p-6 shadow-sm">
-      {eyebrow && <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">{eyebrow}</div>}
-      <h2 className="mt-1 text-2xl font-semibold text-white">{title}</h2>
-      {subtitle && <div className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">{subtitle}</div>}
+      {eyebrow && <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">{eyebrow}</div>}
+      <h2 className="mt-1 text-2xl font-semibold text-[#0d2447]">{title}</h2>
+      {subtitle && <div className="mt-2 max-w-4xl text-sm leading-7 text-[#27476f]">{subtitle}</div>}
       <div className="mt-5">{children}</div>
     </section>
   );
@@ -34,33 +34,33 @@ function Section({ eyebrow, title, subtitle, children, id }: {
 
 function QA({ question, children }: { question: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-white/6 bg-white/[0.02] p-5">
+    <div className="rounded-2xl border border-white/6 bg-[#eef6ff] p-5">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 shrink-0 text-cyan-400 font-black text-sm">Q</span>
-        <h3 className="text-sm font-bold text-white">{question}</h3>
+        <h3 className="text-sm font-bold text-[#0d2447]">{question}</h3>
       </div>
-      <div className="mt-3 pl-6 text-sm leading-7 text-muted-foreground">{children}</div>
+      <div className="mt-3 pl-6 text-sm leading-7 text-[#27476f]">{children}</div>
     </div>
   );
 }
 
 function StepCard({ number, title, children }: { number: string; title: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border bg-white/[0.02] p-5">
+    <div className="rounded-2xl border bg-[#eef6ff] p-5">
       <div className="flex items-center gap-3">
-        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-500/25 bg-cyan-500/10 text-xs font-semibold text-cyan-200">
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-500/25 bg-cyan-500/10 text-xs font-semibold text-blue-700">
           {number}
         </span>
-        <h3 className="text-base font-semibold text-white">{title}</h3>
+        <h3 className="text-base font-semibold text-[#0d2447]">{title}</h3>
       </div>
-      <div className="mt-4 text-sm leading-7 text-muted-foreground">{children}</div>
+      <div className="mt-4 text-sm leading-7 text-[#27476f]">{children}</div>
     </div>
   );
 }
 
 function BulletList({ items }: { items: ReactNode[] }) {
   return (
-    <ul className="list-disc space-y-2 pl-5 text-sm leading-7 text-muted-foreground">
+    <ul className="list-disc space-y-2 pl-5 text-sm leading-7 text-[#27476f]">
       {items.map((item, i) => <li key={i}>{item}</li>)}
     </ul>
   );
@@ -68,7 +68,7 @@ function BulletList({ items }: { items: ReactNode[] }) {
 
 function Callout({ children, color = "cyan" }: { children: ReactNode; color?: "cyan" | "amber" | "emerald" }) {
   const s = { cyan: "border-cyan-500/20 bg-cyan-500/5", amber: "border-amber-500/20 bg-amber-500/5", emerald: "border-emerald-500/20 bg-emerald-500/5" };
-  return <div className={`rounded-2xl border p-5 text-sm leading-7 text-slate-200 ${s[color]}`}>{children}</div>;
+  return <div className={`rounded-2xl border p-5 text-sm leading-7 text-[#27476f] ${s[color]}`}>{children}</div>;
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -78,29 +78,29 @@ export default function GettingStartedJsonApiPage() {
     <main className="mx-auto max-w-7xl px-6 py-10">
 
       {/* Breadcrumb */}
-      <div className="mb-6 flex items-center gap-2 text-sm text-slate-500">
+      <div className="mb-6 flex items-center gap-2 text-sm text-[#557099]">
         <Link href="/api-docs" className="hover:text-cyan-400 transition-colors">← API Docs</Link>
         <span>/</span>
-        <span className="text-slate-400">Getting started</span>
+        <span className="text-[#557099]">Getting started</span>
       </div>
 
       {/* Header */}
       <header className="mb-10">
         <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
           <div className="max-w-4xl">
-            <div className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">Getting started</div>
-            <h1 className="mt-3 text-4xl font-semibold leading-tight text-white sm:text-5xl">
+            <div className="text-xs font-medium uppercase tracking-[0.18em] text-blue-700">Getting started</div>
+            <h1 className="mt-3 text-4xl font-semibold leading-tight text-[#0d2447] sm:text-5xl">
               Getting started with the Urd Atlas JSON API
             </h1>
-            <p className="mt-4 text-lg leading-8 text-slate-300">
+            <p className="mt-4 text-lg leading-8 text-[#27476f]">
               A complete beginner guide. No prior experience with APIs or JSON required.
               Read this from top to bottom before opening the technical reference.
             </p>
           </div>
 
           {/* Table of contents */}
-          <div className="mt-8 rounded-2xl border border-white/10 bg-black/10 p-5">
-            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Contents</div>
+          <div className="mt-8 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-[#557099] mb-3">Contents</div>
             <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 text-sm">
               {[
                 ["#what-is-json", "1. What JSON is"],
@@ -116,7 +116,7 @@ export default function GettingStartedJsonApiPage() {
                 ["#questions", "11. Common questions answered"],
                 ["#next-steps", "12. What to do next"],
               ].map(([href, label]) => (
-                <a key={href} href={href} className="text-cyan-200 hover:underline py-0.5">{label}</a>
+                <a key={href} href={href} className="text-blue-700 hover:underline py-0.5">{label}</a>
               ))}
             </div>
           </div>
@@ -137,13 +137,13 @@ export default function GettingStartedJsonApiPage() {
 
         {/* ── 1. What is JSON ── */}
         <Section id="what-is-json" eyebrow="Chapter 1" title="What JSON is">
-          <p className="text-sm leading-7 text-muted-foreground">
+          <p className="text-sm leading-7 text-[#27476f]">
             JSON stands for JavaScript Object Notation. Despite the name, it has nothing to do
             with JavaScript in practice — it is simply a text format for storing and transmitting
             structured data. Any programming language can read it. You can also open it in a
             plain text editor.
           </p>
-          <p className="mt-3 text-sm leading-7 text-muted-foreground">
+          <p className="mt-3 text-sm leading-7 text-[#27476f]">
             A JSON file looks like this:
           </p>
           <div className="mt-4">
@@ -164,14 +164,14 @@ export default function GettingStartedJsonApiPage() {
               { title: "Square brackets [ ]", desc: "Wrap a list of items. Items can be numbers, text, or other objects." },
               { title: "Colon :", desc: "Separates a field name from its value. Comma separates multiple fields." },
             ].map(item => (
-              <div key={item.title} className="rounded-2xl border bg-white/[0.02] p-4">
-                <div className="text-sm font-bold text-white font-mono">{item.title}</div>
-                <p className="mt-2 text-xs leading-5 text-slate-400">{item.desc}</p>
+              <div key={item.title} className="rounded-2xl border bg-[#eef6ff] p-4">
+                <div className="text-sm font-bold text-[#0d2447] font-mono">{item.title}</div>
+                <p className="mt-2 text-xs leading-5 text-[#557099]">{item.desc}</p>
               </div>
             ))}
           </div>
           <Callout color="cyan">
-            <span className="font-semibold text-white">Key point:</span>{" "}
+            <span className="font-semibold text-[#0d2447]">Key point:</span>{" "}
             JSON is just text. It is not a program, not a database, and not a spreadsheet.
             It is a file — like a .txt file — that happens to be structured in a way that
             software can read easily.
@@ -180,36 +180,36 @@ export default function GettingStartedJsonApiPage() {
 
         {/* ── 2. What is an API ── */}
         <Section id="what-is-api" eyebrow="Chapter 2" title="What an API is">
-          <p className="text-sm leading-7 text-muted-foreground">
+          <p className="text-sm leading-7 text-[#27476f]">
             API stands for Application Programming Interface. In plain language: it is a way
             for your computer to ask a server for data and get a structured response back.
             Instead of opening a webpage and reading it with your eyes, your script sends a
             request and receives machine-readable data directly.
           </p>
-          <div className="mt-5 rounded-2xl border border-white/8 bg-black/20 p-5">
-            <h3 className="text-sm font-bold text-white mb-4">The difference — with and without an API</h3>
+          <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
+            <h3 className="text-sm font-bold text-[#0d2447] mb-4">The difference — with and without an API</h3>
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-xl border border-white/6 p-4">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Without API</div>
-                <div className="text-sm leading-6 text-slate-300">
+                <div className="text-xs font-bold uppercase tracking-wider text-[#557099] mb-2">Without API</div>
+                <div className="text-sm leading-6 text-[#27476f]">
                   Open browser → navigate to page → read regime label → write it down →
                   repeat tomorrow → repeat for each chain → build your own table manually
                 </div>
-                <div className="mt-2 text-xs text-slate-500">Time per day: 10–30 minutes. Error-prone. Cannot be automated.</div>
+                <div className="mt-2 text-xs text-[#557099]">Time per day: 10–30 minutes. Error-prone. Cannot be automated.</div>
               </div>
               <div className="rounded-xl border border-cyan-500/15 bg-cyan-500/5 p-4">
                 <div className="text-xs font-bold uppercase tracking-wider text-cyan-500 mb-2">With API</div>
-                <div className="text-sm leading-6 text-slate-300">
+                <div className="text-sm leading-6 text-[#27476f]">
                   Script runs → sends one request per chain → receives full JSON with all
                   fields → saves files locally → done
                 </div>
-                <div className="mt-2 text-xs text-slate-500">Time per day: seconds. Fully automated. No manual steps.</div>
+                <div className="mt-2 text-xs text-[#557099]">Time per day: seconds. Fully automated. No manual steps.</div>
               </div>
             </div>
           </div>
           <div className="mt-5">
-            <h3 className="text-sm font-bold text-white mb-3">What an API key is</h3>
-            <p className="text-sm leading-7 text-muted-foreground">
+            <h3 className="text-sm font-bold text-[#0d2447] mb-3">What an API key is</h3>
+            <p className="text-sm leading-7 text-[#27476f]">
               An API key is a long string of characters that identifies you as a subscriber.
               You include it in every request so the server knows who you are and what you
               are entitled to access. Think of it like a key card — you swipe it every time
@@ -219,7 +219,7 @@ export default function GettingStartedJsonApiPage() {
               <CodeBlock label="Example: what an API key looks like">{`ta_live_2c627b2852556cf57de58ae97d6476e27660cf1ebe9348a2`}</CodeBlock>
             </div>
             <Callout color="amber">
-              <span className="font-semibold text-white">Important:</span>{" "}
+              <span className="font-semibold text-[#0d2447]">Important:</span>{" "}
               Treat your API key like a password. Do not paste it into public files, share
               it in screenshots, or commit it to a public code repository. If compromised,
               revoke it from Dashboard and create a new one.
@@ -229,7 +229,7 @@ export default function GettingStartedJsonApiPage() {
 
         {/* ── 3. What you actually receive ── */}
         <Section id="what-you-get" eyebrow="Chapter 3" title="What you actually receive as a subscriber">
-          <p className="text-sm leading-7 text-muted-foreground">
+          <p className="text-sm leading-7 text-[#27476f]">
             When you subscribe to Urd Atlas, you get API access to structured JSON files.
             There are three types of files (called genres), and they are published for each
             chain every day. Here is the complete picture:
@@ -238,38 +238,38 @@ export default function GettingStartedJsonApiPage() {
           <div className="mt-5 overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left py-3 pr-6 text-xs font-bold uppercase tracking-wider text-slate-400">Genre</th>
-                  <th className="text-left py-3 pr-6 text-xs font-bold uppercase tracking-wider text-slate-400">What it contains</th>
-                  <th className="text-left py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Best for</th>
+                <tr className="border-b border-[#c9d9ea]">
+                  <th className="text-left py-3 pr-6 text-xs font-bold uppercase tracking-wider text-[#557099]">Genre</th>
+                  <th className="text-left py-3 pr-6 text-xs font-bold uppercase tracking-wider text-[#557099]">What it contains</th>
+                  <th className="text-left py-3 text-xs font-bold uppercase tracking-wider text-[#557099]">Best for</th>
                 </tr>
               </thead>
-              <tbody className="text-slate-300">
+              <tbody className="text-[#27476f]">
                 <tr className="border-b border-white/5">
-                  <td className="py-3 pr-6 font-bold text-amber-300">Gold</td>
+                  <td className="py-3 pr-6 font-bold text-amber-800">Gold</td>
                   <td className="py-3 pr-6">Raw daily chain metrics in native units. Transaction counts, fees, block times, active addresses.</td>
-                  <td className="py-3 text-slate-400">Your own calculations, raw data analysis</td>
+                  <td className="py-3 text-[#557099]">Your own calculations, raw data analysis</td>
                 </tr>
                 <tr className="border-b border-white/5">
                   <td className="py-3 pr-6 font-bold text-violet-300">Meta</td>
                   <td className="py-3 pr-6">The regime label (STABLE/HEATING/CONGESTED/CHEAP), confidence score, scorecard, and ranked driver signals.</td>
-                  <td className="py-3 text-slate-400">Dashboards, alerts, research conditioning</td>
+                  <td className="py-3 text-[#557099]">Dashboards, alerts, research conditioning</td>
                 </tr>
                 <tr>
                   <td className="py-3 pr-6 font-bold text-sky-300">Derived</td>
                   <td className="py-3 pr-6">7-day and 30-day rolling averages for every Gold metric.</td>
-                  <td className="py-3 text-slate-400">Trend charts, smoothed analysis</td>
+                  <td className="py-3 text-[#557099]">Trend charts, smoothed analysis</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           <div className="mt-6">
-            <h3 className="text-sm font-bold text-white mb-3">Files available per plan</h3>
+            <h3 className="text-sm font-bold text-[#0d2447] mb-3">Files available per plan</h3>
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5">
-                <div className="text-xs font-bold uppercase tracking-wider text-cyan-300 mb-3">Basic — $29/mo — 1 chain</div>
-                <p className="text-xs text-slate-400 mb-3">If your entitled chain is bitcoin, you can fetch:</p>
+                <div className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-3">Basic — $29/mo — 1 chain</div>
+                <p className="text-xs text-[#557099] mb-3">If your entitled chain is bitcoin, you can fetch:</p>
                 <CodeBlock>{`/api/v1/files/gold/bitcoin/latest.json
 /api/v1/files/meta/bitcoin/latest.json
 /api/v1/files/derived/bitcoin/latest.json
@@ -285,11 +285,11 @@ export default function GettingStartedJsonApiPage() {
 /api/v1/files/gold/bitcoin/90d/latest.json
 /api/v1/files/meta/bitcoin/90d/latest.json
 /api/v1/files/derived/bitcoin/90d/latest.json`}</CodeBlock>
-                <p className="mt-3 text-xs text-slate-500">That is 12 files total per day — 3 genres × 4 windows.</p>
+                <p className="mt-3 text-xs text-[#557099]">That is 12 files total per day — 3 genres × 4 windows.</p>
               </div>
               <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-5">
                 <div className="text-xs font-bold uppercase tracking-wider text-purple-300 mb-3">Pro — $79/mo — all 4 chains</div>
-                <p className="text-xs text-slate-400 mb-3">Same structure, but for all four chains and 6 windows (adds 180d and 365d):</p>
+                <p className="text-xs text-[#557099] mb-3">Same structure, but for all four chains and 6 windows (adds 180d and 365d):</p>
                 <CodeBlock>{`/api/v1/files/meta/bitcoin/latest.json
 /api/v1/files/meta/ethereum/latest.json
 /api/v1/files/meta/arbitrum/latest.json
@@ -298,7 +298,7 @@ export default function GettingStartedJsonApiPage() {
 /api/v1/files/meta/bitcoin/365d/latest.json
 /api/v1/files/meta/ethereum/365d/latest.json
 ...and so on for gold and derived`}</CodeBlock>
-                <p className="mt-3 text-xs text-slate-500">That is 72 files total — 3 genres × 4 chains × 6 windows.</p>
+                <p className="mt-3 text-xs text-[#557099]">That is 72 files total — 3 genres × 4 chains × 6 windows.</p>
               </div>
             </div>
           </div>
@@ -306,7 +306,7 @@ export default function GettingStartedJsonApiPage() {
 
         {/* ── 4. Files explained ── */}
         <Section id="files-explained" eyebrow="Chapter 4" title="The window files — explained in full">
-          <p className="text-sm leading-7 text-muted-foreground">
+          <p className="text-sm leading-7 text-[#27476f]">
             This is where most new subscribers get confused. The URL structure looks like this:
           </p>
           <div className="mt-4">
@@ -319,13 +319,13 @@ export default function GettingStartedJsonApiPage() {
               This is always the most recently published file for today.
               It contains data for the most recent date the pipeline has published.
               This file is updated every day when the pipeline runs.
-              <span className="block mt-2 font-semibold text-white">Fetch this every day to always have the newest data.</span>
+              <span className="block mt-2 font-semibold text-[#0d2447]">Fetch this every day to always have the newest data.</span>
             </QA>
 
             <QA question="What does '90d/latest.json' mean?">
               This is a bundle file containing the last 90 days of data in a single JSON file.
               It is not 90 separate files — it is one file with an array of 90 daily records.
-              <div className="mt-3 rounded-xl border border-white/6 bg-black/20 p-4">
+              <div className="mt-3 rounded-xl border border-white/6 bg-[#eef6ff] p-4">
                 <CodeBlock label="What the 90d file looks like inside">{`{
   "chain": "bitcoin",
   "window": "90d",
@@ -337,7 +337,7 @@ export default function GettingStartedJsonApiPage() {
   ]
 }`}</CodeBlock>
               </div>
-              <span className="block mt-2 font-semibold text-white">
+              <span className="block mt-2 font-semibold text-[#0d2447]">
                 This file is also updated every day — it always contains the most recent 90 days,
                 rolling forward one day at a time.
               </span>
@@ -352,14 +352,14 @@ export default function GettingStartedJsonApiPage() {
             </QA>
 
             <QA question="Which file should I fetch every day?">
-              <span className="font-semibold text-white">For daily monitoring:</span> fetch <InlineCode>latest.json</InlineCode> (without a window).
+              <span className="font-semibold text-[#0d2447]">For daily monitoring:</span> fetch <InlineCode>latest.json</InlineCode> (without a window).
               One request per chain, one file, always fresh.
               <br /><br />
-              <span className="font-semibold text-white">For building a historical dataset:</span> fetch <InlineCode>90d/latest.json</InlineCode>
+              <span className="font-semibold text-[#0d2447]">For building a historical dataset:</span> fetch <InlineCode>90d/latest.json</InlineCode>
               once when you sign up to get your history, then fetch <InlineCode>latest.json</InlineCode>
               daily to add one new day at a time.
               <br /><br />
-              <span className="font-semibold text-white">For backtesting or analysis over a long period:</span>{" "}
+              <span className="font-semibold text-[#0d2447]">For backtesting or analysis over a long period:</span>{" "}
               fetch the largest window your plan allows (<InlineCode>90d</InlineCode> for Basic,
               <InlineCode>365d</InlineCode> for Pro) to get everything in one request.
             </QA>
@@ -368,13 +368,13 @@ export default function GettingStartedJsonApiPage() {
               <div className="mt-1 overflow-x-auto">
                 <table className="w-full text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10">
-                      <th className="text-left py-2 pr-4 text-slate-400">Window token</th>
-                      <th className="text-left py-2 pr-4 text-slate-400">What it contains</th>
-                      <th className="text-left py-2 text-slate-400">Available on</th>
+                    <tr className="border-b border-[#c9d9ea]">
+                      <th className="text-left py-2 pr-4 text-[#557099]">Window token</th>
+                      <th className="text-left py-2 pr-4 text-[#557099]">What it contains</th>
+                      <th className="text-left py-2 text-[#557099]">Available on</th>
                     </tr>
                   </thead>
-                  <tbody className="text-slate-300">
+                  <tbody className="text-[#27476f]">
                     {[
                       ["latest", "Most recent single day only", "Basic + Pro"],
                       ["7d", "Last 7 days as an array", "Basic + Pro"],
@@ -384,9 +384,9 @@ export default function GettingStartedJsonApiPage() {
                       ["365d", "Last 365 days as an array", "Pro only"],
                     ].map(([token, desc, plan]) => (
                       <tr key={token} className="border-b border-white/5">
-                        <td className="py-2 pr-4 font-mono text-cyan-300">{token}</td>
+                        <td className="py-2 pr-4 font-mono text-blue-700">{token}</td>
                         <td className="py-2 pr-4">{desc}</td>
-                        <td className="py-2 text-slate-500">{plan}</td>
+                        <td className="py-2 text-[#557099]">{plan}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -399,7 +399,7 @@ export default function GettingStartedJsonApiPage() {
         {/* ── 5. Automatic vs manual ── */}
         <Section id="daily-or-manual" eyebrow="Chapter 5" title="Do I get the data automatically, or do I have to fetch it manually?">
           <Callout color="amber">
-            <span className="font-semibold text-white">Short answer:</span>{" "}
+            <span className="font-semibold text-[#0d2447]">Short answer:</span>{" "}
             Urd Atlas publishes new files every day automatically. But they are not
             pushed to you — you must fetch them. Think of it like a library that gets
             new books every morning: the books arrive automatically, but you still have
@@ -407,8 +407,8 @@ export default function GettingStartedJsonApiPage() {
           </Callout>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-sm font-bold text-white mb-3">What Urd Atlas does automatically</h3>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-sm font-bold text-[#0d2447] mb-3">What Urd Atlas does automatically</h3>
               <BulletList items={[
                 "Runs the classification pipeline every day",
                 "Publishes new Gold, Meta, and Derived files for each chain",
@@ -417,8 +417,8 @@ export default function GettingStartedJsonApiPage() {
                 "Updates the public /status endpoint so you can check freshness",
               ]} />
             </div>
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-sm font-bold text-white mb-3">What you do</h3>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-sm font-bold text-[#0d2447] mb-3">What you do</h3>
               <BulletList items={[
                 "Send a GET request to the API with your API key",
                 "Receive the JSON file as the response body",
@@ -428,20 +428,20 @@ export default function GettingStartedJsonApiPage() {
             </div>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-white/8 bg-black/20 p-5">
-            <h3 className="text-sm font-bold text-white mb-4">Two ways subscribers work</h3>
+          <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
+            <h3 className="text-sm font-bold text-[#0d2447] mb-4">Two ways subscribers work</h3>
             <div className="grid gap-4 lg:grid-cols-2">
               <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Manual (start here)</div>
-                <p className="text-sm leading-6 text-slate-300">
+                <div className="text-xs font-bold uppercase tracking-wider text-[#557099] mb-2">Manual (start here)</div>
+                <p className="text-sm leading-6 text-[#27476f]">
                   You open a terminal and run one command. You get the file. You repeat when
                   you want new data. No setup, no scheduler, no code. Good for: occasional
                   checks, one-off analysis, getting started.
                 </p>
               </div>
               <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Automated (next step)</div>
-                <p className="text-sm leading-6 text-slate-300">
+                <div className="text-xs font-bold uppercase tracking-wider text-[#557099] mb-2">Automated (next step)</div>
+                <p className="text-sm leading-6 text-[#27476f]">
                   You write a small script that checks for new data and downloads it if found.
                   You schedule it to run every day. Good for: daily archives, feeding a
                   dashboard, keeping data fresh without thinking about it.
@@ -461,7 +461,7 @@ export default function GettingStartedJsonApiPage() {
             </StepCard>
             <StepCard number="2" title="Arrive at your Dashboard">
               After payment, you land on the{" "}
-              <Link href="/dashboard" className="text-cyan-200 underline">Dashboard</Link>.
+              <Link href="/dashboard" className="text-blue-700 underline">Dashboard</Link>.
               It shows your plan, entitled chain (Basic) or all chains (Pro), allowed
               windows, and history depth. This is your subscriber control panel.
             </StepCard>
@@ -493,30 +493,30 @@ export default function GettingStartedJsonApiPage() {
             </StepCard>
           </div>
           <Callout color="emerald">
-            <span className="font-semibold text-white">Total time for steps 1–6:</span>{" "}
+            <span className="font-semibold text-[#0d2447]">Total time for steps 1–6:</span>{" "}
             Under 10 minutes. Everything after this is optional enhancement.
           </Callout>
         </Section>
 
         {/* ── 7. First request ── */}
         <Section id="first-request" eyebrow="Chapter 7" title="How to make your first API request">
-          <p className="text-sm leading-7 text-muted-foreground">
+          <p className="text-sm leading-7 text-[#27476f]">
             There are several ways to make an HTTP request. Pick the one that matches
             what you already have installed.
           </p>
 
           <div className="mt-5 grid gap-5">
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-base font-semibold text-white mb-1">Option A: curl (simplest — works on Windows, Mac, Linux)</h3>
-              <p className="text-xs text-slate-400 mb-3">curl is usually pre-installed. Open any terminal and run:</p>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-base font-semibold text-[#0d2447] mb-1">Option A: curl (simplest — works on Windows, Mac, Linux)</h3>
+              <p className="text-xs text-[#557099] mb-3">curl is usually pre-installed. Open any terminal and run:</p>
               <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY_HERE" https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json`}</CodeBlock>
-              <p className="mt-3 text-xs text-slate-400">To save to a file instead of printing:</p>
+              <p className="mt-3 text-xs text-[#557099]">To save to a file instead of printing:</p>
               <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY_HERE" https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json -o meta_bitcoin_latest.json`}</CodeBlock>
             </div>
 
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-base font-semibold text-white mb-1">Option B: Python (recommended for analysis)</h3>
-              <p className="text-xs text-slate-400 mb-3">Install requests once: <InlineCode>pip install requests</InlineCode></p>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-base font-semibold text-[#0d2447] mb-1">Option B: Python (recommended for analysis)</h3>
+              <p className="text-xs text-[#557099] mb-3">Install requests once: <InlineCode>pip install requests</InlineCode></p>
               <CodeBlock>{`import requests, json
 
 API_KEY = "YOUR_KEY_HERE"
@@ -534,8 +534,8 @@ with open("meta_bitcoin_latest.json", "w") as f:
     json.dump(data, f, indent=2)`}</CodeBlock>
             </div>
 
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-base font-semibold text-white mb-1">Option C: PowerShell (Windows)</h3>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-base font-semibold text-[#0d2447] mb-1">Option C: PowerShell (Windows)</h3>
               <CodeBlock>{`$key = "YOUR_KEY_HERE"
 $url = "https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json"
 $headers = @{ "X-API-Key" = $key }
@@ -548,53 +548,53 @@ $response | ConvertTo-Json -Depth 10 | Out-File -FilePath "meta_bitcoin_latest.j
 
         {/* ── 8. What software you need ── */}
         <Section id="tools" eyebrow="Chapter 8" title="What software you need on your computer">
-          <p className="text-sm leading-7 text-muted-foreground">
+          <p className="text-sm leading-7 text-[#27476f]">
             You do not need much. Here is the minimum and the recommended setup.
           </p>
           <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-sm font-bold text-white">Minimum (already have)</h3>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-sm font-bold text-[#0d2447]">Minimum (already have)</h3>
               <BulletList items={[
                 "A terminal (Command Prompt, PowerShell, or Terminal on Mac/Linux)",
                 "curl — usually pre-installed",
                 "A text editor to open JSON files (Notepad works, VS Code is better)",
               ]} />
-              <p className="mt-3 text-xs text-slate-500">Good enough for: manual daily fetching and reading the output.</p>
+              <p className="mt-3 text-xs text-[#557099]">Good enough for: manual daily fetching and reading the output.</p>
             </div>
             <div className="rounded-2xl border border-cyan-500/15 bg-cyan-500/5 p-5">
-              <h3 className="text-sm font-bold text-white">Recommended for analysis</h3>
+              <h3 className="text-sm font-bold text-[#0d2447]">Recommended for analysis</h3>
               <BulletList items={[
-                <>Python 3.x — free at <a href="https://python.org" className="text-cyan-200 underline" target="_blank" rel="noopener noreferrer">python.org</a></>,
+                <>Python 3.x — free at <a href="https://python.org" className="text-blue-700 underline" target="_blank" rel="noopener noreferrer">python.org</a></>,
                 "pip install requests (one command)",
                 "pip install pandas (for data manipulation)",
-                <>VS Code — free code editor at <a href="https://code.visualstudio.com" className="text-cyan-200 underline" target="_blank" rel="noopener noreferrer">code.visualstudio.com</a></>,
+                <>VS Code — free code editor at <a href="https://code.visualstudio.com" className="text-blue-700 underline" target="_blank" rel="noopener noreferrer">code.visualstudio.com</a></>,
                 "Jupyter Notebook — for interactive analysis (pip install jupyter)",
               ]} />
-              <p className="mt-3 text-xs text-slate-500">Good for: building your own analysis, charts, and automation.</p>
+              <p className="mt-3 text-xs text-[#557099]">Good for: building your own analysis, charts, and automation.</p>
             </div>
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-sm font-bold text-white">For non-coders</h3>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-sm font-bold text-[#0d2447]">For non-coders</h3>
               <BulletList items={[
                 "Excel or Google Sheets — can load JSON with a bit of setup",
                 "Power Query in Excel — imports JSON natively",
                 "Postman — visual tool for testing API requests (free)",
                 "Zapier or Make — no-code automation platforms",
               ]} />
-              <p className="mt-3 text-xs text-slate-500">Good for: spreadsheet users who want structured data without writing code.</p>
+              <p className="mt-3 text-xs text-[#557099]">Good for: spreadsheet users who want structured data without writing code.</p>
             </div>
           </div>
         </Section>
 
         {/* ── 9. How to analyse ── */}
         <Section id="analysis" eyebrow="Chapter 9" title="How to analyse the data — practical examples">
-          <p className="text-sm leading-7 text-muted-foreground">
+          <p className="text-sm leading-7 text-[#27476f]">
             Once you have JSON files on your computer, here are the most common things
             new subscribers want to do with them.
           </p>
 
           <div className="mt-5 grid gap-5">
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-base font-semibold text-white mb-3">Read the regime label and confidence from a file</h3>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-base font-semibold text-[#0d2447] mb-3">Read the regime label and confidence from a file</h3>
               <CodeBlock>{`import json
 
 with open("meta_bitcoin_latest.json") as f:
@@ -607,8 +607,8 @@ date = data["date"]                       # e.g. "2026-04-13"
 print(f"{date}: {label} (confidence: {confidence:.2f})")`}</CodeBlock>
             </div>
 
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-base font-semibold text-white mb-3">Load a 90-day history file into a table (pandas)</h3>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-base font-semibold text-[#0d2447] mb-3">Load a 90-day history file into a table (pandas)</h3>
               <CodeBlock>{`import json
 import pandas as pd
 
@@ -632,8 +632,8 @@ print(df.tail(10))  # show last 10 rows
 print(df["label"].value_counts())  # how many days each label appeared`}</CodeBlock>
             </div>
 
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-base font-semibold text-white mb-3">Compare all four chains (Pro) — build a daily summary table</h3>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-base font-semibold text-[#0d2447] mb-3">Compare all four chains (Pro) — build a daily summary table</h3>
               <CodeBlock>{`import requests, pandas as pd
 
 API_KEY = "YOUR_KEY_HERE"
@@ -654,8 +654,8 @@ df = pd.DataFrame(rows)
 print(df.to_string(index=False))`}</CodeBlock>
             </div>
 
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-base font-semibold text-white mb-3">Load into Excel — no code required</h3>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-base font-semibold text-[#0d2447] mb-3">Load into Excel — no code required</h3>
               <BulletList items={[
                 "Open Excel → Data tab → Get Data → From File → From JSON",
                 "Select your .json file",
@@ -663,7 +663,7 @@ print(df.to_string(index=False))`}</CodeBlock>
                 "Click Load — you get a table with one row per day",
                 "Refresh tomorrow: Data → Refresh All",
               ]} />
-              <p className="mt-3 text-xs text-slate-400">
+              <p className="mt-3 text-xs text-[#557099]">
                 This works best with the window files (90d, 365d) because they contain
                 an array of daily records. The latest.json file contains only one day.
               </p>
@@ -674,13 +674,13 @@ print(df.to_string(index=False))`}</CodeBlock>
         {/* ── 10. Automation ── */}
         <Section id="automation" eyebrow="Chapter 10" title="How to automate daily fetching">
           <Callout>
-            <span className="font-semibold text-white">Do not automate until the manual version works.</span>{" "}
+            <span className="font-semibold text-[#0d2447]">Do not automate until the manual version works.</span>{" "}
             First: fetch one file manually. Then: fetch it in a script. Then: schedule that script.
           </Callout>
 
           <div className="mt-5">
-            <h3 className="text-base font-semibold text-white mb-3">The recommended beginner automation pattern</h3>
-            <p className="text-sm leading-7 text-muted-foreground mb-4">
+            <h3 className="text-base font-semibold text-[#0d2447] mb-3">The recommended beginner automation pattern</h3>
+            <p className="text-sm leading-7 text-[#27476f] mb-4">
               Instead of fetching blindly every day, the script checks the public status endpoint
               first. If the published date has changed since the last fetch, it downloads the new
               file. This avoids unnecessary requests and makes logs easy to read.
@@ -742,7 +742,7 @@ if __name__ == "__main__":
           </div>
 
           <div className="mt-5">
-            <h3 className="text-base font-semibold text-white mb-3">Set your API key as an environment variable</h3>
+            <h3 className="text-base font-semibold text-[#0d2447] mb-3">Set your API key as an environment variable</h3>
             <div className="grid gap-3 lg:grid-cols-2">
               <CodeBlock label="Windows (Command Prompt)">{`set URD_ATLAS_API_KEY=your_key_here
 python fetch_urdatlas.py`}</CodeBlock>
@@ -752,8 +752,8 @@ python3 fetch_urdatlas.py`}</CodeBlock>
           </div>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-sm font-bold text-white mb-3">Schedule on Windows — Task Scheduler</h3>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-sm font-bold text-[#0d2447] mb-3">Schedule on Windows — Task Scheduler</h3>
               <BulletList items={[
                 "Press Windows key → search Task Scheduler → Open it",
                 "Click Create Basic Task in the right panel",
@@ -765,12 +765,12 @@ python3 fetch_urdatlas.py`}</CodeBlock>
                 "Finish — the task runs automatically every day",
               ]} />
             </div>
-            <div className="rounded-2xl border bg-white/[0.02] p-5">
-              <h3 className="text-sm font-bold text-white mb-3">Schedule on Mac / Linux — cron</h3>
-              <p className="text-xs text-slate-400 mb-3">Open Terminal and type <InlineCode>crontab -e</InlineCode>, then add:</p>
+            <div className="rounded-2xl border bg-[#eef6ff] p-5">
+              <h3 className="text-sm font-bold text-[#0d2447] mb-3">Schedule on Mac / Linux — cron</h3>
+              <p className="text-xs text-[#557099] mb-3">Open Terminal and type <InlineCode>crontab -e</InlineCode>, then add:</p>
               <CodeBlock>{`# Run every day at 14:00 and 18:00 (catches most publication windows)
 0 14,18 * * * URD_ATLAS_API_KEY=your_key /usr/bin/python3 /home/you/fetch_urdatlas.py >> /home/you/urdatlas.log 2>&1`}</CodeBlock>
-              <p className="mt-3 text-xs text-slate-400">
+              <p className="mt-3 text-xs text-[#557099]">
                 Save and exit. Cron runs the script automatically. Check the log file to
                 see what happened.
               </p>
@@ -787,7 +787,7 @@ python3 fetch_urdatlas.py`}</CodeBlock>
             </QA>
             <QA question="What time does the new data arrive?">
               The pipeline runs twice daily at approximately 09:00 and 21:00 Europe/Oslo. Check{" "}
-              <Link href="/status" className="text-cyan-200 underline">/status</Link>{" "}
+              <Link href="/status" className="text-blue-700 underline">/status</Link>{" "}
               to see the latest published date. When the date changes, new files are available.
             </QA>
             <QA question="Do I get notified when new data is available?">
@@ -839,9 +839,9 @@ python3 fetch_urdatlas.py`}</CodeBlock>
               { href: "/methodology", title: "4. Methodology", desc: "How the regime classification works — baselines, persistence filter, confidence gate." },
             ].map(item => (
               <Link key={item.href} href={item.href}
-                className="rounded-2xl border bg-white/[0.02] p-4 transition hover:border-cyan-500/30 hover:bg-white/[0.04]">
-                <div className="text-base font-semibold text-white">{item.title}</div>
-                <div className="mt-2 text-sm leading-6 text-muted-foreground">{item.desc}</div>
+                className="rounded-2xl border bg-[#eef6ff] p-4 transition hover:border-cyan-500/30 hover:bg-white/[0.04]">
+                <div className="text-base font-semibold text-[#0d2447]">{item.title}</div>
+                <div className="mt-2 text-sm leading-6 text-[#27476f]">{item.desc}</div>
               </Link>
             ))}
           </div>

@@ -1,14 +1,16 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
-import { MethodologyHeader, MethodologyNav, Section, WarningCallout, InlineCode } from "../_components";
+import { MethodologyHeader, MethodologyNav, Section, WarningCallout, InlineCode, MethodologyContent, MethodologyPageShell } from "../_components";
 
 export default function MethodologyBoundariesPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <MethodologyPageShell>
       <MethodologyHeader
         title="Limitations & Boundaries"
         description="This page separates disclosure boundaries from analytical interpretation boundaries, so customers can see both what the public trust layer does not reveal and what the product should not be used to infer."
       />
-      <MethodologyNav />
+
+      <MethodologyContent>
+        <MethodologyNav />
       <ShortFullContent
         pageKey="methodology-boundaries"
         summary={<>This page defines what Urd Atlas discloses publicly, what remains private, and why that boundary exists.</>}
@@ -21,7 +23,7 @@ export default function MethodologyBoundariesPage() {
         fullContent={
           <div className="grid gap-6">
         <Section title="What the public methodology discloses">
-          <ul className="list-disc pl-5 text-sm leading-7 text-slate-300">
+          <ul className="list-disc pl-5 text-sm leading-7 text-[#27476f]">
             <li>Field meaning and artifact ownership</li>
             <li>Interpretation of confidence, scorecard, regime, and freshness</li>
             <li>Publicly relevant thresholds and gates</li>
@@ -30,7 +32,7 @@ export default function MethodologyBoundariesPage() {
         </Section>
 
         <Section title="What the public methodology does not disclose">
-          <ul className="list-disc pl-5 text-sm leading-7 text-slate-300">
+          <ul className="list-disc pl-5 text-sm leading-7 text-[#27476f]">
             <li>Exact upstream AWS schemas or join logic</li>
             <li>Intermediate feature tables and ingestion repair rules</li>
             <li>Enough implementation detail to reconstruct raw source rows</li>
@@ -39,7 +41,7 @@ export default function MethodologyBoundariesPage() {
         </Section>
 
         <Section title="Analytical interpretation boundaries">
-          <ul className="list-disc pl-5 text-sm leading-7 text-slate-300">
+          <ul className="list-disc pl-5 text-sm leading-7 text-[#27476f]">
             <li>
               Labels and scores are chain-relative. A <InlineCode>CONGESTED</InlineCode> label on
               Arbitrum says nothing by itself about Ethereum.
@@ -81,6 +83,7 @@ export default function MethodologyBoundariesPage() {
           </div>
         }
       />
-    </main>
+      </MethodologyContent>
+    </MethodologyPageShell>
   );
 }

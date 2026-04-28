@@ -42,19 +42,19 @@ function SliderRow(props: SliderRowProps) {
   }
 
   return (
-    <div className="rounded-xl border p-4">
+    <div className="rounded-2xl border border-[#9db8d4] bg-[#dcecf9] p-4 text-[#0a1d3a] shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium text-foreground">{label}</div>
-          <div className="mt-1 text-xs leading-5 text-muted-foreground">{description}</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-[#061b3a]">{label}</div>
+          <div className="mt-2 text-xs leading-5 text-[#173b66]">{description}</div>
         </div>
 
-        <div className="rounded-full border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+        <div className="rounded-full border border-[#0d2447] bg-[#0d2447] px-3 py-1 text-xs font-semibold text-white shadow-sm">
           {value}
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-5">
         <input
           type="range"
           min={min}
@@ -63,12 +63,12 @@ function SliderRow(props: SliderRowProps) {
           value={value}
           disabled={disabled}
           onChange={handleChange}
-          className="w-full accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full accent-[#0d2447] disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={label}
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+      <div className="mt-2 flex items-center justify-between text-[11px] font-medium text-[#173b66]">
         <span>{min}</span>
         <span>{max}</span>
       </div>
@@ -93,26 +93,26 @@ export default function ThresholdControls(props: ThresholdControlsProps) {
   return (
     <section
       className={[
-        "rounded-2xl border p-6",
+        "rounded-3xl border border-[#9db8d4] bg-[#e7f1fb] p-6 text-[#0a1d3a] shadow-sm",
         className ?? "",
       ].join(" ")}
       aria-label="Threshold controls"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Threshold controls</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h2 className="text-lg font-semibold text-[#061b3a]">Threshold controls</h2>
+          <p className="mt-1 text-sm leading-6 text-[#27476f]">
             Interactive threshold inputs for future custom-threshold workflows. These controls are
             descriptive UI only until explicitly wired into a custom-output flow.
           </p>
         </div>
 
         {disabled ? (
-          <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-amber-300">
+          <span className="inline-flex items-center rounded-full border border-amber-500 bg-amber-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-amber-900">
             Display only
           </span>
         ) : (
-          <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-emerald-300">
+          <span className="inline-flex items-center rounded-full border border-emerald-500 bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-900">
             Interactive
           </span>
         )}
@@ -230,7 +230,7 @@ export default function ThresholdControls(props: ThresholdControlsProps) {
         />
       </div>
 
-      <div className="mt-6 rounded-xl border bg-muted/20 p-4 text-xs text-muted-foreground">
+      <div className="mt-6 rounded-2xl border border-[#9db8d4] bg-[#eef6ff] p-4 text-xs leading-5 text-[#27476f]">
         Governance note: these controls do not overwrite canonical published outputs and must remain
         clearly separated from the default public regime layer.
       </div>

@@ -1,15 +1,16 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
-import { InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable } from "../_components";
+import { InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable, MethodologyContent, MethodologyPageShell } from "../_components";
 
 export default async function MethodologyFreshnessPage() {
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <MethodologyPageShell>
       <MethodologyHeader
         title="Publication Freshness Policy"
         description="Expected publication lag by chain, soft-warning and hard-fail boundaries, and how freshness should be interpreted alongside confidence."
       />
 
-      <MethodologyNav />
+      <MethodologyContent>
+        <MethodologyNav />
 
       <ShortFullContent
         pageKey="methodology-freshness"
@@ -55,6 +56,7 @@ export default async function MethodologyFreshnessPage() {
           </div>
         }
       />
-    </main>
+      </MethodologyContent>
+    </MethodologyPageShell>
   );
 }

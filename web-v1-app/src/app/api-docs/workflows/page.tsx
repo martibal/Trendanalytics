@@ -6,6 +6,7 @@ import {
   UrdInlineCode,
   UrdPage,
   UrdSection,
+  UrdButtonLink,
 } from "@/components/site/UrdDesignSystem";
 
 function Code({ children }: { children: string }) {
@@ -20,7 +21,11 @@ export default function WorkflowsPage() {
         title="Common research workflows"
         highlight="from sample artifacts to analysis"
         summary="One concrete path from sample artifacts to useful analysis. Use this page together with the sample pack and schema reference to get to a first useful notebook quickly."
-      />
+      >
+        <UrdButtonLink href="/api-docs" className="border-white/15 bg-white/8 text-white hover:bg-white/12 hover:text-white">
+          ← Back to API Docs
+        </UrdButtonLink>
+      </PageHero>
       <UrdContainer>
         <ShortFullContent
           pageKey="api-workflows"

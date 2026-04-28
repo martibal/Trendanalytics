@@ -9,7 +9,8 @@ import ThresholdControlsClient from "@/components/thresholds/ThresholdControlsCl
 import ShortFullContent from "@/components/site/ShortFullContent";
 
 import PageHero from "@/components/site/PageHero";
-import { UrdContainer, UrdPage } from "@/components/site/UrdDesignSystem";
+import { UrdContainer, UrdPage, urd, cx } from "@/components/site/UrdDesignSystem";
+import { UrdHashModal, UrdHashModalClose, UrdHashModalTrigger } from "@/components/site/UrdHashModal";
 
 import "server-only";
 
@@ -34,32 +35,12 @@ const CANONICAL_DEFAULTS: ThresholdControlValues = {
 // Shared UI primitives — identical across all pages
 // ---------------------------------------------------------------------------
 
-function ModalStyles() {
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: `
-          .ta-modal { display: none; }
-          .ta-modal:target { display: flex; }
-        `,
-      }}
-    />
-  );
-}
-
 function InlineCode({ children }: { children: ReactNode }) {
   return <code className="rounded border border-[#9db8d4] bg-[#f4f9ff] px-1 py-0.5 text-[#0d2447] text-xs font-mono">{children}</code>;
 }
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
-  return (
-    <a
-      href={`#${id}`}
-      className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-black text-[#0d2447] hover:bg-white hover:text-blue-800"
-    >
-      {label}
-    </a>
-  );
+  return <UrdHashModalTrigger id={id}>{label}</UrdHashModalTrigger>;
 }
 
 type ExplainPair = { basic: ReactNode; advanced: ReactNode; traceability?: ReactNode };
@@ -78,54 +59,40 @@ function ExplainModal({
   traceability?: ReactNode;
 }) {
   return (
-    <div id={id} className="ta-modal fixed inset-0 z-[80] items-center justify-center p-4">
-      <a
-        href="#"
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-        aria-label="Close dialog"
-      />
-      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] shadow-2xl shadow-slate-950/30">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#c9d9ea] px-6 py-5">
+    <UrdHashModal id={id}>
+      <UrdHashModalClose className={urd.modalBackdrop} ariaLabel="Close dialog">
+        <span className="sr-only">Close dialog</span>
+      </UrdHashModalClose>
+      <div className={urd.modalPanel}>
+        <div className={urd.modalHeader}>
           <div>
-            <h3 className="text-2xl font-semibold text-[#0d2447]">{title}</h3>
+            <h3 className="text-2xl font-black text-[#0d2447]">{title}</h3>
             {subtitle ? (
-              <div className="mt-2 text-sm leading-6 text-[#27476f]">{subtitle}</div>
+              <div className="mt-2 text-sm font-semibold leading-6 text-[#27476f]">{subtitle}</div>
             ) : null}
           </div>
-          <a
-            href="#"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] text-xl text-[#0d2447] hover:bg-white"
-            aria-label="Close dialog"
-          >
-            ×
-          </a>
+          <UrdHashModalClose className={urd.modalClose}>×</UrdHashModalClose>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <section className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-emerald-200">
-                Basic
-              </div>
-              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.basic}</div>
+          <div className={urd.modalGrid}>
+            <section className={urd.modalBasicPanel}>
+              <div className={cx(urd.modalKicker, "text-emerald-800")}>Basic</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.basic}</div>
             </section>
-            <details className="rounded-2xl border border-[#9db8d4] bg-cyan-500/5 p-5" open>
-              <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-                Advanced
-              </summary>
-              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.advanced}</div>
+            <details className={urd.modalAdvancedPanel} open>
+              <summary className={cx(urd.modalKicker, "cursor-pointer list-none")}>Advanced</summary>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{pair.advanced}</div>
             </details>
           </div>
           {traceability ? (
-            <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#27476f]">
-                Traceability
-              </div>
-              <div className="mt-3 text-sm leading-7 text-[#0d2447]">{traceability}</div>
+            <div className="mt-4 rounded-2xl border border-[#9db8d4] bg-[#f4f9ff] p-5">
+              <div className={urd.modalKicker}>Traceability</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[#0d2447]">{traceability}</div>
             </div>
           ) : null}
         </div>
       </div>
-    </div>
+    </UrdHashModal>
   );
 }
 
@@ -506,7 +473,7 @@ export default async function ThresholdsPage() {
       />
 
       <UrdContainer className="py-10">
-      <ModalStyles />
+      
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <section className="mb-10 rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
@@ -562,13 +529,13 @@ export default async function ThresholdsPage() {
           </div>
 
           {/* Reading map */}
-          <div className="mt-6 rounded-2xl border border-[#c9d9ea] bg-white/3 p-4">
+          <div className="mt-6 rounded-2xl border border-[#c9d9ea] bg-[#d9eafb] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
                   How to read this page
                 </div>
-                <div className="mt-2 text-sm text-slate-100">
+                <div className="mt-2 text-sm text-[#0d2447]">
                   Canonical values → Confidence gate → Band thresholds → Regime rules → Simulator
                 </div>
               </div>

@@ -1,23 +1,16 @@
 import ShortFullContent from "@/components/site/ShortFullContent";
-import {
-  Callout,
-  InlineCode,
-  MethodologyHeader,
-  MethodologyNav,
-  Section,
-  SimpleTable,
-  WarningCallout,
-} from "../_components";
+import { Callout, InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable, WarningCallout, MethodologyContent, MethodologyPageShell } from "../_components";
 
 export default function MethodologyFieldsPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <MethodologyPageShell>
       <MethodologyHeader
         title="Field Dictionary"
         description="This page defines the public meaning of the main published fields and the interpretation warnings that matter most for technical users."
       />
 
-      <MethodologyNav />
+      <MethodologyContent>
+        <MethodologyNav />
 
       <ShortFullContent
         pageKey="methodology-fields"
@@ -240,6 +233,7 @@ export default function MethodologyFieldsPage() {
           </div>
         }
       />
-    </main>
+      </MethodologyContent>
+    </MethodologyPageShell>
   );
 }

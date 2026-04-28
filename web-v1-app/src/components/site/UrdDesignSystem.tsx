@@ -11,11 +11,26 @@ export const urd = {
     textStrong: "#0d2447",
     textBody: "#27476f",
     textMuted: "#557099",
-    border: "#c9d9ea",
-    borderStrong: "#9db8d4",
+    border: "#9db8d4",
+    borderStrong: "#557099",
     surface: "#eaf3fb",
-    surfaceSoft: "#e7f1fb",
-    surfaceRaised: "#eef6ff",
+    surfaceSoft: "#d9eafb",
+    surfaceRaised: "#f4f9ff",
+    panel: "#dbeafa",
+    panelStrong: "#cfe2f5",
+    ink: "#0a1d3a",
+    inkStrong: "#0d2447",
+    inkBody: "#27476f",
+    link: "#0b58ca",
+    chipBg: "#dceaf8",
+    infoPanel: "#d9eafb",
+    infoPanelStrong: "#cfe2f5",
+    chartPanel: "#d9eafb",
+    chartPlot: "#f4f9ff",
+    chartGrid: "#7fa3ca",
+    chartRaw: "#b45309",
+    chartMA7: "#0046c7",
+    chartMA30: "#031329",
   },
 
   page: "min-h-screen bg-[#edf6ff] text-[#0a1d3a]",
@@ -33,30 +48,30 @@ export const urd = {
     "mt-8 max-w-3xl text-xl font-black leading-9 text-white",
 
   section:
-    "rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
+    "rounded-3xl border border-[#9db8d4] bg-[#dbeafa] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
   sectionTitle: "text-2xl font-black tracking-[-0.03em] text-[#0d2447]",
   sectionBody: "mt-4 text-sm font-medium leading-7 text-[#27476f]",
 
-  nav: "mb-8 overflow-x-auto rounded-2xl border border-[#c9d9ea] bg-[#e7f1fb] p-3",
+  nav: "mb-8 overflow-x-auto rounded-2xl border border-[#9db8d4] bg-[#d9eafb] p-3",
   navInner: "flex min-w-max flex-wrap gap-2",
   navItem:
-    "rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1.5 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+    "rounded-full border border-[#7fa3ca] bg-[#f4f9ff] px-3 py-1.5 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
 
   button:
-    "inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+    "inline-flex items-center rounded-full border border-[#7fa3ca] bg-[#f4f9ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
 
   code:
     "rounded border border-[#9db8d4] bg-[#f4f9ff] px-1.5 py-0.5 font-mono text-xs font-bold text-[#0d2447]",
 
-  tableWrap: "mt-5 overflow-x-auto rounded-2xl border border-[#b6cce3]",
+  tableWrap: "mt-5 overflow-x-auto rounded-2xl border border-[#7fa3ca]",
   table: "w-full text-sm",
-  tableHead: "bg-[#dceaf8]",
+  tableHead: "bg-[#cfe2f5]",
   tableTh:
     "px-4 py-3 text-left text-xs font-black uppercase tracking-[0.12em] text-[#203c63]",
-  tableBody: "divide-y divide-[#b6cce3] bg-[#eaf3fb]",
-  tableTd: "px-4 py-3 text-[#27476f]",
+  tableBody: "divide-y divide-[#9db8d4] bg-[#f4f9ff]",
+  tableTd: "px-4 py-3 font-medium text-[#27476f]",
 
-  callout: "rounded-2xl border border-blue-300 bg-[#e7f1fb] p-5",
+  callout: "rounded-2xl border border-[#7fa3ca] bg-[#d9eafb] p-5",
   calloutTitle: "text-sm font-black text-blue-700",
   calloutBody: "mt-3 text-sm font-semibold leading-7 text-[#0d2447]",
 
@@ -64,12 +79,47 @@ export const urd = {
   warningTitle: "text-sm font-black text-amber-700",
 
   modalPanel:
-    "relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] shadow-2xl shadow-slate-950/30",
+    "relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#7fa3ca] bg-[#d9eafb] text-[#0a1d3a] shadow-2xl shadow-slate-950/30",
+
+  card:
+    "rounded-3xl border border-[#9db8d4] bg-[#dbeafa] text-[#0a1d3a] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
+  cardPadded:
+    "rounded-3xl border border-[#9db8d4] bg-[#dbeafa] p-6 text-[#0a1d3a] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
+  subtlePanel:
+    "rounded-2xl border border-[#9db8d4] bg-[#f4f9ff] text-[#0a1d3a]",
+  darkOnLightText: "text-[#0a1d3a]",
+  darkOnLightBody: "text-[#27476f]",
+  darkOnLightMuted: "text-[#557099]",
+  lightButton:
+    "inline-flex items-center rounded-full border border-[#7fa3ca] bg-[#f4f9ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+  chartCard:
+    "rounded-2xl border border-[#9db8d4] bg-[#cfe2f5] p-5 text-[#0a1d3a] shadow-sm",
+  chartPanel:
+    "rounded-xl border border-[#7fa3ca] bg-[#f4f9ff] text-[#0a1d3a]",
+
+  modalBackdrop:
+    "absolute inset-0 bg-slate-950/80 backdrop-blur-sm",
+  modalHeader:
+    "flex shrink-0 items-start justify-between gap-4 border-b border-[#9db8d4] px-6 py-5",
+  modalClose:
+    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#9db8d4] bg-[#f4f9ff] text-xl text-[#0d2447] hover:bg-white",
+  modalGrid:
+    "grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
+  modalBasicPanel:
+    "rounded-2xl border border-emerald-400 bg-emerald-50 p-5 text-[#0a1d3a]",
+  modalAdvancedPanel:
+    "rounded-2xl border border-[#7fa3ca] bg-[#f4f9ff] p-5 text-[#0a1d3a]",
+  modalKicker:
+    "text-xs font-black uppercase tracking-[0.14em] text-blue-700",
+  infoPanel:
+    "rounded-2xl border border-[#9db8d4] bg-[#d9eafb] p-4 text-[#0a1d3a]",
+  infoPanelStrong:
+    "rounded-2xl border border-[#7fa3ca] bg-[#cfe2f5] p-4 text-[#0a1d3a]",
 
   topHeader:
     "absolute inset-x-0 top-0 z-[80] bg-transparent text-white",
   topHeaderShell:
-    "relative mx-auto flex h-[98px] w-full max-w-[1180px] items-end justify-between gap-7 px-5 pb-6 pt-11 sm:px-7 lg:px-8",
+    "relative mx-auto flex h-[112px] w-full max-w-[1220px] items-end justify-between gap-8 px-6 pb-8 pt-12 sm:px-8 lg:px-10",
   topHeaderBrand:
     "inline-flex min-w-0 items-center text-white transition hover:opacity-90",
   brandText:
@@ -113,8 +163,8 @@ export function UrdBrand({
   compact?: boolean;
   className?: string;
 }) {
-  const textSize = compact ? "text-[23px]" : "text-[23px]";
-  const logoSize = compact ? "h-9 w-9" : "h-9 w-9";
+  const textSize = compact ? "text-[25px]" : "text-[25px]";
+  const logoSize = compact ? "h-10 w-10" : "h-10 w-10";
 
   return (
     <span className={cx("relative inline-flex min-w-0 items-center gap-3 pr-3", className)}>
@@ -239,6 +289,32 @@ export function UrdSection({
         {children}
       </div>
     </section>
+  );
+}
+
+export function UrdCard({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cx(urd.cardPadded, className)}>{children}</div>;
+}
+
+export function UrdMoreLink({
+  href,
+  children = "More",
+  className,
+}: {
+  href: string;
+  children?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Link href={href} className={cx(urd.lightButton, className)}>
+      {children}
+    </Link>
   );
 }
 

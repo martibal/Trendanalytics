@@ -129,7 +129,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
       <div className={urd.topHeaderShell}>
         <UrdBrandLink compact onClick={closeMenus} />
 
-        <nav aria-label="Primary" className="hidden items-center gap-8 md:flex">
+        <nav aria-label="Primary" className="hidden items-center gap-9 md:flex">
           {HOME_ITEMS.map((item) => {
             if (item.href === "/chains") {
               return (
@@ -139,7 +139,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
                     aria-haspopup="menu"
                     aria-expanded={chainsOpen}
                     onClick={() => setChainsOpen((prev) => !prev)}
-                    className="inline-flex items-center text-[12px] font-extrabold text-white/90 transition hover:text-white"
+                    className="inline-flex items-center text-[13px] font-extrabold text-white/90 transition hover:text-white"
                   >
                     Chains
                     <span className="ml-1.5 text-[10px] text-white/55">▾</span>
@@ -180,7 +180,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
                 key={item.href}
                 href={item.href}
                 onClick={closeMenus}
-                className="text-[12px] font-extrabold text-white/90 transition hover:text-white"
+                className="text-[13px] font-extrabold text-white/90 transition hover:text-white"
               >
                 {item.label}
               </Link>
@@ -195,13 +195,13 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
             <>
               <Link
                 href="/dashboard"
-                className="inline-flex h-10 items-center rounded-[8px] bg-blue-600 px-5 text-[12px] font-extrabold text-white shadow-[0_12px_26px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
+                className="inline-flex h-11 items-center rounded-[10px] bg-blue-600 px-6 text-[13px] font-extrabold text-white shadow-[0_12px_26px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
               >
                 Dashboard
               </Link>
               <Link
                 href="/sign-in"
-                className="inline-flex h-10 items-center rounded-[8px] border border-white/12 bg-white/[0.04] px-5 text-[12px] font-extrabold text-white transition hover:bg-white/[0.08]"
+                className="inline-flex h-11 items-center rounded-[10px] border border-white/12 bg-white/[0.04] px-6 text-[13px] font-extrabold text-white transition hover:bg-white/[0.08]"
               >
                 Log in
               </Link>
