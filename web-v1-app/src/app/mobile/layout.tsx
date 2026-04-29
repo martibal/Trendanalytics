@@ -24,7 +24,7 @@ export const viewport: Viewport = {
 
 export default function MobileLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="mobile-shell min-h-screen bg-[#0A0E1A] text-white">
+    <div className="mobile-shell min-h-screen bg-[#edf6ff] text-[#0a1d3a]">
       {children}
       <PwaRegister />
     </div>
