@@ -12,7 +12,7 @@ import ChainIcon from "@/components/ChainIcon";
 import ShortFullContent from "@/components/site/ShortFullContent";
 
 import PageHero from "@/components/site/PageHero";
-import { UrdContainer, UrdPage, urd, cx } from "@/components/site/UrdDesignSystem";
+import { UrdContainer, UrdPage, cx } from "@/components/site/UrdDesignSystem";
 import { UrdHashModal, UrdHashModalClose, UrdHashModalTrigger } from "@/components/site/UrdHashModal";
 
 import "server-only";
@@ -96,31 +96,31 @@ function ExplainModal({
 }) {
   return (
     <UrdHashModal id={id}>
-      <UrdHashModalClose className={urd.modalBackdrop} ariaLabel="Close dialog">
+      <UrdHashModalClose className={"fixed inset-0 z-40 bg-[#031329]/55 backdrop-blur-sm"} ariaLabel="Close dialog">
         <span className="sr-only">Close dialog</span>
       </UrdHashModalClose>
-      <div className={urd.modalPanel}>
-        <div className={urd.modalHeader}>
+      <div className={"fixed left-1/2 top-1/2 z-50 flex max-h-[86vh] w-[min(92vw,980px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-[#9db8d4] bg-[#e1eefb] text-[#0a1d3a] shadow-[0_30px_90px_rgba(3,19,41,0.35)]"}>
+        <div className={"flex items-start justify-between gap-6 border-b border-[#9db8d4] bg-[#d5e8f8] px-6 py-5"}>
           <div>
             <h3 className="text-2xl font-black text-[var(--urd-text-strong)]">{title}</h3>
             {subtitle ? <div className="mt-2 text-sm font-semibold leading-6 text-[var(--urd-text-body)]">{subtitle}</div> : null}
           </div>
-          <UrdHashModalClose className={urd.modalClose}>×</UrdHashModalClose>
+          <UrdHashModalClose className={"inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#9db8d4] bg-[#eef6ff] text-xl font-semibold text-[#0a1d3a] shadow-sm transition hover:bg-white"}>×</UrdHashModalClose>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
-          <div className={urd.modalGrid}>
-            <section className={urd.modalBasicPanel}>
-              <div className={cx(urd.modalKicker, "text-emerald-800")}>Basic</div>
+          <div className={"grid gap-4 md:grid-cols-2"}>
+            <section className={"rounded-2xl border border-[#9db8d4] bg-[#eef6ff] p-4 text-[#0a1d3a] shadow-sm"}>
+              <div className={cx("text-xs font-semibold uppercase tracking-[0.16em] text-[#0d2447]", "text-emerald-800")}>Basic</div>
               <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.basic}</div>
             </section>
-            <details className={urd.modalAdvancedPanel} open>
-              <summary className={cx(urd.modalKicker, "cursor-pointer list-none")}>Advanced</summary>
+            <details className={"rounded-2xl border border-[#9db8d4] bg-[#dcecf8] p-4 text-[#0a1d3a] shadow-sm"} open>
+              <summary className={cx("text-xs font-semibold uppercase tracking-[0.16em] text-[#0d2447]", "cursor-pointer list-none")}>Advanced</summary>
               <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.advanced}</div>
             </details>
           </div>
           {pair.traceability ? (
             <div className="mt-4 rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-raised)] p-5">
-              <div className={urd.modalKicker}>Traceability</div>
+              <div className={"text-xs font-semibold uppercase tracking-[0.16em] text-[#0d2447]"}>Traceability</div>
               <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.traceability}</div>
             </div>
           ) : null}

@@ -2,7 +2,6 @@ import React, { type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
-import { cx, urd } from "@/components/site/UrdDesignSystem";
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { computeHistoryDepthDays } from "@/lib/historyDepth";
@@ -16,6 +15,7 @@ import {
   type SurfaceRowDisplay,
 } from "@/lib/landingSurface";
 import { readStorageObject } from "@/lib/storage";
+import { cx, urd } from "@/components/site/UrdDesignSystem";
 
 import "server-only";
 
@@ -1466,6 +1466,100 @@ function JsonLayerCard(props: {
   );
 }
 
+function JsonExamplePickerModal() {
+  const layers: Array<{
+    tone: JsonLayerTone;
+    title: string;
+    description: string;
+  }> = [
+    {
+      tone: "gold",
+      title: "Gold",
+      description: "Daily observation data for the selected chain and date.",
+    },
+    {
+      tone: "meta",
+      title: "Meta",
+      description: "Regime label, confidence, freshness, and driver context.",
+    },
+    {
+      tone: "derived",
+      title: "Derived",
+      description: "Rolling baselines and trend context built from Gold.",
+    },
+  ];
+
+  return (
+    <div
+      id="json-example-picker"
+      className="fixed inset-0 z-[100] hidden items-center justify-center bg-[#020817]/82 px-5 py-8 backdrop-blur-sm [&:target]:flex"
+    >
+      <a href="#" className="absolute inset-0" aria-label="Close JSON example picker" />
+
+      <section className="relative w-full max-w-[1040px] rounded-[26px] border border-white/12 bg-[#061426] p-6 text-white shadow-[0_32px_120px_rgba(0,0,0,0.56)] sm:p-8">
+        <div className="flex items-start justify-between gap-5">
+          <div>
+            <div className="inline-flex rounded-full border border-cyan-300/35 bg-cyan-300/10 px-4 py-1.5 text-[13px] font-black uppercase tracking-[0.14em] text-cyan-200">
+              Historical JSON examples
+            </div>
+            <h3 className="mt-5 max-w-[760px] text-[34px] font-black tracking-[-0.045em] text-white">
+              Inspect real Gold, Meta, and Derived files before you read the full page.
+            </h3>
+            <p className="mt-3 max-w-[760px] text-[15px] font-semibold leading-7 text-slate-300">
+              Choose a layer and then compare a high-confidence example with a low-confidence / degraded example.
+              These are read from the published JSON archive, not hardcoded demo snippets.
+            </p>
+          </div>
+
+          <a
+            href="#"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-white/12 px-4 text-[13px] font-black text-white transition hover:bg-white/8"
+          >
+            Close
+          </a>
+        </div>
+
+        <div className="mt-8 grid gap-4 lg:grid-cols-3">
+          {layers.map((layer) => {
+            const tone = jsonLayerToneClasses(layer.tone);
+
+            return (
+              <div key={layer.tone} className={`rounded-[20px] border p-5 ${tone.card}`}>
+                <div className={`inline-flex rounded-full border px-3 py-1 text-[12px] font-black ${tone.badge}`}>
+                  {layer.title}
+                </div>
+                <h4 className={`mt-4 text-[26px] font-black tracking-[-0.035em] ${tone.title}`}>
+                  {layer.title}
+                </h4>
+                <p className="mt-2 min-h-[54px] text-[14px] font-semibold leading-6 text-slate-300">
+                  {layer.description}
+                </p>
+
+                <div className="mt-5 grid gap-3">
+                  <a
+                    href={`#json-${layer.tone}-high`}
+                    className="inline-flex h-11 items-center justify-between rounded-full border border-cyan-300/35 bg-cyan-300/12 px-4 text-[13px] font-black text-cyan-100 transition hover:bg-cyan-300/18"
+                  >
+                    High confidence
+                    <span aria-hidden="true">→</span>
+                  </a>
+                  <a
+                    href={`#json-${layer.tone}-degraded`}
+                    className="inline-flex h-11 items-center justify-between rounded-full border border-amber-300/40 bg-amber-300/12 px-4 text-[13px] font-black text-amber-100 transition hover:bg-amber-300/18"
+                  >
+                    Low confidence / degraded
+                    <span aria-hidden="true">→</span>
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function JsonExampleModal(props: {
   tone: JsonLayerTone;
   confidence: JsonExampleConfidence;
@@ -1733,15 +1827,15 @@ export default async function HomePage() {
                 Daily Gold, Meta, and Derived JSON for BTC, ETH, ARB, and BASE. Regime context without maintaining your own pipeline
               </p>
             <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/status"
-                className="inline-flex h-14 min-w-[200px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
+              <a
+                href="#json-example-picker"
+                className="inline-flex h-14 min-w-[260px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
               >
-                Latest chain status
-              </Link>
+                View historical example JSONs
+              </a>
               <Link
                 href="/api-docs"
-                className="inline-flex h-14 min-w-[190px] items-center justify-center rounded-[8px] border border-blue-300/50 bg-[#051b36]/40 px-6 text-[14px] font-extrabold text-white transition hover:bg-white/[0.06]"
+                className="inline-flex h-14 min-w-[190px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
               >
                 View API Docs
               </Link>
@@ -1851,6 +1945,8 @@ export default async function HomePage() {
             </div>
           </div>
 
+          <JsonExamplePickerModal />
+
           <JsonExampleModal
             tone="gold"
             confidence="high"
@@ -1858,6 +1954,8 @@ export default async function HomePage() {
             subtitle="Gold is factual daily data. This example uses the date selected from the highest readable Meta confidence score."
             example={jsonExampleCodeMap.gold_high}
           />
+          <JsonExamplePickerModal />
+
           <JsonExampleModal
             tone="gold"
             confidence="degraded"
