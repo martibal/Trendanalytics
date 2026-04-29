@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
@@ -23,10 +22,10 @@ const CLERK_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 function navLinkClass(active: boolean) {
   return [
-    "inline-flex h-10 items-center whitespace-nowrap rounded-full px-4 text-sm font-extrabold transition-colors",
+    "inline-flex h-10 items-center rounded-full px-4 text-sm font-medium transition-colors whitespace-nowrap",
     active
-      ? "border border-cyan-300/35 bg-cyan-300/12 text-white"
-      : "text-white/88 hover:bg-white/[0.06] hover:text-white",
+      ? "border border-cyan-400/20 bg-cyan-400/10 text-white"
+      : "text-slate-300 hover:bg-white/[0.05] hover:text-white",
   ].join(" ");
 }
 
@@ -40,12 +39,12 @@ function AuthAwareActions({
   const { isLoaded, isSignedIn } = useAuth();
 
   const dashboardClass = mobile
-    ? "inline-flex items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-300/12 px-4 py-3 text-sm font-extrabold text-white"
-    : "inline-flex h-11 items-center whitespace-nowrap rounded-full border border-cyan-300/30 bg-cyan-300/12 px-6 text-sm font-extrabold text-white transition hover:bg-cyan-300/18";
+    ? "inline-flex items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-white"
+    : "inline-flex h-11 items-center justify-center whitespace-nowrap rounded-full border border-cyan-400/20 bg-cyan-400/10 px-6 text-sm font-semibold text-white transition hover:bg-cyan-400/16";
 
   const secondaryClass = mobile
-    ? "inline-flex items-center justify-center rounded-xl border border-white/14 bg-white/[0.04] px-4 py-3 text-sm font-extrabold text-white"
-    : "inline-flex h-11 items-center whitespace-nowrap rounded-full border border-white/14 bg-white/[0.04] px-6 text-sm font-extrabold text-white transition hover:bg-white/[0.08]";
+    ? "inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200"
+    : "inline-flex h-11 items-center justify-center whitespace-nowrap rounded-full border border-white/10 bg-white/[0.03] px-6 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06]";
 
   if (!isLoaded) {
     return <span className={secondaryClass}>Account</span>;
@@ -75,36 +74,6 @@ function AuthAwareActions({
         </button>
       </SignOutButton>
     </>
-  );
-}
-
-function Brand({ onClick }: { onClick: () => void }) {
-  return (
-    <Link
-      href="/"
-      onClick={onClick}
-      className="inline-flex min-w-0 shrink-0 items-center gap-2.5 text-white transition hover:opacity-90"
-      aria-label="Urd Atlas home"
-    >
-      <span className="inline-flex min-w-0 items-baseline">
-        <span className="text-[23px] font-black uppercase tracking-[-0.045em] text-white">
-          URD
-        </span>
-        <span className="ml-1.5 text-[23px] font-black uppercase tracking-[-0.045em] text-blue-400">
-          ATLAS
-        </span>
-      </span>
-      <span className="relative inline-flex h-8 w-8 shrink-0 opacity-65" aria-hidden="true">
-        <Image
-          src="/web-bilder/ygg-transparent.png"
-          alt=""
-          fill
-          sizes="32px"
-          className="object-contain"
-          priority
-        />
-      </span>
-    </Link>
   );
 }
 
@@ -144,82 +113,100 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
   }, []);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-[120] border-b border-white/10 bg-[#031329]/96 text-white shadow-[0_10px_32px_rgba(0,0,0,0.22)] backdrop-blur-md">
-      <div className="mx-auto flex min-h-[86px] w-full max-w-[1600px] items-center justify-between gap-5 px-5 py-5 sm:px-7 lg:px-8 2xl:px-10">
-        <div className="flex min-w-0 items-center gap-5 xl:gap-8">
-          <Brand onClick={closeMenus} />
+    <header className="sticky inset-x-0 top-0 z-[80] border-b border-white/10 bg-[#031329] text-white shadow-[0_12px_30px_rgba(3,19,41,0.18)]">
+      <div className="mx-auto flex h-[76px] w-full items-center gap-6 px-6 sm:px-8 xl:px-12 2xl:px-16">
+        <Link
+          href="/"
+          onClick={closeMenus}
+          className="inline-flex min-w-0 shrink-0 items-center gap-2 text-white transition hover:opacity-90"
+          aria-label="Urd Atlas home"
+        >
+          <span className="inline-flex items-baseline whitespace-nowrap">
+            <span className="text-[21px] font-black uppercase tracking-[-0.04em] text-white">
+              URD
+            </span>
+            <span className="ml-1.5 text-[21px] font-black uppercase tracking-[-0.04em] text-blue-400">
+              ATLAS
+            </span>
+          </span>
+          <img
+            src="/web-bilder/ygg-transparent.png"
+            alt=""
+            aria-hidden="true"
+            className="h-5 w-5 shrink-0 object-contain opacity-70"
+          />
+        </Link>
 
-          <nav aria-label="Primary" className="hidden items-center gap-1 xl:flex">
-            <div ref={chainsRef} className="relative">
-              <button
-                type="button"
-                aria-haspopup="menu"
-                aria-expanded={chainsOpen}
-                onClick={() => setChainsOpen((prev) => !prev)}
-                className={navLinkClass(Boolean(isChainsActive))}
+        <nav aria-label="Primary" className="hidden min-w-0 flex-1 items-center gap-1 xl:flex">
+          <div ref={chainsRef} className="relative">
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={chainsOpen}
+              onClick={() => setChainsOpen((prev) => !prev)}
+              className={navLinkClass(Boolean(isChainsActive))}
+            >
+              Chains
+              <span className="ml-2 text-xs text-slate-500">▾</span>
+            </button>
+
+            {chainsOpen ? (
+              <div
+                role="menu"
+                aria-label="Chains"
+                className="absolute left-0 top-12 min-w-[260px] rounded-2xl border border-white/10 bg-[#07111d]/96 p-2 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur-md"
               >
-                Chains
-                <span className="ml-2 text-xs text-white/55">▾</span>
-              </button>
-
-              {chainsOpen ? (
-                <div
-                  role="menu"
-                  aria-label="Chains"
-                  className="absolute left-0 top-12 z-[130] min-w-[260px] rounded-2xl border border-white/10 bg-[#07111d]/98 p-2 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur-md"
-                >
-                  <Link
-                    href="/chains"
-                    onClick={closeMenus}
-                    className="block rounded-xl px-3 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.05]"
-                  >
-                    All chains overview
-                  </Link>
-                  <div className="my-2 h-px bg-white/8" />
-                  {CHAIN_LIST.map((chain) => (
-                    <Link
-                      key={chain.id}
-                      href={`/chains/${chain.id}`}
-                      onClick={closeMenus}
-                      className="block rounded-xl px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white"
-                    >
-                      {chain.label} · {chain.name}
-                    </Link>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
-            {DESKTOP_ITEMS.map((item) => {
-              const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
-              return (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  href="/chains"
                   onClick={closeMenus}
-                  className={navLinkClass(Boolean(active))}
+                  className="block rounded-xl px-3 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                 >
-                  {item.label}
+                  All chains overview
                 </Link>
-              );
-            })}
-          </nav>
-        </div>
+                <div className="my-2 h-px bg-white/8" />
+                {CHAIN_LIST.map((chain) => (
+                  <Link
+                    key={chain.id}
+                    href={`/chains/${chain.id}`}
+                    onClick={closeMenus}
+                    className="block rounded-xl px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white"
+                  >
+                    {chain.label} · {chain.name}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </div>
 
-        <div className="hidden items-center gap-3 xl:ml-12 xl:flex 2xl:ml-20">
+          {DESKTOP_ITEMS.map((item) => {
+            const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={closeMenus}
+                className={navLinkClass(Boolean(active))}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="ml-auto hidden shrink-0 items-center gap-3 pl-10 xl:flex 2xl:pl-16">
           {CLERK_CONFIGURED ? (
             <AuthAwareActions />
           ) : (
             <>
               <Link
                 href="/dashboard"
-                className="inline-flex h-11 items-center whitespace-nowrap rounded-full border border-cyan-300/30 bg-cyan-300/12 px-6 text-sm font-extrabold text-white transition hover:bg-cyan-300/18"
+                className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-full border border-cyan-400/20 bg-cyan-400/10 px-6 text-sm font-semibold text-white transition hover:bg-cyan-400/16"
               >
                 Dashboard
               </Link>
               <Link
                 href="/sign-in"
-                className="inline-flex h-11 items-center whitespace-nowrap rounded-full border border-white/14 bg-white/[0.04] px-6 text-sm font-extrabold text-white transition hover:bg-white/[0.08]"
+                className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-full border border-white/10 bg-white/[0.03] px-6 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06]"
               >
                 Log in
               </Link>
@@ -232,7 +219,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
           aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((prev) => !prev)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/14 bg-white/[0.04] text-lg text-white transition hover:bg-white/[0.08] xl:hidden"
+          className="ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-lg text-white transition hover:bg-white/[0.06] xl:hidden"
         >
           {mobileOpen ? "✕" : "☰"}
         </button>
@@ -280,14 +267,14 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
                   <Link
                     href="/dashboard"
                     onClick={closeMenus}
-                    className="inline-flex items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-300/12 px-4 py-3 text-sm font-extrabold text-white"
+                    className="inline-flex items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-white"
                   >
                     Dashboard
                   </Link>
                   <Link
                     href="/sign-in"
                     onClick={closeMenus}
-                    className="inline-flex items-center justify-center rounded-xl border border-white/14 bg-white/[0.04] px-4 py-3 text-sm font-extrabold text-white"
+                    className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200"
                   >
                     Log in
                   </Link>
