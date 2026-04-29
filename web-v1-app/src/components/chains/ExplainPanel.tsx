@@ -16,13 +16,13 @@ type ExplainPanelProps = {
 function toneClasses(tone: ExplainPanelProps["tone"]) {
   switch (tone) {
     case "primary":
-      return "border-cyan-500/25 bg-cyan-500/5";
+      return "border-[#7fb2e6] bg-[#d5e8f7]";
     case "success":
-      return "border-emerald-500/25 bg-emerald-500/5";
+      return "border-emerald-300 bg-emerald-50";
     case "warning":
-      return "border-yellow-500/25 bg-yellow-500/5";
+      return "border-amber-300 bg-amber-50";
     default:
-      return "border-white/10 bg-white/[0.02]";
+      return "border-[#9db8d4] bg-[#dbeaf6]";
   }
 }
 
@@ -44,35 +44,35 @@ export default function ExplainPanel({
       open={defaultExpanded}
       className={`group rounded-2xl border ${toneClasses(
         tone
-      )} p-4 shadow-[0_8px_30px_rgba(0,0,0,0.18)] transition`}
+      )} p-4 shadow-[0_16px_32px_rgba(15,47,91,0.10)] transition`}
     >
       <summary className="cursor-pointer list-none select-none">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             {kicker ? (
-              <div className="text-[11px] uppercase tracking-[0.16em] text-blue-700/80">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-blue-700">
                 {kicker}
               </div>
             ) : null}
-            <div className="mt-1 text-sm font-semibold text-[var(--urd-text-strong)]">{title}</div>
-            <div className="mt-2 text-sm leading-6 text-[var(--urd-text-muted)]">{summary}</div>
+            <div className="mt-1 text-sm font-semibold text-[#0a1d3a]">{title}</div>
+            <div className="mt-2 text-sm leading-6 text-[#27476f]">{summary}</div>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-[var(--urd-text-muted)]">
+            <span className="rounded-full border border-[#9db8d4] bg-[#eaf3fb] px-2.5 py-1 text-[11px] font-bold text-[#0d2447]">
               More
             </span>
-            <span className="text-slate-500 transition group-open:rotate-180">▾</span>
+            <span className="text-[#557099] transition group-open:rotate-180">▾</span>
           </div>
         </div>
       </summary>
 
-      <div id={panelId} className="mt-4 border-t border-white/10 pt-4">
+      <div id={panelId} className="mt-4 border-t border-[#9db8d4] pt-4">
         <div className="mb-4 flex items-center justify-between gap-4">
-          <div className="text-xs uppercase tracking-[0.16em] text-slate-400">
+          <div className="text-xs uppercase tracking-[0.16em] text-[#557099]">
             Explanation mode
           </div>
-          <div className="inline-flex rounded-full border border-white/10 bg-slate-950/60 p-1">
+          <div className="inline-flex rounded-full border border-[#9db8d4] bg-[#eaf3fb] p-1">
             <button
               type="button"
               onClick={(e) => {
@@ -80,10 +80,10 @@ export default function ExplainPanel({
                 e.stopPropagation();
                 setMode("basic");
               }}
-              className={`rounded-full px-3 py-1.5 text-xs transition ${
+              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
                 mode === "basic"
-                  ? "bg-white text-slate-950"
-                  : "text-[var(--urd-text-muted)] hover:text-[var(--urd-text-strong)]"
+                  ? "bg-[#0d2447] text-white shadow-sm"
+                  : "text-[#27476f] hover:text-[#0a1d3a]"
               }`}
             >
               Basic
@@ -95,10 +95,10 @@ export default function ExplainPanel({
                 e.stopPropagation();
                 setMode("advanced");
               }}
-              className={`rounded-full px-3 py-1.5 text-xs transition ${
+              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
                 mode === "advanced"
-                  ? "bg-white text-slate-950"
-                  : "text-[var(--urd-text-muted)] hover:text-[var(--urd-text-strong)]"
+                  ? "bg-[#0d2447] text-white shadow-sm"
+                  : "text-[#27476f] hover:text-[#0a1d3a]"
               }`}
             >
               Advanced
@@ -106,11 +106,11 @@ export default function ExplainPanel({
           </div>
         </div>
 
-        <div className="space-y-4 text-sm leading-7 text-[var(--urd-text-muted)]">
+        <div className="space-y-4 text-sm leading-7 text-[#27476f]">
           {mode === "basic" ? basic : advanced}
         </div>
 
-        {footer ? <div className="mt-4 border-t border-white/10 pt-4">{footer}</div> : null}
+        {footer ? <div className="mt-4 border-t border-[#9db8d4] pt-4">{footer}</div> : null}
       </div>
     </details>
   );

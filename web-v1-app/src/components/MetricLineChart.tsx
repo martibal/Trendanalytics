@@ -187,16 +187,16 @@ function CustomTooltip({
     ma30: "MA30 — 30-day avg",
   };
   return (
-    <div className="rounded-lg border border-[var(--urd-border)] bg-[var(--urd-raised)] px-3 py-2 text-xs text-[var(--urd-text)] shadow-lg">
-      <div className="mb-1.5 font-black text-[var(--urd-text-strong)]">{label}</div>
+    <div className="rounded-lg border border-[#9db8d4] bg-[#eef6ff] px-3 py-2 text-xs text-[#0a1d3a] shadow-lg">
+      <div className="mb-1.5 font-black text-[#0d2447]">{label}</div>
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2 py-0.5">
           <span
             className="inline-block h-2 w-3 rounded-sm flex-shrink-0"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-[var(--urd-text-body)]">{names[entry.name] ?? entry.name}:</span>
-          <span className="font-black text-[var(--urd-text-strong)]">
+          <span className="text-[#27476f]">{names[entry.name] ?? entry.name}:</span>
+          <span className="font-black text-[#0d2447]">
             {fmtNumber(entry.value)}{unitLabel ? ` ${unitLabel}` : ""}
           </span>
         </div>
@@ -217,7 +217,7 @@ function ChartLegend({
   showMA30: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs font-black text-[var(--urd-text-strong)]">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs font-black text-[#0d2447]">
       {showValue && (
         <div className="flex items-center gap-2">
           <svg width="28" height="10" className="flex-shrink-0">
@@ -308,7 +308,7 @@ export default function MetricLineChart(props: {
       ? "text-emerald-800"
       : trend?.direction === "down"
         ? "text-red-800"
-        : "text-[var(--urd-text-muted)]";
+        : "text-[#557099]";
 
   return (
     <div className={cx(urd.chartCard, "flex flex-col gap-4")}>
@@ -317,25 +317,25 @@ export default function MetricLineChart(props: {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-black text-[var(--urd-text-strong)]">{title}</span>
+            <span className="text-sm font-black text-[#0d2447]">{title}</span>
             {ctx && (
-              <span className="rounded-full border border-[var(--urd-border)] bg-[var(--urd-raised)] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[var(--urd-text-strong)] flex-shrink-0">
+              <span className="rounded-full border border-[#9db8d4] bg-[#eef6ff] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#0d2447] flex-shrink-0">
                 {AXIS_LABELS[ctx.axis]}
               </span>
             )}
           </div>
           {ctx && (
-            <p className="text-xs font-medium text-[var(--urd-text-body)] leading-relaxed">{ctx.what}</p>
+            <p className="text-xs font-medium text-[#27476f] leading-relaxed">{ctx.what}</p>
           )}
           {unitLabel && (
-            <span className="text-xs font-medium text-[var(--urd-text-muted)]">Units: {unitLabel}</span>
+            <span className="text-xs font-medium text-[#557099]">Units: {unitLabel}</span>
           )}
         </div>
 
         {/* MA7 vs MA30 live readout */}
         {trend && (
-          <div className="rounded-xl border border-[var(--urd-border)] bg-[var(--urd-raised)] px-3 py-2 text-xs flex-shrink-0 text-right">
-            <div className="text-[10px] font-black uppercase tracking-wide text-[var(--urd-text-muted)] mb-0.5">
+          <div className="rounded-xl border border-[#9db8d4] bg-[#eef6ff] px-3 py-2 text-xs flex-shrink-0 text-right">
+            <div className="text-[10px] font-black uppercase tracking-wide text-[#557099] mb-0.5">
               Current signal
             </div>
             <div className={`font-medium ${trendColor}`}>{trend.label}</div>
@@ -418,7 +418,7 @@ export default function MetricLineChart(props: {
           </LineChart>
         ) : (
           <div
-            className="flex h-full w-full items-center justify-center rounded-lg border border-dashed border-[var(--urd-border)] bg-[var(--urd-raised)] text-xs font-semibold text-[var(--urd-text-body)]"
+            className="flex h-full w-full items-center justify-center rounded-lg border border-dashed border-[#9db8d4] bg-[#eef6ff] text-xs font-semibold text-[#27476f]"
             aria-live="polite"
           >
             Preparing chart…
@@ -428,8 +428,8 @@ export default function MetricLineChart(props: {
 
       {/* ── Contextual reading guide ── */}
       {ctx?.guide && (
-        <div className="rounded-xl border border-[var(--urd-border)] bg-[var(--urd-raised)] px-4 py-3 text-xs font-medium leading-relaxed text-[var(--urd-text-body)]">
-          <span className="font-black text-[var(--urd-text-strong)]">
+        <div className="rounded-xl border border-[#9db8d4] bg-[#eef6ff] px-4 py-3 text-xs font-medium leading-relaxed text-[#27476f]">
+          <span className="font-black text-[#0d2447]">
             Reading this at {windowDays}d:&nbsp;
           </span>
           {ctx.guide}
@@ -438,7 +438,7 @@ export default function MetricLineChart(props: {
 
       {/* ── Technical footnote ── */}
       {subtitle && (
-        <div className="border-t border-[var(--urd-border)] pt-2 text-[10px] font-medium leading-relaxed text-[var(--urd-text-muted)]">
+        <div className="border-t border-[#9db8d4] pt-2 text-[10px] font-medium leading-relaxed text-[#557099]">
           {subtitle}
         </div>
       )}

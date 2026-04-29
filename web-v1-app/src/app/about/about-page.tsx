@@ -1,6 +1,8 @@
 // src/app/about/page.tsx
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { cx, urd } from "@/components/site/UrdDesignSystem";
+import { UrdHashModal, UrdHashModalClose, UrdHashModalTrigger } from "@/components/site/UrdHashModal";
 
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 
@@ -11,31 +13,15 @@ import "server-only";
 // ---------------------------------------------------------------------------
 
 function ModalStyles() {
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: `
-          .ta-modal { display: none; }
-          .ta-modal:target { display: flex; }
-        `,
-      }}
-    />
-  );
+  return null;
 }
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">{children}</code>;
+  return <code className={urd.code}>{children}</code>;
 }
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
-  return (
-    <a
-      href={`#${id}`}
-      className="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/5 px-3 py-1 text-xs font-medium text-cyan-200 hover:bg-cyan-500/10"
-    >
-      {label}
-    </a>
-  );
+  return <UrdHashModalTrigger id={id}>{label}</UrdHashModalTrigger>;
 }
 
 type ExplainPair = { basic: ReactNode; advanced: ReactNode; traceability?: ReactNode };
@@ -52,36 +38,38 @@ function ExplainModal({
   pair: ExplainPair;
 }) {
   return (
-    <div id={id} className="ta-modal fixed inset-0 z-[80] items-center justify-center p-4">
-      <a href="#" className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" aria-label="Close dialog" />
-      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-cyan-500/20 bg-[#071322] shadow-2xl shadow-cyan-950/40">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/8 px-6 py-5">
+    <UrdHashModal id={id}>
+      <UrdHashModalClose className={urd.modalBackdrop} ariaLabel="Close dialog">
+        <span className="sr-only">Close dialog</span>
+      </UrdHashModalClose>
+      <div role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} className={urd.modalPanel}>
+        <div className={urd.modalHeader}>
           <div>
-            <h3 className="text-2xl font-semibold text-white">{title}</h3>
-            {subtitle ? <div className="mt-2 text-sm leading-6 text-slate-300">{subtitle}</div> : null}
+            <h3 id={`${id}-title`} className="text-2xl font-black text-[#082247]">{title}</h3>
+            {subtitle ? <div className="mt-2 text-sm font-semibold leading-6 text-[#24466f]">{subtitle}</div> : null}
           </div>
-          <a href="#" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl text-slate-200 hover:bg-white/10" aria-label="Close dialog">×</a>
+          <UrdHashModalClose className={urd.modalClose}>×</UrdHashModalClose>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-emerald-200">Basic</div>
-              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.basic}</div>
+          <div className={urd.modalGrid}>
+            <section className={urd.modalBasicPanel}>
+              <div className={urd.modalKicker}>Basic</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[#24466f]">{pair.basic}</div>
             </section>
-            <details className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5" open>
-              <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">Advanced</summary>
-              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.advanced}</div>
-            </details>
+            <section className={urd.modalAdvancedPanel}>
+              <div className={urd.modalKicker}>Advanced</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[#24466f]">{pair.advanced}</div>
+            </section>
           </div>
           {pair.traceability ? (
-            <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-300">Traceability</div>
-              <div className="mt-3 text-sm leading-7 text-slate-200">{pair.traceability}</div>
+            <div className={cx(urd.infoPanelStrong, "mt-4")}>
+              <div className={urd.modalKicker}>Traceability</div>
+              <div className="mt-3 text-sm font-semibold leading-7 text-[#24466f]">{pair.traceability}</div>
             </div>
           ) : null}
         </div>
       </div>
-    </div>
+    </UrdHashModal>
   );
 }
 

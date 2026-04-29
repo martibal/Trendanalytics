@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import ExplanationLevelToggle, { type ExplanationLevel } from "@/components/ExplanationLevelToggle";
-import { cx } from "@/components/site/UrdDesignSystem";
+import { cx, urd } from "@/components/site/UrdDesignSystem";
 import { qaCategories, qaEntries, type QaCategory, type QaEntry } from "@/lib/qa";
 
 type ActiveCategory = QaCategory | "All";
@@ -158,7 +158,7 @@ export default function QaPageClient() {
           onClick={() => setOpenId(null)}
         >
           <div
-            className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-[#9db8d4] bg-[#eaf3fb] p-6 text-[#0a1d3a] shadow-2xl shadow-slate-950/30"
+            className={cx(urd.modalPanel, "max-h-[90vh] overflow-y-auto p-6")}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
@@ -180,12 +180,12 @@ export default function QaPageClient() {
               </button>
             </div>
 
-            <div className="mt-5 rounded-2xl border border-[#b6cce3] bg-[#eef6ff] p-4 text-[#0d2447]">
+            <div className={cx(urd.infoPanel, "mt-5")}>
               <ExplanationLevelToggle level={level} onChange={setLevel} label="Answer depth" />
             </div>
 
-            <div className="mt-5 rounded-2xl border border-[#b6cce3] bg-[#eef6ff] p-5">
-              <div className="space-y-4 text-sm font-semibold leading-7 text-[#27476f]">
+            <div className={cx(urd.infoPanelStrong, "mt-5")}>
+              <div className="space-y-4 text-sm font-semibold leading-7 text-[#24466f]">
                 {visibleParagraphs.map((paragraph, index) => (
                   <p key={`${activeEntry.id}-${level}-${index}`}>{paragraph}</p>
                 ))}

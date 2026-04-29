@@ -12,7 +12,7 @@ function ModalStyles() {
       dangerouslySetInnerHTML={{
         __html: `
           .ta-modal { display: none; }
-          .ta-modal:target { display: flex; }
+          .ta-modal:target, .ta-modal.ua-modal-open { display: flex; }
         `,
       }}
     />
@@ -82,15 +82,15 @@ function ExplainModal({
         className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm"
         aria-label="Close dialog"
       />
-      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-[2rem] border border-cyan-300/20 bg-[#071322] shadow-2xl shadow-cyan-950/40">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
+      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-[2rem] border border-[#8fb5d9] bg-[#d8e9fb] text-[#0a1d3a] shadow-2xl shadow-slate-950/30">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#8fb5d9] px-6 py-5">
           <div>
-            <h3 className="text-2xl font-semibold text-white">{title}</h3>
-            {subtitle ? <div className="mt-2 text-sm leading-6 text-slate-300">{subtitle}</div> : null}
+            <h3 className="text-2xl font-semibold text-[#031329]">{title}</h3>
+            {subtitle ? <div className="mt-2 text-sm leading-6 text-[#27476f]">{subtitle}</div> : null}
           </div>
           <a
             href="#"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl text-slate-200 hover:bg-white/10"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#8fb5d9] bg-[#eaf3fb] text-xl text-[#27476f] hover:bg-white"
             aria-label="Close dialog"
           >
             ×
@@ -99,16 +99,16 @@ function ExplainModal({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-3xl border border-emerald-300/20 bg-emerald-300/10 p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
                 Basic
               </div>
-              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.basic}</div>
+              <div className="mt-3 text-sm leading-7 text-[#0d2447]">{pair.basic}</div>
             </section>
             <details className="rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5" open>
               <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
                 Advanced
               </summary>
-              <div className="mt-3 text-sm leading-7 text-slate-100">{pair.advanced}</div>
+              <div className="mt-3 text-sm leading-7 text-[#0d2447]">{pair.advanced}</div>
             </details>
           </div>
           {pair.traceability ? (
@@ -116,7 +116,7 @@ function ExplainModal({
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
                 Traceability
               </div>
-              <div className="mt-3 text-sm leading-7 text-slate-200">{pair.traceability}</div>
+              <div className="mt-3 text-sm leading-7 text-[#27476f]">{pair.traceability}</div>
             </div>
           ) : null}
         </div>
@@ -135,7 +135,7 @@ const whatItDoesExplain: ExplainPair = {
         fee increase a regime shift or just noise from a single application?
       </p>
       <p className="mt-3">
-        Urd Atlas answers one question: <span className="font-medium text-white">is
+        Urd Atlas answers one question: <span className="font-semibold text-[#031329]">is
         what I am seeing right now a real shift in network conditions, or will it revert
         in a few days?</span>
       </p>
@@ -186,10 +186,10 @@ const whatItDoesNotExplain: ExplainPair = {
         blockchain analytics product. This is not a limitation — it is a design decision.
       </p>
       <ul className="mt-3 list-disc space-y-2 pl-5">
-        <li><span className="font-medium text-white">No price data.</span> If you want to combine regime state with price, you bring your own price data.</li>
-        <li><span className="font-medium text-white">No forecasts.</span> The model describes the current state. It makes no claim about what will happen next.</li>
-        <li><span className="font-medium text-white">No trading signals.</span> CONGESTED is not a sell signal. CHEAP is not a buy signal.</li>
-        <li><span className="font-medium text-white">No opaque outputs.</span> Every number can be traced back to source artifact, formula, and methodology version.</li>
+        <li><span className="font-semibold text-[#031329]">No price data.</span> If you want to combine regime state with price, you bring your own price data.</li>
+        <li><span className="font-semibold text-[#031329]">No forecasts.</span> The model describes the current state. It makes no claim about what will happen next.</li>
+        <li><span className="font-semibold text-[#031329]">No trading signals.</span> CONGESTED is not a sell signal. CHEAP is not a buy signal.</li>
+        <li><span className="font-semibold text-[#031329]">No opaque outputs.</span> Every number can be traced back to source artifact, formula, and methodology version.</li>
       </ul>
     </>
   ),
@@ -220,9 +220,9 @@ const dataLayersExplain: ExplainPair = {
     <>
       <p>All published data is organised into three layers, each building on the previous.</p>
       <ul className="mt-3 list-disc space-y-2 pl-5">
-        <li><span className="font-medium text-white">Gold</span> — raw daily observations: transaction counts, fees, block times, gas usage, active addresses.</li>
-        <li><span className="font-medium text-white">Meta</span> — the intelligence layer: regime label, confidence score, scorecard, and driver set.</li>
-        <li><span className="font-medium text-white">Derived</span> — the trend layer: 7-day and 30-day moving averages used in charts.</li>
+        <li><span className="font-semibold text-[#031329]">Gold</span> — raw daily observations: transaction counts, fees, block times, gas usage, active addresses.</li>
+        <li><span className="font-semibold text-[#031329]">Meta</span> — the intelligence layer: regime label, confidence score, scorecard, and driver set.</li>
+        <li><span className="font-semibold text-[#031329]">Derived</span> — the trend layer: 7-day and 30-day moving averages used in charts.</li>
       </ul>
       <p className="mt-3">Subscribers can download all three layers as JSON files via the API.</p>
     </>
@@ -289,7 +289,7 @@ const dataAttributionExplain: ExplainPair = {
   basic: (
     <>
       <p>
-        The underlying blockchain data comes from <span className="font-medium text-white">AWS Public Blockchain Data</span> —
+        The underlying blockchain data comes from <span className="font-semibold text-[#031329]">AWS Public Blockchain Data</span> —
         a publicly available dataset of on-chain transactions and blocks for multiple
         networks. Urd Atlas processes this data through its own analytical pipeline.
       </p>
@@ -375,11 +375,11 @@ function DatasetBadge({ dataset }: { dataset: DatasetManifest | null }) {
     <div className="rounded-[14px] border border-white/12 bg-white/[0.06] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
       <div className="text-xs font-black uppercase tracking-[0.12em] text-cyan-200/90">Dataset context</div>
       <div className="mt-4 grid gap-3 text-sm">
-        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
+        <div className="flex items-center justify-between gap-4 border-b border-[#8fb5d9] pb-3">
           <span className="text-white/70">Published revision</span>
           <span className="font-mono font-bold text-white">{dataset?.version ?? "—"}</span>
         </div>
-        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
+        <div className="flex items-center justify-between gap-4 border-b border-[#8fb5d9] pb-3">
           <span className="text-white/70">Methodology</span>
           <span className="font-mono font-bold text-white">{dataset?.methodology_version ?? "—"}</span>
         </div>

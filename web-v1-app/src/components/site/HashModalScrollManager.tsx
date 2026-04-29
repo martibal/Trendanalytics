@@ -8,13 +8,68 @@ function getCurrentPathWithoutHash() {
   return `${window.location.pathname}${window.location.search}`;
 }
 
-function isModalTarget(id: string) {
+function getModalTarget(id: string) {
   const target = document.getElementById(id);
-  return Boolean(target?.classList.contains("ta-modal"));
+  if (!target?.classList.contains("ta-modal")) return null;
+  return target;
+}
+
+function openModal(id: string) {
+  const target = getModalTarget(id);
+  if (!target) return false;
+
+  sessionStorage.setItem(MODAL_SCROLL_KEY, String(window.scrollY));
+
+  document.querySelectorAll(".ta-modal.ua-modal-open").forEach((node) => {
+    node.classList.remove("ua-modal-open");
+  });
+
+  target.classList.add("ua-modal-open");
+  history.pushState(null, "", `${getCurrentPathWithoutHash()}#${id}`);
+
+  requestAnimationFrame(() => {
+    const rawSaved = sessionStorage.getItem(MODAL_SCROLL_KEY);
+    const savedY = rawSaved ? Number(rawSaved) : window.scrollY;
+    window.scrollTo({
+      top: Number.isFinite(savedY) ? savedY : window.scrollY,
+      left: window.scrollX,
+      behavior: "auto",
+    });
+  });
+
+  return true;
+}
+
+function closeModal() {
+  const currentId = window.location.hash.slice(1);
+  if (!currentId || !getModalTarget(currentId)) return false;
+
+  document.querySelectorAll(".ta-modal.ua-modal-open").forEach((node) => {
+    node.classList.remove("ua-modal-open");
+  });
+
+  const rawSaved = sessionStorage.getItem(MODAL_SCROLL_KEY);
+  const savedY = rawSaved ? Number(rawSaved) : window.scrollY;
+  history.replaceState(null, "", getCurrentPathWithoutHash());
+
+  requestAnimationFrame(() => {
+    window.scrollTo({
+      top: Number.isFinite(savedY) ? savedY : window.scrollY,
+      left: window.scrollX,
+      behavior: "auto",
+    });
+  });
+
+  return true;
 }
 
 export default function HashModalScrollManager() {
   useEffect(() => {
+    const initialId = window.location.hash.slice(1);
+    if (initialId) {
+      getModalTarget(initialId)?.classList.add("ua-modal-open");
+    }
+
     const onClick = (event: MouseEvent) => {
       const target = event.target as Element | null;
       const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
@@ -24,51 +79,54 @@ export default function HashModalScrollManager() {
       if (!href) return;
 
       if (href === "#") {
-        if (!window.location.hash) return;
-        const currentId = window.location.hash.slice(1);
-        if (!currentId || !isModalTarget(currentId)) return;
-
+        if (!closeModal()) return;
         event.preventDefault();
-        const rawSaved = sessionStorage.getItem(MODAL_SCROLL_KEY);
-        const savedY = rawSaved ? Number(rawSaved) : window.scrollY;
-        history.replaceState(null, "", getCurrentPathWithoutHash());
-        requestAnimationFrame(() => {
-          window.scrollTo({ top: Number.isFinite(savedY) ? savedY : window.scrollY, left: window.scrollX, behavior: "auto" });
-        });
         return;
       }
 
       if (!href.startsWith("#")) return;
 
       const id = href.slice(1);
-      if (!id || !isModalTarget(id)) return;
+      if (!id || !getModalTarget(id)) return;
 
       event.preventDefault();
-      sessionStorage.setItem(MODAL_SCROLL_KEY, String(window.scrollY));
-      history.pushState(null, "", `${getCurrentPathWithoutHash()}#${id}`);
+      openModal(id);
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      const currentId = window.location.hash.slice(1);
-      if (!currentId || !isModalTarget(currentId)) return;
+      if (closeModal()) event.preventDefault();
+    };
 
-      const rawSaved = sessionStorage.getItem(MODAL_SCROLL_KEY);
-      const savedY = rawSaved ? Number(rawSaved) : window.scrollY;
-      history.replaceState(null, "", getCurrentPathWithoutHash());
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: Number.isFinite(savedY) ? savedY : window.scrollY, left: window.scrollX, behavior: "auto" });
+    const onPopState = () => {
+      document.querySelectorAll(".ta-modal.ua-modal-open").forEach((node) => {
+        node.classList.remove("ua-modal-open");
       });
+
+      const id = window.location.hash.slice(1);
+      if (id) getModalTarget(id)?.classList.add("ua-modal-open");
     };
 
     document.addEventListener("click", onClick);
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("popstate", onPopState);
 
     return () => {
       document.removeEventListener("click", onClick);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("popstate", onPopState);
     };
   }, []);
 
-  return null;
+  return (
+    <style
+      dangerouslySetInnerHTML={{
+        __html: `
+          .ta-modal.ua-modal-open {
+            display: flex !important;
+          }
+        `,
+      }}
+    />
+  );
 }
