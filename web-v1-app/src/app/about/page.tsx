@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
+import { urd } from "@/components/site/UrdDesignSystem";
 
 import "server-only";
 
@@ -79,44 +80,44 @@ function ExplainModal({
     <div id={id} className="ta-modal fixed inset-0 z-[80] items-center justify-center p-4">
       <a
         href="#"
-        className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm"
+        className={urd.modalOverlay}
         aria-label="Close dialog"
       />
-      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-[2rem] border border-[#8fb5d9] bg-[#d8e9fb] text-[#0a1d3a] shadow-2xl shadow-slate-950/30">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#8fb5d9] px-6 py-5">
+      <div className={urd.modalPanel}>
+        <div className={urd.modalHeader}>
           <div>
-            <h3 className="text-2xl font-semibold text-[#031329]">{title}</h3>
-            {subtitle ? <div className="mt-2 text-sm leading-6 text-[#27476f]">{subtitle}</div> : null}
+            <h3 className={urd.modalTitle}>{title}</h3>
+            {subtitle ? <div className={urd.modalSubtitle}>{subtitle}</div> : null}
           </div>
           <a
             href="#"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#8fb5d9] bg-[#eaf3fb] text-xl text-[#27476f] hover:bg-white"
+            className={urd.modalClose}
             aria-label="Close dialog"
           >
             ×
           </a>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <section className="rounded-3xl border border-emerald-300/20 bg-emerald-300/10 p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+        <div className={urd.modalBody}>
+          <div className={urd.modalGrid}>
+            <section className={urd.modalInfoBox}>
+              <div className={urd.modalInfoLabel}>
                 Basic
               </div>
-              <div className="mt-3 text-sm leading-7 text-[#0d2447]">{pair.basic}</div>
+              <div className={urd.modalInfoBody}>{pair.basic}</div>
             </section>
-            <details className="rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5" open>
-              <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+            <details className={urd.modalInfoBoxAlt} open>
+              <summary className={urd.modalInfoLabel}>
                 Advanced
               </summary>
-              <div className="mt-3 text-sm leading-7 text-[#0d2447]">{pair.advanced}</div>
+              <div className={urd.modalInfoBody}>{pair.advanced}</div>
             </details>
           </div>
           {pair.traceability ? (
-            <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+            <div className={urd.modalTraceBox}>
+              <div className={urd.modalInfoLabel}>
                 Traceability
               </div>
-              <div className="mt-3 text-sm leading-7 text-[#27476f]">{pair.traceability}</div>
+              <div className={urd.modalInfoBody}>{pair.traceability}</div>
             </div>
           ) : null}
         </div>
