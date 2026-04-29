@@ -145,7 +145,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
 
   return (
     <header className="fixed inset-x-0 top-0 z-[120] border-b border-white/10 bg-[#031329]/96 text-white shadow-[0_10px_32px_rgba(0,0,0,0.22)] backdrop-blur-md">
-      <div className="mx-auto flex min-h-[86px] w-full max-w-[1360px] items-center justify-between gap-5 px-5 py-5 sm:px-7 lg:px-8">
+      <div className="mx-auto flex min-h-[86px] w-full max-w-[1600px] items-center justify-between gap-5 px-5 py-5 sm:px-7 lg:px-8 2xl:px-10">
         <div className="flex min-w-0 items-center gap-5 xl:gap-8">
           <Brand onClick={closeMenus} />
 
@@ -206,7 +206,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
           </nav>
         </div>
 
-        <div className="hidden items-center gap-3 xl:flex">
+        <div className="hidden items-center gap-3 xl:ml-12 xl:flex 2xl:ml-20">
           {CLERK_CONFIGURED ? (
             <AuthAwareActions />
           ) : (
