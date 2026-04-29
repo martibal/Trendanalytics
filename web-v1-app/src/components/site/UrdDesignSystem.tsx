@@ -15,6 +15,11 @@ export const urd = {
     surface: "#eaf3fb",
     surfaceSoft: "#e7f1fb",
     surfaceRaised: "#eef6ff",
+    inkStrong: "#071d3b",
+    chartRaw: "#2f7cff",
+    chartMA7: "#0046bf",
+    chartMA30: "#071d3b",
+    chartGrid: "#7fa8d4",
   },
 
   page: "min-h-screen bg-[#edf6ff] text-[#0a1d3a]",
@@ -44,6 +49,9 @@ export const urd = {
   button:
     "inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
 
+  lightButton:
+    "inline-flex items-center justify-center rounded-full border border-[#8fb5d9] bg-[#d9ebfb] px-3 py-1.5 text-xs font-black text-[#0d2447] shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_6px_14px_rgba(8,34,71,0.08)] transition hover:bg-white hover:text-[#031329]",
+
   code:
     "rounded border border-[#9db8d4] bg-[#f4f9ff] px-1.5 py-0.5 font-mono text-xs font-bold text-[#0d2447]",
 
@@ -62,6 +70,11 @@ export const urd = {
   warning: "rounded-2xl border border-amber-400 bg-amber-50 p-5",
   warningTitle: "text-sm font-black text-amber-700",
 
+  chartCard:
+    "rounded-3xl border border-[#8fb5d9] bg-[#d9ebfb] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_16px_34px_rgba(8,34,71,0.10)]",
+
+  chartPanel:
+    "rounded-2xl border border-[#9db8d4] bg-[#eef6ff] text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]",
 
   landingChainCard:
     "group relative isolate flex min-h-[286px] overflow-hidden rounded-[22px] border border-[#78a8d8] bg-[radial-gradient(circle_at_18%_10%,rgba(255,255,255,0.98)_0%,rgba(247,251,255,0.88)_24%,transparent_48%),linear-gradient(145deg,#f7fbff_0%,#dcecff_38%,#c1d9f1_100%)] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),inset_0_-1px_0_rgba(73,112,153,0.15),0_18px_36px_rgba(8,34,71,0.15),0_3px_10px_rgba(8,34,71,0.08)] ring-1 ring-white/70 transition duration-200 hover:-translate-y-1 hover:border-[#4f91d8] hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(73,112,153,0.16),0_24px_52px_rgba(8,34,71,0.22),0_8px_20px_rgba(47,124,255,0.16)]",
@@ -81,6 +94,7 @@ export const urd = {
     "mt-auto flex items-center justify-between gap-3 pt-6 text-[13px] font-bold text-[#31577f]",
 
   modalOverlay: "absolute inset-0 bg-[#031329]/86 backdrop-blur-sm",
+  modalBackdrop: "absolute inset-0 bg-[#031329]\/86 backdrop-blur-sm",
   modalPanel:
     "relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-[#77a8d8] bg-[#cfe4f7] text-[#071d3b] shadow-[0_28px_80px_rgba(3,19,41,0.42),inset_0_1px_0_rgba(255,255,255,0.85)]",
   modalHeader:
@@ -98,6 +112,16 @@ export const urd = {
   modalInfoLabel:
     "text-xs font-black uppercase tracking-[0.18em] text-[#005be8]",
   modalInfoBody: "mt-3 text-sm font-semibold leading-7 text-[#0d2447]",
+  modalBasicPanel:
+    "rounded-3xl border border-[#78a8d8] bg-[#bfd9ef] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.68),0_10px_22px_rgba(8,34,71,0.08)]",
+  modalAdvancedPanel:
+    "rounded-3xl border border-[#6fa1d2] bg-[#b7d4ec] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.62),0_10px_22px_rgba(8,34,71,0.08)]",
+  modalKicker:
+    "text-xs font-black uppercase tracking-[0.18em] text-[#005be8]",
+  infoPanel:
+    "rounded-3xl border border-[#78a8d8] bg-[#c5def4] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.66)]",
+  infoPanelStrong:
+    "rounded-3xl border border-[#78a8d8] bg-[#c5def4] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.66)]",
   modalTraceBox:
     "mt-4 rounded-3xl border border-[#78a8d8] bg-[#c5def4] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.66)]",
 } as const;
