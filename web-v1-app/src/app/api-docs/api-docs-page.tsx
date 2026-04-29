@@ -20,11 +20,11 @@ const AUTH_ENDPOINTS = [
 ];
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-[var(--urd-raised)] px-1 py-0.5 font-mono text-xs">{children}</code>;
+  return <code className="rounded border border-[var(--urd-border-soft)] bg-[var(--urd-raised-soft)] px-1 py-0.5 font-mono text-xs text-[var(--urd-text-strong)]">{children}</code>;
 }
 
 function CodeBlock({ children }: { children: string }) {
-  return <pre className="overflow-x-auto rounded-2xl border bg-[var(--urd-panel-strong)] p-5 text-xs leading-6 text-[var(--urd-text-body)]"><code>{children}</code></pre>;
+  return <pre className="overflow-x-auto rounded-2xl border bg-[var(--urd-code-bg)] p-5 text-xs leading-6 text-[var(--urd-code-text)]"><code>{children}</code></pre>;
 }
 
 export default async function ApiDocsPage() {

@@ -133,7 +133,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
             src="/web-bilder/ygg-transparent.png"
             alt=""
             aria-hidden="true"
-            className="h-5 w-5 shrink-0 object-contain opacity-70"
+            className="h-10 w-10 shrink-0 object-contain opacity-70"
           />
         </Link>
 
