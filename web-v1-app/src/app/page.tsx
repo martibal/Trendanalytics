@@ -2,6 +2,7 @@ import React, { type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
+
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { computeHistoryDepthDays } from "@/lib/historyDepth";
@@ -16,6 +17,8 @@ import {
 } from "@/lib/landingSurface";
 import { readStorageObject } from "@/lib/storage";
 import { cx, urd } from "@/components/site/UrdDesignSystem";
+import HeroJsonPeek from "@/components/landing/HeroJsonPeek";
+import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
 
 import "server-only";
 
@@ -1422,47 +1425,23 @@ function JsonLayerCard(props: {
   title: string;
   subtitle: string;
   description: string;
-  fields: readonly { name: string; note: string }[];
 }) {
   const tone = jsonLayerToneClasses(props.tone);
 
   return (
-    <a
-      href={`#json-${props.tone}-high`}
-      className={`group block rounded-[20px] border p-8 transition hover:-translate-y-0.5 hover:border-white/24 hover:shadow-[0_24px_70px_rgba(0,0,0,0.28)] ${tone.card}`}
-    >
-      <div className={`inline-flex rounded-full border px-4 py-1.5 text-[14px] font-black ${tone.badge}`}>
+    <div className={`rounded-[14px] border p-4 ${tone.card}`}>
+      <div className={`inline-flex rounded-full border px-3 py-1 text-[12px] font-black ${tone.badge}`}>
         {props.title}
       </div>
 
-      <h3 className={`mt-7 text-[38px] font-black tracking-[-0.045em] ${tone.title}`}>
-        {props.title}
-      </h3>
-
-      <div className="mt-2 text-[13px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+      <div className="mt-4 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
         {props.subtitle}
       </div>
 
-      <p className="mt-6 max-w-[440px] text-[18px] font-semibold leading-9 text-slate-200">
+      <p className="mt-3 text-[14px] font-semibold leading-7 text-slate-200">
         {props.description}
       </p>
-
-      <div className="mt-8 space-y-5">
-        {props.fields.map((field) => (
-          <div key={field.name} className="grid grid-cols-[12px_minmax(0,1fr)] gap-3">
-            <span className={`mt-2.5 h-2 w-2 rounded-full ${tone.bullet.replace("text-", "bg-")}`} />
-            <div>
-              <div className="font-mono text-[16px] font-bold text-white">{field.name}</div>
-              <div className="mt-1 text-[13px] leading-6 text-slate-400">{field.note}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-9 text-[15px] font-black text-white/85 transition group-hover:text-white">
-        Open example JSON →
-      </div>
-    </a>
+    </div>
   );
 }
 
@@ -1675,18 +1654,29 @@ function PlanCard(props: {
   bestFor: string;
   href: string;
   cta: string;
+  badge?: string;
 }) {
-  const cardClass =
-    "border border-[#89a9d1]/28 bg-[linear-gradient(145deg,rgba(22,34,54,0.96)_0%,rgba(55,78,112,0.88)_40%,rgba(30,47,73,0.96)_72%,rgba(18,29,47,0.98)_100%)] shadow-[inset_0_1px_0_rgba(210,230,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.03),0_22px_60px_rgba(3,14,32,0.32)]";
+  const isFeatured = Boolean(props.badge);
+
+  const cardClass = isFeatured
+    ? "border border-[#2f7cff]/55 bg-[linear-gradient(145deg,rgba(20,42,86,0.98)_0%,rgba(36,82,156,0.92)_42%,rgba(20,42,86,0.98)_100%)] shadow-[inset_0_1px_0_rgba(140,180,255,0.28),inset_0_-1px_0_rgba(255,255,255,0.05),0_28px_70px_rgba(8,40,100,0.42)]"
+    : "border border-[#89a9d1]/28 bg-[linear-gradient(145deg,rgba(22,34,54,0.96)_0%,rgba(55,78,112,0.88)_40%,rgba(30,47,73,0.96)_72%,rgba(18,29,47,0.98)_100%)] shadow-[inset_0_1px_0_rgba(210,230,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.03),0_22px_60px_rgba(3,14,32,0.32)]";
 
   const pillClass =
     "border border-[#b8d1f0]/22 bg-[linear-gradient(180deg,rgba(210,228,248,0.14)_0%,rgba(150,181,214,0.08)_100%)] text-[#e3efff] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]";
 
-  const buttonClass =
-    "border border-[#9fc1ea]/30 bg-[linear-gradient(180deg,rgba(176,205,236,0.16)_0%,rgba(107,146,191,0.12)_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-[linear-gradient(180deg,rgba(176,205,236,0.22)_0%,rgba(107,146,191,0.16)_100%)]";
+  const buttonClass = isFeatured
+    ? "border border-white/30 bg-white text-[#0d2447] shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_10px_24px_rgba(255,255,255,0.18)] hover:bg-[#eaf3fb]"
+    : "border border-[#9fc1ea]/30 bg-[linear-gradient(180deg,rgba(176,205,236,0.16)_0%,rgba(107,146,191,0.12)_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-[linear-gradient(180deg,rgba(176,205,236,0.22)_0%,rgba(107,146,191,0.16)_100%)]";
 
   return (
     <article className={`relative flex min-h-[405px] flex-col rounded-[28px] p-8 ${cardClass}`}>
+      {props.badge ? (
+        <div className="absolute -top-3 left-7 inline-flex rounded-full border border-[#2f7cff]/45 bg-[#2f7cff] px-3.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_8px_18px_rgba(47,124,255,0.42)]">
+          {props.badge}
+        </div>
+      ) : null}
+
       <div className="flex items-start justify-between gap-5">
         <h3 className="text-[15px] font-black uppercase tracking-[0.22em] text-white">
           {props.name}
@@ -1802,6 +1792,16 @@ export default async function HomePage() {
   return (
     <main className="min-h-screen bg-[#edf6ff] text-[#0a1d3a]">
       <section className="relative isolate overflow-hidden bg-[#031329] text-white">
+        <div className="relative z-20 border-b border-white/8 bg-[#031329]/96 px-4 py-2 text-center text-[14px] font-semibold leading-6 text-white/82">
+          Three subscription levels: Free, Basic $29/mo, and Pro $79/mo.{" "}
+          <a
+            href="#pricing"
+            className="font-extrabold text-blue-300 underline decoration-blue-300/40 underline-offset-4 hover:text-blue-200"
+          >
+            Click for more
+          </a>
+          .
+        </div>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_8%,rgba(44,109,255,0.12),transparent_28%),linear-gradient(180deg,#031329_0%,#041327_100%)]" />
 
           <div className="pointer-events-none absolute inset-y-0 right-[2%] hidden items-center lg:flex">
@@ -1817,78 +1817,75 @@ export default async function HomePage() {
             </div>
           </div>
 
-        <SectionShell className="relative pb-20 pt-[140px] md:pb-24 md:pt-[150px] lg:pb-[4.4rem] lg:pt-[165px]">
+        <SectionShell className="relative pb-12 pt-[78px] md:pb-14 md:pt-[90px] lg:pb-12 lg:pt-[96px]">
+
             <div className="max-w-[820px]">
-              <h1 className="max-w-[820px] text-[54px] font-black leading-[0.98] tracking-[-0.055em] text-white sm:text-[58px] lg:text-[68px]">
+              <h1 className="max-w-[820px] text-[48px] font-black leading-[0.98] tracking-[-0.055em] text-white sm:text-[54px] lg:text-[62px]">
                 Separate blockchain noise
                 <span className="block text-[#2f7cff]">from structural change.</span>
               </h1>
-              <p className="mt-7 max-w-[800px] text-[24px] font-semibold leading-8 text-white/88 sm:text-[20px]">
-                Daily Gold, Meta, and Derived JSON for BTC, ETH, ARB, and BASE. Regime context without maintaining your own pipeline
+              <p className="mt-6 max-w-[800px] text-[19px] font-semibold leading-7 text-white/88 sm:text-[20px]">
+                Daily Gold, Meta, and Derived JSON for BTC, ETH, ARB, and BASE. Regime context without maintaining your own pipeline.
               </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <a
-                href="#json-example-picker"
-                className="inline-flex h-14 min-w-[260px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
+            <div className="mt-7 flex flex-wrap gap-3">
+
+
+              <Link
+                href="/methodology"
+                className="inline-flex h-12 min-w-[240px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_14px_30px_rgba(37,99,235,0.32)] transition hover:bg-blue-700"
               >
-                View historical example JSONs
-              </a>
+                Methodology & JSON fields →
+              </Link>
               <Link
                 href="/api-docs"
-                className="inline-flex h-14 min-w-[190px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
+                className="inline-flex h-12 min-w-[170px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_14px_30px_rgba(37,99,235,0.32)] transition hover:bg-blue-700"
               >
                 View API Docs
               </Link>
             </div>
+
           </div>
         </SectionShell>
       </section>
 
-      <section className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_58%,#eef6ff_100%)] pb-0 pt-10">
-        <SectionShell>
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <div className="text-[13px] font-black uppercase tracking-[0.12em] text-[#0d2447]">
-                Latest chain status
+        <HeroJsonPeek />
+
+        <section className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_100%)] py-10">
+          <SectionShell>
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <div className="text-[13px] font-black uppercase tracking-[0.12em] text-[#0d2447]">
+                  Latest chain status
+                </div>
+                <p className="mt-1 text-[14px] font-medium leading-5 text-[#557099]">
+                  Click any chain card to open the full chain view and history.
+                </p>
               </div>
-              <p className="mt-1 text-[14px] font-medium leading-5 text-[#557099]">
-                Click any chain card to open the full chain view and history.
+
+              <p className="shrink-0 pt-0.5 text-right text-[13px] font-medium leading-5 text-[#7187a8]">
+                Last data load: {lastDataLoad}
               </p>
             </div>
 
-            <p className="shrink-0 pt-0.5 text-right text-[13px] font-medium leading-5 text-[#7187a8]">
-              Last data load: {lastDataLoad}
-            </p>
-          </div>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {displayRows.slice(0, 4).map((row) => (
-              <StatusCard
-                key={row.chain}
-                row={row}
-                primaryChange={primaryChangeMap.get(row.chain)}
-              />
-            ))}
-          </div>
-
-          <div className="mt-12 grid overflow-hidden rounded-[14px] border border-[#c9d9ea] bg-[#edf5fb] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)] sm:grid-cols-2 lg:grid-cols-5">
-            <FeaturePill icon={<CalendarIcon />} title="Daily JSON" note="Fresh data every day" />
-            <FeaturePill icon={<CalendarIcon />} title="Long history" note={`${publishedDays} days and growing`} />
-            <FeaturePill icon={<TriangleIcon />} title="4 Chains" note="BTC, ETH, ARB, BASE" />
-            <FeaturePill icon={<ApiIcon />} title="API First" note="Built for developers" />
-            <FeaturePill icon={<ShieldIcon />} title="Transparent" note="Deterministic methodology" />
-          </div>
-
-          <div className="mt-16 px-2 text-center">
-            <h2 className="text-[26px] font-black tracking-[-0.02em] text-[#0d2447]">
-              Get started in 3 easy steps
-            </h2>
-            <div className="mx-auto mt-7 grid max-w-[900px] gap-6 md:grid-cols-3 md:gap-8">
-              <StepItem number="1" title="Choose a plan" note="Pick the right plan for your needs" />
-              <StepItem number="2" title="Get API access" note="Instant access to the JSON API" />
-              <StepItem number="3" title="Pull JSON" note="Integrate and start building" />
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {displayRows.slice(0, 4).map((row) => (
+                <StatusCard
+                  key={row.chain}
+                  row={row}
+                  primaryChange={primaryChangeMap.get(row.chain)}
+                />
+              ))}
             </div>
-          </div>
+          </SectionShell>
+        </section>
+
+        <WhoThisIsFor />
+
+      <section className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_58%,#eef6ff_100%)] pb-0 pt-10">
+        <SectionShell>
+
+
+
 
             <div
               id="json-layers"
@@ -1898,8 +1895,8 @@ export default async function HomePage() {
               <h2 className="text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447]">
                 JSON is our product
               </h2>
-              <p className="mt-4 max-w-[9800px] text-[17px] font-medium leading-8 text-[#37547b]">
-                Each chain is published as three inspectable JSON layers. Click on a layer below to inspect a concrete example file.
+              <p className="mt-4 max-w-[980px] text-[17px] font-medium leading-8 text-[#37547b]">
+                Each chain is published as three compact JSON layers with distinct roles in the regime model.
               </p>
             </div>
 
@@ -1907,40 +1904,22 @@ export default async function HomePage() {
               <JsonLayerCard
                 tone="gold"
                 title="Gold"
-                subtitle="What happened"
-                description="Gold tells you what actually happened on-chain on that date."
-                fields={[
-                  { name: "tx_count_daily", note: "daily activity count" },
-                  { name: "unique_active_addresses", note: "breadth of use" },
-                  { name: "median_fee_native", note: "daily fee level" },
-                  { name: "failed_tx_rate", note: "friction signal" },
-                ]}
+                subtitle="Raw observations"
+                description="Gold is built around factual daily on-chain metrics: activity, fees, utilization, friction, and network usage."
               />
 
               <JsonLayerCard
                 tone="meta"
                 title="Meta"
-                subtitle="What it means"
-                description="Meta describes the current chain state, confidence, freshness, and regime drivers."
-                fields={[
-                  { name: "status.label", note: "published regime" },
-                  { name: "confidence_score", note: "evidence strength" },
-                  { name: "regime.drivers", note: "why the label fired" },
-                  { name: "status.one_liner", note: "plain-language read" },
-                ]}
+                subtitle="Regime context"
+                description="Meta is built around the published regime label, confidence score, freshness, and the drivers explaining why the label fired."
               />
 
               <JsonLayerCard
                 tone="derived"
                 title="Derived"
-                subtitle="How it is trending"
-                description="Derived shows rolling baselines and relative position built from the Gold layer."
-                fields={[
-                  { name: "metric__ma7", note: "short trend" },
-                  { name: "metric__ma30", note: "medium baseline" },
-                  { name: "z_score", note: "historical position" },
-                  { name: "percentile_180d", note: "relative context" },
-                ]}
+                subtitle="Trend baselines"
+                description="Derived is built around moving averages and relative-position metrics that separate short-term noise from structural change."
               />
             </div>
           </div>
@@ -1954,7 +1933,7 @@ export default async function HomePage() {
             subtitle="Gold is factual daily data. This example uses the date selected from the highest readable Meta confidence score."
             example={jsonExampleCodeMap.gold_high}
           />
-          <JsonExamplePickerModal />
+          
 
           <JsonExampleModal
             tone="gold"
@@ -1994,6 +1973,17 @@ export default async function HomePage() {
             example={jsonExampleCodeMap.derived_degraded}
           />
 
+          <div className="mt-14 px-2 text-center">
+            <h2 className="text-[26px] font-black tracking-[-0.02em] text-[#0d2447]">
+              Get started in 3 easy steps
+            </h2>
+            <div className="mx-auto mt-7 grid max-w-[900px] gap-6 md:grid-cols-3 md:gap-8">
+              <StepItem number="1" title="Choose a plan" note="Pick the right plan for your needs" />
+              <StepItem number="2" title="Get API access" note="Instant access to the JSON API" />
+              <StepItem number="3" title="Pull JSON" note="Integrate and start building" />
+            </div>
+          </div>
+
           <div className="mt-14 -mx-5 bg-[#031329] px-5 py-10 sm:-mx-7 sm:px-7 lg:-mx-10 lg:px-10 2xl:-mx-16 2xl:px-16">
             <div id="pricing" className="mx-auto w-full">
               <div className="grid gap-7 xl:grid-cols-3">
@@ -2029,6 +2019,7 @@ export default async function HomePage() {
                   bestFor="Best for: multi-chain research, backtesting, and production pipelines."
                   href="/dashboard"
                   cta="Start Pro →"
+              
                 />
               </div>
             </div>

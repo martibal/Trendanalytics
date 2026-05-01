@@ -6,8 +6,6 @@ import { currentDataSource, readStorageObject } from "@/lib/storage";
 import {
   whatIsUrdAtlasExplanation,
   interpretationBoundaryExplanation,
-  whoThisIsForExplanation,
-  whatThisIsUsedForExplanation,
 } from "@/lib/content/landingExplanations";
 import {
   confidenceBand,
@@ -28,7 +26,6 @@ import UseCases from "@/components/landing/UseCases";
 import DataContractDetails from "@/components/landing/DataContractDetails";
 import MobileLanding from "@/components/mobile/MobileLanding";
 import GetStarted from "@/components/landing/GetStarted";
-import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
 
 import "server-only";
 
@@ -484,8 +481,6 @@ export default async function HomePage() {
   const displayRows = rows.map(toSurfaceRowDisplay);
   const whatIsExplain = whatIsUrdAtlasExplanation();
   const boundaryExplain = interpretationBoundaryExplanation();
-  const whoForExplain = whoThisIsForExplanation();
-  const usedForExplain = whatThisIsUsedForExplanation();
 
   return (
     <>
@@ -495,7 +490,6 @@ export default async function HomePage() {
         <ModalStyles />
 
         <Hero historyDepthDays={historyDepthDays} />
-        <WhoThisIsFor />
         <GetStarted />
         <LiveChains rows={displayRows} />
         <UseCases />
@@ -517,20 +511,6 @@ export default async function HomePage() {
           title="Interpretation boundary"
           subtitle="Urd Atlas is intentionally descriptive. It explains current network state, but it does not tell you what to do."
           pair={boundaryExplain}
-        />
-
-        <ExplainModal
-          id="who-this-is-for-modal"
-          title="Who this is for"
-          subtitle="Three working roles, each with a different reason to want a documented on-chain state on every row of their workflow."
-          pair={whoForExplain}
-        />
-
-        <ExplainModal
-          id="what-this-is-used-for-modal"
-          title="What this data is used for"
-          subtitle="Concrete things subscribers do with the JSON files in their daily work — and what each one looks like in practice."
-          pair={usedForExplain}
         />
       </main>
     </>
