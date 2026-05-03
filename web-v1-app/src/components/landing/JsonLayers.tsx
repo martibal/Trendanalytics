@@ -23,9 +23,9 @@ const LAYERS = [
   {
     tag: "Meta",
     tagClass: "border-cyan-400/25 bg-cyan-400/8 text-cyan-300",
-    title: "Regime intelligence",
+    title: "Regime reference layer",
     subtitle: "What it means",
-    desc: "The analytical layer subscribers are paying for — regime label, confidence, scorecard, and driver attribution. Pre-assembled and documented.",
+    desc: "The reference layer subscribers are paying for — regime label, confidence, scorecard, and driver attribution. Pre-assembled and documented.",
     fields: [
       { name: "status.label", note: "STABLE / HEATING / CONGESTED / CHEAP" },
       { name: "confidence.confidence_score", note: "Evidence quality, 0–1" },
@@ -59,11 +59,11 @@ export default function JsonLayers() {
   return (
     <section className="mt-16">
       <div className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-500">
-        Three files per chain, per day
+        Three reference layers per chain, per day
       </div>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
         <h2 className="text-3xl font-black tracking-[-0.02em] text-white leading-tight">
-          Gold, Meta, Derived.
+          Gold, Derived, Meta.
         </h2>
       </div>
 

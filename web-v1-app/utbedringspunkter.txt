@@ -1,0 +1,120 @@
+
+
+- whitepaper fil laget, legg den der den hører hjemme på nettsiden
+
+- bruk chain page hero banneret for info, her er det plass til mye kjapp info som kan fungere pent grafisk uten å forstyrre og mette for mye
+
+
+
+- legg "read these first" øverst i methodology siden så det er lettere for førstegangs besøkende å skjønne hvorfor de er inne på den siden
+
+- på dashboard siden, dersom man ikke er innlogget - dropp "not connected", bruk feks "sign in to see your account"+kort beskrivelse av hva dashboard siden gjør isteden
+
+- flytt faq til mellom glossary og api docs og legg about nederst på siden
+
+- på landing siden, når en bruker lukker json eksempelfilen så kan det stå feks "This is what subscribers receive every day. See plans →" også linke til betalingsalternativene
+
+- gjør sample pack mer tilgjengelig allerede fra landingssiden så folk skjønner hvor verdifullt det er
+
+- tving siden til å ikke gå til toppen når den lukker eksempel json bildet
+
+- track record er verdt mye mer enn jeg tror, legg til dette i banneret der "Every label, every confidence score, every determinism hash this product has ever published. 509 days, four chains, fully reproducible. This is your compliance reference — verifiable, version-stamped, and never retroactively altered."
+siden det er gull verdt for compliance folk
+
+
+
+
+
+De seks "hvorfor"-spørsmålene en ny kjøper har — i den rekkefølgen de oppstår
+1. Hvorfor en kategori i det hele tatt?
+Spørsmålet kjøperen stiller seg: "Hvorfor skal jeg ha STABLE/HEATING/CONGESTED og ikke bare et tall?"
+Det du må svare: Et tall (f.eks. confidence 0.84) tvinger leseren til å gjøre tolkning-jobben selv hver gang. En kategori er en avgjørelse som er tatt for deg, etter en dokumentert regel, og som kan slås opp. Det betyr at to mennesker som ser samme dag, ser samme tilstand. Det er forutsetningen for at en backtest, en research-note og en LP-rapport kan referere til "den dagen Ethereum var CONGESTED" og mene nøyaktig det samme.
+Punktvis formulering:
+
+Tall krever tolkning hver gang. Kategorier er tolkningen, ferdig gjort.
+En kategori er reproduserbar mellom mennesker; et tall er ikke det.
+Du kan ikke joine "0.84" på en backtest-tabell. Du kan joine "CONGESTED".
+Kategorien skjuler ikke tallene — alle drivere, z-scores og percentiler er fortsatt eksponert. Den bare gir dem et navn.
+
+
+2. Hvorfor på dagsoppløsning og ikke time-for-time eller ukentlig?
+Spørsmålet: "Er én klasse per dag det riktige? Mister jeg ikke noe?"
+Det du må svare: Krypto-markedet er fullt av timesvise og minuttsvise signaler som er støyfanger, ikke regimer. En regime-tilstand som varer i 15 minutter er per definisjon ikke en regime-tilstand. Daglig oppløsning er det laveste tidsoppløsning som kan skille strukturelt skifte fra transient støy, fordi det krever at en endring vedvarer over en hel publikasjonssyklus før den får et navn.
+Den andre veien — ukentlig — ville gjort labels uutnyttbare for risk-funksjoner som må reagere innen samme arbeidsuke som hendelsen.
+Punktvis formulering:
+
+Sub-daglige signaler er støy med dato; daglige labels er hendelser.
+En CONGESTED-dag er en dag, ikke et 15-minutters spike.
+Daglig er hyppig nok til å være handlingsrelevant og sjelden nok til at hver label har faktisk substans.
+Methodology-siden dokumenterer hvorfor.
+
+
+3. Hvorfor disse fire kjedene — og hvorfor ikke Solana, Cosmos, kryptokurver osv.?
+Spørsmålet: "Er dette en MVP som blir foreldet når Solana er det viktigste?"
+Det du må svare: Kjedevalget er ikke tilfeldig — det er bevisst valgt for å dekke to arketypiske topologier:
+
+BTC — UTXO settlement-kjede med fee-pressure og confirmation-pacing som primære stress-signaler
+ETH — EVM L1 med gas-utilization og MEV-friction som primære stress-signaler
+ARB + BASE — to ulike L2-arkitekturer (optimistic rollup hhv. OP Stack) som lar deg analysere L2-vs-L1-divergens på samme schema
+
+Det vil si: med disse fire kan du faktisk gjøre meningsfull cross-topology research. Å legge til Solana eller Cosmos uten metodisk tilpasning ville produsert labels som ikke er sammenlignbare med resten — og det ville brutt den eneste tingen som faktisk gjør produktet verdt noe.
+Punktvis formulering:
+
+Hver av de fire representerer en distinkt on-chain topologi (UTXO, EVM L1, optimistic L2, OP Stack L2)
+Identisk schema på tvers er bare meningsfullt fordi metodikken er kalibrert per ruleset (btc_v1, eth_l1_v1, arb_v1, base_v1)
+Flere kjeder kommer når de kan kalibreres med samme grad av kontroll, ikke før
+Du betaler ikke for fire ulike pipelines — du betaler for fire kjeder du faktisk kan sammenligne
+
+
+4. Hvorfor 90 / 365 dagers historie — og ikke 30 eller 1000?
+Spørsmålet: "Er 90 dager nok? Er 365 nok?"
+Det du må svare: Hver historielengde tilsvarer et bestemt analytisk minimum:
+
+90 dager = nok til å se én eller to fulle regime-sykluser per kjede. Minimum for å verifisere at strategien deler seg meningsfullt på tvers av regimer (Basic-tieren).
+365 dager = nok til å se sesongvariasjoner og cross-chain-divergenser. Minimum for de fleste regime-conditioned modellingoppgaver (Pro-tieren).
+
+Det er ikke pris-tier-forskjell for prisens skyld — det er analytisk-kapabilitet-tier-forskjell.
+Punktvis formulering:
+
+90d = nok til å verifisere at en strategi deler seg på regime
+365d = nok til å trene en regime-conditioned modell
+Lengre historie er tilgjengelig som History Add-on når det trengs
+Hvorfor ikke 30d? Fordi 30d ikke inneholder nok regime-skifter til å være bevis
+
+
+5. Hvorfor JSON og ikke et dashboard, charts, eller et API som returnerer tolket prosa?
+Spørsmålet: "Hvorfor må jeg integrere noe? Kan jeg ikke bare se på det?"
+Det du må svare: Fordi produktet er en input til ditt eksisterende arbeid, ikke et erstatnings-arbeidsmiljø. Hvis du allerede har en backtest-pipeline, en research-database eller en risk-rapportering-flyt, vil du joine regime-data inn i det — ikke bytte til en ny app for å se på det.
+Et dashboard ville forutsatt at du går til Urd Atlas for å gjøre arbeidet ditt. JSON-tilnærmingen forutsetter at Urd Atlas kommer til deg, og blir en kolonne i datasettet ditt.
+Punktvis formulering:
+
+Du eier filene. Vi gir dem til deg, du gjør hva du vil.
+Det er en kolonne i din egen tabell, ikke et nytt verktøy å logge inn på.
+Charts er for tilskuere; JSON er for arbeidende analytikere.
+Hvis du vil ha charts, har vi dem på chain-sidene — men det er ikke produktet.
+
+
+6. Hvorfor en confidence-gate, og hvorfor akkurat 0.40?
+Spørsmålet: "Hva er denne UNKNOWN/DEGRADED-greia, og er det ikke bare en unnskyldning når dataen er dårlig?"
+Det du må svare: Det er det motsatte av en unnskyldning. De fleste produkter publiserer en label uansett hva — det gjør den ubrukelig akkurat de dagene da datakvaliteten faktisk er problematisk. UNKNOWN/DEGRADED er en aktiv erkjennelse av at "dagens data støtter ikke en konfident klassifisering, og vi nekter å publisere én", og 0.40-grensen er en bevisst kalibrert publikasjonsterskel — ikke et estimat på hva som er sant, men et minimum på hvor mye evidens som kreves for at en navngitt tilstand skal slippe gjennom.
+Det er forskjellen mellom et produkt du kan sette i en backtest, og et produkt du må manuelt etterredigere.
+Punktvis formulering:
+
+Vi publiserer ikke en confident label på en dag der dataen ikke støtter den
+0.40 er ikke "rådata er feil"; det er "evidensen er ikke sterk nok for at en navngitt tilstand er forsvarlig"
+Andre produkter smoother dette bort. Vi viser det aktivt.
+En backtest filtreres på confidence_score >= threshold på ett sted. Det er det.
+
+
+Hvordan dette bør se ut på landingssiden
+Disse seks spørsmålene fortjener en egen seksjon på landingssiden, plassert mellom "Latest chain status" og "Get started in 3 easy steps". Tittelen kan være rett frem:
+
+Why we made the decisions we made
+Every product is a sequence of choices. These are ours, and the reasoning behind each one.
+
+Hver av de seks som et lite kort, eller som en accordion-liste der spørsmålet er headline og svaret kan utvides. Begge fungerer; jeg lener mot accordion fordi siden allerede har mange kort og en accordion gir lesere kontroll over hvor dypt de vil gå.
+
+Hvorfor dette grepet er mer kraftfullt enn det ser ut
+Det adresserer salgsmotstand før den oppstår. En kvant-kjøper som leser landingssiden i dag tenker "OK, men hvorfor kategori og ikke score?". De stiller spørsmålet i hodet, finner ikke svar, og legger fanen i bakgrunnen. Hvis spørsmålet besvares før de stiller det har du allerede vunnet — fordi du har vist at du har tenkt på det de skulle stille.
+Det kvalifiserer bort feil kjøpere. En leser som leser "Vi publiserer ikke labels på lavkonfidens-dager" og tenker "men jeg vil ha en label hver dag uansett" — den personen er ikke kunden din. Du sparer dem for et abonnement de ville sagt opp etter to uker, og du sparer deg for en tap-og-mistilfreds kunde.
+Det viser intellektuell konsistens, som er ditt hovedargument. Du er allerede et produkt for folk som verdsetter dokumenterte beslutninger. Å vise hvorfor hver beslutning ble tatt, er bare å fortsette på den linjen.

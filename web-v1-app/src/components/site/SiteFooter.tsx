@@ -11,14 +11,17 @@ export default function SiteFooter() {
           <section>
             <div className="text-xl font-semibold tracking-[-0.03em] text-white">Urd Atlas</div>
             <p className="mt-4 max-w-sm text-sm leading-7 text-slate-400">
-              Descriptive on-chain regime context across Bitcoin, Ethereum, Arbitrum, and Base.
-              No price. No forecasts. No recommendations.
+              On-chain reference data for Bitcoin, Ethereum, Arbitrum, and Base.
+              No price data. No forecasts. No recommendations.
             </p>
           </section>
 
           <section>
             <div className="text-sm font-semibold uppercase tracking-[0.16em] text-cyan-300/80">Trust</div>
             <div className="mt-4 flex flex-col gap-3 text-sm text-slate-400">
+              <Link href="/about" className="transition hover:text-white">
+                About
+              </Link>
               <Link href="/methodology" className="transition hover:text-white">
                 Methodology
               </Link>

@@ -11,13 +11,13 @@ export default function DataContractDetails({ dataset, dataSource }: DataContrac
     <section className="mt-10">
       <details className="rounded-3xl border border-white/10 bg-white/4 p-6">
         <summary className="cursor-pointer list-none text-sm font-semibold text-white">
-          Published artifact and contract details
+          Published reference data contract details
         </summary>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div>
             <p className="text-sm leading-7 text-slate-300">
-              Urd Atlas reads from published artifacts rather than recomputing the public surface in the UI.
+              Urd Atlas reads from the published reference data artifacts rather than recomputing the public surface in the UI.
               That keeps the website aligned with the same contract subscribers consume downstream.
             </p>
             <div className="mt-4 flex flex-wrap gap-3 text-sm">

@@ -768,7 +768,7 @@ export default async function ChainPage({
 
           <div className="mt-3 grid gap-1 text-sm text-[var(--urd-text-body)]">
             <div>
-              <span className="font-medium text-[var(--urd-text-strong)]">Published context:</span>{" "}
+              <span className="font-medium text-[var(--urd-text-strong)]">Published reference data:</span>{" "}
               Artifact semantics are defined publicly in Methodology, Provenance &amp; Revisions, and the schema reference.
             </div>
             <div>

@@ -468,7 +468,7 @@ export default async function StatusPage() {
               </h1>
               <p className="mt-4 text-lg leading-8 text-[var(--urd-text-muted)]">
                 Freshness and confidence for every published chain. This page answers
-                whether the published artifacts are current and usable right now — not
+                whether the published on-chain reference data is current and usable right now — not
                 what to do about it. Expected refresh windows are around 09:00 and 21:00
                 Europe/Oslo.
               </p>

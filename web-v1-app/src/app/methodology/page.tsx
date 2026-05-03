@@ -1,4 +1,3 @@
-import Link from "next/link";
 import ShortFullContent from "@/components/site/ShortFullContent";
 import {
   Callout,
@@ -17,17 +16,26 @@ export default function MethodologyOverviewPage() {
     <MethodologyPageShell>
       <MethodologyHeader
         title="Methodology"
-        description="How Urd Atlas turns daily blockchain observations into descriptive regime labels, confidence, scorecards, and traceable JSON artifacts."
+        description="How Urd Atlas turns daily blockchain observations into on-chain reference data: Gold observations, Derived transforms, and Meta regime labels, confidence, scorecards, and traceable JSON artifacts."
       />
 
       <MethodologyContent>
+        <Callout title="Read these first">
+          <p>
+            First time here? Start with <MethodologyLink href="/methodology/reference">Public Methodology Reference</MethodologyLink>{" "}
+            to understand what the reference data means, then read <MethodologyLink href="/methodology/verification">Verification &amp; Evidence</MethodologyLink>{" "}
+            to see how published labels can be checked. Use <MethodologyLink href="/methodology/fields">Field Dictionary</MethodologyLink>{" "}
+            as the lookup layer when you need exact field definitions.
+          </p>
+        </Callout>
+
         <MethodologyNav />
 
         <ShortFullContent
           pageKey="methodology-overview"
-          summary={<>This section explains what Urd Atlas publishes, how to read the outputs, what can be checked independently, and where public methodology intentionally stops.</>}
+          summary={<>This section documents the Urd Atlas reference data methodology: what gets published, how to read the outputs, what can be checked independently, and where public methodology intentionally stops.</>}
           bullets={[
-            <>Artifact model: <strong>Gold</strong> for daily observations, <strong>Derived</strong> for deterministic transforms, and <strong>Meta</strong> for regime, confidence, scorecard state, and drivers.</>,
+            <>Reference layer model: <strong>Gold</strong> for daily observations, <strong>Derived</strong> for deterministic transforms, and <strong>Meta</strong> for regime, confidence, scorecard state, and drivers.</>,
             <>Read order: <MethodologyLink href="/methodology/reference">Reference</MethodologyLink> first, then <MethodologyLink href="/methodology/verification">Verification</MethodologyLink>, then <MethodologyLink href="/methodology/fields">Fields</MethodologyLink> as a lookup layer.</>,
             <>Trust boundary: outputs should be auditable in meaning and behavior, but the private source-data and implementation chain are not publicly reconstructable.</>,
           ]}
@@ -53,9 +61,9 @@ export default function MethodologyOverviewPage() {
                 />
               </Section>
 
-              <Section title="Artifact model">
+              <Section title="Reference layer model">
                 <p>
-                  Urd Atlas publishes three artifact layers: <InlineCode>Gold</InlineCode>, <InlineCode>Derived</InlineCode>, and <InlineCode>Meta</InlineCode>. Gold is the daily
+                  Urd Atlas publishes three reference layers: <InlineCode>Gold</InlineCode>, <InlineCode>Derived</InlineCode>, and <InlineCode>Meta</InlineCode>. Gold is the daily
                   observation layer. Derived is the deterministic trend layer built from Gold. Meta is the
                   analytical layer that publishes regime, confidence, scorecard state, drivers, and
                   presentation-ready summaries.
@@ -65,15 +73,6 @@ export default function MethodologyOverviewPage() {
                   most important page for an auditor or quant reviewer is the verification page.
                 </p>
               </Section>
-
-              <Callout title="Read these first">
-                <p>
-                  Start with <MethodologyLink href="/methodology/reference">Public Methodology Reference</MethodologyLink>.
-                  Then read <MethodologyLink href="/methodology/verification">Verification &amp; Evidence</MethodologyLink>.
-                  Use <MethodologyLink href="/methodology/fields">Field Dictionary</MethodologyLink> as a lookup layer
-                  when you need field-level precision.
-                </p>
-              </Callout>
             </div>
           }
         />

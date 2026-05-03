@@ -30,7 +30,7 @@ export default function HeroJsonPeek() {
                 Three files per chain per day. Every field documented. Every label hash-anchored.
               </h2>
               <p className="mt-3 text-[14px] font-medium leading-[1.7] text-white/72">
-                Subscribers do not consume Urd Atlas as a chart. They pull JSON, join it onto
+                Subscribers do not consume Urd Atlas as a chart. They pull on-chain reference data as JSON, join it onto
                 their own data, and let it drive backtests, monitoring, and audit trails.
               </p>
             </div>

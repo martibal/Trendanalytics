@@ -37,7 +37,7 @@ export default async function ApiDocsPage() {
       <PageHero
         eyebrow="API documentation"
         title="API Docs"
-        summary="Authenticate once, fetch published JSON artifacts directly, and use the methodology and sample pack to validate exactly what the product delivers."
+        summary="Authenticate once, fetch published on-chain reference data directly as JSON, and use the methodology and sample pack to validate exactly what the product delivers."
       >
         <div className="flex flex-wrap gap-2 text-sm">
           <UrdButtonLink href="/api-docs/getting-started">Getting started</UrdButtonLink>
@@ -47,7 +47,7 @@ export default async function ApiDocsPage() {
         </div>
 
         <div className="mt-6 max-w-xl rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-4 text-xs text-[var(--urd-text-body)]">
-          <div className="font-medium uppercase tracking-[0.12em] text-blue-700">Published context</div>
+          <div className="font-medium uppercase tracking-[0.12em] text-blue-700">Published reference data</div>
           <div className="mt-2">Published revision <InlineCode>{dataset?.version ?? "—"}</InlineCode></div>
           <div className="mt-1">Methodology <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
           <div className="mt-2 text-[var(--urd-text-body)]">Public provenance is anchored in date, updated_through, methodology_version, published revision, and regime.determinism_hash.</div>
@@ -60,7 +60,7 @@ export default async function ApiDocsPage() {
         summary={<>Use this page to see what the API delivers, what you should inspect before buying, and where to go first.</>}
         bullets={[
           <>Start with <strong>Getting started</strong> if you want the fastest route from zero to your first pull.</>,
-          <>Open <strong>Public sample pack</strong> to inspect real JSON artifacts before subscribing.</>,
+          <>Open <strong>Public sample pack</strong> to inspect real reference data JSON before subscribing.</>,
           <>Use <strong>Schema reference</strong> when you need exact parsing and field structure.</>,
           <>Use <strong>Common workflows</strong> when you want to see how analysts and dashboards actually use the data.</>,
         ]}
@@ -70,7 +70,7 @@ export default async function ApiDocsPage() {
         <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
           <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">Before you buy</h2>
           <div className="mt-4 grid gap-4 lg:grid-cols-3 text-sm leading-7 text-[var(--urd-text-body)]">
-            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">1. Download sample artifacts</div><p className="mt-2">Use the <Link href="/api-docs/samples" className="underline">public sample pack</Link> to inspect real Gold, Derived, and Meta files.</p></div>
+            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">1. Download sample artifacts</div><p className="mt-2">Use the <Link href="/api-docs/samples" className="underline">public sample pack</Link> to inspect real Gold, Derived, and Meta reference files.</p></div>
             <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">2. Validate methodology and provenance</div><p className="mt-2">Use the <Link href="/methodology/reference" className="underline">reference</Link>, <Link href="/methodology/verification" className="underline">verification pack</Link>, and <Link href="/methodology/provenance" className="underline">provenance page</Link>.</p></div>
             <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">3. See operational expectations</div><p className="mt-2">Read the <Link href="/service" className="underline">service expectations and revision policy</Link> before subscribing.</p></div>
           </div>

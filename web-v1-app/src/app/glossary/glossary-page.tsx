@@ -84,7 +84,7 @@ export default async function GlossaryPage({
           <ul className="list-disc pl-5">
             <li>No glossary entry should imply a recommendation.</li>
             <li>No glossary entry should imply future price direction.</li>
-            <li>Definitions should remain descriptive and traceable to published artifacts.</li>
+            <li>Definitions should remain descriptive and traceable to published reference data artifacts.</li>
             <li>
               Terms should be read in the context of the currently published methodology version.
             </li>

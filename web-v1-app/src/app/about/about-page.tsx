@@ -107,9 +107,9 @@ const whatItDoesExplain: ExplainPair = {
   advanced: (
     <>
       <p>
-        Urd Atlas is a deterministic on-chain context layer. It applies a
+        Urd Atlas is a deterministic on-chain reference data layer. It applies a
         reproducible regime classification pipeline to AWS Public Blockchain Data for four
-        chains (Bitcoin, Ethereum, Arbitrum, Base), producing daily meta artifacts
+        chains (Bitcoin, Ethereum, Arbitrum, Base), producing daily Meta reference artifacts
         containing: a regime label from a five-state vocabulary, a three-axis scorecard
         (Demand, Friction, Capacity), a ranked driver set, a confidence score, and a
         determinism hash enabling full reproducibility auditing.
@@ -184,7 +184,7 @@ const whatItDoesNotExplain: ExplainPair = {
       <p className="mt-3">
         The practical implication is that Urd Atlas outputs are appropriate as one
         input to a broader analytical process. An analyst using this data is expected to
-        combine regime context with their own price views, positioning data, and market
+        combine reference data with their own price views, positioning data, and market
         structure analysis. The product deliberately does not do that synthesis.
       </p>
     </>
@@ -195,7 +195,7 @@ const dataLayersExplain: ExplainPair = {
   basic: (
     <>
       <p>
-        All published data is organised into three layers, each building on the previous.
+        All published reference data is organised into three layers, each building on the previous.
       </p>
       <ul className="mt-3 list-disc space-y-2 pl-5">
         <li>
@@ -216,7 +216,7 @@ const dataLayersExplain: ExplainPair = {
         </li>
       </ul>
       <p className="mt-3">
-        Subscribers can download all three layers as JSON files via the API.
+        Subscribers can download all three reference layers as JSON files via the API.
       </p>
     </>
   ),
@@ -324,7 +324,7 @@ const dataAttributionExplain: ExplainPair = {
         blocks for supported chains. Urd Atlas ingests these via a Python-based ETL
         pipeline that aggregates daily features (CANON_COLS), computes the statistical
         processing layer (regime engine, scorecard, confidence), and publishes the results
-        as versioned JSON artifacts behind the documented API contract.
+        as versioned reference data JSON behind the documented API contract.
       </p>
       <p className="mt-3">
         The pipeline is deterministic and idempotent per (chain, date) — rerunning it for
@@ -360,7 +360,7 @@ export default async function AboutPage() {
                 Urd Atlas
               </h1>
               <p className="mt-4 text-lg leading-8 text-slate-300">
-                Deterministic, explainable regime context for Bitcoin, Ethereum, Arbitrum,
+                Deterministic on-chain reference data for Bitcoin, Ethereum, Arbitrum,
                 and Base. Built to separate persistent network state changes from short-term
                 noise — every day, automatically, with full methodology transparency.
               </p>
@@ -457,7 +457,7 @@ export default async function AboutPage() {
             Every historical output is anchored by a determinism hash.
           </p>
           <ul className="mt-4 space-y-2 text-sm text-slate-300">
-            {["Open methodology with version history", "Determinism hash per published label", "Basic + Advanced explanations on every page", "Full JSON artifact download for subscribers"].map((item) => (
+            {["Open methodology with version history", "Determinism hash per published label", "Basic + Advanced explanations on every page", "Full reference data JSON download for subscribers"].map((item) => (
               <li key={item} className="flex items-start gap-2">
                 <span className="mt-1 shrink-0 text-cyan-400">→</span>
                 {item}
@@ -611,7 +611,7 @@ export default async function AboutPage() {
         <h2 className="mt-2 text-2xl font-semibold text-white">Read the full Q&amp;A</h2>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
           The dedicated Q&amp;A page answers skeptical user questions about noise, regime change,
-          confidence, baselines, JSON artifacts, and trust signals at both Basic and Advanced levels.
+          confidence, baselines, reference data JSON, and trust signals at both Basic and Advanced levels.
         </p>
         <Link
           href="/faq"
@@ -655,7 +655,7 @@ export default async function AboutPage() {
       <ExplainModal
         id="data-layers-modal"
         title="The three data layers"
-        subtitle="Gold, Meta, and Derived — what each contains and why they are separate."
+        subtitle="Gold, Derived, and Meta — the three reference layers and why they are separate."
         pair={dataLayersExplain}
       />
       <ExplainModal

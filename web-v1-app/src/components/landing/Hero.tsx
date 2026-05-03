@@ -182,7 +182,7 @@ export default function Hero({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-100/90">
               <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.85)]" />
-              Daily chain-state JSON
+              On-chain reference data
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-300">
@@ -202,11 +202,11 @@ export default function Hero({
               </div>
 
               <h1 className="mt-5 max-w-4xl text-[2.9rem] font-black leading-[0.98] tracking-[-0.05em] text-white sm:text-[3.8rem] xl:text-[4.7rem]">
-                Separate blockchain noise from structural change.
+                On-chain reference data for structural chain-state change.
               </h1>
 
               <p className="mt-6 max-w-3xl text-[18px] leading-8 text-slate-300">
-                Urd Atlas publishes daily JSON for BTC, ETH, ARB, and BASE so you can read current
+                Urd Atlas publishes daily Gold, Derived, and Meta reference layers for BTC, ETH, ARB, and BASE so you can read current
                 chain state without building your own ingestion, normalization, confidence, and
                 regime-classification stack.
               </p>

@@ -37,14 +37,14 @@ function code(path: string) {
 function capabilityRows() {
   return [
     {
-      tier: "Basic",
+      tier: "Single Chain",
       chains: "1 entitled chain",
       windows: "latest, 7d, 30d, 90d",
       history: "90 days",
       custom: "No",
     },
     {
-      tier: "Pro",
+      tier: "Research",
       chains: "All 4 chains",
       windows: "latest, 7d, 30d, 90d, 180d, 365d",
       history: "365 days",
@@ -192,6 +192,73 @@ export default async function DashboardPage() {
       : "Not set";
 
   const billingTemporarilyDisabled = true;
+
+  if (accountView.authConfigured && !accountView.isAuthenticated) {
+    return (
+      <UrdPage>
+        <PageHero
+          eyebrow="Subscriber area"
+          title="Dashboard"
+          highlight="Sign in to see your account"
+          summary="The dashboard is the subscriber control surface for account state, API keys, entitlement-aware JSON delivery, and billing context."
+        >
+          <div className="max-w-3xl rounded-3xl border border-white/15 bg-white/10 p-5 text-sm font-semibold leading-7 text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+            <div className="text-xs font-black uppercase tracking-[0.16em] text-cyan-200">
+              Account access
+            </div>
+            <div className="mt-2 text-base font-black text-white">
+              Sign in to inspect your subscriber state
+            </div>
+            <p className="mt-2">
+              Your dashboard shows the account, entitlement, API-key, and delivery settings used by
+              authenticated reference-data access.
+            </p>
+          </div>
+        </PageHero>
+
+        <UrdContainer className="space-y-8">
+          <UrdSection title="Sign in to see your account">
+            <div className="grid gap-6 lg:grid-cols-[1fr_0.75fr]">
+              <div className="space-y-4 text-sm font-semibold leading-7 text-[#27476f]">
+                <p>
+                  This dashboard is the authenticated workspace for subscribers. Once signed in,
+                  it shows your plan, entitled chains, history depth, allowed delivery windows,
+                  API keys, and billing-linkage state.
+                </p>
+                <p>
+                  Public methodology pages, status pages, and documentation remain available
+                  without signing in. Account-specific delivery controls are shown only after an
+                  authenticated session is present.
+                </p>
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <UrdButtonLink href="/sign-in">Sign in</UrdButtonLink>
+                  <UrdButtonLink href="/api-docs">Read API docs</UrdButtonLink>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
+                <div className="text-sm font-black text-[#0d2447]">What the dashboard does</div>
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-sm font-semibold leading-7 text-[#27476f]">
+                  <li>Shows the subscriber account and entitlement snapshot used by file delivery.</li>
+                  <li>Displays entitled chains, history depth, and allowed JSON delivery windows.</li>
+                  <li>Provides API-key lifecycle controls for authenticated reference-data access.</li>
+                  <li>Separates subscriber delivery from the public descriptive website.</li>
+                </ul>
+              </div>
+            </div>
+          </UrdSection>
+
+          <UrdSection title="Public resources">
+            <div className="flex flex-wrap gap-3 text-sm">
+              <UrdButtonLink href="/status">Public status</UrdButtonLink>
+              <UrdButtonLink href="/methodology">Methodology</UrdButtonLink>
+              <UrdButtonLink href="/thresholds">Threshold simulator</UrdButtonLink>
+            </div>
+          </UrdSection>
+        </UrdContainer>
+      </UrdPage>
+    );
+  }
 
   const allowedWindows = [
     accountView.snapshot.maxWindowDays >= 0 ? "latest" : null,
@@ -351,7 +418,7 @@ export default async function DashboardPage() {
                   })}
                 </div>
                 <p className="mt-3 text-xs font-semibold leading-6 text-[#557099]">
-                  Normative rule: Basic is limited to one entitled chain; Pro covers all four chains.
+                  Normative rule: Single Chain is limited to one entitled chain; Research covers all four chains.
                 </p>
               </div>
             </UrdSection>

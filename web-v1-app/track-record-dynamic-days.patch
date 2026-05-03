@@ -1,0 +1,45 @@
+diff --git a/src/app/track-record/page.tsx b/src/app/track-record/page.tsx
+--- a/src/app/track-record/page.tsx
++++ b/src/app/track-record/page.tsx
+@@ -4,6 +4,7 @@ import Link from "next/link";
+ 
+ import { CHAIN_LIST, type ChainId } from "@/config/chains";
+ import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
++import { computeHistoryDepthDays } from "@/lib/historyDepth";
+ import { readStorageObject } from "@/lib/storage";
+ import ChainIcon from "@/components/ChainIcon";
+ import RegimeBadge from "@/components/RegimeBadge";
+@@ -519,10 +520,11 @@ export default async function TrackRecordPage({
+       ? ["bitcoin", "ethereum", "arbitrum", "base"]
+       : [selectedChain];
+ 
+-  const [allRows, archiveSummaries] = await Promise.all([
++  const [allRows, archiveSummaries, historyDepthDays] = await Promise.all([
+     Promise.all(chainIds.map(readChainHistory)).then((rows) => rows.flat()),
+     Promise.all(chainIds.map(readChainArchiveSummary)),
++    computeHistoryDepthDays().catch(() => null),
+   ]);
+ 
+   const sortedRows = allRows
+@@ -543,6 +545,10 @@ export default async function TrackRecordPage({
+     .sort()
+     .slice(-1)[0] ?? null;
++  const pipelineRunDays =
++    typeof historyDepthDays === "number" && Number.isFinite(historyDepthDays)
++      ? historyDepthDays.toLocaleString("en-GB")
++      : "—";
+   const hasAnyRevisionId = filteredRows.some(
+     (row) => row.revisionId !== null && row.revisionId !== undefined
+   );
+@@ -604,8 +610,10 @@ export default async function TrackRecordPage({
+                 </div>
+                 <p className="mt-2 text-base font-semibold leading-7 text-[#0d2447]">
+                   Every label, every confidence score, every determinism hash this product has
+-                  ever published. 509 days, four chains, fully reproducible. This is your
+-                  compliance reference — verifiable, version-stamped, and never retroactively
++                  ever published. {pipelineRunDays !== "—" ? `${pipelineRunDays} days, four chains` : "Four chains"},
++                  fully reproducible. This is your compliance reference — verifiable,
++                  version-stamped, and never retroactively
+                   altered.
+                 </p>
+               </div>

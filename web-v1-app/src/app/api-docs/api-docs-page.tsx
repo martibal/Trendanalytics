@@ -36,7 +36,7 @@ export default async function ApiDocsPage() {
           <div className="max-w-4xl">
             <div className="text-xs font-medium uppercase tracking-[0.18em] text-blue-700">API documentation</div>
             <h1 className="mt-3 text-4xl font-semibold text-[var(--urd-text-strong)] sm:text-5xl">API Docs</h1>
-            <p className="mt-4 text-lg leading-8 text-[var(--urd-text-body)]">Authenticate once, fetch published JSON artifacts directly, and use the methodology and sample pack to validate exactly what the product delivers.</p>
+            <p className="mt-4 text-lg leading-8 text-[var(--urd-text-body)]">Authenticate once, fetch published on-chain reference data directly as JSON, and use the methodology and sample pack to validate exactly what the product delivers.</p>
             <div className="mt-5 flex flex-wrap gap-2 text-sm">
               <Link href="/api-docs/getting-started" className="rounded-full border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-2 text-[var(--urd-text-body)] hover:bg-[var(--urd-raised)]">Getting started</Link>
               <Link href="/api-docs/schema" className="rounded-full border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-2 text-[var(--urd-text-body)] hover:bg-[var(--urd-raised)]">Schema reference</Link>
@@ -45,10 +45,10 @@ export default async function ApiDocsPage() {
             </div>
           </div>
           <div className="min-w-[220px] rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-4 text-xs text-[var(--urd-text-body)]">
-            <div className="font-medium uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">Published context</div>
+            <div className="font-medium uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">Published reference data</div>
             <div className="mt-2">Dataset <InlineCode>{dataset?.version ?? "—"}</InlineCode></div>
             <div className="mt-1">Methodology <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
-            <div className="mt-1">Published artifact contract</div>
+            <div className="mt-1">Published reference data contract</div>
             <div className="mt-2 text-[var(--urd-text-muted)]">Runtime backend is a deployment detail, not the primary public provenance truth.</div>
           </div>
         </div>
@@ -58,7 +58,7 @@ export default async function ApiDocsPage() {
         <section className="rounded-2xl border p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">Before you buy</h2>
           <div className="mt-4 grid gap-4 lg:grid-cols-3 text-sm leading-7 text-[var(--urd-text-body)]">
-            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">1. Download sample artifacts</div><p className="mt-2">Use the <Link href="/api-docs/samples" className="underline">public sample pack</Link> to inspect real Gold, Derived, and Meta files.</p></div>
+            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">1. Download sample artifacts</div><p className="mt-2">Use the <Link href="/api-docs/samples" className="underline">public sample pack</Link> to inspect real Gold, Derived, and Meta reference files.</p></div>
             <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">2. Validate methodology and provenance</div><p className="mt-2">Use the <Link href="/methodology/reference" className="underline">reference</Link>, <Link href="/methodology/verification" className="underline">verification pack</Link>, and <Link href="/methodology/provenance" className="underline">provenance page</Link>.</p></div>
             <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">3. See operational expectations</div><p className="mt-2">Read the <Link href="/service" className="underline">service expectations and revision policy</Link> before subscribing.</p></div>
           </div>

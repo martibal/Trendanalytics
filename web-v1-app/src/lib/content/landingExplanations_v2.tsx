@@ -331,7 +331,7 @@ export function landingFreshnessExplanation(): ExplainContent {
 
 export function dataLayersExplanation(): ExplainContent {
   return {
-    title: "Gold, Meta, and Derived — what the three layers mean",
+    title: "Gold, Derived, and Meta — what the three layers mean",
     subtitle: "How published data is structured from raw observations to regime intelligence.",
     basic: (
       <>
@@ -458,7 +458,7 @@ export function interpretationBoundaryExplanation(): ExplainContent {
         <p className="mt-3">
           The practical implication is that Urd Atlas outputs are appropriate as one input to
           a broader analytical process, not as a standalone signal product. An analyst using this
-          data is expected to combine regime context with their own price views, positioning data,
+          data is expected to combine reference data with their own price views, positioning data,
           and market structure analysis. The product explicitly does not do that synthesis on their
           behalf.
         </p>
@@ -532,7 +532,7 @@ export function siteOrganisationExplanation(): ExplainContent {
           The subscriber surface adds authenticated file delivery via the{" "}
           <InlineCode>/api/v1/files/</InlineCode> endpoint, which enforces chain, genre, window,
           and date-range entitlements server-side. API keys are hashed at rest. Rate limiting
-          applies per account across all keys (Basic: 60 req/min, Pro: 300 req/min). The public
+          applies per account across all keys (Single Chain: 60 req/min, Research: 300 req/min). The public
           pages remain 100% unauthenticated with no login wall.
         </p>
       </>
@@ -616,12 +616,12 @@ export function subscriberSurfaceExplanation(): ExplainContent {
           A subscription adds one thing: direct access to the underlying JSON data files that power
           the site. If you are an analyst or developer who wants to run your own calculations,
           build your own charts, or feed the data into another tool, a subscription lets you
-          download the raw Gold, Meta, and Derived files for each chain.
+          download the raw Gold, Derived, and Meta files for each chain.
         </p>
         <p className="mt-3">
-          There are two subscription tiers. <span className="font-medium text-white">Basic</span>{" "}
+          There are two subscription tiers. <span className="font-medium text-white">Single Chain</span>{" "}
           gives you access to one chain of your choice. {" "}
-          <span className="font-medium text-white">Pro</span> gives you access to all four chains,
+          <span className="font-medium text-white">Research</span> gives you access to all four chains,
           a longer history window, and the ability to generate custom threshold outputs. A one-time{" "}
           <span className="font-medium text-white">History Add-on</span> unlocks the full available
           history for your entitled scope.
@@ -638,8 +638,8 @@ export function subscriberSurfaceExplanation(): ExplainContent {
           than 404, explicitly signalling entitlement enforcement rather than content absence.
         </p>
         <p className="mt-3">
-          Basic entitlement: one chain, all genres (gold/meta/derived), windows up to 90d, history
-          depth 90 days. Pro entitlement: all chains, all genres, windows up to 365d, history depth
+          Single Chain entitlement: one chain, all genres (gold/meta/derived), windows up to 90d, history
+          depth 90 days. Research entitlement: all chains, all genres, windows up to 365d, history depth
           365 days, custom threshold feed generation. The History Add-on sets{" "}
           <InlineCode>historyUnlocked = true</InlineCode>, removing the depth constraint for the
           entitled scope.
@@ -647,8 +647,8 @@ export function subscriberSurfaceExplanation(): ExplainContent {
         <p className="mt-3">
           API keys are opaque random strings stored as argon2id hashes. Keys are shown once at
           creation; thereafter only the last 4 characters are exposed for identification. Rate
-          limits are enforced per account across all keys using a sliding window (Basic: 60/min,
-          Pro: 300/min) via Upstash Redis with an in-process fallback for degraded Redis conditions.
+          limits are enforced per account across all keys using a sliding window (Single Chain: 60/min,
+          Research: 300/min) via Upstash Redis with an in-process fallback for degraded Redis conditions.
         </p>
       </>
     ),
@@ -713,7 +713,7 @@ export function valuePropositionExplanation(): ExplainContent {
       <>
         <p>
           The product&apos;s analytical foundation is a deterministic regime classification
-          pipeline over AWS Public Blockchain Data. The pipeline produces daily meta artifacts for
+          pipeline over AWS Public Blockchain Data. The pipeline produces daily Meta reference artifacts for
           four chains (Bitcoin, Ethereum, Arbitrum, Base) containing: a regime label drawn from a
           five-state vocabulary, a three-axis scorecard (Demand, Friction, Capacity) with 0–100
           scores derived from a tanh-compressed robust z-signal, a ranked driver set exposing the
@@ -753,7 +753,7 @@ export function valuePropositionExplanation(): ExplainContent {
           way that narrative commentary cannot be.
         </p>
         <p className="mt-3">
-          The subscriber API delivers authenticated access to the Gold, Meta, and Derived artifact
+          The subscriber API delivers authenticated access to the Gold, Derived, and Meta artifact
           layers via a proxy endpoint that enforces chain, genre, window, and date-range
           entitlements server-side. Rate limiting is applied per account using a sliding window
           over Upstash Redis. API keys are stored as argon2id hashes and shown only once at

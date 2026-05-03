@@ -33,10 +33,10 @@ export const qaEntries: QaEntry[] = [
     question: "What does this product actually do?",
     basic: [
       "Urd Atlas reads raw blockchain data every day, runs it through a calculation pipeline, and publishes an answer to one question: does this chain still look normal, or is something meaningfully changing?",
-      "The answer is published as a regime label, a confidence score, and a short explanation of which metrics are doing the explanatory work. You can read the web surface for free or subscribe to the JSON artifacts for direct downstream use.",
+      "The answer is published as on-chain reference data: a regime label, a confidence score, and a short explanation of which metrics are doing the explanatory work. You can read the web surface for free or subscribe to the reference data JSON for direct downstream use.",
     ],
     advanced: [
-      "The product is a deterministic, rule-based classification layer built on top of AWS Public Blockchain Data. It aggregates daily chain data, normalizes it with robust z-score logic, calculates evidence sufficiency, and publishes Gold, Meta, and Derived JSON artifacts.",
+      "The product is a deterministic on-chain reference data layer built on top of AWS Public Blockchain Data. It aggregates daily chain data, normalizes it with robust z-score logic, calculates evidence sufficiency, and publishes Gold, Derived, and Meta reference data JSON.",
       "Meta contains the main analytical output: status.label, confidence, scorecard dimensions, drivers, and traceability fields. The design goal is reproducible descriptive context, not forecasting or recommendations.",
     ],
   },
@@ -46,7 +46,7 @@ export const qaEntries: QaEntry[] = [
     question: "What do you know that is not already visible in raw data?",
     basic: [
       "Raw data gives you numbers. It does not tell you whether those numbers are high, low, normal, or important for that specific chain right now.",
-      "Urd Atlas adds that context by comparing the latest data to the chain's own recent history and deciding whether the move is meaningful enough to count as regime context rather than noise.",
+      "Urd Atlas adds that reference context by comparing the latest data to the chain's own recent history and deciding whether the move is meaningful enough to count as a regime state rather than noise.",
     ],
     advanced: [
       "The additional layer is chain-relative normalization, confidence gating, and deterministic classification. Absolute values alone do not tell you whether a move is unusual for Bitcoin, Ethereum, Arbitrum, or Base.",
@@ -59,11 +59,11 @@ export const qaEntries: QaEntry[] = [
     question: "What do I get here that I cannot already get for free elsewhere?",
     basic: [
       "You can read raw chain data for free in explorers and dashboards. What you usually do not get is a daily, documented answer to whether the current move still looks like noise or has become structural.",
-      "You also usually do not get that answer as reusable JSON artifacts that can go straight into your own notebooks, dashboards, filters, or models.",
+      "You also usually do not get that answer as reusable on-chain reference data that can go straight into your own notebooks, dashboards, filters, or models.",
     ],
     advanced: [
       "The free alternative is to pull AWS Public Blockchain Data yourself, write the aggregation logic, normalize it correctly per chain, implement confidence gating, version the artifacts, and keep the whole pipeline maintained.",
-      "Urd Atlas packages that work into documented Gold, Meta, and Derived outputs so the user consumes stateful, chain-relative analytical artifacts instead of rebuilding the full stack from public source data.",
+      "Urd Atlas packages that work into documented Gold, Derived, and Meta reference layers so the user consumes stateful, chain-relative reference data instead of rebuilding the full stack from public source data.",
     ],
   },
   {
@@ -310,7 +310,7 @@ export const qaEntries: QaEntry[] = [
   {
     id: "gold-meta-derived-difference",
     category: "JSON and Subscription",
-    question: "What is the difference between Gold, Meta, and Derived?",
+    question: "What is the difference between Gold, Derived, and Meta?",
     basic: [
       "Gold is the raw daily observation layer. Meta is the analytical interpretation layer. Derived is the smoothed trend layer built from Gold.",
       "Together they give you raw facts, the model's reading, and trend context in a reusable JSON format.",
@@ -379,23 +379,23 @@ export const qaEntries: QaEntry[] = [
   {
     id: "basic-vs-free",
     category: "JSON and Subscription",
-    question: "What do I get in Basic that I do not already get for free?",
+    question: "What do I get in Single Chain that I do not already get for free?",
     basic: [
-      "The free surface lets you inspect the published state. Basic gives you the actual JSON artifacts for one chain so you can use them in your own tools and models.",
+      "The free surface lets you inspect the published state. Single Chain gives you the actual reference data JSON for one chain so you can use it in your own tools and models.",
     ],
     advanced: [
-      "Basic unlocks authenticated API access to Gold, Meta, and Derived for one chain across the supported windows. The public site is the readable inspection layer; Basic is the programmatic artifact layer.",
+      "Single Chain unlocks authenticated API access to Gold, Derived, and Meta for one chain across the supported windows. The public site is the readable inspection layer; Single Chain is the programmatic reference data layer.",
     ],
   },
   {
     id: "pro-vs-basic",
     category: "JSON and Subscription",
-    question: "What do I get in Pro that I do not get in Basic?",
+    question: "What do I get in Research that I do not get in Single Chain?",
     basic: [
-      "Pro expands from one chain to all four and gives you a deeper history window. It is for users who need cross-chain context or broader research coverage.",
+      "Research expands from one chain to all four and gives you a deeper history window. It is for users who need cross-chain context or broader research coverage.",
     ],
     advanced: [
-      "Pro gives broader chain entitlement, longer historical windows, and a more natural setup for cross-chain or research-heavy workflows. It is the package most serious users will see as the actual product rather than the entry tier.",
+      "Research gives broader chain entitlement, longer historical windows, and a more natural setup for cross-chain or research-heavy workflows. It is the package most serious users will see as the actual product rather than the entry tier.",
     ],
   },
   {
@@ -406,7 +406,7 @@ export const qaEntries: QaEntry[] = [
       "Because the site is for reading and inspecting. The subscription is for using the artifacts directly in your own workflow.",
     ],
     advanced: [
-      "The public site and the subscriber API are built on the same published artifacts, but only the subscription exposes the raw machine-readable JSON as a stable downstream interface. That is the qualitative difference, not just more text or more charts.",
+      "The public site and the subscriber API are built on the same published reference data, but only the subscription exposes the raw machine-readable JSON as a stable downstream interface. That is the qualitative difference, not just more text or more charts.",
     ],
   },
   {
@@ -437,7 +437,7 @@ export const qaEntries: QaEntry[] = [
     category: "Fundamentals",
     question: "Is this for investors, developers, or researchers?",
     basic: [
-      "Primarily for analytically oriented users who are comfortable with data and want reusable JSON artifacts, not just visual dashboards.",
+      "Primarily for analytically oriented users who are comfortable with data and want reusable on-chain reference data JSON, not just visual dashboards.",
     ],
     advanced: [
       "The product fits three core groups: quantitative investors, research-oriented on-chain users, and developers who want chain-state artifacts without owning the entire ingestion and normalization stack.",
@@ -448,7 +448,7 @@ export const qaEntries: QaEntry[] = [
     category: "Fundamentals",
     question: "Do I need to know how to code to get value from this?",
     basic: [
-      "No for the public site. Yes, at least a little, if you want to get the full value from the subscriber JSON artifacts.",
+      "No for the public site. Yes, at least a little, if you want to get the full value from the subscriber reference data JSON.",
     ],
     advanced: [
       "The website itself is readable without code. The API product is designed for programmatic use, so some ability to make authenticated requests and parse JSON is expected for subscriber workflows.",

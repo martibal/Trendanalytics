@@ -55,10 +55,10 @@ export default async function GlossaryPage({
         summary="Public definitions for the product’s published terminology, fields, and interpretation boundaries. The glossary exists to make the product readable without turning it into an advisory or predictive surface."
       >
         <div className="max-w-xl rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
-          <div className="text-xs uppercase tracking-wide text-cyan-200">Published context</div>
+          <div className="text-xs uppercase tracking-wide text-cyan-200">Published reference data</div>
           <div className="mt-1 font-medium text-white">Dataset: {dataset?.version ?? "—"}</div>
           <div className="mt-1 text-xs text-slate-300">Methodology: {dataset?.methodology_version ?? "—"}</div>
-          <div className="mt-1 text-xs text-slate-300">Published artifact contract</div>
+          <div className="mt-1 text-xs text-slate-300">Published reference data contract</div>
         </div>
       </PageHero>
 
@@ -91,7 +91,7 @@ export default async function GlossaryPage({
           <ul className="list-disc pl-5">
             <li>No glossary entry should imply a recommendation.</li>
             <li>No glossary entry should imply future price direction.</li>
-            <li>Definitions should remain descriptive and traceable to published artifacts.</li>
+            <li>Definitions should remain descriptive and traceable to published reference data artifacts.</li>
             <li>
               Terms should be read in the context of the currently published methodology version.
             </li>

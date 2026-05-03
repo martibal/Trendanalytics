@@ -22,6 +22,8 @@ import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
 
 import "server-only";
 
+const WHITEPAPER_HREF = "/whitepaper/Urd_Atlas_Whitepaper.pdf";
+
 type LandingApiChain = {
   chain?: string;
   label?: string;
@@ -1064,6 +1066,139 @@ function StatusCard({
   );
 }
 
+
+type BuyerDecision = {
+  question: string;
+  answer: string;
+  bullets: string[];
+};
+
+const BUYER_DECISIONS: BuyerDecision[] = [
+  {
+    question: "Why a category at all?",
+    answer:
+      "A raw number forces the reader to do the interpretation work every time. A regime category is the interpretation, applied by a documented rule and available as a stable join key.",
+    bullets: [
+      "Numbers require interpretation every time. Categories are the interpretation, already done.",
+      "A category is reproducible between people; a raw score alone is not.",
+      "A backtest, research note, and LP report can all refer to an Ethereum CONGESTED day and mean the same thing.",
+      "The category does not hide the evidence: drivers, z-scores, percentiles, confidence, and freshness remain exposed.",
+    ],
+  },
+  {
+    question: "Why daily resolution instead of hourly or weekly?",
+    answer:
+      "A regime state that lasts 15 minutes is not a regime. Daily publication is frequent enough to be operationally useful and slow enough that each label has substance beyond transient spikes.",
+    bullets: [
+      "Sub-daily signals often capture noise with a timestamp; daily labels mark events that persisted through a publication cycle.",
+      "A CONGESTED day is a day, not a 15-minute spike.",
+      "Weekly labels would be too slow for many risk and research workflows that need to react within the same work week.",
+      "Daily cadence is the compromise: timely enough to use, conservative enough to avoid naming every spike.",
+    ],
+  },
+  {
+    question: "Why these four chains?",
+    answer:
+      "BTC, ETH, ARB, and BASE were chosen to cover distinct on-chain topologies while preserving a comparable schema and chain-specific rulesets.",
+    bullets: [
+      "Bitcoin represents a UTXO settlement chain where fee pressure and confirmation pacing are primary stress signals.",
+      "Ethereum represents an EVM L1 where gas utilization and friction are central state variables.",
+      "Arbitrum and Base provide two L2 surfaces for studying L2 versus L1 divergence under a shared reference schema.",
+      "New chains should be added only when they can be calibrated with the same level of methodological control.",
+    ],
+  },
+  {
+    question: "Why 90 and 365 days of history?",
+    answer:
+      "History length is an analytical capability boundary, not a pricing decoration. Ninety days is enough to verify whether a strategy splits meaningfully by regime. Three hundred sixty-five days is the minimum useful surface for most regime-conditioned modelling.",
+    bullets: [
+      "90 days is enough for basic regime segmentation and pre-purchase validation.",
+      "365 days captures seasonality, regime transitions, and cross-chain divergence better than a short window.",
+      "30 days is usually too short to contain enough regime changes to serve as evidence.",
+      "Longer history can be layered in when a workflow requires deeper archival backtesting.",
+    ],
+  },
+  {
+    question: "Why JSON instead of only dashboards, charts, or prose?",
+    answer:
+      "The product is an input to your existing analytical systems, not a replacement workspace. JSON lets Urd Atlas become a column in your own dataset instead of another tool your team must log into.",
+    bullets: [
+      "You own the files and can integrate them into your own database, backtests, notebooks, or reports.",
+      "Charts are useful for inspection; JSON is what working analysts and engineers can automate.",
+      "A regime label can be joined to returns, flows, internal risk flags, or research datasets.",
+      "Chain pages exist for human inspection, but the subscriber product is the structured reference data.",
+    ],
+  },
+  {
+    question: "Why a confidence gate, and why 0.40?",
+    answer:
+      "UNKNOWN/DEGRADED is not an excuse for weak data; it is an explicit refusal to publish a named state when the evidence surface is not strong enough. The 0.40 gate is the minimum evidence threshold for a named classification to pass through.",
+    bullets: [
+      "Urd Atlas does not publish a confident-looking label when the data does not support one.",
+      "0.40 is not a statement that raw data is wrong; it is a named-state publication threshold.",
+      "Low-confidence days remain machine-readable instead of being smoothed away.",
+      "A backtest can filter on confidence_score >= threshold in one place instead of manually repairing labels later.",
+    ],
+  },
+];
+
+function BuyerDecisionSection() {
+  return (
+    <section className="relative bg-[linear-gradient(180deg,#f5f9ff_0%,#eaf5ff_100%)] py-12">
+      <SectionShell>
+        <div className="max-w-[960px]">
+          <div className="text-[13px] font-black uppercase tracking-[0.14em] text-[#1d5fce]">
+            Product choices
+          </div>
+          <h2 className="mt-3 text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447] sm:text-[40px]">
+            Why we made the decisions we made
+          </h2>
+          <p className="mt-4 max-w-[860px] text-[17px] font-semibold leading-8 text-[#37547b]">
+            Every product is a sequence of choices. These are ours, and the reasoning behind each one.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-4 lg:grid-cols-2">
+          {BUYER_DECISIONS.map((item, index) => (
+            <details
+              key={item.question}
+              className="group rounded-[24px] border border-[#b8d8ff]/80 bg-white/82 p-0 shadow-[0_18px_55px_rgba(13,36,71,0.08)] backdrop-blur transition open:bg-white open:shadow-[0_24px_72px_rgba(13,36,71,0.12)]"
+            >
+              <summary className="flex cursor-pointer list-none items-start gap-4 px-5 py-5 marker:hidden sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#2f7cff]/24 bg-[#2f7cff]/10 text-[13px] font-black text-[#1d5fce]">
+                  {index + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[18px] font-black leading-6 tracking-[-0.02em] text-[#0d2447]">
+                    {item.question}
+                  </span>
+                  <span className="mt-2 block text-[14px] font-semibold leading-6 text-[#557099]">
+                    {item.answer}
+                  </span>
+                </span>
+                <span className="mt-1 text-[20px] font-black leading-none text-[#2f7cff] transition group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+
+              <div className="border-t border-[#cfe4fb] px-5 pb-5 pt-4 sm:px-6">
+                <ul className="grid gap-3 text-[14px] font-semibold leading-6 text-[#37547b]">
+                  {item.bullets.map((bullet) => (
+                    <li key={bullet} className="flex gap-3">
+                      <span className="mt-[0.55rem] h-1.5 w-1.5 shrink-0 rounded-full bg-[#2f7cff]" />
+                      <span>{bullet}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+          ))}
+        </div>
+      </SectionShell>
+    </section>
+  );
+}
+
 type JsonLayerTone = "gold" | "meta" | "derived";
 type JsonExampleConfidence = "high" | "degraded";
 type JsonExampleKey = `${JsonLayerTone}_${JsonExampleConfidence}`;
@@ -1459,12 +1594,12 @@ function JsonExamplePickerModal() {
     {
       tone: "meta",
       title: "Meta",
-      description: "Regime label, confidence, freshness, and driver context.",
+      description: "Regime label, confidence, freshness, and driver context for downstream analysis.",
     },
     {
       tone: "derived",
       title: "Derived",
-      description: "Rolling baselines and trend context built from Gold.",
+      description: "Deterministic rolling baselines and trend context built from Gold.",
     },
   ];
 
@@ -1473,7 +1608,7 @@ function JsonExamplePickerModal() {
       id="json-example-picker"
       className="fixed inset-0 z-[100] hidden items-center justify-center bg-[#020817]/82 px-5 py-8 backdrop-blur-sm [&:target]:flex"
     >
-      <a href="#" className="absolute inset-0" aria-label="Close JSON example picker" />
+      <a href="#close-json-example" className="absolute inset-0" aria-label="Close JSON example picker" />
 
       <section className="relative w-full max-w-[1040px] rounded-[26px] border border-white/12 bg-[#061426] p-6 text-white shadow-[0_32px_120px_rgba(0,0,0,0.56)] sm:p-8">
         <div className="flex items-start justify-between gap-5">
@@ -1482,16 +1617,16 @@ function JsonExamplePickerModal() {
               Historical JSON examples
             </div>
             <h3 className="mt-5 max-w-[760px] text-[34px] font-black tracking-[-0.045em] text-white">
-              Inspect real Gold, Meta, and Derived files before you read the full page.
+              Inspect real Gold, Derived, and Meta reference files before you read the full page.
             </h3>
             <p className="mt-3 max-w-[760px] text-[15px] font-semibold leading-7 text-slate-300">
-              Choose a layer and then compare a high-confidence example with a low-confidence / degraded example.
+              Choose a reference layer and then compare a high-confidence example with a low-confidence / degraded example.
               These are read from the published JSON archive, not hardcoded demo snippets.
             </p>
           </div>
 
           <a
-            href="#"
+            href="#close-json-example"
             className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-white/12 px-4 text-[13px] font-black text-white transition hover:bg-white/8"
           >
             Close
@@ -1554,7 +1689,7 @@ function JsonExampleModal(props: {
       id={`json-${props.tone}-${props.confidence}`}
       className="fixed inset-0 z-[100] hidden items-center justify-center bg-[#020817]/82 px-5 py-8 backdrop-blur-sm [&:target]:flex"
     >
-      <a href="#json-layers" className="absolute inset-0" aria-label="Close JSON example" />
+      <a href="#close-json-example" className="absolute inset-0" aria-label="Close JSON example" />
 
       <section className="relative w-full max-w-[980px] rounded-[26px] border border-white/12 bg-[#061426] p-6 shadow-[0_32px_120px_rgba(0,0,0,0.56)] sm:p-8">
         <div className="flex items-start justify-between gap-5">
@@ -1603,7 +1738,7 @@ function JsonExampleModal(props: {
           </div>
 
           <a
-            href="#json-layers"
+            href="#close-json-example"
             className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-white/12 px-4 text-[13px] font-black text-white transition hover:bg-white/8"
           >
             Close
@@ -1793,12 +1928,20 @@ export default async function HomePage() {
     <main className="min-h-screen bg-[#edf6ff] text-[#0a1d3a]">
       <section className="relative isolate overflow-hidden bg-[#031329] text-white">
         <div className="relative z-20 border-b border-white/8 bg-[#031329]/96 px-4 py-2 text-center text-[14px] font-semibold leading-6 text-white/82">
-          Three subscription levels: Free, Basic $29/mo, and Pro $79/mo.{" "}
+          Three subscription levels: Free, Single Chain $49/mo, and Research $149/mo.{" "}
           <a
             href="#pricing"
             className="font-extrabold text-blue-300 underline decoration-blue-300/40 underline-offset-4 hover:text-blue-200"
           >
             Click for more
+          </a>
+          <span className="mx-2 text-white/35">·</span>
+          <a
+            href={WHITEPAPER_HREF}
+            download
+            className="font-extrabold text-cyan-200 underline decoration-cyan-200/40 underline-offset-4 hover:text-white"
+          >
+            Download whitepaper
           </a>
           .
         </div>
@@ -1825,7 +1968,7 @@ export default async function HomePage() {
                 <span className="block text-[#2f7cff]">from structural change.</span>
               </h1>
               <p className="mt-6 max-w-[800px] text-[19px] font-semibold leading-7 text-white/88 sm:text-[20px]">
-                Daily Gold, Meta, and Derived JSON for BTC, ETH, ARB, and BASE. Regime context without maintaining your own pipeline.
+                On-chain reference data for BTC, ETH, ARB, and BASE. Daily Gold, Derived, and Meta JSON without maintaining your own pipeline.
               </p>
             <div className="mt-7 flex flex-wrap gap-3">
 
@@ -1841,6 +1984,12 @@ export default async function HomePage() {
                 className="inline-flex h-12 min-w-[170px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_14px_30px_rgba(37,99,235,0.32)] transition hover:bg-blue-700"
               >
                 View API Docs
+              </Link>
+              <Link
+                href="/api-docs/samples"
+                className="inline-flex h-12 min-w-[190px] items-center justify-center rounded-[8px] border border-blue-300/45 bg-white/8 px-6 text-[14px] font-extrabold text-blue-100 shadow-[0_14px_30px_rgba(3,19,41,0.22)] transition hover:bg-white/14 hover:text-white"
+              >
+                Open sample pack →
               </Link>
             </div>
 
@@ -1879,6 +2028,8 @@ export default async function HomePage() {
           </SectionShell>
         </section>
 
+        <BuyerDecisionSection />
+
         <WhoThisIsFor />
 
       <section className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_58%,#eef6ff_100%)] pb-0 pt-10">
@@ -1893,10 +2044,10 @@ export default async function HomePage() {
             >
             <div className="max-w-[1200px]">
               <h2 className="text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447]">
-                JSON is our product
+                Reference data delivered as JSON
               </h2>
               <p className="mt-4 max-w-[980px] text-[17px] font-medium leading-8 text-[#37547b]">
-                Each chain is published as three compact JSON layers with distinct roles in the regime model.
+                Each chain is published as three compact reference layers with distinct roles: Gold observations, Derived transforms, and Meta regime and confidence context.
               </p>
             </div>
 
@@ -1911,8 +2062,8 @@ export default async function HomePage() {
               <JsonLayerCard
                 tone="meta"
                 title="Meta"
-                subtitle="Regime context"
-                description="Meta is built around the published regime label, confidence score, freshness, and the drivers explaining why the label fired."
+                subtitle="Regime reference layer"
+                description="Meta is the reference layer for the published regime label, confidence score, freshness, and the drivers explaining why the label fired."
               />
 
               <JsonLayerCard
@@ -1921,6 +2072,67 @@ export default async function HomePage() {
                 subtitle="Trend baselines"
                 description="Derived is built around moving averages and relative-position metrics that separate short-term noise from structural change."
               />
+            </div>
+
+            <div className="mt-8 rounded-[28px] border border-[#9cc7ff]/60 bg-[linear-gradient(135deg,rgba(255,255,255,0.92)_0%,rgba(234,245,255,0.86)_52%,rgba(218,237,255,0.80)_100%)] p-6 shadow-[0_22px_70px_rgba(13,36,71,0.12)] backdrop-blur md:p-7 lg:grid lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)] lg:items-center lg:gap-8">
+              <div>
+                <div className="inline-flex rounded-full border border-[#2f7cff]/22 bg-[#2f7cff]/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#1d5fce]">
+                  Public sample pack
+                </div>
+                <h3 className="mt-4 max-w-[760px] text-[28px] font-black leading-tight tracking-[-0.035em] text-[#0d2447]">
+                  Inspect the exact files before you subscribe.
+                </h3>
+                <p className="mt-3 max-w-[820px] text-[16px] font-semibold leading-7 text-[#37547b]">
+                  The sample pack gives technical buyers real Gold, Derived, and Meta payloads, including high-confidence and degraded states. Use it to check schemas, confidence gates, driver fields, and hash-anchored named rows before adding Urd Atlas to a pipeline.
+                </p>
+              </div>
+
+              <div className="mt-6 rounded-[22px] border border-[#c7dcf5] bg-white/82 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_12px_34px_rgba(13,36,71,0.08)] lg:mt-0">
+                <div className="grid gap-2 text-[13px] font-bold leading-5 text-[#48688f]">
+                  <div className="flex items-center justify-between gap-4 rounded-[14px] bg-[#edf6ff] px-4 py-3">
+                    <span>Gold / Derived / Meta</span>
+                    <span className="text-[#0d2447]">real JSON</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-[14px] bg-[#edf6ff] px-4 py-3">
+                    <span>High + degraded examples</span>
+                    <span className="text-[#0d2447]">pre-purchase</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-[14px] bg-[#edf6ff] px-4 py-3">
+                    <span>Verification-ready fields</span>
+                    <span className="text-[#0d2447]">audit path</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                  <Link
+                    href="/api-docs/samples"
+                    className="inline-flex h-11 items-center justify-center rounded-full bg-[#2f7cff] px-5 text-[13px] font-black text-white shadow-[0_14px_34px_rgba(47,124,255,0.24)] transition hover:-translate-y-0.5 hover:bg-[#2368dd]"
+                  >
+                    Open sample pack →
+                  </Link>
+                  <a
+                    href="#json-example-picker"
+                    className="inline-flex h-11 items-center justify-center rounded-full border border-[#2f7cff]/25 bg-white px-5 text-[13px] font-black text-[#1d5fce] transition hover:-translate-y-0.5 hover:bg-[#eef6ff]"
+                  >
+                    View examples →
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div
+              id="json-after-example"
+              className="mt-8 scroll-mt-24 rounded-[22px] border border-[#b8d8ff] bg-white/76 px-5 py-4 shadow-[0_18px_55px_rgba(13,36,71,0.10)] backdrop-blur sm:flex sm:items-center sm:justify-between sm:gap-6"
+            >
+              <p className="text-[15px] font-extrabold leading-7 text-[#0d2447]">
+                This is what subscribers receive every day.
+              </p>
+              <a
+                href="#pricing"
+                className="mt-3 inline-flex h-11 items-center justify-center rounded-full border border-[#2f7cff]/25 bg-[#2f7cff] px-5 text-[13px] font-black text-white shadow-[0_14px_34px_rgba(47,124,255,0.24)] transition hover:-translate-y-0.5 hover:bg-[#2368dd] sm:mt-0"
+              >
+                See plans →
+              </a>
             </div>
           </div>
 
@@ -1993,32 +2205,32 @@ export default async function HomePage() {
                   price="$0"
                   pill="Public surface"
                   headline="Full web surface — no API access."
-                  body="Track record, status, methodology, glossary, thresholds, and schema reference. The same published artifacts subscribers receive — readable on-site, not downloadable."
+                  body="Track record, status, methodology, glossary, thresholds, and schema reference. The same published reference data subscribers receive — readable on-site, not downloadable."
                   bestFor="Best for: exploring the product before subscribing."
                   href="/status"
                   cta="Open public surface →"
                 />
                 <PlanCard
                   tone="basic"
-                  name="Basic"
-                  price="$29/mo"
+                  name="Single Chain"
+                  price="$49/mo"
                   pill="1 chain · 90d · JSON"
                   headline="One chain. API access. 90-day history."
-                  body="Gold, Meta, and Derived JSON for one chain of your choice — BTC, ETH, ARB, or BASE. Delivered daily via authenticated API."
-                  bestFor="Best for: focused monitoring or single-chain research."
+                  body="Daily on-chain reference data for one chain of your choice — BTC, ETH, ARB, or BASE. Gold, Derived, and Meta JSON delivered via authenticated API."
+                  bestFor="Best for: independent analysts validating the dataset against one chain."
                   href="/dashboard"
-                  cta="Start Basic →"
+                  cta="Start Single Chain →"
                 />
                 <PlanCard
                   tone="pro"
-                  name="Pro"
-                  price="$79/mo"
+                  name="Research"
+                  price="$149/mo"
                   pill="4 chains · 365d · JSON"
                   headline="All four chains. API access. 365-day history."
-                  body="Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Standard Pro includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
+                  body="Daily on-chain reference data across BTC, ETH, ARB, and BASE. Gold, Derived, and Meta JSON delivered via authenticated API. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
                   bestFor="Best for: multi-chain research, backtesting, and production pipelines."
                   href="/dashboard"
-                  cta="Start Pro →"
+                  cta="Start Research →"
               
                 />
               </div>

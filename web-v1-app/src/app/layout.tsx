@@ -11,7 +11,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Urd Atlas",
-  description: "Descriptive on-chain regime context. No price. No forecasts. No recommendations.",
+  description: "On-chain reference data for BTC, ETH, ARB, and BASE. No price data. No forecasts. No recommendations.",
 };
 
 function AuthProvider({

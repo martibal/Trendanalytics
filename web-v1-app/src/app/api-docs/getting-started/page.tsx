@@ -139,7 +139,7 @@ export default function GettingStartedJsonApiPage() {
         bullets={[
           <>If you only do one thing before buying, download one sample Meta file and inspect its label, confidence, and determinism hash.</>,
           <>If you only do one thing after buying, create an API key and fetch one latest.json file successfully.</>,
-          <>Basic gives one chain with 90 days. Pro gives all four chains with 365 days. Full archive access, when offered, remains a separate add-on.</>,
+          <>Single Chain gives one chain with 90 days. Research gives all four chains with 365 days. Full archive access, when offered, remains a separate add-on.</>,
         ]}
         whyItMatters={<>A new user should be able to understand the product and reach a first successful API request without reading the entire guide.</>}
         fullContent={
@@ -278,7 +278,7 @@ export default function GettingStartedJsonApiPage() {
             <h3 className="text-sm font-bold text-[#0d2447] mb-3">Files available per plan</h3>
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5">
-                <div className="text-xs font-bold uppercase tracking-wider text-cyan-700 mb-3">Basic — $29/mo — 1 chain</div>
+                <div className="text-xs font-bold uppercase tracking-wider text-cyan-700 mb-3">Single Chain — $49/mo — 1 chain</div>
                 <p className="text-xs text-[#557099] mb-3">If your entitled chain is bitcoin, you can fetch:</p>
                 <CodeBlock>{`/api/v1/files/gold/bitcoin/latest.json
 /api/v1/files/meta/bitcoin/latest.json
@@ -298,7 +298,7 @@ export default function GettingStartedJsonApiPage() {
                 <p className="mt-3 text-xs text-[#557099]">That is 12 files total per day — 3 genres × 4 windows.</p>
               </div>
               <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-5">
-                <div className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-3">Pro — $79/mo — all 4 chains</div>
+                <div className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-3">Research — $149/mo — all 4 chains</div>
                 <p className="text-xs text-[#557099] mb-3">Same structure, but for all four chains and 6 windows (adds 180d and 365d):</p>
                 <CodeBlock>{`/api/v1/files/meta/bitcoin/latest.json
 /api/v1/files/meta/ethereum/latest.json
@@ -370,8 +370,8 @@ export default function GettingStartedJsonApiPage() {
               daily to add one new day at a time.
               <br /><br />
               <span className="font-black text-[#0d2447]">For backtesting or analysis over a long period:</span>{" "}
-              fetch the largest window your plan allows (<InlineCode>90d</InlineCode> for Basic,
-              <InlineCode>365d</InlineCode> for Pro) to get everything in one request.
+              fetch the largest window your plan allows (<InlineCode>90d</InlineCode> for Single Chain,
+              <InlineCode>365d</InlineCode> for Research) to get everything in one request.
             </QA>
 
             <QA question="What are the available windows?">
@@ -386,12 +386,12 @@ export default function GettingStartedJsonApiPage() {
                   </thead>
                   <tbody className="text-[#27476f]">
                     {[
-                      ["latest", "Most recent single day only", "Basic + Pro"],
-                      ["7d", "Last 7 days as an array", "Basic + Pro"],
-                      ["30d", "Last 30 days as an array", "Basic + Pro"],
-                      ["90d", "Last 90 days as an array", "Basic + Pro"],
-                      ["180d", "Last 180 days as an array", "Pro only"],
-                      ["365d", "Last 365 days as an array", "Pro only"],
+                      ["latest", "Most recent single day only", "Single Chain + Research"],
+                      ["7d", "Last 7 days as an array", "Single Chain + Research"],
+                      ["30d", "Last 30 days as an array", "Single Chain + Research"],
+                      ["90d", "Last 90 days as an array", "Single Chain + Research"],
+                      ["180d", "Last 180 days as an array", "Research only"],
+                      ["365d", "Last 365 days as an array", "Research only"],
                     ].map(([token, desc, plan]) => (
                       <tr key={token} className="border-b border-[#c0d4e8]">
                         <td className="py-2 pr-4 font-mono text-cyan-700">{token}</td>
@@ -421,7 +421,7 @@ export default function GettingStartedJsonApiPage() {
               <h3 className="text-sm font-bold text-[#0d2447] mb-3">What Urd Atlas does automatically</h3>
               <BulletList items={[
                 "Runs the classification pipeline every day",
-                "Publishes new Gold, Meta, and Derived files for each chain",
+                "Publishes new Gold, Derived, and Meta files for each chain",
                 "Updates the window bundle files (7d, 30d, 90d, etc.) to include the new day",
                 "Makes all files available on the API immediately after publication",
                 "Updates the public /status endpoint so you can check freshness",
@@ -465,14 +465,14 @@ export default function GettingStartedJsonApiPage() {
         <Section id="after-subscribe" eyebrow="Chapter 6" title="What happens step by step after you subscribe">
           <div className="grid gap-4 xl:grid-cols-3 lg:grid-cols-2">
             <StepCard number="1" title="Complete payment on Stripe">
-              Click &quot;Start Basic&quot; or &quot;Start Pro&quot; on the plans page. For Basic, choose your
+              Click &quot;Start Single Chain&quot; or &quot;Start Research&quot; on the plans page. For Single Chain, choose your
               chain first. You are redirected to Stripe&apos;s checkout page. Enter your card
               details. Your subscription is active immediately after payment.
             </StepCard>
             <StepCard number="2" title="Arrive at your Dashboard">
               After payment, you land on the{" "}
               <Link href="/dashboard" className="font-bold text-blue-700 underline">Dashboard</Link>.
-              It shows your plan, entitled chain (Basic) or all chains (Pro), allowed
+              It shows your plan, entitled chain (Single Chain) or all chains (Research), allowed
               windows, and history depth. This is your subscriber control panel.
             </StepCard>
             <StepCard number="3" title="Create an API key">
@@ -643,7 +643,7 @@ print(df["label"].value_counts())  # how many days each label appeared`}</CodeBl
             </div>
 
             <div className="rounded-2xl border bg-[#f8fbff] p-5">
-              <h3 className="text-base font-semibold text-[#0d2447] mb-3">Compare all four chains (Pro) — build a daily summary table</h3>
+              <h3 className="text-base font-semibold text-[#0d2447] mb-3">Compare all four chains (Research) — build a daily summary table</h3>
               <CodeBlock>{`import requests, pandas as pd
 
 API_KEY = "YOUR_KEY_HERE"
@@ -812,7 +812,7 @@ python3 fetch_urdatlas.py`}</CodeBlock>
               Yes. Copy the key string and use it wherever you want. You can also create
               a second key in Dashboard for a different machine.
             </QA>
-            <QA question="Is the JSON format the same for Basic and Pro?">
+            <QA question="Is the JSON format the same for Single Chain and Research?">
               Yes — identical format. The difference is scope: which chains and how many
               days of history you can access, not the structure of the files.
             </QA>
@@ -827,8 +827,8 @@ python3 fetch_urdatlas.py`}</CodeBlock>
             </QA>
             <QA question="I get a 403 error — what does that mean?">
               A 403 means your request is outside your entitlement. Common causes:
-              requesting a chain you are not entitled to (Basic only gets one chain),
-              requesting a window larger than your plan allows (e.g. 365d on Basic),
+              requesting a chain you are not entitled to (Single Chain only gets one chain),
+              requesting a window larger than your plan allows (e.g. 365d on Single Chain),
               or your subscription is not active. Check Dashboard to confirm your plan status.
             </QA>
             <QA question="I get a 401 error — what does that mean?">

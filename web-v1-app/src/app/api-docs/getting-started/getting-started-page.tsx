@@ -230,7 +230,7 @@ export default function GettingStartedJsonApiPage() {
               <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">What Urd Atlas does automatically</h3>
               <BulletList items={[
                 "Runs the classification pipeline every day.",
-                "Publishes new Gold, Meta, and Derived JSON files for each chain.",
+                "Publishes new Gold, Derived, and Meta JSON files for each chain.",
                 "Updates the public status endpoint so you can check freshness.",
                 "Makes the new files available on the API immediately after publication.",
               ]} />
@@ -330,8 +330,8 @@ export default function GettingStartedJsonApiPage() {
             </StepCard>
 
             <StepCard number="2" title="Choose your plan and subscribe">
-              Go to the plans section. Basic gives you one chain of your choice.
-              Pro gives you all four. Choose your plan and complete payment via Stripe.
+              Go to the plans section. Single Chain gives you one chain of your choice.
+              Research gives you all four. Choose your plan and complete payment via Stripe.
               Your card is charged immediately and the subscription is active right away.
             </StepCard>
 
@@ -379,11 +379,11 @@ export default function GettingStartedJsonApiPage() {
         <Section
           id="plans"
           eyebrow="Plans"
-          title="What Basic and Pro give you"
+          title="What Single Chain and Research give you"
           subtitle="The biggest difference is not the JSON format — it is how many chains and how much history you can access."
         >
           <div className="grid gap-4 xl:grid-cols-2">
-            <PlanCard title="Basic" price="$29/month" accent="border-cyan-500/20 bg-cyan-500/5">
+            <PlanCard title="Single Chain" price="$49/month" accent="border-cyan-500/20 bg-cyan-500/5">
               <BulletList items={[
                 <><span className="font-semibold text-[var(--urd-text-strong)]">One chain</span> of your choice: bitcoin, ethereum, arbitrum, or base</>,
                 <>All three file types: <InlineCode>gold</InlineCode>, <InlineCode>meta</InlineCode>, and <InlineCode>derived</InlineCode></>,
@@ -398,7 +398,7 @@ export default function GettingStartedJsonApiPage() {
               </div>
             </PlanCard>
 
-            <PlanCard title="Pro" price="$79/month" accent="border-purple-500/20 bg-purple-500/5">
+            <PlanCard title="Research" price="$149/month" accent="border-purple-500/20 bg-purple-500/5">
               <BulletList items={[
                 <><span className="font-semibold text-[var(--urd-text-strong)]">All four chains:</span> bitcoin, ethereum, arbitrum, and base</>,
                 <>All three file types: <InlineCode>gold</InlineCode>, <InlineCode>meta</InlineCode>, and <InlineCode>derived</InlineCode></>,
@@ -418,11 +418,11 @@ export default function GettingStartedJsonApiPage() {
           <div className="mt-5 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] p-5">
             <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">History Add-on</h3>
             <p className="mt-3 text-sm leading-7 text-[var(--urd-text-body)]">
-              Standard subscriber scope stays explicit: Basic includes up to 90 days and
-              Pro includes up to 365 days. Where a separate History Add-on is offered, it
+              Standard subscriber scope stays explicit: Single Chain includes up to 90 days and
+              Research includes up to 365 days. Where a separate History Add-on is offered, it
               unlocks the full currently available archive beyond those default API windows.
               The public track record can therefore be longer than the standard subscriber
-              API range without changing what standard Pro includes.
+              API range without changing what standard Research includes.
             </p>
           </div>
         </Section>
@@ -432,7 +432,7 @@ export default function GettingStartedJsonApiPage() {
           id="file-types"
           eyebrow="File types"
           title="What the three file types actually contain"
-          subtitle="Both Basic and Pro get all three. The difference is scope, not format."
+          subtitle="Both Single Chain and Research get all three. The difference is scope, not format."
         >
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
@@ -520,11 +520,11 @@ export default function GettingStartedJsonApiPage() {
               have already downloaded and saved locally is yours to keep.
             </QA>
 
-            <QA question="Is the JSON format the same for Basic and Pro?">
+            <QA question="Is the JSON format the same for Single Chain and Research?">
               Yes. Both plans receive identical file formats. The difference is scope:
-              Basic gets one chain and 90-day history. Pro gets all four chains and
+              Single Chain gets one chain and 90-day history. Research gets all four chains and
               365-day history. The public track record may be longer because it reflects
-              the full published archive, but standard Pro still means 365 days unless a
+              the full published archive, but standard Research still means 365 days unless a
               separate archive unlock is explicitly added. The fields inside the files are the same.
             </QA>
 

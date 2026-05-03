@@ -27,11 +27,11 @@ export default async function MobilePlansPage() {
       <main className="flex-1 space-y-4 px-4 py-4 pb-24">
         <div className="rounded-3xl border border-cyan-500/15 bg-cyan-500/[0.04] p-4">
           <p className="text-[13px] leading-[1.75] text-slate-200">
-            Free lets you inspect the public surface on-site. Paid plans unlock daily API delivery of Gold, Meta, and Derived JSON.
+            Free lets you inspect the public surface on-site. Paid plans unlock daily API delivery of Gold, Derived, and Meta reference data JSON.
           </p>
           <p className="mt-2 text-[12px] leading-[1.7] text-slate-400">
-            New here? Start with <span className="font-semibold text-white">Basic</span> on your most-watched chain.
-            Upgrade to <span className="font-semibold text-white">Pro</span> later if you want all four chains and deeper history.
+            New here? Start with <span className="font-semibold text-white">Single Chain</span> on your most-watched chain.
+            Upgrade to <span className="font-semibold text-white">Research</span> later if you want all four chains and deeper history.
           </p>
         </div>
 
@@ -41,11 +41,11 @@ export default async function MobilePlansPage() {
             <div className="mt-1 text-[10px] leading-[1.5] text-slate-500">Inspect public surface only</div>
           </div>
           <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.06] p-3">
-            <div className="text-[11px] font-bold text-cyan-200">Basic</div>
+            <div className="text-[11px] font-bold text-cyan-200">Single Chain</div>
             <div className="mt-1 text-[10px] leading-[1.5] text-slate-400">1 chain · 90 days</div>
           </div>
           <div className="rounded-2xl border border-purple-500/20 bg-purple-500/[0.06] p-3">
-            <div className="text-[11px] font-bold text-purple-200">Pro</div>
+            <div className="text-[11px] font-bold text-purple-200">Research</div>
             <div className="mt-1 text-[10px] leading-[1.5] text-slate-400">4 chains · 365 days</div>
           </div>
         </div>

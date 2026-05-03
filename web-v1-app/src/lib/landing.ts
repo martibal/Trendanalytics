@@ -1,16 +1,16 @@
 // ─── Hero — centre column ──────────────────────────────────────────────────────
 
 export const heroTagline =
-  "The on-chain fee environment, classified.";
+  "On-chain reference data for BTC, ETH, ARB, and BASE.";
 
 export const heroSubline =
-  "Every day, the pipeline reads raw transaction data from BTC, ETH, ARB, and BASE — scores each metric against a 180-day chain-relative baseline — and publishes one regime label per chain. Not a chart. Not a price feed. A structured, auditable classification of whether the network is behaving normally or something has structurally shifted.";
+  "Every day, the pipeline reads raw transaction data from BTC, ETH, ARB, and BASE and publishes three reference layers: Gold observations, Derived transforms, and Meta regime and confidence context. Not a chart. Not a price feed. Structured, auditable on-chain reference data for downstream analysis.";
 
 export const heroBodyParagraphs = [] as const;
 
 export const heroSalesPunch = [
-  "The JSON output — not just the charts.",
-  "Subscribers get Gold, Meta, and Derived JSON via API daily — ready to plug into notebooks, models, and dashboards. No pipeline to build or maintain.",
+  "Reference data delivered as JSON — not just charts.",
+  "Subscribers get daily Gold, Derived, and Meta reference data via API — ready to plug into notebooks, models, and dashboards. No pipeline to build or maintain.",
 ] as const;
 
 export const heroFaqPrompt =
@@ -155,7 +155,7 @@ export const heroActionItems = [
   },
   {
     label: "Structured data without pipeline overhead",
-    detail: "Gold, Meta, and Derived JSON delivered via API. Plug into notebooks or downstream models — no infrastructure to build.",
+    detail: "Daily Gold, Derived, and Meta reference data delivered via API. Plug into notebooks or downstream models — no infrastructure to build.",
   },
   {
     label: "Independent verification",
@@ -172,7 +172,7 @@ export const landingUseCases = [
   },
   {
     title: "Structured daily data without pipeline overhead",
-    body: "Gold, Meta, and Derived JSON published daily, delivered via authenticated API. Plug directly into notebooks, dashboards, or downstream models — no data pipeline to build or maintain.",
+    body: "Daily Gold, Derived, and Meta reference data delivered via authenticated API. Plug directly into notebooks, dashboards, or downstream models — no data pipeline to build or maintain.",
   },
   {
     title: "400+ days of auditable history",
@@ -191,36 +191,38 @@ export const landingPlans = [
     border: "border-white/10 bg-white/5",
     body: "Full web surface — no API access.",
     detail:
-      "Track record, status, methodology, glossary, thresholds, and schema reference. The same published artifacts subscribers receive — readable on-site, not downloadable.",
+      "Track record, status, methodology, glossary, thresholds, and schema reference. The same published reference data subscribers receive — readable on-site, not downloadable.",
     bestFor: "Best for: exploring the product before subscribing.",
     href: "/track-record",
     cta: "Open public surface →",
   },
   {
-    name: "Basic",
-    price: "$29/mo",
+    name: "Single Chain",
+    checkoutPlan: "basic",
+    price: "$49/mo",
     tierTag: "1 chain · 90d · JSON",
     accent: "text-cyan-200",
     border: "border-cyan-500/25 bg-cyan-500/8",
     body: "One chain. API access. 90-day history.",
     detail:
-      "Gold, Meta, and Derived JSON for one chain of your choice — BTC, ETH, ARB, or BASE. Delivered daily via authenticated API.",
-    bestFor: "Best for: focused monitoring or single-chain research.",
+      "Daily on-chain reference data for one chain of your choice — BTC, ETH, ARB, or BASE. Gold, Derived, and Meta JSON delivered via authenticated API.",
+    bestFor: "Best for: independent analysts validating the dataset against one chain.",
     href: "/sign-up",
-    cta: "Start Basic →",
+    cta: "Start Single Chain →",
   },
   {
-    name: "Pro",
-    price: "$79/mo",
+    name: "Research",
+    checkoutPlan: "pro",
+    price: "$149/mo",
     tierTag: "4 chains · 365d · JSON",
     accent: "text-purple-200",
     border: "border-purple-500/25 bg-purple-500/8",
     body: "All four chains. API access. 365-day history.",
     detail:
-      "Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Standard Pro includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive.",
+      "Daily on-chain reference data across BTC, ETH, ARB, and BASE. Gold, Derived, and Meta JSON delivered via authenticated API. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive.",
     bestFor: "Best for: multi-chain research, backtesting, and production pipelines.",
     href: "/sign-up",
-    cta: "Start Pro →",
+    cta: "Start Research →",
   },
 ] as const;
 
@@ -242,7 +244,7 @@ export const trustCards = [
   {
     eyebrow: "Schema",
     title: "What every field contains",
-    body: "See Gold, Meta, and Derived fields documented in full.",
+    body: "See every Gold, Derived, and Meta reference field documented in full.",
     href: "/api-docs/schema",
   },
 ] as const;
@@ -273,14 +275,14 @@ export const jsonLayers = [
   },
   {
     eyebrow: "Meta",
-    title: "Regime intelligence",
+    title: "Regime reference layer",
     schemaHref: "/api-docs/schema#meta",
     accentColor: "text-purple-300",
     borderColor: "border-purple-500/20",
     bgColor: "bg-purple-500/5",
     dotColor: "text-purple-500/50",
     description:
-      "The full analytical output — regime label, confidence score, three-axis scorecard (Demand / Friction / Capacity), and a ranked driver set with z-scores, percentiles, and momentum. The commercial core of the product.",
+      "The core reference layer for regime classification — regime label, confidence score, three-axis scorecard (Demand / Friction / Capacity), and a ranked driver set with z-scores, percentiles, and momentum. The commercial core of the product.",
     bestFor:
       "Best for: regime research, confidence-gated analysis, driver attribution, backtesting.",
     fields: [
@@ -328,7 +330,7 @@ export const exploreCards = [
   },
   {
     title: "JSON Schema",
-    body: "See every field in Gold, Meta, and Derived documented before you subscribe.",
+    body: "See every Gold, Derived, and Meta reference field documented before you subscribe.",
     href: "/api-docs/schema",
   },
   {

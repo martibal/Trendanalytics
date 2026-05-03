@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
+import { computeHistoryDepthDays } from "@/lib/historyDepth";
 import { readStorageObject } from "@/lib/storage";
 import ChainIcon from "@/components/ChainIcon";
 import RegimeBadge from "@/components/RegimeBadge";
@@ -519,9 +520,10 @@ export default async function TrackRecordPage({
       ? ["bitcoin", "ethereum", "arbitrum", "base"]
       : [selectedChain];
 
-  const [allRows, archiveSummaries] = await Promise.all([
+  const [allRows, archiveSummaries, historyDepthDays] = await Promise.all([
     Promise.all(chainIds.map(readChainHistory)).then((rows) => rows.flat()),
     Promise.all(chainIds.map(readChainArchiveSummary)),
+    computeHistoryDepthDays().catch(() => null),
   ]);
 
   const sortedRows = allRows
@@ -543,6 +545,10 @@ export default async function TrackRecordPage({
     .filter((value): value is string => Boolean(value))
     .sort()
     .slice(-1)[0] ?? null;
+  const pipelineRunDays =
+    typeof historyDepthDays === "number" && Number.isFinite(historyDepthDays)
+      ? historyDepthDays.toLocaleString("en-GB")
+      : "—";
   const hasAnyRevisionId = filteredRows.some(
     (row) => row.revisionId !== null && row.revisionId !== undefined
   );
@@ -598,6 +604,17 @@ export default async function TrackRecordPage({
                 day by day. What you see here is what was actually published — not reconstructed,
                 not adjusted, not a backtest.
               </p>
+              <div className="mt-5 rounded-2xl border border-[#9db8d4] bg-[#f4f9ff] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+                <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
+                  Compliance reference
+                </div>
+                <p className="mt-2 text-base font-semibold leading-7 text-[#0d2447]">
+                  Every label, every confidence score, every determinism hash this product has
+                  ever published. {pipelineRunDays !== "—" ? `${pipelineRunDays} days, four chains` : "Four chains"},
+                  fully reproducible. This is your compliance reference — verifiable,
+                  version-stamped, and never retroactively altered.
+                </p>
+              </div>
               <div className="mt-5 flex flex-wrap gap-3">
                 <MoreLink id="what-is-modal" label="What is this page?" />
                 <MoreLink id="boundary-modal" label="Interpretation boundary" />

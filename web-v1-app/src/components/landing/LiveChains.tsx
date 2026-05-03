@@ -63,7 +63,7 @@ export default function LiveChains({ rows }: { rows: SurfaceRowDisplay[] }) {
           </h2>
           <p className="mt-2 max-w-2xl text-[14px] leading-[1.8] text-slate-300">
             This is what the pipeline published most recently — regime label, confidence, and
-            freshness metadata for each chain. Exactly what subscribers receive in their daily JSON.
+            freshness metadata for each chain. Exactly what subscribers receive in their daily reference data JSON.
             Hover any field for a plain-language explanation.
           </p>
         </div>

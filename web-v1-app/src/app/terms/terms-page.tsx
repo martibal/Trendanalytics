@@ -71,7 +71,7 @@ export default function TermsPage() {
             published data artifacts.
           </p>
           <p>
-            The service is designed to present regime context, confidence, drivers, rolling trend
+            The service is designed to present on-chain reference data, including regime context, confidence, drivers, rolling trend
             views, freshness context, and related explanatory material based on published
             blockchain data artifacts.
           </p>
@@ -154,7 +154,7 @@ export default function TermsPage() {
           </p>
           <p>
             That license is granted solely for your own internal personal use or your own internal
-            business use. It is not a sale of the service, the data, the JSON artifacts, the
+            business use. It is not a sale of the service, the data, the reference data JSON, the
             labels, the scores, or any associated intellectual property.
           </p>
           <p>
@@ -211,7 +211,7 @@ export default function TermsPage() {
 
         <Section title="9. Published Artifacts and API Contract">
           <p>
-            Urd Atlas is built around published artifacts and documented API contracts. Public
+            Urd Atlas is built around published reference data artifacts and documented API contracts. Public
             routes and authenticated file delivery are intended to expose published outputs rather
             than hidden runtime model state.
           </p>
@@ -263,7 +263,7 @@ export default function TermsPage() {
         <Section title="11. Intellectual Property">
           <p>
             Unless otherwise stated, the site structure, explanatory text, UI presentation, brand
-            elements, compiled published artifacts, documentation, and authenticated outputs made
+            elements, compiled published reference data artifacts, documentation, and authenticated outputs made
             available through Urd Atlas are protected by applicable intellectual property and
             contract rights.
           </p>
@@ -289,7 +289,7 @@ export default function TermsPage() {
           <p>
             To the maximum extent permitted by applicable law, Urd Atlas and its operators are not
             liable for indirect, incidental, special, consequential, or business losses arising
-            from use of the website, API, subscriber data, or published artifacts.
+            from use of the website, API, subscriber data, or published reference data artifacts.
           </p>
           <p>
             You are solely responsible for any interpretation or use of the information provided by

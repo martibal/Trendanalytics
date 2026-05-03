@@ -136,7 +136,7 @@ export default function PrivacyPage() {
 
         <Section title="8. Published Data and Traceability Metadata">
           <p>
-            The public product is built around published artifacts and traceable metadata. Public
+            The public product is built around published reference data artifacts and traceable metadata. Public
             routes may expose dataset version, methodology version, source mode, freshness context,
             chain-specific lag, and canonical contract fields.
           </p>

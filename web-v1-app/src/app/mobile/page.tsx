@@ -306,8 +306,8 @@ export default async function MobileOverviewPage() {
               { href: "/mobile/wiki", title: "Wiki", body: "Definitions for every term, label, and field." },
               { href: "/mobile/methodology", title: "Methodology", body: "How the pipeline works and how labels are assigned." },
               { href: "/mobile/thresholds", title: "Thresholds", body: "The exact thresholds and banding rules used." },
-              { href: "/mobile/plans", title: "Plans", body: "Free, Basic, and Pro — what each includes." },
-              { href: "/mobile/api-docs", title: "API", body: "How to fetch Gold, Meta, and Derived JSON." },
+              { href: "/mobile/plans", title: "Plans", body: "Free, Single Chain, and Research — what each includes." },
+              { href: "/mobile/api-docs", title: "API", body: "How to fetch Gold, Derived, and Meta reference data JSON." },
             ].map((item) => (
               <Link key={item.href} href={item.href} className="rounded-2xl border border-white/8 bg-black/15 p-3 active:bg-white/[0.06]">
                 <div className="text-[12px] font-bold text-white">{item.title}</div>

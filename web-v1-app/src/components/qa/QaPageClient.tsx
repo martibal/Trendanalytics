@@ -193,7 +193,7 @@ export default function QaPageClient() {
             </div>
 
             <div className="mt-5 text-xs font-semibold text-[#557099]">
-              Descriptive only. These answers explain the product and published artifacts; they do not constitute forecasts or recommendations.
+              Descriptive only. These answers explain the product and published reference data artifacts; they do not constitute forecasts or recommendations.
             </div>
           </div>
         </div>

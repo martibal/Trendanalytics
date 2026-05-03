@@ -28,8 +28,8 @@ export default function SamplePackPage() {
       <PageHero
         eyebrow="Pre-purchase validation"
         title="Public sample pack"
-        highlight="real JSON artifacts"
-        summary="These are real published sample artifacts intended for pre-purchase diligence. They let a technical buyer inspect the actual JSON shape, confidence states, provenance fields, and representative differences between BTC/ETH-style cadence and ARB/BASE-style cadence before subscribing."
+        highlight="real reference data artifacts"
+        summary="These are real published on-chain reference data artifacts intended for pre-purchase diligence. They let a technical buyer inspect the actual JSON shape, confidence states, provenance fields, and representative differences between BTC/ETH-style cadence and ARB/BASE-style cadence before subscribing."
       >
         <UrdButtonLink href="/api-docs" className="border-white/15 bg-white/8 text-white hover:bg-white/12 hover:text-white">
           ← Back to API Docs

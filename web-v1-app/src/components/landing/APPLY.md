@@ -259,25 +259,25 @@ import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
                 />
                 <PlanCard
                   tone="basic"
-                  name="Basic"
-                  price="$29/mo"
+                  name="Single Chain"
+                  price="$49/mo"
                   pill="1 chain · 90d · JSON"
                   headline="One chain. API access. 90-day history."
                   body="Gold, Meta, and Derived JSON for one chain of your choice — BTC, ETH, ARB, or BASE. Delivered daily via authenticated API."
-                  bestFor="Best for: focused monitoring or single-chain research."
+                  bestFor="Best for: independent analysts validating the dataset against one chain."
                   href="/dashboard"
-                  cta="Start Basic →"
+                  cta="Start Single Chain →"
                 />
                 <PlanCard
                   tone="pro"
-                  name="Pro"
-                  price="$79/mo"
+                  name="Research"
+                  price="$149/mo"
                   pill="4 chains · 365d · JSON"
                   headline="All four chains. API access. 365-day history."
-                  body="Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Standard Pro includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
+                  body="Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
                   bestFor="Best for: multi-chain research, backtesting, and production pipelines."
                   href="/dashboard"
-                  cta="Start Pro →"
+                  cta="Start Research →"
                 />
               </div>
             </div>
@@ -315,25 +315,25 @@ import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
                 />
                 <PlanCard
                   tone="basic"
-                  name="Basic"
-                  price="$29/mo"
+                  name="Single Chain"
+                  price="$49/mo"
                   pill="1 chain · 90d · JSON"
                   headline="One chain. API access. 90-day history."
                   body="Gold, Meta, and Derived JSON for one chain of your choice — BTC, ETH, ARB, or BASE. Delivered daily via authenticated API."
-                  bestFor="Best for: focused monitoring or single-chain research."
+                  bestFor="Best for: independent analysts validating the dataset against one chain."
                   href="/dashboard"
-                  cta="Start Basic →"
+                  cta="Start Single Chain →"
                 />
                 <PlanCard
                   tone="pro"
-                  name="Pro"
-                  price="$79/mo"
+                  name="Research"
+                  price="$149/mo"
                   pill="4 chains · 365d · JSON"
                   headline="All four chains. API access. 365-day history."
-                  body="Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Standard Pro includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
+                  body="Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
                   bestFor="Best for: multi-chain research, backtesting, and production pipelines."
                   href="/dashboard"
-                  cta="Start Pro →"
+                  cta="Start Research →"
                   badge="Most popular"
                 />
               </div>

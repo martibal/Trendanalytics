@@ -190,6 +190,32 @@ function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
   );
 }
 
+function HeroInfoCard({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/15 bg-white/[0.075] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_30px_rgba(0,0,0,0.16)] backdrop-blur">
+      <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-200/85">
+        {label}
+      </div>
+      <div className="mt-2 min-h-[28px] break-words text-base font-black leading-6 text-white">
+        {value}
+      </div>
+      {children ? (
+        <div className="mt-2 text-xs font-semibold leading-5 text-slate-300">
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ExplainModal({
   id,
   title,
@@ -287,17 +313,17 @@ function confidenceBand(v?: number) {
 }
 
 function pillClass(kind: "neutral" | "good" | "warn" | "bad") {
-  const base = "rounded-full border px-2.5 py-1 text-xs";
+  const base = "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]";
   if (kind === "good") {
-    return `${base} border-emerald-500/25 bg-emerald-500/10 !text-emerald-700`;
+    return `${base} border-emerald-300 bg-emerald-50 !text-emerald-800`;
   }
   if (kind === "warn") {
-    return `${base} border-amber-500/25 bg-amber-500/10 text-amber-200`;
+    return `${base} border-amber-300 bg-amber-100 !text-amber-900`;
   }
   if (kind === "bad") {
-    return `${base} border-rose-500/25 bg-rose-500/10 text-rose-200`;
+    return `${base} border-rose-300 bg-rose-100 !text-rose-900`;
   }
-  return `${base} border-[#c9d9ea] bg-[#eef6ff] !text-[#0d2447]`;
+  return `${base} border-[#9db8d4] bg-white !text-[#0d2447]`;
 }
 
 function confidencePill(v?: number) {
@@ -1936,8 +1962,43 @@ export default async function ChainPage({
       <PageHero
         eyebrow="Chain analysis"
         title={displayName}
-        summary="Descriptive chain-level regime classification, freshness, confidence, scorecard dimensions, drivers, and metric history."
-      />
+        summary="Latest published reference row for this chain: regime, confidence, freshness, determinism, drivers, and metric history."
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <HeroInfoCard label="Published regime" value={<RegimeBadge label={regimeLabel} statusColor={meta.status?.color} />}>
+            Named state from the latest Meta row.
+          </HeroInfoCard>
+
+          <HeroInfoCard
+            label="Confidence"
+            value={typeof conf === "number" ? conf.toFixed(3) : "—"}
+          >
+            {confBand} band · confidence is separate from freshness.
+          </HeroInfoCard>
+
+          <HeroInfoCard label="Data as of" value={fmtDate(asOf)}>
+            UTC date covered by the current published row.
+          </HeroInfoCard>
+
+          <HeroInfoCard
+            label="Observed lag"
+            value={typeof observedLagDays === "number" ? `${observedLagDays}d` : "—"}
+          >
+            Lag is checked against the expected cadence for this chain.
+          </HeroInfoCard>
+
+          <HeroInfoCard
+            label="Hash anchor"
+            value={
+              <span className="font-mono text-sm">
+                {meta.regime?.determinism_hash ?? "not issued"}
+              </span>
+            }
+          >
+            Named rows can be checked against the public payload.
+          </HeroInfoCard>
+        </div>
+      </PageHero>
 
       <UrdContainer className="py-10 !text-[#0d2447] [&_p]:!text-[#27476f] [&_li]:!text-[#27476f] [&_h1]:!text-[#0d2447] [&_h2]:!text-[#0d2447] [&_h3]:!text-[#0d2447]">
       <ModalStyles />
@@ -2058,9 +2119,9 @@ export default async function ChainPage({
         </section>
 
         <section className="grid gap-4 lg:grid-cols-5">
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+          <div className="rounded-[22px] border border-[#b8cce0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5fb_100%)] p-5 shadow-[0_10px_28px_rgba(13,36,71,0.08),inset_0_1px_0_rgba(255,255,255,0.92)]">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
+              <div className="inline-flex items-center rounded-full border border-[#2f7cff]/20 bg-[#eaf2ff] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] !text-[#215bcb] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                 Published regime
               </div>
               <MoreLink id={`regime-${chainId}`} />
@@ -2068,70 +2129,72 @@ export default async function ChainPage({
             <div className="mt-4">
               <RegimeBadge label={regimeLabel} statusColor={meta.status?.color} />
             </div>
-            <p className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+            <p className="mt-4 text-sm leading-7 !text-[#34567f] [&_p]:!text-[#34567f]">
               Top-line descriptive state for the current published row.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
+          <div className="rounded-[22px] border border-[#b8cce0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5fb_100%)] p-5 shadow-[0_10px_28px_rgba(13,36,71,0.08),inset_0_1px_0_rgba(255,255,255,0.92)]">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="inline-flex items-center rounded-full border border-[#2f7cff]/20 bg-[#eaf2ff] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] !text-[#215bcb] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                 Confidence
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1">
                 <span className={confidencePill(conf)}>{confBand}</span>
                 <MoreLink id={`confidence-${chainId}`} />
               </div>
             </div>
-            <div className="mt-4 text-5xl font-semibold">{typeof conf === "number" ? conf.toFixed(3) : "—"}</div>
-            <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+            <div className="mt-4 text-[2.15rem] font-black leading-[0.95] tracking-[-0.035em] !text-[#082a57]">
+              {typeof conf === "number" ? conf.toFixed(3) : "—"}
+            </div>
+            <div className="mt-4 text-sm leading-7 !text-[#34567f] [&_p]:!text-[#34567f]">
               Data quality {fmtNum(meta.confidence?.data_quality_score, 3)} · Label support{" "}
               {fmtNum(meta.confidence?.label_confidence_score, 3)}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+          <div className="rounded-[22px] border border-[#b8cce0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5fb_100%)] p-5 shadow-[0_10px_28px_rgba(13,36,71,0.08),inset_0_1px_0_rgba(255,255,255,0.92)]">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
+              <div className="inline-flex items-center rounded-full border border-[#2f7cff]/20 bg-[#eaf2ff] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] !text-[#215bcb] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                 Data as of
               </div>
               <MoreLink id={`asof-${chainId}`} />
             </div>
-            <div className="mt-4 break-words text-5xl font-semibold leading-none">
+            <div className="mt-4 break-words text-[2rem] font-black leading-[0.95] tracking-[-0.03em] !text-[1.85rem]">
               {fmtDate(asOf)}
             </div>
-            <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+            <div className="mt-4 text-sm leading-7 !text-[#34567f] [&_p]:!text-[#34567f]">
               Check this before interpreting any label too strongly.
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+          <div className="rounded-[22px] border border-[#b8cce0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5fb_100%)] p-5 shadow-[0_10px_28px_rgba(13,36,71,0.08),inset_0_1px_0_rgba(255,255,255,0.92)]">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
+              <div className="inline-flex items-center rounded-full border border-[#2f7cff]/20 bg-[#eaf2ff] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] !text-[#215bcb] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                 Observed lag
               </div>
               <MoreLink id={`lag-${chainId}`} />
             </div>
-              <div className="mt-4 text-5xl font-semibold">
+              <div className="mt-4 text-[2rem] font-black leading-[0.95] tracking-[-0.025em] !text-[#082a57]">
                 {typeof observedLagDays === "number" ? `${observedLagDays}d` : "—"}
               </div>
-            <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
+            <div className="mt-4 text-sm leading-7 !text-[#34567f] [&_p]:!text-[#34567f]">
               Freshness is shown separately from confidence.
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
+          <div className="rounded-[22px] border border-[#b8cce0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5fb_100%)] p-5 shadow-[0_10px_28px_rgba(13,36,71,0.08),inset_0_1px_0_rgba(255,255,255,0.92)]">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
+              <div className="inline-flex items-center rounded-full border border-[#2f7cff]/20 bg-[#eaf2ff] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] !text-[#215bcb] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                 Determinism
               </div>
               <MoreLink id={`determinism-${chainId}`} />
             </div>
-            <div className="mt-4 break-all text-base font-semibold">
+            <div className="mt-4 break-all text-[1.02rem] font-semibold leading-6 !text-[#082a57]">
               {meta.regime?.determinism_hash ?? "—"}
             </div>
-            <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
-              Window days: <span className="font-medium">{meta.regime?.window_days ?? meta.scorecard?.window_days ?? "—"}</span>
+            <div className="mt-4 text-sm leading-7 !text-[#34567f] [&_p]:!text-[#34567f]">
+              Window days: <span className="font-semibold !text-[#082a57]">{meta.regime?.window_days ?? meta.scorecard?.window_days ?? "—"}</span>
             </div>
           </div>
         </section>

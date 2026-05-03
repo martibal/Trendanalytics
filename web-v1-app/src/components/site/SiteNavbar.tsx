@@ -12,10 +12,9 @@ const DESKTOP_ITEMS = [
   { href: "/track-record", label: "Track Record" },
   { href: "/thresholds", label: "Thresholds" },
   { href: "/glossary", label: "Glossary" },
+  { href: "/faq", label: "FAQ" },
   { href: "/api-docs", label: "API Docs" },
   { href: "/methodology", label: "Methodology" },
-  { href: "/about", label: "About" },
-  { href: "/faq", label: "FAQ" },
 ] as const;
 
 const CLERK_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);

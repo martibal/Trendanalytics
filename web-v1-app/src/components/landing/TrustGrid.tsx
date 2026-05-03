@@ -17,7 +17,7 @@ const trustCards = [
   {
     eyebrow: "Schema",
     title: "What every field contains",
-    body: "See Gold, Meta, and Derived fields documented in full before you subscribe.",
+    body: "See Gold, Derived, and Meta reference fields documented in full before you subscribe.",
     href: "/api-docs/schema",
   },
 ] as const;

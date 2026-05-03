@@ -34,7 +34,7 @@ const nextLinks = [
   { title: "Q&A", body: "Definitions, thresholds, confidence, and why the labels mean what they mean.", href: "/faq" },
   { title: "Methodology", body: "Read the full model logic, thresholds, and interpretation boundary.", href: "/methodology" },
   { title: "Track Record", body: "Inspect what was actually published over time, not just the latest row.", href: "/track-record" },
-  { title: "JSON Schema", body: "See every field in Gold, Meta, and Derived before you subscribe.", href: "/api-docs/schema" },
+  { title: "JSON Schema", body: "See every Gold, Derived, and Meta reference field before you subscribe.", href: "/api-docs/schema" },
 ] as const;
 
 export default function MobileLanding({ rows, historyDepthDays, lastUpdatedLabel }: MobileLandingProps) {
@@ -48,7 +48,7 @@ export default function MobileLanding({ rows, historyDepthDays, lastUpdatedLabel
 
         <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
           <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.8)]" />
-          Daily chain-state JSON
+          On-chain reference data
         </div>
 
         {lastUpdatedLabel ? (
@@ -57,15 +57,13 @@ export default function MobileLanding({ rows, historyDepthDays, lastUpdatedLabel
           </div>
         ) : null}
 
-        <h1 className="mt-4 text-[2.1rem] font-black leading-[1.0] tracking-[-0.04em] text-white">
-          Separating blockchain noise from structural change
-        </h1>
+          <h1 className="mt-4 text-[2rem] font-black leading-[1.0] tracking-[-0.04em] text-white">
+            Blockchain regime reference data, stripped down to evidence.
+          </h1>
 
-        <p className="mt-4 text-[15px] leading-7 text-slate-200">
-          Get structured regime labels, confidence scores, and driver context for BTC, ETH, ARB,
-          and BASE — delivered daily as ready-to-use JSON. Everything you need to understand
-          current chain state, nothing you have to build yourself.
-        </p>
+          <p className="mt-4 text-[15px] leading-7 text-slate-200">
+            Daily, hash-anchored regime classifications for BTC, ETH, ARB, and BASE. Built for use as input to your existing analytical systems. Not a signal product. Not a recommendation engine.
+          </p>
 
         {/* Confidence gate — key differentiator */}
         <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-3">
@@ -102,7 +100,7 @@ export default function MobileLanding({ rows, historyDepthDays, lastUpdatedLabel
           <p className="text-[12px] leading-[1.7] text-slate-300">
             Building this yourself — data ingestion, normalization, confidence logic, daily
             publication, and archive handling — typically takes weeks of engineering time.{" "}
-            <span className="font-bold text-white">Urd Atlas delivers it for $29/mo.</span>
+            <span className="font-bold text-white">Urd Atlas delivers it from $49/mo.</span>
           </p>
         </div>
 
@@ -110,7 +108,7 @@ export default function MobileLanding({ rows, historyDepthDays, lastUpdatedLabel
         <div className="mt-5">
           <div className="flex items-baseline gap-2 mb-3">
             <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300/80">Start from</span>
-            <span className="text-[26px] font-black text-white">$29<span className="text-[13px] font-semibold text-slate-400">/mo</span></span>
+            <span className="text-[26px] font-black text-white">$49<span className="text-[13px] font-semibold text-slate-400">/mo</span></span>
             <span className="text-[11px] text-slate-500">· Cancel anytime</span>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -187,15 +185,15 @@ export default function MobileLanding({ rows, historyDepthDays, lastUpdatedLabel
         <h2 className="mt-1 text-2xl font-semibold text-white">Pick the plan that fits your workflow</h2>
         <p className="mt-2 text-sm leading-7 text-slate-400">
           Free lets you inspect the public surface on-site. Paid plans unlock direct API access to
-          Gold, Meta, and Derived JSON — delivered daily.
+          Daily on-chain reference data — Gold, Derived, and Meta JSON delivered via API.
         </p>
 
         {/* Free vs paid explainer */}
         <div className="mt-4 space-y-1.5 text-[11px]">
           {[
             { tier: "Free", desc: "Inspect published surface on-site. No API access.", color: "text-slate-300" },
-            { tier: "Basic — $29/mo", desc: "API access · 1 chain · 90-day JSON history.", color: "text-cyan-300" },
-            { tier: "Pro — $79/mo", desc: "API access · 4 chains · 365-day JSON history.", color: "text-purple-300" },
+            { tier: "Single Chain — $49/mo", desc: "API access · 1 chain · 90-day JSON history.", color: "text-cyan-300" },
+            { tier: "Research — $149/mo", desc: "API access · 4 chains · 365-day JSON history.", color: "text-purple-300" },
           ].map((t) => (
             <div key={t.tier} className="flex items-start gap-2 rounded-xl border border-white/6 bg-white/[0.02] px-3 py-2">
               <span className={`shrink-0 font-black ${t.color}`}>{t.tier}</span>
@@ -204,7 +202,7 @@ export default function MobileLanding({ rows, historyDepthDays, lastUpdatedLabel
           ))}
         </div>
         <p className="mt-3 text-[11px] text-slate-500">
-          Not sure? Start with Basic — upgrade to Pro at any time. Cancel anytime.
+          Not sure? Start with Single Chain — upgrade to Research at any time. Cancel anytime.
         </p>
 
         <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/8 px-4 py-3 text-xs leading-6 text-amber-100/85">
@@ -220,14 +218,14 @@ export default function MobileLanding({ rows, historyDepthDays, lastUpdatedLabel
               className: "border-white/10 bg-white/5",
             },
             {
-              name: "Basic", price: "$29/mo", note: "One chain · 90-day JSON access.",
+              name: "Single Chain", price: "$49/mo", note: "One chain · 90-day JSON access.",
               detail: "Best for focused single-chain monitoring, research, and downstream workflow use.",
               href: "/sign-up", cta: "Payments open soon", isFree: false,
               className: "border-cyan-500/25 bg-cyan-500/8",
             },
             {
-              name: "Pro", price: "$79/mo", note: "Four chains · 365-day JSON access.",
-              detail: `Best for multi-chain monitoring, heavier API use, and broader research workflows. Standard Pro includes 365 days of subscriber API history. The public track record can be longer because it reflects the full published archive.`,
+              name: "Research", price: "$149/mo", note: "Four chains · 365-day JSON access.",
+              detail: `Best for multi-chain monitoring, heavier API use, and broader research workflows. Standard Research includes 365 days of subscriber API history. The public track record can be longer because it reflects the full published archive.`,
               href: "/sign-up", cta: "Payments open soon", isFree: false,
               className: "border-purple-500/25 bg-purple-500/8",
             },
@@ -265,7 +263,7 @@ export default function MobileLanding({ rows, historyDepthDays, lastUpdatedLabel
       {/* ── Three JSON files ── */}
       <section className="mt-6 rounded-3xl border p-5">
         <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-cyan-200">The three files</div>
-        <h2 className="mt-1 text-2xl font-semibold text-white">Gold, Meta, Derived</h2>
+        <h2 className="mt-1 text-2xl font-semibold text-white">Gold, Derived, Meta</h2>
         <p className="mt-2 text-sm leading-7 text-slate-300">
           Meta is the commercial heart of the product. Gold lets you verify inputs.
           Derived gives you smoothed trend context.

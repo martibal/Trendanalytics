@@ -156,9 +156,9 @@ const whatItDoesExplain: ExplainPair = {
   advanced: (
     <>
       <p>
-        Urd Atlas is a deterministic on-chain context layer. It applies a reproducible
+        Urd Atlas is a deterministic on-chain reference data layer. It applies a reproducible
         regime classification pipeline to AWS Public Blockchain Data for four chains
-        (Bitcoin, Ethereum, Arbitrum, Base), producing daily meta artifacts containing: a
+        (Bitcoin, Ethereum, Arbitrum, Base), producing daily Meta reference artifacts containing: a
         regime label from a five-state vocabulary, a three-axis scorecard (Demand,
         Friction, Capacity), a ranked driver set, a confidence score, and a determinism
         hash enabling full reproducibility auditing.
@@ -209,7 +209,7 @@ const whatItDoesNotExplain: ExplainPair = {
       </p>
       <p className="mt-3">
         Urd Atlas outputs are appropriate as one input to a broader analytical process. The
-        product deliberately does not combine regime context with price views, positioning,
+        product deliberately does not combine reference data with price views, positioning,
         or market structure.
       </p>
     </>
@@ -219,13 +219,13 @@ const whatItDoesNotExplain: ExplainPair = {
 const dataLayersExplain: ExplainPair = {
   basic: (
     <>
-      <p>All published data is organised into three layers, each building on the previous.</p>
+      <p>All published reference data is organised into three layers, each building on the previous.</p>
       <ul className="mt-3 list-disc space-y-2 pl-5">
         <li><span className="font-semibold text-[#031329]">Gold</span> — raw daily observations: transaction counts, fees, block times, gas usage, active addresses.</li>
-        <li><span className="font-semibold text-[#031329]">Meta</span> — the intelligence layer: regime label, confidence score, scorecard, and driver set.</li>
+        <li><span className="font-semibold text-[#031329]">Meta</span> — the regime reference layer: regime label, confidence score, scorecard, and driver set.</li>
         <li><span className="font-semibold text-[#031329]">Derived</span> — the trend layer: 7-day and 30-day moving averages used in charts.</li>
       </ul>
-      <p className="mt-3">Subscribers can download all three layers as JSON files via the API.</p>
+      <p className="mt-3">Subscribers can download all three reference layers as JSON files via the API.</p>
     </>
   ),
   advanced: (
@@ -306,7 +306,7 @@ const dataAttributionExplain: ExplainPair = {
         AWS Public Blockchain Data provides parquet-format datasets of transactions and
         blocks for supported chains. Urd Atlas ingests these through an ETL pipeline that
         aggregates daily features, computes the statistical processing layer, and publishes
-        JSON artifacts.
+        reference data JSON.
       </p>
       <p className="mt-3">
         The pipeline is deterministic and idempotent per chain/date. Outputs are versioned by
@@ -457,11 +457,11 @@ export default async function AboutPage() {
               <div>
                 <Eyebrow>Data contract</Eyebrow>
                 <h2 className="mt-3 text-3xl font-black tracking-[-0.03em] text-[#0d2447]">
-                  Three JSON layers, one reproducible pipeline.
+                  Three reference layers, one reproducible pipeline.
                 </h2>
                 <p className="mt-3 max-w-4xl text-sm font-medium leading-7 text-[#37547b]">
-                  The product is not a dashboard first and a data service second. The JSON
-                  artifacts are the product surface. The website explains, previews, and
+                  The product is not a dashboard first and a data service second. The on-chain
+                  reference data is the product surface. The website explains, previews, and
                   contextualizes what subscribers can consume directly.
                 </p>
               </div>
@@ -498,7 +498,7 @@ export default async function AboutPage() {
               <p className="mt-4 text-sm font-medium leading-7 text-[#37547b]">
                 The underlying chain data comes from AWS Public Blockchain Data. Urd Atlas
                 adds the analytical layer: daily aggregation, robust historical context,
-                regime classification, confidence gating, and published JSON artifacts.
+                regime classification, confidence gating, and published reference data JSON.
               </p>
               <div className="mt-5 rounded-[14px] border border-[#c9d9ea] bg-white/45 p-4 text-sm font-medium leading-7 text-[#37547b]">
                 The distinction matters: the raw data is public; the product value is the
@@ -578,7 +578,7 @@ export default async function AboutPage() {
       <ExplainModal
         id="data-layers-modal"
         title="The three data layers"
-        subtitle="Gold, Meta, and Derived — what each contains and why they are separate."
+        subtitle="Gold, Derived, and Meta — the three reference layers and why they are separate."
         pair={dataLayersExplain}
       />
       <ExplainModal

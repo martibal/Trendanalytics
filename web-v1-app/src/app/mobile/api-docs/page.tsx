@@ -89,8 +89,8 @@ const ENDPOINTS = [
     title: "Historical window",
     method: "GET",
     path: "/api/v1/files/meta/{chain}/last{N}d/latest.json",
-    desc: "A bundled window of published Meta rows. N is your entitled window depth: 90 (Basic) or 365 (Pro).",
-    plan: "Basic: 90d · Pro: 365d",
+    desc: "A bundled window of published Meta rows. N is your entitled window depth: 90 (Single Chain) or 365 (Research).",
+    plan: "Single Chain: 90d · Research: 365d",
   },
   {
     title: "Gold raw observations",
@@ -104,7 +104,7 @@ const ENDPOINTS = [
     method: "GET",
     path: "/api/v1/files/derived/{chain}/last{N}d/latest.json",
     desc: "Bundled MA7/MA30 trend series for all Gold metrics over your entitled window.",
-    plan: "Basic: 90d · Pro: 365d",
+    plan: "Single Chain: 90d · Research: 365d",
   },
 ];
 
@@ -239,8 +239,8 @@ export default function MobileApiDocsPage() {
           </div>
           <div className="space-y-2">
             {[
-              { plan: "Basic — $29/mo", access: "1 chain of your choice · Gold, Meta, Derived · 90-day history", color: "#22d3ee" },
-              { plan: "Pro — $79/mo", access: "All 4 chains · Gold, Meta, Derived · 365-day history", color: "#a78bfa" },
+              { plan: "Single Chain — $49/mo", access: "1 chain of your choice · Gold, Derived, Meta reference data · 90-day history", color: "#22d3ee" },
+              { plan: "Research — $149/mo", access: "All 4 chains · Gold, Derived, Meta reference data · 365-day history", color: "#a78bfa" },
               { plan: "History Add-on", access: "Full archive from December 2024 as one-time purchase", color: "#fbbf24" },
             ].map((p) => (
               <div key={p.plan} className="rounded-xl border border-white/6 bg-black/10 px-3 py-3">
@@ -256,7 +256,7 @@ export default function MobileApiDocsPage() {
           className="block rounded-2xl border border-cyan-500/15 bg-cyan-500/5 p-4 text-center"
         >
           <div className="text-[12px] font-bold text-white">Subscribe to get API access →</div>
-          <div className="mt-1 text-[11px] text-slate-400">Start with Basic on your most-watched chain</div>
+          <div className="mt-1 text-[11px] text-slate-400">Start with Single Chain on your most-watched chain</div>
         </Link>
       </main>
 

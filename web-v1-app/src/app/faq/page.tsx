@@ -10,7 +10,7 @@ export default function FaqPage() {
       <PageHero
         eyebrow="Q&A"
         title="Questions skeptics ask before they trust the output"
-        summary="This page answers the practical and technical questions users are likely to ask about noise, regime change, confidence, baselines, JSON artifacts, and traceability."
+        summary="This page answers the practical and technical questions users are likely to ask about on-chain reference data, noise, regime change, confidence, baselines, JSON delivery, and traceability."
       >
         <div className="flex flex-wrap gap-3 text-sm text-slate-300">
           <span>{qaEntries.length} answers</span>
@@ -27,7 +27,7 @@ export default function FaqPage() {
         pageKey="faq"
         summary={<>Use this page when you want short answers to the skeptical questions a serious buyer would ask before trusting the product.</>}
         bullets={[
-          <>The Q&amp;A covers noise vs regime change, confidence, baselines, JSON artifacts, and trust signals.</>,
+          <>The Q&amp;A covers on-chain reference data, noise vs regime change, confidence, baselines, JSON delivery, and trust signals.</>,
           <>Start with the short answer. Expand only the questions you actually care about.</>,
           <>Basic and Advanced explanation levels remain available inside the full answers.</>,
         ]}

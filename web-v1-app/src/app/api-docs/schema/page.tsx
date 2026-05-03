@@ -2,7 +2,7 @@ import ShortFullContent from "@/components/site/ShortFullContent";
 import PageHero from "@/components/site/PageHero";
 import { UrdButtonLink, UrdContainer, UrdInlineCode, UrdPage } from "@/components/site/UrdDesignSystem";
 // src/app/api-docs/schema/page.tsx
-// JSON Schema Reference — complete field-level documentation for Gold, Meta, and Derived
+// JSON Schema Reference — complete field-level documentation for Gold, Derived, and Meta
 // artifacts. This page exists to let potential subscribers understand exactly what they
 // receive before subscribing.
 
@@ -149,7 +149,7 @@ export default async function SchemaPage() {
       <PageHero
         eyebrow="What you actually get"
         title="JSON Schema Reference"
-        highlight="Gold, Meta, and Derived"
+        highlight="Gold, Derived, and Meta"
         summary="Every field in every published JSON file — defined at two levels. This page exists so you know exactly what a subscription delivers before you subscribe."
       >
         <div className="flex flex-wrap gap-2">
@@ -189,7 +189,7 @@ export default async function SchemaPage() {
         </div>
       <ShortFullContent
         pageKey="schema-reference"
-        summary={<>This page is the structural contract for the published JSON artifacts. Use it when you need exact field names, object structure, and parsing expectations.</>}
+        summary={<>This page is the structural contract for the published reference data JSON. Use it when you need exact field names, object structure, and parsing expectations.</>}
         bullets={[
           <>Use <strong>Schema Reference</strong> for contract structure and parsing. Use <Link href="/methodology/fields" className="underline">Field Dictionary</Link> when you need deeper interpretation.</>,
           <>The three artifact families are <strong>Gold</strong>, <strong>Meta</strong>, and <strong>Derived</strong>. Each one has its own field groups and intended use.</>,
@@ -466,7 +466,7 @@ export default async function SchemaPage() {
             field="derived.context_blocks"
             type="array"
             basic="Historical analog periods for context — currently empty in all published data. This field is reserved for a future feature and should be ignored for now."
-            advanced="Placeholder for the analog engine output (compute_analogs_and_forward_stats). The analog engine is implemented in the pipeline but context_blocks are not yet populated in published artifacts. When the feature ships, this array will contain historical periods whose on-chain signature most closely resembled the current state, along with forward statistics for each analog period."
+            advanced="Placeholder for the analog engine output (compute_analogs_and_forward_stats). The analog engine is implemented in the pipeline but context_blocks are not yet populated in published reference data artifacts. When the feature ships, this array will contain historical periods whose on-chain signature most closely resembled the current state, along with forward statistics for each analog period."
           />
         </div>
       </section>
