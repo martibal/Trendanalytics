@@ -15,27 +15,27 @@ export default function HeroJsonPeek() {
   return (
     <section
       id="json-layers"
-      className="relative bg-[linear-gradient(180deg,#031329_0%,#06203e_45%,#08294f_100%)] pb-12 pt-2"
+      className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_58%,#eef6ff_100%)] pb-12 pt-12"
       >
       <div className="w-full px-5 sm:px-7 lg:px-10 2xl:px-16">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-stretch">
 
           {/* ------------ Left: the claim with concrete numbers ----------- */}
-          <div className="flex flex-col justify-between rounded-[22px] border border-white/10 bg-[#0a223f]/82 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.32)] lg:p-7">
+          <div className="flex flex-col justify-between rounded-[24px] border border-[#b8d8ff]/80 bg-white/84 p-6 shadow-[0_20px_64px_rgba(13,36,71,0.10)] backdrop-blur lg:p-7">
             <div>
-              <div className="text-[12px] font-black uppercase tracking-[0.2em] text-cyan-300">
-                The product is the JSON
+              <div className="text-[12px] font-black uppercase tracking-[0.2em] text-[#1d5fce]">
+                This is what you receive every day
               </div>
-              <h2 className="mt-3 text-[26px] font-black leading-[1.12] tracking-[-0.025em] text-white sm:text-[28px]">
-                Three files per chain per day. Every field documented. Every label hash-anchored.
+              <h2 className="mt-3 text-[26px] font-black leading-[1.12] tracking-[-0.025em] text-[#0d2447] sm:text-[28px]">
+                Gold, Derived, and Meta files per chain per day. Every field documented. Every named label hash-anchored.
               </h2>
-              <p className="mt-3 text-[14px] font-medium leading-[1.7] text-white/72">
-                Subscribers do not consume Urd Atlas as a chart. They pull on-chain reference data as JSON, join it onto
-                their own data, and let it drive backtests, monitoring, and audit trails.
+              <p className="mt-3 text-[14px] font-semibold leading-[1.7] text-[#37547b]">
+                After the workflow example above, this is the concrete artifact surface: daily JSON that can be joined onto
+                your own data and used in backtests, monitoring, reporting, and audit trails.
               </p>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-white/10 pt-5 text-[12px] font-black uppercase tracking-[0.12em] text-white/82 sm:grid-cols-3">
+            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-[#cfe4fb] pt-5 text-[12px] font-black uppercase tracking-[0.12em] text-[#0d2447] sm:grid-cols-3">
               <div>Daily JSON</div>
               <div>512 days history</div>
               <div>4 chains</div>
@@ -53,13 +53,13 @@ export default function HeroJsonPeek() {
             <div className="mt-6 flex flex-wrap gap-3">
               <a
                 href="#json-example-picker"
-                className="inline-flex h-12 items-center justify-center rounded-[8px] bg-blue-600 px-5 text-[13px] font-extrabold text-white shadow-[0_12px_28px_rgba(37,99,235,0.32)] transition hover:bg-blue-700"
+                className="inline-flex h-12 items-center justify-center rounded-[8px] bg-blue-600 px-5 text-[13px] font-extrabold text-white shadow-[0_12px_28px_rgba(37,99,235,0.24)] transition hover:bg-blue-700"
               >
                 View example JSON →
               </a>
               <Link
                 href="/api-docs/schema"
-                className="inline-flex h-12 items-center justify-center rounded-[8px] bg-blue-600 px-5 text-[13px] font-extrabold text-white shadow-[0_12px_28px_rgba(37,99,235,0.32)] transition hover:bg-blue-700"
+                className="inline-flex h-12 items-center justify-center rounded-[8px] border border-[#2f7cff]/25 bg-white px-5 text-[13px] font-extrabold text-[#1d5fce] shadow-[0_12px_28px_rgba(13,36,71,0.08)] transition hover:bg-[#eef6ff]"
               >
                 Schema reference →
               </Link>
@@ -69,7 +69,7 @@ export default function HeroJsonPeek() {
           {/* ------------ Right: the JSON peek itself --------------------- */}
           <a
             href="#json-example-picker"
-            className="group relative flex flex-col overflow-hidden rounded-[22px] border border-cyan-300/22 bg-[#06182d] shadow-[0_22px_50px_rgba(0,0,0,0.42)] transition hover:border-cyan-300/40 hover:shadow-[0_28px_60px_rgba(0,0,0,0.52)]"
+            className="group relative flex flex-col overflow-hidden rounded-[24px] border border-[#93c5fd]/35 bg-[#06182d] shadow-[0_24px_70px_rgba(13,36,71,0.22)] transition hover:border-[#60a5fa]/60 hover:shadow-[0_30px_82px_rgba(13,36,71,0.28)]"
           >
             {/* mock window chrome */}
             <div className="flex items-center justify-between gap-3 border-b border-white/8 bg-[#08203c] px-5 py-3">

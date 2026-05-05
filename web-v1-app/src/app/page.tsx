@@ -1199,6 +1199,322 @@ function BuyerDecisionSection() {
   );
 }
 
+
+const WORKFLOW_IMAGES = [
+  {
+    title: "Start with the data you already have",
+    src: "/landing-workflows/urd-atlas-workflow-1.png",
+    alt:
+      "Example existing dataset with price, strategy, and risk fields before Urd Atlas regime context is joined.",
+  },
+  {
+    title: "Join in daily Urd Atlas regime data",
+    src: "/landing-workflows/urd-atlas-workflow-2.png",
+    alt:
+      "Example dataset after joining Urd Atlas regime, confidence, and evidence fields by date and chain.",
+  },
+  {
+    title: "Segment, filter, and report by regime",
+    src: "/landing-workflows/urd-atlas-workflow-3.png",
+    alt:
+      "Example downstream analysis using Urd Atlas regime labels to segment, filter, and report by network conditions.",
+  },
+];
+
+const REGIME_STATES = [
+  {
+    label: "STABLE",
+    tone: "border-emerald-300 bg-emerald-50 text-emerald-800",
+    description:
+      "The network is behaving as expected. Activity, fees, and capacity are within normal range for this chain.",
+  },
+  {
+    label: "HEATING",
+    tone: "border-amber-300 bg-amber-50 text-amber-900",
+    description:
+      "Demand is rising above normal and showing directional momentum. The network is warming up.",
+  },
+  {
+    label: "CONGESTED",
+    tone: "border-rose-300 bg-rose-50 text-rose-800",
+    description:
+      "The network is under significant pressure. Fees and capacity are elevated beyond typical levels.",
+  },
+  {
+    label: "CHEAP",
+    tone: "border-cyan-300 bg-cyan-50 text-cyan-800",
+    description:
+      "Both fees and capacity pressure are low. Quiet conditions relative to recent history.",
+  },
+  {
+    label: "UNKNOWN/DEGRADED",
+    tone: "border-slate-300 bg-slate-50 text-slate-800",
+    description:
+      "The data was not strong enough to support a confident label that day. Urd Atlas publishes this explicitly instead of forcing a classification.",
+  },
+];
+
+const ANALYST_QUESTIONS = [
+  {
+    question: "What is a regime label?",
+    answer:
+      "A regime label is a daily name for the network condition of a chain. It turns a set of activity, fee, capacity, confidence, and driver fields into a stable category that can be joined to your own data.",
+  },
+  {
+    question: "Compared to what is something normal?",
+    answer:
+      "Each chain is compared to its own recent history. Ethereum is not judged against Bitcoin, and Base is not judged against Ethereum. The label is chain-relative, not price-relative.",
+  },
+  {
+    question: "I already have price data. What does this add?",
+    answer:
+      "Price data tells you what the market paid. Urd Atlas tells you what kind of network day it was when that happened. That gives you a second dimension for research, backtests, monitoring, and reporting.",
+  },
+  {
+    question: "Can I build this myself with Glassnode or Dune?",
+    answer:
+      "You can build parts of it if you maintain the ingestion, normalization, thresholds, label rules, confidence gate, versioning, and verification surface yourself. Urd Atlas sells that maintained reference layer directly as daily JSON.",
+  },
+  {
+    question: "How do I know the thresholds are trustworthy?",
+    answer:
+      "The thresholds are published, the methodology is versioned, and every named label is tied to evidence fields and a determinism hash. You do not have to accept the label alone; the supporting fields are shipped with it.",
+  },
+  {
+    question: "Yesterday's data — is that not outdated?",
+    answer:
+      "This is not an intraday trading feed. It is daily reference data for regime context. The point is to classify the day as a whole, not react to every short-lived spike.",
+  },
+  {
+    question: "What about the seven-day delay on ARB and BASE?",
+    answer:
+      "The delay is exposed rather than hidden. ARB and BASE are useful for historical, cross-chain, and regime-conditioned analysis, but their freshness status should be checked before operational use.",
+  },
+  {
+    question: "What is a confidence score?",
+    answer:
+      "Confidence measures how strongly the available evidence supports the published label. If confidence is too low, Urd Atlas publishes UNKNOWN/DEGRADED instead of pretending the label is stronger than the data supports.",
+  },
+];
+
+function RegimeDefinitionLine() {
+  return (
+    <div className="mt-8 text-center">
+      <p className="mx-auto max-w-[1320px] text-[20px] font-black leading-8 tracking-[-0.02em] text-white sm:text-[24px] sm:leading-9">
+        A regime is a simple answer to one question: is this blockchain behaving normally right now, or has something meaningfully shifted?
+        <span className="text-cyan-200"> Not the price — the network itself.</span>
+      </p>
+    </div>
+  );
+}
+
+function WorkflowUseCaseSection() {
+  return (
+    <div id="workflow-use-case" className="relative px-4 pb-8 pt-2 sm:px-6 lg:px-8 2xl:px-10">
+      <div className="mx-auto max-w-[1680px]">
+        <div className="max-w-[1120px]">
+          <h2 className="text-[36px] font-black leading-tight tracking-[-0.04em] text-white sm:text-[46px]">
+            A regime column for the data you already have.
+          </h2>
+          <p className="mt-4 max-w-[980px] text-[18px] font-semibold leading-8 text-white/76">
+            Your data tells you what happened. Urd Atlas tells you what kind of day it was when it happened — and that context changes what you can learn from your own data.
+          </p>
+        </div>
+
+        <div className="mt-8 flex flex-col items-center gap-2 text-center">
+          <div className="text-[13px] font-black uppercase tracking-[0.14em] text-cyan-300">
+            Example downstream workflow
+          </div>
+          <div className="text-[12px] font-bold uppercase tracking-[0.13em] text-cyan-200/62">
+            Illustrative example. Hypothetical data.
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">
+          {WORKFLOW_IMAGES.map((item, index) => (
+            <figure key={item.src} className="overflow-hidden">
+              <a
+                href={`#workflow-image-${index + 1}`}
+                className="group block"
+                aria-label={`${item.title}. Click to open a larger preview.`}
+              >
+                <div className="relative aspect-[4/3] w-full rounded-[28px] bg-[#06182d] shadow-[0_30px_88px_rgba(0,0,0,0.48)] ring-1 ring-white/8">
+                  <Image
+                    src={item.src}
+                    alt={item.alt}
+                    fill
+                    sizes="(min-width: 1800px) 520px, (min-width: 1536px) 31vw, (min-width: 1280px) 46vw, 100vw"
+                    className="object-contain p-1 transition duration-300 group-hover:scale-[1.01]"
+                  />
+                  <div className="absolute inset-x-4 bottom-4 inline-flex w-fit items-center rounded-full border border-white/25 bg-[#031329]/82 px-3 py-1 text-[11px] font-black uppercase tracking-[0.11em] text-white shadow-[0_10px_30px_rgba(0,0,0,0.28)]">
+                    Click to enlarge
+                  </div>
+                </div>
+              </a>
+              <figcaption className="flex items-start gap-3 px-1 py-4">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#2f7cff] text-[14px] font-black text-white">
+                  {index + 1}
+                </span>
+                <span className="pt-1 text-[15px] font-black leading-5 text-white">
+                  {item.title}
+                </span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+
+        <RegimeDefinitionLine />
+
+      </div>
+
+      {WORKFLOW_IMAGES.map((item, index) => (
+          <div
+            key={`${item.src}-modal`}
+            id={`workflow-image-${index + 1}`}
+            className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-[#031329]/0 p-4 opacity-0 transition duration-200 target:pointer-events-auto target:bg-[#031329]/78 target:opacity-100"
+          >
+            <a
+              href="#workflow-use-case"
+              aria-label="Close enlarged workflow image"
+              className="absolute inset-0 block"
+            />
+            <div className="relative z-[1] w-full max-w-[1280px] overflow-hidden rounded-[28px] border border-white/18 bg-[#071a31] shadow-[0_36px_120px_rgba(0,0,0,0.48)]">
+              <div className="flex items-center justify-between gap-4 border-b border-white/12 px-5 py-4 sm:px-6">
+                <div>
+                  <div className="text-[12px] font-black uppercase tracking-[0.13em] text-cyan-200/82">
+                    Workflow example {index + 1}
+                  </div>
+                  <div className="mt-1 text-[18px] font-black leading-6 tracking-[-0.02em] text-white">
+                    {item.title}
+                  </div>
+                </div>
+                <a
+                  href="#workflow-use-case"
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-white/18 bg-white/8 px-4 text-[12px] font-black uppercase tracking-[0.1em] text-white transition hover:bg-white/14"
+                >
+                  Close
+                </a>
+              </div>
+              <div className="relative aspect-[16/10] w-full bg-[#06182d]">
+                <Image
+                  src={item.src}
+                  alt={item.alt}
+                  fill
+                  sizes="100vw"
+                  className="object-contain"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+    </div>
+  );
+}
+
+function RegimeStatesSection() {
+  return (
+    <section className="relative bg-[linear-gradient(180deg,#f5f9ff_0%,#eaf5ff_100%)] py-12">
+      <SectionShell>
+        <div className="max-w-[960px]">
+          <div className="text-[13px] font-black uppercase tracking-[0.14em] text-[#1d5fce]">
+            Regime vocabulary
+          </div>
+          <h2 className="mt-3 text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447] sm:text-[40px]">
+            What kind of day was it?
+          </h2>
+          <p className="mt-4 max-w-[860px] text-[17px] font-semibold leading-8 text-[#37547b]">
+            Each daily label is a plain-language name for how the network behaved relative to its own recent history.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-4 lg:grid-cols-5">
+          {REGIME_STATES.map((state) => (
+            <div
+              key={state.label}
+              className="rounded-[24px] border border-[#b8d8ff]/80 bg-white/82 p-5 shadow-[0_18px_55px_rgba(13,36,71,0.08)] backdrop-blur"
+            >
+              <div className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.11em] ${state.tone}`}>
+                {state.label}
+              </div>
+              <p className="mt-4 text-[14px] font-semibold leading-6 text-[#37547b]">
+                {state.description}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-6 rounded-[22px] border border-[#b8d8ff]/70 bg-white/74 px-5 py-4 text-[15px] font-bold leading-7 text-[#0d2447] shadow-[0_16px_45px_rgba(13,36,71,0.07)]">
+          All states are chain-relative — compared to that chain&apos;s own recent history, not to other chains or to price.
+        </p>
+      </SectionShell>
+    </section>
+  );
+}
+
+function DailyResolutionSection() {
+  return (
+    <section className="relative bg-[#eaf5ff] py-8">
+      <SectionShell>
+        <div className="rounded-[28px] border border-[#b8d8ff] bg-white/82 p-6 shadow-[0_18px_55px_rgba(13,36,71,0.08)] backdrop-blur md:p-7">
+          <div className="text-[13px] font-black uppercase tracking-[0.14em] text-[#1d5fce]">
+            Why daily?
+          </div>
+          <p className="mt-3 max-w-[980px] text-[18px] font-semibold leading-8 text-[#37547b]">
+            Regime does not change in an hour. A CONGESTED day is a day — not a 15-minute spike. Daily resolution is frequent enough to be operationally useful and slow enough that each label has substance beyond transient noise. If you need sub-hourly data for intraday trading, this is not the right product.
+          </p>
+        </div>
+      </SectionShell>
+    </section>
+  );
+}
+
+function AnalystQuestionsSection() {
+  return (
+    <section className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_100%)] py-12">
+      <SectionShell>
+        <div className="max-w-[960px]">
+          <div className="text-[13px] font-black uppercase tracking-[0.14em] text-[#1d5fce]">
+            Buyer questions
+          </div>
+          <h2 className="mt-3 text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447] sm:text-[40px]">
+            Questions analysts ask before subscribing
+          </h2>
+          <p className="mt-4 max-w-[820px] text-[17px] font-semibold leading-8 text-[#37547b]">
+            Direct answers to the objections that matter before you add an external regime layer to your own workflow.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-4 lg:grid-cols-2">
+          {ANALYST_QUESTIONS.map((item) => (
+            <details
+              key={item.question}
+              className="group rounded-[24px] border border-[#b8d8ff]/80 bg-white/82 p-0 shadow-[0_18px_55px_rgba(13,36,71,0.08)] backdrop-blur transition open:bg-white open:shadow-[0_24px_72px_rgba(13,36,71,0.12)]"
+            >
+              <summary className="flex cursor-pointer list-none items-start gap-4 px-5 py-5 marker:hidden sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#2f7cff]/24 bg-[#2f7cff]/10 text-[18px] font-black leading-none text-[#1d5fce]">
+                  ?
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[18px] font-black leading-6 tracking-[-0.02em] text-[#0d2447]">
+                    {item.question}
+                  </span>
+                  <span className="mt-2 block text-[14px] font-semibold leading-6 text-[#557099]">
+                    {item.answer}
+                  </span>
+                </span>
+                <span className="mt-1 text-[20px] font-black leading-none text-[#2f7cff] transition group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+            </details>
+          ))}
+        </div>
+      </SectionShell>
+    </section>
+  );
+}
+
+
 type JsonLayerTone = "gold" | "meta" | "derived";
 type JsonExampleConfidence = "high" | "degraded";
 type JsonExampleKey = `${JsonLayerTone}_${JsonExampleConfidence}`;
@@ -1947,28 +2263,28 @@ export default async function HomePage() {
         </div>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_8%,rgba(44,109,255,0.12),transparent_28%),linear-gradient(180deg,#031329_0%,#041327_100%)]" />
 
-          <div className="pointer-events-none absolute inset-y-0 right-[2%] hidden items-center lg:flex">
-            <div className="relative h-[250px] w-[250px] translate-y-12 opacity-[0.30] xl:h-[520px] xl:w-[520px]">
+          <div className="pointer-events-none absolute right-[4%] top-[86px] hidden lg:block">
+            <div className="relative h-[250px] w-[250px] opacity-[0.24] xl:h-[360px] xl:w-[360px]">
               <Image
                 src="/web-bilder/ygg-transparent.png"
                 alt=""
                 fill
-                sizes="(min-width: 1280px) 520px, 250px"
+                sizes="(min-width: 1280px) 360px, 250px"
                 className="object-contain"
                 priority
               />
             </div>
           </div>
 
-        <SectionShell className="relative pb-12 pt-[78px] md:pb-14 md:pt-[90px] lg:pb-12 lg:pt-[96px]">
+        <SectionShell className="relative pb-6 pt-[78px] md:pb-8 md:pt-[90px] lg:pb-6 lg:pt-[96px]">
 
             <div className="max-w-[820px]">
               <h1 className="max-w-[820px] text-[48px] font-black leading-[0.98] tracking-[-0.055em] text-white sm:text-[54px] lg:text-[62px]">
                 Separate blockchain noise
                 <span className="block text-[#2f7cff]">from structural change.</span>
               </h1>
-              <p className="mt-6 max-w-[800px] text-[19px] font-semibold leading-7 text-white/88 sm:text-[20px]">
-                On-chain reference data for BTC, ETH, ARB, and BASE. Daily Gold, Derived, and Meta JSON without maintaining your own pipeline.
+              <p className="mt-6 max-w-[820px] text-[19px] font-semibold leading-7 text-white/88 sm:text-[20px]">
+                A daily regime label for your blockchain data. JSON. Versioned. Hash-anchored. Joins on date and chain.
               </p>
             <div className="mt-7 flex flex-wrap gap-3">
 
@@ -1995,19 +2311,25 @@ export default async function HomePage() {
 
           </div>
         </SectionShell>
+
+        <WorkflowUseCaseSection />
       </section>
 
         <HeroJsonPeek />
+
+        <RegimeStatesSection />
+
+        <DailyResolutionSection />
 
         <section className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_100%)] py-10">
           <SectionShell>
             <div className="flex items-start justify-between gap-6">
               <div>
                 <div className="text-[13px] font-black uppercase tracking-[0.12em] text-[#0d2447]">
-                  Latest chain status
+                  Today&apos;s published labels
                 </div>
                 <p className="mt-1 text-[14px] font-medium leading-5 text-[#557099]">
-                  Click any chain card to open the full chain view and history.
+                  Published by the latest pipeline run. Click any chain card to open the full chain view and history.
                 </p>
               </div>
 
@@ -2029,6 +2351,8 @@ export default async function HomePage() {
         </section>
 
         <BuyerDecisionSection />
+
+        <AnalystQuestionsSection />
 
         <WhoThisIsFor />
 
@@ -2080,10 +2404,10 @@ export default async function HomePage() {
                   Public sample pack
                 </div>
                 <h3 className="mt-4 max-w-[760px] text-[28px] font-black leading-tight tracking-[-0.035em] text-[#0d2447]">
-                  Inspect the exact files before you subscribe.
+                  Test it against your own data before you subscribe.
                 </h3>
                 <p className="mt-3 max-w-[820px] text-[16px] font-semibold leading-7 text-[#37547b]">
-                  The sample pack gives technical buyers real Gold, Derived, and Meta payloads, including high-confidence and degraded states. Use it to check schemas, confidence gates, driver fields, and hash-anchored named rows before adding Urd Atlas to a pipeline.
+                  We cannot prove our thresholds are the only right ones. What we can prove is that they are consistent, published, and that every named label we publish is verifiable against its determinism hash. Download the sample pack, run the verification script, and join it against your own historical data. That is the only honest way to know whether this is useful for you.
                 </p>
               </div>
 
