@@ -56,7 +56,7 @@ const SCENARIOS = [
     steps: [
       {
         code: null,
-        text: "Access the 365-day archive via Pro API key.",
+        text: "Access the 365-day archive via Research API key.",
       },
       {
         code: "regime.determinism_hash",

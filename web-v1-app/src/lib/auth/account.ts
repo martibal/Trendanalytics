@@ -149,9 +149,9 @@ function buildEntitlementInput(params: {
 function tierLabelForTier(tier: AccountSnapshotView["tier"]): string {
   switch (tier) {
     case "basic":
-      return "Basic";
+      return "Single Chain";
     case "pro":
-      return "Pro";
+      return "Research";
     default:
       return "Public";
   }

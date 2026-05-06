@@ -433,7 +433,7 @@ export default async function ChainHistoryPage({
           </div>
           <p className="mt-1 text-xs leading-5 text-[var(--urd-text-muted)]">
             Every label here is backed by a determinism hash and a full confidence score.
-            A Basic or Pro subscription gives you API access to the complete Meta JSON —
+            A Single Chain or Research subscription gives you API access to the complete Meta JSON —
             the data you see here, structured and ready to use in your own tools.
           </p>
         </div>

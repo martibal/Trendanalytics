@@ -45,7 +45,30 @@ function normalizeEntitledChain(value: string | null | undefined): string | null
   }
 
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+
+  if (
+    trimmed === "bitcoin" ||
+    trimmed === "ethereum" ||
+    trimmed === "arbitrum" ||
+    trimmed === "base"
+  ) {
+    return trimmed;
+  }
+
+  return null;
+}
+
+function getSelectedCheckoutChain(session: Stripe.Checkout.Session): string | null {
+  const customField = session.custom_fields?.find(
+    (field) => field.key === "entitled_chain"
+  );
+
+  const selected =
+    customField && customField.type === "dropdown"
+      ? customField.dropdown?.value
+      : null;
+
+  return normalizeEntitledChain(selected ?? session.metadata?.entitled_chain);
 }
 
 function normalizeHistoryUnlocked(value: string | null | undefined): boolean {
@@ -120,7 +143,7 @@ async function upsertAccountAndSubscriptionFromCheckoutSession(
   }
 
   const tier = normalizeTier(metadata.checkout_plan);
-  const entitledChain = normalizeEntitledChain(metadata.entitled_chain);
+  const entitledChain = tier === SubscriptionTier.pro ? null : getSelectedCheckoutChain(session);
   const historyUnlocked = normalizeHistoryUnlocked(metadata.history_unlocked);
 
   await db.account.upsert({
@@ -224,23 +247,29 @@ async function syncSubscriptionFromStripe(
 
   const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(subscription);
 
+  const subscriptionUpdateData = {
+    stripeSubscriptionId: subscriptionId,
+    tier,
+    historyUnlocked,
+    status: nextStatus,
+    currentPeriodEnd,
+    ...(tier === SubscriptionTier.pro
+      ? { entitledChain: null }
+      : entitledChain
+        ? { entitledChain }
+        : {}),
+  };
+
   await db.subscription.upsert({
     where: { stripeCustomerId: customerId },
-    update: {
-      stripeSubscriptionId: subscriptionId,
-      tier,
-      historyUnlocked,
-      entitledChain,
-      status: nextStatus,
-      currentPeriodEnd,
-    },
+    update: subscriptionUpdateData,
     create: {
       accountId: resolvedAccountId,
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
       tier,
       historyUnlocked,
-      entitledChain,
+      entitledChain: tier === SubscriptionTier.pro ? null : entitledChain,
       status: nextStatus,
       currentPeriodEnd,
     },

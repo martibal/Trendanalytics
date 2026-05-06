@@ -327,7 +327,7 @@ describe("lib/auth/account", () => {
           lastUsedAt: null,
         },
       ],
-      tierLabel: "Basic",
+      tierLabel: "Single Chain",
       entitledChainLabel: "Selection required",
       historyDepthLabel: "90 days",
     });
@@ -389,7 +389,7 @@ describe("lib/auth/account", () => {
         allowedChains: ["bitcoin", "ethereum", "arbitrum", "base"],
       },
       apiKeys: [],
-      tierLabel: "Pro",
+      tierLabel: "Research",
       entitledChainLabel: "All chains",
       historyDepthLabel: "Full available history",
     });

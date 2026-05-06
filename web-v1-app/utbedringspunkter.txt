@@ -140,3 +140,370 @@ da vil usikre folk spørre;
 - hvilken kolonne skal jeg bruke til å koble på mine egne data, datokolonne?
 - hvilke metrikker brukes for å si noe om aktivitet, nettverkspress osv?
 - hvordan har dere beregnet det? jeg vet ikke om jeg kan bare stole på en label, jeg må jo se hvordan dere har kommet dere frem til det
+
+Ja. Derfor bør du ikke starte med “tilstand” eller “reference data” overfor en ikke-teknisk person. De ordene fungerer for profesjonelle kjøpere, men ikke for folk som først må forstå konseptet.
+
+Jeg ville forklart det slik:
+
+> **Urd Atlas måler aktiviteten på store blockchains hver dag og setter et tydelig navn på hva som skjer: normalt, økende aktivitet, lave kostnader eller presset nettverk. Poenget er ikke å si om prisen skal opp eller ned, men å gi analytikere en fast datakolonne de kan bruke når de undersøker hva som skjedde i markedet.**
+
+Det svarer på det meste uten å bruke for mye fagterminologi.
+
+## Svar på de usikre spørsmålene
+
+### “Hva mener du med tilstand?”
+
+Med “tilstand” mener jeg **hvordan selve blockchain-nettverket oppfører seg den dagen**.
+
+Ikke prisen på coin-en.
+Ikke om man bør kjøpe eller selge.
+Men ting som:
+
+* er det mye aktivitet?
+* er det dyrt å bruke nettverket?
+* er nettverket presset?
+* er aktiviteten uvanlig høy eller lav sammenlignet med sin egen historikk?
+
+Så “Ethereum var CONGESTED den dagen” betyr ikke “ETH-prisen gikk opp”. Det betyr: **Ethereum-nettverket så presset ut etter Urd Atlas-metodikken den dagen.**
+
+### “Hva betyr normalt, opphetet, billig eller overbelastet — i forhold til hva?”
+
+I forhold til **samme kjedes egen historikk**.
+
+Ethereum sammenlignes ikke direkte med Bitcoin.
+Base sammenlignes ikke direkte med Ethereum.
+
+Hver kjede vurderes mot sin egen tidligere aktivitet, gebyrnivå, kapasitet og friksjon.
+
+Så “CONGESTED” betyr egentlig:
+
+> Denne kjeden ser uvanlig presset ut sammenlignet med hvordan denne kjeden vanligvis ser ut.
+
+“CHEAP” betyr:
+
+> Det ser uvanlig billig/lavfriksjon ut å bruke nettverket sammenlignet med kjedens egen historikk.
+
+“HEATING” betyr:
+
+> Aktiviteten begynner å ta seg opp og bekreftes av trenddata.
+
+“STABLE” betyr:
+
+> Ingen av de tydelige avvikene er sterke nok til å få et eget regime-navn.
+
+### “Hva mener du med værkart?”
+
+“Værkart” er bare en analogi.
+
+Et vanlig værkart sier ikke hva du skal gjøre med pengene dine. Det sier:
+
+> Her er været akkurat nå: regn, vind, sol, storm.
+
+Urd Atlas gjør noe lignende for blockchain-nettverk:
+
+> Her er nettverkssituasjonen akkurat nå: stabilt, opphetet, billig eller overbelastet.
+
+Men egentlig er “værkart” litt for folkelig for nettsiden din. For profesjonelle ville jeg heller sagt:
+
+> **daily network-state classification**
+
+På norsk:
+
+> **daglig klassifisering av nettverkstilstand**
+
+### “Jeg skjønner ikke hva jeg skal bruke det til?”
+
+Du bruker det som en ekstra kolonne i analysearbeidet ditt.
+
+Eksempel:
+
+Du har fra før en tabell med datoer, prisendringer, volum, egne signaler eller strategidata.
+
+Urd Atlas gir deg en ekstra kolonne:
+
+```text
+date        chain      regime       confidence
+2026-03-31  ethereum   CONGESTED    0.847
+2026-04-01  ethereum   STABLE       0.722
+```
+
+Da kan du spørre:
+
+* Hvordan oppfører strategien min seg på CONGESTED-dager?
+* Ser risiko annerledes ut når nettverket er HEATING?
+* Er analysene mine mer stabile når confidence er høy?
+* Bør jeg filtrere bort dager der klassifiseringen er UNKNOWN/DEGRADED?
+* Hva skjedde historisk på dager der gebyrer, aktivitet og kapasitet pekte i samme retning?
+
+Poenget er ikke at Urd Atlas gir svaret alene. Poenget er at du får en ferdig, dokumentert variabel du kan bruke i egne analyser.
+
+### “Jeg har allerede intradag prisdata. Hva skal jeg med dette?”
+
+Prisdata sier hva markedet betalte.
+
+Urd Atlas sier hvordan blockchain-nettverket oppførte seg.
+
+Det er to forskjellige ting.
+
+Intradag prisdata kan fortelle:
+
+> ETH gikk opp 3 % mellom klokken 10 og 14.
+
+Urd Atlas kan fortelle:
+
+> Ethereum-nettverket var samtidig i et CONGESTED-regime, med høy aktivitet, høy friksjon og høy kapasitetspress.
+
+Prisdata er markedsdata.
+Urd Atlas er nettverksdata.
+
+Hvis du bare ser pris, ser du resultatet i markedet. Hvis du også ser nettverkstilstanden, får du mer kontekst rundt hva som faktisk skjedde på kjeden.
+
+### “Hva betyr reference data?”
+
+Reference data betyr **stabile, strukturerte data som andre systemer kan bygge på**.
+
+Det er ikke en nyhetsfeed.
+Det er ikke et dashboard du må sjekke manuelt.
+Det er ikke en meningstekst.
+
+Det er data som kan brukes som input.
+
+I Urd Atlas betyr det:
+
+> Hver dag publiseres faste JSON-filer som sier hvilken tilstand hver kjede var i, hvor sterk klassifiseringen er, hvilke målinger som drev den, og hvilken metodeversjon som ble brukt.
+
+En enklere forklaring:
+
+> Reference data er data du slår opp og bruker som fasit i andre analyser.
+
+### “Hva betyr confidence score?”
+
+Confidence score betyr:
+
+> Hvor sterkt datagrunnlaget støtter den publiserte klassifiseringen.
+
+Hvis confidence er høy, er klassifiseringen godt støttet.
+
+Hvis confidence er lav, sier systemet:
+
+> Vi har ikke nok evidens til å gi en trygg navngitt tilstand.
+
+Derfor finnes `UNKNOWN/DEGRADED`.
+
+Det er ikke en unnskyldning. Det er en kvalitetskontroll.
+
+I stedet for å tvinge frem en label hver dag, sier Urd Atlas noen ganger:
+
+> Denne dagen er ikke sterk nok til å klassifiseres sikkert.
+
+Det gjør dataene mer brukbare i seriøse analyser, fordi du kan filtrere på confidence.
+
+### “Hvordan bruker jeg disse tilstandene i mine egne systemer?”
+
+Du laster ned JSON-filene eller henter dem via API, og kobler dem til egne datasett på dato og kjede.
+
+For eksempel:
+
+```text
+my_strategy_results + Urd Atlas regime data
+```
+
+Da kan du analysere resultater etter regime:
+
+```text
+Strategy return when ETH = STABLE
+Strategy return when ETH = CONGESTED
+Strategy return when ETH = HEATING
+```
+
+Eller du kan bruke confidence som filter:
+
+```text
+only use rows where confidence_score >= 0.70
+```
+
+Det gir deg tre ting:
+
+1. **Konsistent historisk merking**
+   Samme dag får samme label hver gang.
+
+2. **Bedre segmentering**
+   Du kan skille mellom vanlige dager og dager med tydelig nettverkspress.
+
+3. **Mer etterprøvbar analyse**
+   Du kan vise hvorfor en dag fikk en label, fordi drivers, z-scores, percentiles og hash/metodeversjon følger med.
+
+## Den beste ikke-tekniske forklaringen
+
+Jeg ville brukt denne:
+
+> **Urd Atlas gjør daglig blockchain-aktivitet om til strukturerte nettverksklassifiseringer. I stedet for bare å se pris, kan en analytiker se om selve nettverket var stabilt, opphetet, billig eller overbelastet den dagen — og bruke den informasjonen som en datakolonne i egne analyser.**
+
+Enda enklere:
+
+> **Det er et daglig merkesystem for blockchain-nettverk. Hver dag får hver kjede en dokumentert label, som STABLE eller CONGESTED, basert på aktivitet, kostnader og kapasitet. Analytikere kan bruke disse labelene i egne modeller, rapporter og backtester.**
+
+Det siste er kanskje den beste forklaringen for folk som ikke skjønner den tekniske landingssiden ennå.
+
+
+
+Ja — dette er akkurat de neste spørsmålene en skeptisk kjøper vil stille. Og de er gode tegn, fordi de betyr at personen begynner å tenke: “Kan dette faktisk brukes i min pipeline?”
+
+Jeg ville svart slik:
+
+## Kort ikke-teknisk forklaring
+
+**Aktivitet** betyr hvor mye som skjer på kjeden: transaksjoner, brukere/adresser og bruksmengde.
+
+**Nettverkspris** betyr ikke token-prisen. Det betyr hva det koster å bruke nettverket, typisk transaksjonsgebyrer.
+
+**Presset nettverk** betyr at kjeden viser tegn på høy bruk, høy kostnad eller kapasitetsbelastning relativt til sin egen historikk.
+
+**Nettverksaktivitet** er samlebetegnelsen for bruksmønsteret på kjeden: hvor mye den brukes, hvor dyr den er å bruke, og hvor nær kapasitet den ligger.
+
+## Hvilken kolonne kobler jeg på egne data?
+
+Ja: først og fremst **dato + kjede**.
+
+Typisk join-key:
+
+```text
+date + chain
+```
+
+Eksempel:
+
+```text
+my_data.date = urd_atlas.date
+my_data.chain = urd_atlas.chain
+```
+
+Da kan du legge til Urd Atlas-feltene som ekstra kolonner:
+
+```text
+date        chain      my_metric    regime       confidence
+2026-03-31  ethereum   ...          CONGESTED    0.847
+2026-04-01  ethereum   ...          STABLE       0.722
+```
+
+Så bruker du `regime` som segmenteringskolonne og `confidence_score` som kvalitetsfilter.
+
+## Hvilke metrikker brukes?
+
+På enkelt språk:
+
+**Aktivitet / demand**
+
+* transaction count
+* active addresses der det er tilgjengelig
+* usage intensity
+
+**Kostnad / friction**
+
+* median transaction fee
+* fee burden, altså gebyr relativt til typisk overført verdi
+
+**Kapasitet / capacity**
+
+* gas utilization for EVM-kjeder som Ethereum, Base og Arbitrum
+* failed transaction rate der det er relevant
+* block-time instability for Bitcoin, siden Bitcoin ikke har gas på samme måte
+
+Mer konkret:
+
+```text
+Demand:
+tx_count_daily
+unique_active_addresses
+
+Friction:
+median_tx_fee_native
+median_tx_fee_native / median_tx_value_native
+
+Capacity:
+gas_utilization_pct
+failed_tx_rate
+avg_block_time_sec
+blocktime_instability for Bitcoin
+```
+
+Dette er grunnen til at produktet ikke bare sier “CONGESTED”. Det viser også hvilke drivere som gjorde at dagen fikk den labelen.
+
+## Hvordan er det beregnet?
+
+Kortversjonen:
+
+1. Urd Atlas samler daglige observasjoner per kjede.
+2. Tallene sammenlignes mot kjedens egen historikk.
+3. Systemet ser om aktivitet, kostnad eller kapasitet er uvanlig høy eller lav.
+4. Det bruker dokumenterte terskler for å avgjøre label.
+5. Hvis evidensen er svak, publiseres `UNKNOWN/DEGRADED` i stedet for å late som labelen er sikker.
+6. Hver publisert rad inneholder confidence, drivers, metodeversjon og eventuelt determinism hash.
+
+Så nei — kunden trenger ikke “bare stole på en label”.
+
+De kan sjekke:
+
+```text
+regime.label
+confidence.confidence_score
+regime.drivers[]
+regime.drivers[].metric
+regime.drivers[].z_robust
+regime.drivers[].pct_90d
+regime.drivers[].momentum_7d_vs_30d
+methodology_version
+determinism_hash
+```
+
+## Den litt mer tekniske forklaringen
+
+For hver metric beregnes historisk avvik. Systemet ser blant annet på:
+
+* hvor verdien ligger i forhold til siste 90 dager
+* hvor langt den er fra historisk median, målt med robust z-score
+* om kort trend ligger over mellomlang trend
+* om confidence er høy nok til å publisere en navngitt label
+
+Eksempel:
+
+```text
+tx_count_daily unusually high → demand pressure
+median_tx_fee_native unusually high → friction pressure
+gas_utilization_pct unusually high → capacity pressure
+```
+
+Hvis kombinasjonen av disse tilfredsstiller publiserte regler, får dagen en label.
+
+For eksempel:
+
+```text
+Capacity EXTREME_HIGH → CONGESTED
+Capacity HIGH + Friction HIGH → CONGESTED
+Friction LOW + Capacity LOW → CHEAP
+Demand HIGH + positive trend → HEATING
+None of the above → STABLE
+Confidence < 0.40 → UNKNOWN/DEGRADED
+```
+
+Dette er hele poenget med thresholds-siden og whitepaperet: kunden kan se hvordan labelen oppstår.
+
+## God forklaring til nettsiden
+
+Jeg ville formulert dette slik et sted i en FAQ / “How to use it”-seksjon:
+
+> **You do not have to trust the label alone.**
+> Each regime label is published with the metrics that drove it, including the metric name, current value, 90-day percentile, robust z-score, 7d-vs-30d momentum, confidence score, methodology version, and determinism hash. The label is the headline. The evidence is shipped with it.
+
+På norsk:
+
+> **Du trenger ikke stole blindt på labelen.**
+> Hver regime-label publiseres sammen med metrikken som drev den, dagens verdi, 90-dagers percentile, robust z-score, 7d-vs-30d momentum, confidence score, methodology version og determinism hash. Labelen er overskriften. Evidensen følger med.
+
+Dette er veldig sterkt fordi det svarer direkte på kjøperens viktigste bekymring:
+
+> “Hvordan vet jeg at dette ikke bare er en påstand?”
+
+Svaret ditt er:
+
+> Fordi labelen ikke kommer alene. Den kommer med bevismaterialet.

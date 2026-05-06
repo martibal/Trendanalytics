@@ -2542,7 +2542,7 @@ export default async function HomePage() {
                   headline="One chain. API access. 90-day history."
                   body="Daily on-chain reference data for one chain of your choice — BTC, ETH, ARB, or BASE. Gold, Derived, and Meta JSON delivered via authenticated API."
                   bestFor="Best for: independent analysts validating the dataset against one chain."
-                  href="/dashboard"
+                  href="/api/v1/checkout?plan=basic"
                   cta="Start Single Chain →"
                 />
                 <PlanCard
@@ -2553,7 +2553,7 @@ export default async function HomePage() {
                   headline="All four chains. API access. 365-day history."
                   body="Daily on-chain reference data across BTC, ETH, ARB, and BASE. Gold, Derived, and Meta JSON delivered via authenticated API. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
                   bestFor="Best for: multi-chain research, backtesting, and production pipelines."
-                  href="/dashboard"
+                  href="/api/v1/checkout?plan=pro"
                   cta="Start Research →"
               
                 />
