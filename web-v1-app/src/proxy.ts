@@ -1,3 +1,4 @@
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse, userAgent } from "next/server";
 
 function isMobileRequest(req: NextRequest) {
@@ -9,6 +10,7 @@ function mapToMobilePath(pathname: string): string | null {
   if (pathname.startsWith("/mobile")) return null;
   if (pathname.startsWith("/_next")) return null;
   if (pathname.startsWith("/api/")) return null;
+  if (pathname.startsWith("/__clerk")) return null;
 
   if (pathname === "/") return "/mobile";
 
@@ -25,7 +27,7 @@ function mapToMobilePath(pathname: string): string | null {
   return "/mobile";
 }
 
-export function proxy(req: NextRequest) {
+export default clerkMiddleware((_auth, req) => {
   const url = req.nextUrl.clone();
   const pathname = url.pathname;
   const requestedView = url.searchParams.get("view");
@@ -51,10 +53,11 @@ export function proxy(req: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|css|js|map|txt|xml|woff|woff2)$).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|map|txt|xml)).*)",
+    "/(api|trpc|__clerk)(.*)",
   ],
 };
