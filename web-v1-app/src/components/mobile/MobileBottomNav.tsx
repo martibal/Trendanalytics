@@ -1,12 +1,22 @@
+// src/components/mobile/MobileBottomNav.tsx
+//
+// Endringer vs original:
+//   1. Desktop-tab peker på /?view=desktop som nå setter cookie via proxy
+//      slik at brukeren faktisk lander på desktop i stedet for å bli
+//      bounced tilbake til /mobile.
+//   2. Ikonene ◉ og ⊞ er byttet ut. ◉ rendres som emoji på noen Android-
+//      enheter og ⊞ mangler i mange systemfonter. Erstattet med enkle
+//      ASCII-tegn som er reliable på tvers av iOS og Android.
+
 import Link from "next/link";
 
 export default function MobileBottomNav({ active }: { active: string }) {
   const tabs = [
-    { key: "overview", label: "Home", href: "/mobile", icon: "◉" },
-    { key: "track", label: "Track", href: "/mobile/track-record", icon: "◌" },
-    { key: "plans", label: "Plans", href: "/mobile/plans", icon: "$" },
-    { key: "wiki", label: "Wiki", href: "/mobile/wiki", icon: "⊞" },
-    { key: "desktop", label: "Desktop", href: "/?view=desktop", icon: "↗" },
+    { key: "overview", label: "Home",    href: "/mobile",              icon: "◦"  },
+    { key: "track",    label: "Track",   href: "/mobile/track-record", icon: "≡"  },
+    { key: "plans",    label: "Plans",   href: "/mobile/plans",        icon: "$"  },
+    { key: "wiki",     label: "Wiki",    href: "/mobile/wiki",         icon: "?"  },
+    { key: "desktop",  label: "Desktop", href: "/?view=desktop",       icon: "↗"  },
   ] as const;
 
   return (
@@ -17,7 +27,9 @@ export default function MobileBottomNav({ active }: { active: string }) {
             key={tab.key}
             href={tab.href}
             className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition-colors ${
-              active === tab.key ? "text-[#9fe8ff]" : "text-[#d8e9ff]/70 active:text-white"
+              active === tab.key
+                ? "text-[#9fe8ff]"
+                : "text-[#d8e9ff]/70 active:text-white"
             }`}
           >
             <span className="text-sm leading-none">{tab.icon}</span>

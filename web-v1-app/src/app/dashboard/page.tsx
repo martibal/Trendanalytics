@@ -191,7 +191,7 @@ export default async function DashboardPage() {
       ? `${accountView.snapshot.maxWindowDays}d`
       : "Not set";
 
-  const billingTemporarilyDisabled = true;
+  const hasBillingPortalAccess = Boolean(accountView.account?.stripeCustomerId);
 
   if (accountView.authConfigured && !accountView.isAuthenticated) {
     return (
@@ -512,24 +512,51 @@ export default async function DashboardPage() {
             <UrdSection title="Billing management">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <p>
-                  Payments are temporarily disabled while business registration and production billing
-                  setup are being completed.
+                  Manage your subscription, payment method, invoices, and cancellation directly through
+                  Stripe Customer Portal. Stripe remains the billing source of truth; Urd Atlas mirrors
+                  subscription state through webhook-synced entitlements.
                 </p>
-                <span className={statusBadgeClass(billingTemporarilyDisabled ? "inactive" : "active")}>
-                  inactive
+                <span className={statusBadgeClass(hasBillingPortalAccess ? "active" : "inactive")}>
+                  {hasBillingPortalAccess ? "active" : "inactive"}
                 </span>
               </div>
 
               <div className="mt-4 space-y-3 text-sm font-semibold leading-7 text-[#27476f]">
-                <p>
-                  Billing links, Stripe checkout, and the customer portal are intentionally unavailable
-                  in this pre-launch state.
-                </p>
+                {hasBillingPortalAccess ? (
+                  <>
+                    <p>
+                      Opening billing management sends you to Stripe&apos;s hosted portal. Cancellation,
+                      payment-method changes, and invoice access happen there, then Stripe webhooks
+                      update this dashboard automatically.
+                    </p>
 
-                <div className="rounded-2xl border border-amber-400 bg-amber-50 p-4 font-semibold text-amber-900">
-                  Payments will be re-enabled once business registration, bank account setup, and enabled
-                  Stripe configuration are complete.
-                </div>
+                    <form action="/api/v1/checkout/portal" method="post">
+                      <button
+                        type="submit"
+                        className="inline-flex rounded-full border border-[#0b5cff] bg-[#0b5cff] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#084bd1]"
+                      >
+                        Manage billing
+                      </button>
+                    </form>
+
+                    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 font-semibold text-[#27476f]">
+                      Standard cancellations should be initiated through Stripe Customer Portal. Manual
+                      admin intervention is only needed for support cases, refunds, or failed syncs.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      Billing management becomes available after checkout has created and linked a Stripe
+                      customer for this account.
+                    </p>
+
+                    <div className="rounded-2xl border border-amber-400 bg-amber-50 p-4 font-semibold text-amber-900">
+                      No Stripe customer is connected to this account yet. Subscribe first, then return
+                      here to manage billing, invoices, and cancellation through Stripe.
+                    </div>
+                  </>
+                )}
               </div>
             </UrdSection>
 
