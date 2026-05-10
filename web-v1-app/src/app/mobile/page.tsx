@@ -15,6 +15,8 @@ import {
   type MobileChainState,
 } from "@/lib/mobile/data";
 import { readStorageObject } from "@/lib/storage";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
 
 import "server-only";
 
@@ -32,14 +34,14 @@ type LandingHero = {
 const WORKFLOW_IMAGES = [
   {
     number: "1",
-    title: "Start with your data",
+    title: "Your dataset",
     src: "/landing-workflows/urd-atlas-mobile-workflow-1.png",
     alt:
-      "Fictive example data showing an existing dataset before Urd Atlas regime context is joined.",
+      "Fictive example data showing an external dataset before Urd Atlas regime context is joined.",
   },
   {
     number: "2",
-    title: "Join Urd Atlas JSON",
+    title: "Join Urd Atlas",
     src: "/landing-workflows/urd-atlas-mobile-workflow-2.png",
     alt:
       "Fictive example data showing Urd Atlas regime, confidence, and evidence fields joined by date and chain.",
@@ -53,12 +55,27 @@ const WORKFLOW_IMAGES = [
   },
 ];
 
-const REGIME_LABELS = [
-  "STABLE",
-  "HEATING",
-  "CONGESTED",
-  "CHEAP",
-  "UNKNOWN/DEGRADED",
+const REGIME_EXPLAINERS = [
+  {
+    label: "STABLE",
+    text: "Normal network conditions relative to recent history.",
+  },
+  {
+    label: "HEATING",
+    text: "Activity is elevated and trend-confirmed. The short-term trend must run ahead of the medium-term baseline.",
+  },
+  {
+    label: "CONGESTED",
+    text: "Friction, fees, failed transactions, or utilization are elevated enough to mark congestion.",
+  },
+  {
+    label: "CHEAP",
+    text: "Friction is unusually low relative to the chain’s own history.",
+  },
+  {
+    label: "UNKNOWN/DEGRADED",
+    text: "Available evidence is not sufficient for a confident regime label.",
+  },
 ] as const;
 
 const CHAIN_SYMBOLS: Record<ChainId, string> = {
@@ -183,34 +200,31 @@ function ChainCard({ state }: { state: MobileChainState }) {
   } as CSSProperties;
 
   const confidencePct = clampPct(state.confidenceScore);
-
-  const demand = formatAxisLevel(state.scorecard.demand?.level);
-  const friction = formatAxisLevel(state.scorecard.friction?.level);
-  const capacity = formatAxisLevel(state.scorecard.capacity?.level);
+  const demand = formatAxisLevel(state.scorecard?.demand?.level);
+  const friction = formatAxisLevel(state.scorecard?.friction?.level);
+  const capacity = formatAxisLevel(state.scorecard?.capacity?.level);
 
   return (
     <Link
       href={`/mobile/chain/${state.chain}`}
-      className="ua-chain-card"
+      className="ua-chain-row"
       style={style}
     >
-      <div className="ua-chain-top">
-        <div className="ua-chain-left">
-          <div className="ua-chain-icon">{CHAIN_SYMBOLS[state.chain]}</div>
+      <div className="ua-chain-row-top">
+        <div className="ua-chain-token">{CHAIN_SYMBOLS[state.chain]}</div>
 
-          <div className="ua-chain-copy">
-            <div className="ua-chain-name">{state.name}</div>
-            <div className="ua-chain-date">
-              {state.asOf ?? "—"}
-              {state.lagDays != null ? ` · ${state.lagDays}d lag` : ""}
-            </div>
-          </div>
+        <div className="ua-chain-copy">
+          <strong>{state.name}</strong>
+          <span>
+            {state.asOf ?? "—"}
+            {state.lagDays != null ? ` · ${state.lagDays}d lag` : ""}
+          </span>
         </div>
 
         <div className="ua-regime-pill">{label}</div>
       </div>
 
-      <div className="ua-confidence-row">
+      <div className="ua-chain-meter-line">
         <span>Confidence</span>
         <strong>
           {typeof state.confidenceScore === "number"
@@ -219,15 +233,12 @@ function ChainCard({ state }: { state: MobileChainState }) {
         </strong>
       </div>
 
-      <div className="ua-confidence-track">
-        <div
-          className="ua-confidence-fill"
-          style={{ width: `${confidencePct}%` }}
-        />
+      <div className="ua-chain-meter">
+        <div style={{ width: `${confidencePct}%` }} />
       </div>
 
-      <p className="ua-axis-line">
-        Demand: {demand} · Friction: {friction} · Capacity: {capacity}
+      <p>
+        Demand {demand} · Friction {friction} · Capacity {capacity}
       </p>
     </Link>
   );
@@ -244,7 +255,7 @@ function WorkflowCard({
     <figure className="ua-workflow-card">
       <a
         href={`#workflow-image-${index + 1}`}
-        className="ua-workflow-link"
+        className="ua-workflow-image-link"
         aria-label={`${image.title}. Open larger workflow image.`}
       >
         <div className="ua-workflow-image-wrap">
@@ -252,7 +263,7 @@ function WorkflowCard({
             src={image.src}
             alt={image.alt}
             fill
-            sizes="(max-width: 720px) 92vw, 680px"
+            sizes="92vw"
             className="ua-workflow-image"
             priority={index === 0}
           />
@@ -261,7 +272,7 @@ function WorkflowCard({
         </div>
       </a>
 
-      <figcaption className="ua-workflow-caption">
+      <figcaption>
         <span>{image.number}</span>
         <strong>{image.title}</strong>
       </figcaption>
@@ -295,19 +306,20 @@ function WorkflowModal({
         </div>
 
         <div className="ua-modal-scroll">
-          <div className="ua-modal-image">
+          <div className="ua-modal-image-stage">
             <Image
               src={image.src}
               alt={image.alt}
               fill
-              sizes="100vw"
-              className="ua-workflow-image"
+              sizes="1448px"
+              className="ua-modal-image"
+              priority={index === 0}
             />
           </div>
         </div>
 
-        <div className="ua-modal-footer">
-          Rotate your phone for the widest view.
+        <div className="ua-modal-foot">
+          Pan the image sideways. Rotate your phone for the widest view.
         </div>
       </div>
     </div>
@@ -317,75 +329,98 @@ function WorkflowModal({
 function PlanCard({
   name,
   price,
-  description,
-  href,
+  text,
   tone,
 }: {
   name: string;
   price: string;
-  description: string;
-  href: string;
-  tone: "plain" | "blue" | "violet";
+  text: string;
+  tone: "plain" | "blue" | "orange";
 }) {
   return (
-    <Link href={href} className={`ua-plan-card ua-plan-${tone}`}>
+    <Link href="/mobile/plans" className={`ua-plan ua-plan-${tone}`}>
       <div>
         <strong>{name}</strong>
-        <p>{description}</p>
+        <span>{text}</span>
       </div>
 
-      <span>{price}</span>
+      <b>{price}</b>
     </Link>
   );
 }
 
-function MobileVisualStyles() {
+function MobileStyles() {
   return (
     <style>{`
-      .mobile-shell {
-        background: #071019 !important;
-        color: #f8fbff !important;
-      }
-
-      .mobile-shell main {
-        margin-top: 0 !important;
-      }
-
-      .ua-mobile-compact,
-      .ua-mobile-compact * {
+      .ua-mobile,
+      .ua-mobile * {
         box-sizing: border-box;
       }
 
-      .ua-mobile-compact {
+      .ua-mobile {
         min-height: 100svh;
         overflow-x: hidden;
         background:
-          radial-gradient(circle at 20% 0%, rgba(37, 99, 235, 0.22), transparent 19rem),
-          linear-gradient(180deg, #071019 0%, #081725 44%, #f3f8ff 44%, #f3f8ff 100%);
-        color: #f8fbff;
+          radial-gradient(circle at 18% -5%, rgba(77, 158, 255, 0.28), transparent 18rem),
+          radial-gradient(circle at 92% 8%, rgba(255, 149, 64, 0.13), transparent 16rem),
+          linear-gradient(180deg, #040b14 0%, #071425 42%, #091a2e 100%);
+        color: #edf7ff;
         font-family: inherit;
       }
 
-      .ua-shell {
+      .ua-page {
         min-height: 100svh;
         padding-bottom: 96px;
       }
 
-      .ua-top {
-        padding: calc(env(safe-area-inset-top) + 16px) 16px 24px;
+      .ua-hero {
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+        padding: calc(env(safe-area-inset-top) + 16px) 16px 22px;
+      }
+
+      .ua-hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        background:
+          linear-gradient(145deg, rgba(255,255,255,0.09), transparent 30%),
+          repeating-linear-gradient(
+            115deg,
+            rgba(255,255,255,0.025) 0,
+            rgba(255,255,255,0.025) 1px,
+            transparent 1px,
+            transparent 20px
+          );
+        opacity: 0.7;
+      }
+
+      .ua-hero::after {
+        content: "";
+        position: absolute;
+        right: -78px;
+        top: -92px;
+        z-index: -1;
+        width: 230px;
+        height: 230px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255, 149, 64, 0.22), transparent 60%);
+        filter: blur(10px);
       }
 
       .ua-topbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 14px;
+        gap: 12px;
       }
 
       .ua-brand {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
+        gap: 9px;
         color: #ffffff;
         text-decoration: none;
       }
@@ -394,152 +429,145 @@ function MobileVisualStyles() {
         width: 30px;
         height: 30px;
         object-fit: contain;
-        opacity: 0.9;
+        filter:
+          drop-shadow(0 0 12px rgba(81, 178, 255, 0.45))
+          drop-shadow(0 8px 18px rgba(0, 0, 0, 0.32));
       }
 
-      .ua-brand-word {
+      .ua-brand span {
+        color: #ffffff;
         font-size: 20px;
-        line-height: 1;
         font-weight: 1000;
         letter-spacing: -0.045em;
       }
 
-      .ua-desktop-link {
-        display: inline-flex;
-        min-height: 38px;
-        align-items: center;
-        justify-content: center;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        background: rgba(255, 255, 255, 0.06);
-        color: #eaf5ff;
-        padding: 0 12px;
-        text-decoration: none;
-        font-size: 12px;
-        font-weight: 900;
-      }
-
-      .ua-hero {
-        margin-top: 26px;
+      .ua-hero-body {
+        margin-top: 28px;
       }
 
       .ua-kicker {
-        color: #9fe8ff;
-        font-size: 11px;
+        display: inline-flex;
+        min-height: 26px;
+        align-items: center;
+        border: 1px solid rgba(126, 204, 255, 0.18);
+        border-radius: 999px;
+        background: linear-gradient(180deg, rgba(126,204,255,0.14), rgba(126,204,255,0.045));
+        color: #bfe9ff;
+        padding: 0 10px;
+        font-size: 9px;
         font-weight: 1000;
-        letter-spacing: 0.22em;
+        letter-spacing: 0.19em;
         text-transform: uppercase;
       }
 
       .ua-title {
-        margin: 12px 0 0;
-        max-width: 390px;
+        margin: 11px 0 0;
+        max-width: 380px;
         color: #ffffff;
-        font-size: 38px;
-        line-height: 1.04;
+        font-size: 37px;
+        line-height: 1.01;
         font-weight: 1000;
-        letter-spacing: -0.065em;
+        letter-spacing: -0.071em;
+        text-shadow:
+          0 14px 40px rgba(0,0,0,0.45),
+          0 0 32px rgba(81,178,255,0.12);
       }
 
       .ua-title span {
-        color: #2f8cff;
+        color: #ff9a4a;
       }
 
       .ua-copy {
-        margin: 16px 0 0;
-        max-width: 390px;
-        color: #dcecff;
-        font-size: 15px;
-        line-height: 1.55;
+        margin: 12px 0 0;
+        max-width: 400px;
+        color: #d9eaff;
+        font-size: 14px;
+        line-height: 1.5;
         font-weight: 650;
         letter-spacing: -0.02em;
       }
 
-      .ua-actions {
-        display: flex;
+      .ua-hero-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 10px;
-        margin-top: 20px;
+        margin-top: 17px;
       }
 
-      .ua-primary,
-      .ua-secondary {
+      .ua-hero-actions a {
         display: inline-flex;
-        min-height: 48px;
-        flex: 1 1 0;
+        min-height: 46px;
         align-items: center;
         justify-content: center;
         border-radius: 16px;
         text-decoration: none;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 1000;
-        letter-spacing: -0.02em;
       }
 
-      .ua-primary {
-        background: linear-gradient(180deg, #2f8cff 0%, #0d6efd 100%);
+      .ua-hero-actions a:first-child {
+        background: linear-gradient(180deg, #ffae63 0%, #ff7d2f 100%);
+        color: #09111d;
+        box-shadow: 0 18px 48px rgba(255, 125, 47, 0.26), inset 0 1px 0 rgba(255,255,255,0.32);
+      }
+
+      .ua-hero-actions a:last-child {
+        border: 1px solid rgba(201,226,255,0.18);
+        background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.045));
         color: #ffffff;
-        box-shadow: 0 18px 44px rgba(13, 110, 253, 0.28);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.11);
       }
 
-      .ua-secondary {
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        background: rgba(255, 255, 255, 0.06);
-        color: #ffffff;
-      }
-
-      .ua-status-row {
+      .ua-hero-stats {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-top: 22px;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 18px;
       }
 
-      .ua-status-box {
-        border-radius: 20px;
-        background: #ffffff;
-        color: #071019;
-        padding: 16px;
-        box-shadow: 0 20px 55px rgba(0, 0, 0, 0.22);
+      .ua-stat {
+        border: 1px solid rgba(201, 226, 255, 0.13);
+        border-radius: 17px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.045));
+        padding: 11px 10px;
+        box-shadow: 0 14px 36px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.10);
       }
 
-      .ua-status-box span {
+      .ua-stat span {
         display: block;
-        color: #52657d;
-        font-size: 10px;
+        color: #9db8d7;
+        font-size: 9px;
         font-weight: 1000;
-        letter-spacing: 0.18em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
       }
 
-      .ua-status-box strong {
+      .ua-stat strong {
         display: block;
-        margin-top: 10px;
-        color: #1478ff;
-        font-size: 28px;
+        margin-top: 7px;
+        color: #f8fbff;
+        font-size: 15px;
         line-height: 1;
         font-weight: 1000;
-        letter-spacing: -0.055em;
-      }
-
-      .ua-status-box p {
-        margin: 7px 0 0;
-        color: #344b68;
-        font-size: 11px;
-        line-height: 1.35;
-        font-weight: 800;
       }
 
       .ua-main {
-        padding: 22px 16px 24px;
-        color: #071019;
+        padding: 10px 16px 22px;
       }
 
       .ua-section {
-        margin-top: 24px;
+        position: relative;
+        padding: 20px 0;
       }
 
-      .ua-section:first-child {
-        margin-top: 0;
+      .ua-section + .ua-section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 8px;
+        left: 8px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(201,226,255,0.18), rgba(255,154,74,0.20), transparent);
       }
 
       .ua-section-head {
@@ -547,218 +575,44 @@ function MobileVisualStyles() {
       }
 
       .ua-section-label {
-        color: #245b99;
-        font-size: 11px;
+        color: #7ed0ff;
+        font-size: 10px;
         font-weight: 1000;
-        letter-spacing: 0.2em;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
       }
 
       .ua-section-title {
         margin: 7px 0 0;
-        color: #071936;
+        color: #ffffff;
         font-size: 24px;
-        line-height: 1.08;
+        line-height: 1.04;
         font-weight: 1000;
-        letter-spacing: -0.055em;
+        letter-spacing: -0.061em;
       }
 
       .ua-section-copy {
-        margin: 9px 0 0;
-        color: #405672;
-        font-size: 14px;
-        line-height: 1.5;
-        font-weight: 650;
-        letter-spacing: -0.02em;
-      }
-
-      .ua-chain-list {
-        display: grid;
-        gap: 10px;
-      }
-
-      .ua-chain-card {
-        display: block;
-        border: 1px solid color-mix(in srgb, var(--ua-regime) 55%, rgba(7, 25, 54, 0.18));
-        border-radius: 22px;
-        background:
-          radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--ua-regime) 16%, transparent), transparent 15rem),
-          #ffffff;
-        color: #071936;
-        padding: 15px;
-        text-decoration: none;
-        box-shadow: 0 16px 40px rgba(7, 25, 54, 0.08);
-      }
-
-      .ua-chain-top {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-      }
-
-      .ua-chain-left {
-        display: flex;
-        min-width: 0;
-        align-items: center;
-        gap: 11px;
-      }
-
-      .ua-chain-icon {
-        display: flex;
-        width: 42px;
-        height: 42px;
-        flex: 0 0 auto;
-        align-items: center;
-        justify-content: center;
-        border-radius: 999px;
-        background: var(--ua-chain);
-        color: #ffffff;
-        font-size: 24px;
-        font-weight: 1000;
-      }
-
-      .ua-chain-copy {
-        min-width: 0;
-      }
-
-      .ua-chain-name {
-        color: #071936;
-        font-size: 16px;
-        line-height: 1.1;
-        font-weight: 1000;
-        letter-spacing: -0.035em;
-      }
-
-      .ua-chain-date {
-        margin-top: 4px;
-        color: #52657d;
-        font-size: 12px;
-        line-height: 1.25;
-        font-weight: 750;
-      }
-
-      .ua-regime-pill {
-        display: inline-flex;
-        min-height: 28px;
-        flex: 0 0 auto;
-        align-items: center;
-        border-radius: 999px;
-        border: 1px solid var(--ua-regime);
-        background: color-mix(in srgb, var(--ua-regime) 10%, transparent);
-        color: var(--ua-regime);
-        padding: 0 9px;
-        font-size: 9px;
-        font-weight: 1000;
-        letter-spacing: 0.08em;
-      }
-
-      .ua-confidence-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-top: 15px;
-        color: #52657d;
-        font-size: 10px;
-        font-weight: 1000;
-        letter-spacing: 0.13em;
-        text-transform: uppercase;
-      }
-
-      .ua-confidence-row strong {
-        color: var(--ua-regime);
-        font-size: 12px;
-        letter-spacing: 0.04em;
-      }
-
-      .ua-confidence-track {
-        overflow: hidden;
-        height: 8px;
-        margin-top: 8px;
-        border-radius: 999px;
-        background: #d9e6f5;
-      }
-
-      .ua-confidence-fill {
-        height: 100%;
-        border-radius: inherit;
-        background: var(--ua-regime);
-      }
-
-      .ua-axis-line {
-        margin: 12px 0 0;
-        color: #263a54;
-        font-size: 12px;
-        line-height: 1.45;
-        font-weight: 750;
-      }
-
-      .ua-product-card,
-      .ua-workflow-shell,
-      .ua-plans-shell,
-      .ua-links-shell {
-        border-radius: 24px;
-        background: #ffffff;
-        padding: 18px;
-        box-shadow: 0 16px 40px rgba(7, 25, 54, 0.08);
-      }
-
-      .ua-product-grid {
-        display: grid;
-        gap: 10px;
-        margin-top: 14px;
-      }
-
-      .ua-product-row {
-        display: grid;
-        grid-template-columns: 72px 1fr;
-        gap: 12px;
-        border-top: 1px solid #e1ebf7;
-        padding-top: 12px;
-      }
-
-      .ua-product-row:first-child {
-        border-top: 0;
-        padding-top: 0;
-      }
-
-      .ua-product-row strong {
-        color: #1478ff;
-        font-size: 12px;
-        font-weight: 1000;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-      }
-
-      .ua-product-row span {
-        color: #263a54;
+        margin: 8px 0 0;
+        color: #c8ddf5;
         font-size: 13px;
         line-height: 1.45;
-        font-weight: 700;
-      }
-
-      .ua-workflow-shell {
-        overflow: hidden;
-        padding: 0;
-      }
-
-      .ua-workflow-intro {
-        padding: 18px 18px 0;
+        font-weight: 680;
       }
 
       .ua-fictive-note {
         display: flex;
         align-items: flex-start;
-        gap: 8px;
+        gap: 7px;
         margin-top: 12px;
+        border: 1px solid rgba(126, 208, 255, 0.16);
         border-radius: 16px;
-        border: 1px solid #cfe8ff;
-        background: #eef8ff;
-        color: #185f9f;
+        background: linear-gradient(180deg, rgba(126,208,255,0.115), rgba(126,208,255,0.045));
+        color: #d9f2ff;
         padding: 10px 11px;
         font-size: 11px;
-        line-height: 1.35;
-        font-weight: 900;
+        line-height: 1.32;
+        font-weight: 850;
+        box-shadow: 0 12px 34px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.08);
       }
 
       .ua-fictive-note span {
@@ -769,37 +623,47 @@ function MobileVisualStyles() {
         align-items: center;
         justify-content: center;
         border-radius: 999px;
-        background: #1478ff;
-        color: #ffffff;
+        background: #7ed0ff;
+        color: #071936;
         font-size: 11px;
         font-weight: 1000;
       }
 
-      .ua-workflow-list {
-        display: grid;
-        gap: 16px;
-        margin-top: 16px;
-        padding: 0 12px 16px;
+      .ua-workflow-scroll {
+        display: flex;
+        gap: 14px;
+        overflow-x: auto;
+        margin: 15px -16px 0;
+        padding: 0 16px 4px;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+
+      .ua-workflow-scroll::-webkit-scrollbar {
+        display: none;
       }
 
       .ua-workflow-card {
+        flex: 0 0 92%;
         margin: 0;
+        scroll-snap-align: center;
       }
 
-      .ua-workflow-link {
+      .ua-workflow-image-link {
         display: block;
         overflow: hidden;
-        border-radius: 18px;
-        border: 1px solid #d7e5f5;
-        background: #071936;
-        text-decoration: none;
+        border: 1px solid rgba(201,226,255,0.14);
+        border-radius: 23px;
+        background: radial-gradient(circle at 20% 0%, rgba(126,208,255,0.14), transparent 12rem), #06101f;
+        box-shadow: 0 24px 72px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.08);
       }
 
       .ua-workflow-image-wrap {
         position: relative;
-        aspect-ratio: 16 / 10;
         width: 100%;
-        background: #071936;
+        aspect-ratio: 4 / 3;
+        background: #06101f;
       }
 
       .ua-workflow-image {
@@ -809,29 +673,30 @@ function MobileVisualStyles() {
 
       .ua-workflow-badge {
         position: absolute;
-        right: 8px;
-        bottom: 8px;
+        right: 9px;
+        bottom: 9px;
         z-index: 2;
+        border: 1px solid rgba(255,255,255,0.16);
         border-radius: 999px;
-        background: rgba(7, 25, 54, 0.9);
+        background: rgba(4, 11, 20, 0.88);
         color: #ffffff;
-        padding: 7px 9px;
+        padding: 8px 10px;
         font-size: 9px;
         line-height: 1;
         font-weight: 1000;
         letter-spacing: 0.07em;
         text-transform: uppercase;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.34);
       }
 
-      .ua-workflow-caption {
+      .ua-workflow-card figcaption {
         display: flex;
         align-items: center;
         gap: 9px;
-        margin-top: 8px;
-        color: #071936;
+        margin-top: 9px;
       }
 
-      .ua-workflow-caption span {
+      .ua-workflow-card figcaption span {
         display: flex;
         width: 26px;
         height: 26px;
@@ -839,42 +704,230 @@ function MobileVisualStyles() {
         align-items: center;
         justify-content: center;
         border-radius: 999px;
-        background: #1478ff;
-        color: #ffffff;
-        font-size: 12px;
+        background: linear-gradient(180deg, #ffae63, #ff7d2f);
+        color: #09111d;
+        font-size: 11px;
         font-weight: 1000;
+        box-shadow: 0 10px 24px rgba(255,125,47,0.20);
       }
 
-      .ua-workflow-caption strong {
-        color: #071936;
+      .ua-workflow-card figcaption strong {
+        color: #f8fbff;
         font-size: 13px;
         line-height: 1.2;
         font-weight: 1000;
-        letter-spacing: -0.02em;
       }
 
-      .ua-regime-strip {
+      .ua-chain-grid {
+        display: grid;
+        gap: 10px;
+        margin-top: 13px;
+      }
+
+      .ua-chain-row {
+        position: relative;
+        display: block;
+        overflow: hidden;
+        border: 1px solid color-mix(in srgb, var(--ua-regime) 44%, rgba(201,226,255,0.14));
+        border-radius: 22px;
+        background:
+          radial-gradient(circle at 6% 0%, color-mix(in srgb, var(--ua-regime) 18%, transparent), transparent 13rem),
+          linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025)),
+          #061325;
+        color: #ffffff;
+        padding: 13px;
+        text-decoration: none;
+        box-shadow: 0 20px 58px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.08);
+      }
+
+      .ua-chain-row-top {
+        display: grid;
+        grid-template-columns: 40px 1fr auto;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .ua-chain-token {
         display: flex;
-        gap: 7px;
-        overflow-x: auto;
-        padding: 0 18px 18px;
-        scrollbar-width: none;
+        width: 40px;
+        height: 40px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: var(--ua-chain);
+        color: #ffffff;
+        font-size: 23px;
+        font-weight: 1000;
+        box-shadow: 0 13px 30px color-mix(in srgb, var(--ua-chain) 34%, transparent), inset 0 1px 0 rgba(255,255,255,0.2);
       }
 
-      .ua-regime-strip::-webkit-scrollbar {
+      .ua-chain-copy strong {
+        display: block;
+        color: #ffffff;
+        font-size: 15px;
+        line-height: 1.1;
+        font-weight: 1000;
+      }
+
+      .ua-chain-copy span {
+        display: block;
+        margin-top: 3px;
+        color: #adc6e3;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .ua-regime-pill {
+        display: inline-flex;
+        min-height: 26px;
+        align-items: center;
+        border: 1px solid var(--ua-regime);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--ua-regime) 12%, transparent);
+        color: var(--ua-regime);
+        padding: 0 8px;
+        font-size: 9px;
+        font-weight: 1000;
+        letter-spacing: 0.07em;
+      }
+
+      .ua-chain-meter-line {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 12px;
+        color: #a9c1dd;
+        font-size: 9px;
+        font-weight: 1000;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .ua-chain-meter-line strong {
+        color: var(--ua-regime);
+        font-size: 11px;
+      }
+
+      .ua-chain-meter {
+        overflow: hidden;
+        height: 7px;
+        margin-top: 7px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.16);
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);
+      }
+
+      .ua-chain-meter div {
+        height: 100%;
+        border-radius: inherit;
+        background: var(--ua-regime);
+        box-shadow: 0 0 18px color-mix(in srgb, var(--ua-regime) 45%, transparent);
+      }
+
+      .ua-chain-row p {
+        margin: 9px 0 0;
+        color: #d7e8fb;
+        font-size: 11px;
+        line-height: 1.35;
+        font-weight: 750;
+      }
+
+      .ua-terms {
+        display: grid;
+        gap: 8px;
+        margin-top: 13px;
+      }
+
+      .ua-term {
+        border-bottom: 1px solid rgba(201,226,255,0.11);
+        padding-bottom: 8px;
+      }
+
+      .ua-term:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .ua-term summary {
+        display: flex;
+        min-height: 32px;
+        align-items: center;
+        justify-content: space-between;
+        color: #f8fbff;
+        cursor: pointer;
+        list-style: none;
+        font-size: 12px;
+        font-weight: 1000;
+        letter-spacing: 0.05em;
+      }
+
+      .ua-term summary::-webkit-details-marker {
         display: none;
       }
 
-      .ua-regime-strip span {
-        flex: 0 0 auto;
-        border-radius: 999px;
-        border: 1px solid #d7e5f5;
-        background: #f3f8ff;
-        color: #263a54;
-        padding: 8px 10px;
-        font-size: 10px;
+      .ua-term summary::after {
+        content: "+";
+        color: #ff9a4a;
+        font-size: 16px;
         font-weight: 1000;
-        letter-spacing: 0.06em;
+      }
+
+      .ua-term[open] summary::after {
+        content: "–";
+      }
+
+      .ua-term p {
+        margin: 2px 0 0;
+        color: #c8ddf5;
+        font-size: 12px;
+        line-height: 1.4;
+        font-weight: 680;
+      }
+
+      .ua-pipeline {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 6px;
+        margin-top: 14px;
+      }
+
+      .ua-pipeline::before {
+        content: "";
+        position: absolute;
+        top: 24px;
+        right: 12px;
+        left: 12px;
+        height: 1px;
+        background: linear-gradient(90deg, #7ed0ff, #ff9a4a);
+        opacity: 0.4;
+      }
+
+      .ua-pipe-step {
+        position: relative;
+        z-index: 1;
+        border: 1px solid rgba(201,226,255,0.13);
+        border-radius: 15px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.04));
+        padding: 10px 6px;
+        text-align: center;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.08);
+      }
+
+      .ua-pipe-step strong {
+        display: block;
+        color: #7ed0ff;
+        font-size: 11px;
+        line-height: 1;
+        font-weight: 1000;
+      }
+
+      .ua-pipe-step span {
+        display: block;
+        margin-top: 5px;
+        color: #adc6e3;
+        font-size: 9px;
+        line-height: 1.2;
+        font-weight: 850;
       }
 
       .ua-plan-grid {
@@ -883,119 +936,50 @@ function MobileVisualStyles() {
         margin-top: 14px;
       }
 
-      .ua-plan-card {
+      .ua-plan {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 14px;
-        border-radius: 18px;
-        padding: 15px;
-        color: #071936;
+        gap: 12px;
+        border: 1px solid rgba(201,226,255,0.13);
+        border-radius: 20px;
+        background: linear-gradient(145deg, rgba(255,255,255,0.115), rgba(255,255,255,0.04));
+        color: #f8fbff;
+        padding: 13px;
         text-decoration: none;
+        box-shadow: 0 18px 50px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.09);
       }
 
-      .ua-plan-card strong {
+      .ua-plan strong {
         display: block;
-        color: #071936;
-        font-size: 16px;
-        line-height: 1.1;
+        color: #ffffff;
+        font-size: 15px;
         font-weight: 1000;
-        letter-spacing: -0.035em;
       }
 
-      .ua-plan-card p {
-        margin: 5px 0 0;
-        color: #52657d;
-        font-size: 12px;
-        line-height: 1.35;
+      .ua-plan span {
+        display: block;
+        margin-top: 3px;
+        color: #c8ddf5;
+        font-size: 11px;
+        line-height: 1.3;
         font-weight: 750;
       }
 
-      .ua-plan-card > span {
-        flex: 0 0 auto;
-        color: #1478ff;
-        font-size: 18px;
+      .ua-plan b {
+        color: #7ed0ff;
+        font-size: 17px;
         font-weight: 1000;
-        letter-spacing: -0.04em;
-      }
-
-      .ua-plan-plain {
-        border: 1px solid #d7e5f5;
-        background: #f7fbff;
       }
 
       .ua-plan-blue {
-        border: 1px solid #9dccff;
-        background: #eaf4ff;
+        border-color: rgba(126,208,255,0.22);
+        background: radial-gradient(circle at 0% 0%, rgba(126,208,255,0.16), transparent 9rem), linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
       }
 
-      .ua-plan-violet {
-        border: 1px solid #c8b9ff;
-        background: #f2efff;
-      }
-
-      .ua-links {
-        display: grid;
-        gap: 9px;
-        margin-top: 12px;
-      }
-
-      .ua-links a {
-        display: flex;
-        min-height: 48px;
-        align-items: center;
-        justify-content: space-between;
-        border-radius: 16px;
-        border: 1px solid #d7e5f5;
-        background: #f7fbff;
-        color: #071936;
-        padding: 0 14px;
-        text-decoration: none;
-        font-size: 14px;
-        font-weight: 900;
-      }
-
-      .ua-bottom-nav {
-        position: fixed;
-        z-index: 50;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
-        border-top: 1px solid rgba(7, 25, 54, 0.1);
-        background: rgba(255, 255, 255, 0.97);
-        box-shadow: 0 -16px 44px rgba(7, 25, 54, 0.16);
-        backdrop-filter: blur(16px);
-      }
-
-      .ua-bottom-nav-inner {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        min-height: 72px;
-      }
-
-      .ua-bottom-nav a {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        gap: 6px;
-        color: #405672;
-        text-decoration: none;
-        font-size: 12px;
-        font-weight: 900;
-      }
-
-      .ua-bottom-nav a:first-child {
-        color: #1478ff;
-      }
-
-      .ua-bottom-dot {
-        width: 18px;
-        height: 18px;
-        border-radius: 6px;
-        background: currentColor;
-        opacity: 0.9;
+      .ua-plan-orange {
+        border-color: rgba(255,154,74,0.26);
+        background: radial-gradient(circle at 0% 0%, rgba(255,154,74,0.17), transparent 9rem), linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
       }
 
       .ua-modal {
@@ -1018,8 +1002,8 @@ function MobileVisualStyles() {
       .ua-modal-backdrop {
         position: absolute;
         inset: 0;
-        background: rgba(7, 16, 25, 0.92);
-        backdrop-filter: blur(10px);
+        background: rgba(4, 11, 20, 0.94);
+        backdrop-filter: blur(12px);
       }
 
       .ua-modal-panel {
@@ -1029,7 +1013,7 @@ function MobileVisualStyles() {
         width: 100%;
         height: 100svh;
         flex-direction: column;
-        background: #071019;
+        background: radial-gradient(circle at 16% 0%, rgba(126,208,255,0.12), transparent 18rem), #040b14;
       }
 
       .ua-modal-header {
@@ -1039,13 +1023,14 @@ function MobileVisualStyles() {
         justify-content: space-between;
         gap: 12px;
         padding: calc(env(safe-area-inset-top) + 12px) 14px 12px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        background: #071019;
+        border-bottom: 1px solid rgba(201,226,255,0.10);
+        background: rgba(4, 11, 20, 0.88);
+        backdrop-filter: blur(18px);
       }
 
       .ua-modal-header span {
         display: block;
-        color: #9fe8ff;
+        color: #7ed0ff;
         font-size: 10px;
         font-weight: 1000;
         letter-spacing: 0.12em;
@@ -1064,8 +1049,8 @@ function MobileVisualStyles() {
       .ua-modal-header a {
         flex: 0 0 auto;
         border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(201,226,255,0.16);
+        background: rgba(255,255,255,0.08);
         color: #ffffff;
         padding: 9px 12px;
         text-decoration: none;
@@ -1076,28 +1061,29 @@ function MobileVisualStyles() {
       .ua-modal-scroll {
         flex: 1 1 auto;
         overflow: auto;
-        background: #071019;
         -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
+      }
+
+      .ua-modal-image-stage {
+        position: relative;
+        width: 1448px;
+        height: 1086px;
+        max-width: none;
+        background: #040b14;
       }
 
       .ua-modal-image {
-        position: relative;
-        width: 100%;
-        min-height: 78svh;
-        background: #071019;
-      }
-
-      .ua-modal-image .ua-workflow-image {
         object-fit: contain;
-        padding: 8px;
+        padding: 10px;
       }
 
-      .ua-modal-footer {
+      .ua-modal-foot {
         flex: 0 0 auto;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        background: #071019;
-        color: #dcecff;
-        padding: 11px 14px calc(env(safe-area-inset-bottom) + 11px);
+        border-top: 1px solid rgba(201,226,255,0.10);
+        background: rgba(4, 11, 20, 0.88);
+        color: #c8ddf5;
+        padding: 10px 14px calc(env(safe-area-inset-bottom) + 10px);
         text-align: center;
         font-size: 12px;
         line-height: 1.35;
@@ -1105,24 +1091,14 @@ function MobileVisualStyles() {
       }
 
       @media (min-width: 720px) {
-        .ua-mobile-compact {
-          background:
-            radial-gradient(circle at 20% 0%, rgba(37, 99, 235, 0.2), transparent 28rem),
-            linear-gradient(180deg, #071019 0%, #081725 360px, #f3f8ff 360px, #f3f8ff 100%);
-        }
-
-        .ua-top,
+        .ua-hero,
         .ua-main {
           max-width: 720px;
           margin-inline: auto;
         }
 
-        .ua-title {
-          font-size: 46px;
-        }
-
-        .ua-copy {
-          font-size: 17px;
+        .ua-modal-panel {
+          max-width: 1100px;
         }
       }
     `}</style>
@@ -1139,243 +1115,191 @@ export default async function MobileOverviewPage() {
   const publishedAt = formatPublishedDate(dataset?.published_at);
 
   return (
-    <div className="ua-mobile-compact">
-      <MobileVisualStyles />
+    <div className="ua-mobile">
+      <MobileStyles />
 
-      <div className="ua-shell">
-        <header className="ua-top">
+      <div className="ua-page">
+        <header className="ua-hero">
           <div className="ua-topbar">
-            <Link href="/" className="ua-brand" aria-label="Urd Atlas home">
+            <Link
+              href="/mobile"
+              className="ua-brand"
+              aria-label="Urd Atlas mobile home"
+            >
               <img
                 src="/web-bilder/ygg-transparent.png"
                 alt=""
                 aria-hidden="true"
               />
-              <span className="ua-brand-word">Urd Atlas</span>
+              <span>Urd Atlas</span>
             </Link>
 
-            <Link href="/?view=desktop" className="ua-desktop-link">
-              Full site
-            </Link>
+            <MobileRouteMenu />
           </div>
 
-          <section className="ua-hero">
-            <div className="ua-kicker">Mobile overview</div>
+          <section className="ua-hero-body">
+            <div className="ua-kicker">Mobile product overview</div>
 
             <h1 className="ua-title">
-              Daily blockchain regime data<span>.</span>
+              Daily regime labels for blockchain data<span>.</span>
             </h1>
 
             <p className="ua-copy">
               Urd Atlas publishes daily Gold, Derived, and Meta JSON per chain:
-              regime label, confidence, evidence, and provenance fields that
-              can be joined to your own data by chain and date.
+              regime label, confidence, evidence, and provenance fields joined
+              by chain and date.
             </p>
 
-            <div className="ua-actions">
-              <Link href="/mobile/plans" className="ua-primary">
-                View plans
-              </Link>
-
-              <a href="#workflow" className="ua-secondary">
-                See workflow
-              </a>
+            <div className="ua-hero-actions">
+              <a href="#workflow">See workflow</a>
+              <Link href="/mobile/plans">View plans</Link>
             </div>
 
-            <div className="ua-status-row">
-              <div className="ua-status-box">
+            <div className="ua-hero-stats">
+              <div className="ua-stat">
                 <span>Updated</span>
                 <strong>{publishedAt ?? "—"}</strong>
-                <p>latest publication</p>
               </div>
 
-              <div className="ua-status-box">
-                <span>Coverage</span>
+              <div className="ua-stat">
+                <span>History</span>
                 <strong>{historyDays ?? "—"}</strong>
-                <p>published daily observations</p>
+              </div>
+
+              <div className="ua-stat">
+                <span>Chains</span>
+                <strong>4</strong>
               </div>
             </div>
           </section>
         </header>
 
         <main className="ua-main">
-          <section id="chains" className="ua-section">
+          <section id="workflow" className="ua-section">
             <div className="ua-section-head">
-              <div className="ua-section-label">Current chain state</div>
-              <h2 className="ua-section-title">Latest regime labels.</h2>
+              <div className="ua-section-label">Workflow</div>
+              <h2 className="ua-section-title">What the data is used for.</h2>
+              <p className="ua-section-copy">
+                Attach Urd Atlas to your own dataset and analyze results through
+                the regime column.
+              </p>
+
+              <div className="ua-fictive-note">
+                <span>i</span>
+                The data shown in these images is fictive example data.
+              </div>
             </div>
 
-            <div className="ua-chain-list">
+            <div className="ua-workflow-scroll">
+              {WORKFLOW_IMAGES.map((image, index) => (
+                <WorkflowCard key={image.src} image={image} index={index} />
+              ))}
+            </div>
+          </section>
+
+          <section id="chains" className="ua-section">
+            <div className="ua-section-head">
+              <div className="ua-section-label">Latest labels</div>
+              <h2 className="ua-section-title">Four chain states.</h2>
+            </div>
+
+            <div className="ua-chain-grid">
               {states.map((state) => (
                 <ChainCard key={state.chain} state={state} />
               ))}
             </div>
           </section>
 
-          <section className="ua-section">
-            <div className="ua-product-card">
-              <div className="ua-section-label">Product</div>
-
-              <h2 className="ua-section-title">
-                Reference data, not a trading signal.
-              </h2>
-
+          <section id="terms" className="ua-section">
+            <div className="ua-section-head">
+              <div className="ua-section-label">Terms</div>
+              <h2 className="ua-section-title">How labels should be read.</h2>
               <p className="ua-section-copy">
-                The output is daily blockchain regime context. It describes
-                network conditions; it does not provide investment advice,
-                forecasts, or price signals.
+                Labels are descriptive regime classifications based on chain
+                evidence, not recommendations or price signals.
               </p>
+            </div>
 
-              <div className="ua-product-grid">
-                <div className="ua-product-row">
-                  <strong>Gold</strong>
-                  <span>Daily measured blockchain fields per chain.</span>
-                </div>
-
-                <div className="ua-product-row">
-                  <strong>Derived</strong>
-                  <span>Transparent trend calculations such as MA7 and MA30.</span>
-                </div>
-
-                <div className="ua-product-row">
-                  <strong>Meta</strong>
-                  <span>
-                    Regime label, confidence, drivers, and determinism hash.
-                  </span>
-                </div>
-              </div>
+            <div className="ua-terms">
+              {REGIME_EXPLAINERS.map((item, index) => (
+                <details key={item.label} className="ua-term" open={index === 0}>
+                  <summary>{item.label}</summary>
+                  <p>{item.text}</p>
+                </details>
+              ))}
             </div>
           </section>
 
-          <section id="workflow" className="ua-section">
-            <div className="ua-workflow-shell">
-              <div className="ua-workflow-intro">
-                <div className="ua-section-label">Workflow</div>
+          <section id="json-pipeline" className="ua-section">
+            <div className="ua-section-head">
+              <div className="ua-section-label">JSON pipeline</div>
+              <h2 className="ua-section-title">From data to files.</h2>
+              <p className="ua-section-copy">
+                Daily chain data is reduced into transparent Gold, Derived and
+                Meta JSON outputs.
+              </p>
+            </div>
 
-                <h2 className="ua-section-title">
-                  Join by chain and date.
-                </h2>
-
-                <p className="ua-section-copy">
-                  Use Urd Atlas as a regime column on top of the data you
-                  already analyze.
-                </p>
-
-                <div className="ua-fictive-note">
-                  <span>i</span>
-                  The data shown in these images is fictive example data.
-                </div>
+            <div className="ua-pipeline" aria-label="Urd Atlas JSON pipeline">
+              <div className="ua-pipe-step">
+                <strong>RAW</strong>
+                <span>source</span>
               </div>
 
-              <div className="ua-workflow-list">
-                {WORKFLOW_IMAGES.map((image, index) => (
-                  <WorkflowCard
-                    key={image.src}
-                    image={image}
-                    index={index}
-                  />
-                ))}
+              <div className="ua-pipe-step">
+                <strong>Gold</strong>
+                <span>daily</span>
               </div>
 
-              <div
-                className="ua-regime-strip"
-                aria-label="Urd Atlas regime labels"
-              >
-                {REGIME_LABELS.map((label) => (
-                  <span key={label}>{label}</span>
-                ))}
+              <div className="ua-pipe-step">
+                <strong>Derived</strong>
+                <span>trends</span>
+              </div>
+
+              <div className="ua-pipe-step">
+                <strong>Meta</strong>
+                <span>label</span>
+              </div>
+
+              <div className="ua-pipe-step">
+                <strong>JSON</strong>
+                <span>API</span>
               </div>
             </div>
           </section>
 
           <section id="plans" className="ua-section">
-            <div className="ua-plans-shell">
+            <div className="ua-section-head">
               <div className="ua-section-label">Plans</div>
-
-              <h2 className="ua-section-title">
-                Three active access levels.
-              </h2>
-
-              <p className="ua-section-copy">
-                Free gives public browsing. Paid plans unlock daily JSON access.
-              </p>
-
-              <div className="ua-plan-grid">
-                <PlanCard
-                  name="Free"
-                  price="$0"
-                  tone="plain"
-                  href="/mobile/plans"
-                  description="Historical charts and public browsing."
-                />
-
-                <PlanCard
-                  name="Single Chain"
-                  price="$49"
-                  tone="blue"
-                  href="/mobile/plans"
-                  description="One blockchain. Gold, Derived, and Meta JSON."
-                />
-
-                <PlanCard
-                  name="Full Access"
-                  price="$149"
-                  tone="violet"
-                  href="/mobile/plans"
-                  description="All supported chains. Full daily JSON access."
-                />
-              </div>
+              <h2 className="ua-section-title">Active access levels.</h2>
             </div>
-          </section>
 
-          <section className="ua-section">
-            <div className="ua-links-shell">
-              <div className="ua-section-label">More</div>
+            <div className="ua-plan-grid">
+              <PlanCard
+                name="Free"
+                price="$0"
+                tone="plain"
+                text="Historical charts and public browsing."
+              />
 
-              <div className="ua-links">
-                <Link href="/mobile/track-record">
-                  Track record <span>→</span>
-                </Link>
+              <PlanCard
+                name="Single Chain"
+                price="$49"
+                tone="blue"
+                text="One chain. Gold, Derived, and Meta JSON."
+              />
 
-                <Link href="/mobile/wiki">
-                  Mobile wiki <span>→</span>
-                </Link>
-
-                <Link href="/dashboard">
-                  Account <span>→</span>
-                </Link>
-
-                <Link href="/?view=desktop">
-                  Full desktop site <span>→</span>
-                </Link>
-              </div>
+              <PlanCard
+                name="Full Access"
+                price="$149"
+                tone="orange"
+                text="All supported chains. Full JSON access."
+              />
             </div>
           </section>
         </main>
 
-        <nav className="ua-bottom-nav" aria-label="Mobile navigation">
-          <div className="ua-bottom-nav-inner">
-            <Link href="/mobile">
-              <span className="ua-bottom-dot" />
-              Home
-            </Link>
-
-            <a href="#chains">
-              <span className="ua-bottom-dot" />
-              Chains
-            </a>
-
-            <a href="#workflow">
-              <span className="ua-bottom-dot" />
-              Workflow
-            </a>
-
-            <Link href="/mobile/plans">
-              <span className="ua-bottom-dot" />
-              Plans
-            </Link>
-          </div>
-        </nav>
+        <MobileBottomNav active="overview" />
       </div>
 
       {WORKFLOW_IMAGES.map((image, index) => (

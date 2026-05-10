@@ -31,6 +31,8 @@ function mapToMobilePath(pathname: string): string | null {
   if (pathname.startsWith("/_next"))    return null;
   if (pathname.startsWith("/api/"))     return null;
   if (pathname.startsWith("/__clerk"))  return null;
+  if (pathname.startsWith("/sign-in"))  return null;
+  if (pathname.startsWith("/sign-up"))  return null;
 
   if (pathname === "/") return "/mobile";
 
@@ -47,7 +49,7 @@ function mapToMobilePath(pathname: string): string | null {
   if (pathname === "/about")                               return "/mobile/wiki";
   if (pathname === "/glossary" || pathname === "/faq")     return "/mobile/wiki";
   if (pathname === "/plans")                               return "/mobile/plans";
-  if (pathname === "/dashboard")                           return "/mobile/plans";
+  if (pathname === "/dashboard")                           return "/mobile/dashboard";
   if (pathname === "/api-docs" ||
       pathname.startsWith("/api-docs/"))                   return "/mobile/api-docs";
 

@@ -1,9 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const ATTRIBUTION_TEXT = "AWS Public Blockchain Data";
 const SUPPORT_EMAIL = "support@urdatlas.com";
 
 export default function SiteFooter() {
+  const pathname = usePathname();
+
+  if (pathname?.startsWith("/mobile")) {
+    return null;
+  }
+
   return (
     <footer className="bg-[#031329]">
       <div className="mx-auto w-full px-6 py-12 sm:px-8 xl:px-12 2xl:px-16">

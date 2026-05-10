@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CHAINS, type ChainId } from "@/config/chains";
 import { readStorageObject } from "@/lib/storage";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
 import MobileChainChart from "@/components/mobile/MobileChainChart";
 import {
   parseMobileChainState,
@@ -140,8 +141,8 @@ function TrendArrow({ trend }: { trend: string | null }) {
 const CHAIN_NAV_KEY: Record<ChainId, string> = {
   bitcoin: "btc",
   ethereum: "eth",
-  arbitrum: "overview",
-  base: "overview",
+  arbitrum: "arb",
+  base: "base",
 };
 
 export default async function MobileChainPage({
@@ -209,6 +210,7 @@ export default async function MobileChainPage({
           >
             {state.regimeLabel ?? "—"}
           </div>
+          <MobileRouteMenu />
         </div>
       </header>
 

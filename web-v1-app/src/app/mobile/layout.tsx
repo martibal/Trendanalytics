@@ -5,7 +5,7 @@ import "./mobile.css";
 
 export const metadata: Metadata = {
   title: "Urd Atlas Mobile",
-  description: "Daily on-chain regime classification for BTC, ETH, ARB, and BASE",
+  description: "Mobile-first daily on-chain regime classification for BTC, ETH, ARB, and BASE.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -17,14 +17,14 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   viewportFit: "cover",
 };
 
 export default function MobileLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="mobile-shell min-h-screen bg-[#edf6ff] text-[#0a1d3a]">
+    <div className="mobile-shell min-h-screen bg-[#040b14] text-[#f8fbff]">
       {children}
       <PwaRegister />
     </div>

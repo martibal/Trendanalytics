@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
 
 const INTEGRATION_STEPS = [
   {
@@ -90,7 +91,7 @@ const ENDPOINTS = [
     method: "GET",
     path: "/api/v1/files/meta/{chain}/last{N}d/latest.json",
     desc: "A bundled window of published Meta rows. N is your entitled window depth: 90 (Single Chain) or 365 (Research).",
-    plan: "Single Chain: 90d · Research: 365d",
+    plan: "Single Chain · Full Access",
   },
   {
     title: "Gold raw observations",
@@ -104,7 +105,7 @@ const ENDPOINTS = [
     method: "GET",
     path: "/api/v1/files/derived/{chain}/last{N}d/latest.json",
     desc: "Bundled MA7/MA30 trend series for all Gold metrics over your entitled window.",
-    plan: "Single Chain: 90d · Research: 365d",
+    plan: "Single Chain · Full Access",
   },
 ];
 
@@ -118,9 +119,7 @@ export default function MobileApiDocsPage() {
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">API Docs</div>
             <div className="text-[14px] font-bold text-white">JSON delivery reference</div>
           </div>
-          <Link href="/api-docs?view=desktop" className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold text-slate-200">
-            Full ↗
-          </Link>
+          <MobileRouteMenu />
         </div>
       </header>
 
@@ -240,8 +239,7 @@ export default function MobileApiDocsPage() {
           <div className="space-y-2">
             {[
               { plan: "Single Chain — $49/mo", access: "1 chain of your choice · Gold, Derived, Meta reference data · 90-day history", color: "#22d3ee" },
-              { plan: "Research — $149/mo", access: "All 4 chains · Gold, Derived, Meta reference data · 365-day history", color: "#a78bfa" },
-              { plan: "History Add-on", access: "Full archive from December 2024 as one-time purchase", color: "#fbbf24" },
+              { plan: "Full Access — $149/mo", access: "All 4 chains · Gold, Derived, Meta reference data", color: "#ff9a4a" },
             ].map((p) => (
               <div key={p.plan} className="rounded-xl border border-white/6 bg-black/10 px-3 py-3">
                 <div className="text-[11px] font-bold mb-0.5" style={{ color: p.color }}>{p.plan}</div>

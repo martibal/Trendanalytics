@@ -3,6 +3,7 @@ import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readStorageObject } from "@/lib/storage";
 import { CHAIN_COLORS, regimeColor } from "@/lib/mobile/data";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
 import "server-only";
 
 type MetaHistoryRow = {
@@ -121,9 +122,7 @@ export default async function MobileTrackRecordPage() {
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Track record</div>
             <div className="mt-0.5 text-[14px] font-bold text-white">What was actually published</div>
           </div>
-          <Link href="/track-record?view=desktop" className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold text-slate-200">
-            Full archive ↗
-          </Link>
+          <MobileRouteMenu />
         </div>
       </header>
 

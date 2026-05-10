@@ -289,5 +289,10 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
 
 export default function SiteNavbar() {
   const pathname = usePathname();
+
+  if (pathname?.startsWith("/mobile")) {
+    return null;
+  }
+
   return <SiteNavbarInner pathname={pathname} />;
 }
