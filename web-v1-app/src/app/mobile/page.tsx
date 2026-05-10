@@ -265,6 +265,10 @@ function WorkflowCard({
             className="ua-workflow-image"
             priority={index === 0}
           />
+
+          <div className="ua-workflow-open-badge">
+            Click for larger image
+          </div>
         </div>
       </a>
 
@@ -301,14 +305,21 @@ function WorkflowModal({
           <a href="#workflow-examples">Close</a>
         </div>
 
-        <div className="ua-modal-image">
-          <Image
-            src={image.src}
-            alt={image.alt}
-            fill
-            sizes="100vw"
-            className="ua-workflow-image"
-          />
+        <div className="ua-modal-scroll">
+          <div className="ua-modal-image">
+            <Image
+              src={image.src}
+              alt={image.alt}
+              fill
+              sizes="100vw"
+              className="ua-workflow-image"
+            />
+          </div>
+        </div>
+
+        <div className="ua-modal-footer">
+          Pinch to zoom if your browser supports it, or rotate your phone for a
+          wider view.
         </div>
       </div>
     </div>
@@ -956,6 +967,24 @@ function MobileVisualStyles() {
         padding: 0;
       }
 
+      .ua-workflow-open-badge {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        z-index: 2;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        background: rgba(3, 19, 41, 0.88);
+        color: #ffffff;
+        padding: 9px 12px;
+        font-size: 11px;
+        line-height: 1;
+        font-weight: 1000;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+      }
+
       .ua-workflow-caption {
         display: flex;
         align-items: center;
@@ -1241,9 +1270,9 @@ function MobileVisualStyles() {
         inset: 0;
         z-index: 90;
         display: flex;
-        align-items: center;
+        align-items: stretch;
         justify-content: center;
-        padding: 18px;
+        padding: 0;
         opacity: 0;
         transition: opacity 160ms ease;
       }
@@ -1256,28 +1285,31 @@ function MobileVisualStyles() {
       .ua-modal-backdrop {
         position: absolute;
         inset: 0;
-        background: rgba(2, 11, 23, 0.84);
+        background: rgba(2, 11, 23, 0.92);
         backdrop-filter: blur(10px);
       }
 
       .ua-modal-panel {
         position: relative;
         z-index: 1;
-        overflow: hidden;
-        width: min(100%, 980px);
-        border-radius: 26px;
-        border: 1px solid rgba(216, 233, 255, 0.16);
-        background: #06182d;
-        box-shadow: 0 34px 120px rgba(0, 0, 0, 0.52);
+        display: flex;
+        width: 100%;
+        max-width: 980px;
+        height: 100svh;
+        flex-direction: column;
+        background: #020b17;
+        box-shadow: 0 34px 120px rgba(0, 0, 0, 0.62);
       }
 
       .ua-modal-header {
         display: flex;
+        flex: 0 0 auto;
         align-items: center;
         justify-content: space-between;
         gap: 16px;
-        padding: 16px;
+        padding: calc(env(safe-area-inset-top) + 14px) 16px 14px;
         border-bottom: 1px solid rgba(216, 233, 255, 0.12);
+        background: rgba(3, 19, 41, 0.98);
       }
 
       .ua-modal-header span {
@@ -1299,8 +1331,10 @@ function MobileVisualStyles() {
       }
 
       .ua-modal-header a {
+        flex: 0 0 auto;
         border-radius: 999px;
-        border: 1px solid rgba(216, 233, 255, 0.18);
+        border: 1px solid rgba(216, 233, 255, 0.22);
+        background: rgba(255, 255, 255, 0.06);
         color: #ffffff;
         padding: 10px 13px;
         text-decoration: none;
@@ -1308,10 +1342,35 @@ function MobileVisualStyles() {
         font-weight: 1000;
       }
 
+      .ua-modal-scroll {
+        flex: 1 1 auto;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        background: #020b17;
+      }
+
       .ua-modal-image {
         position: relative;
-        aspect-ratio: 16 / 10;
         width: 100%;
+        min-height: 76svh;
+        background: #020b17;
+      }
+
+      .ua-modal-image .ua-workflow-image {
+        object-fit: contain;
+        padding: 8px;
+      }
+
+      .ua-modal-footer {
+        flex: 0 0 auto;
+        border-top: 1px solid rgba(216, 233, 255, 0.12);
+        background: rgba(3, 19, 41, 0.98);
+        color: #d8e9ff;
+        padding: 12px 16px calc(env(safe-area-inset-bottom) + 12px);
+        text-align: center;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.35;
       }
 
       @media (max-width: 680px) {
@@ -1565,6 +1624,14 @@ function MobileVisualStyles() {
           align-items: flex-start;
           border-radius: 18px;
           font-size: 11px;
+          letter-spacing: 0.06em;
+        }
+
+        .ua-workflow-open-badge {
+          right: 8px;
+          bottom: 8px;
+          padding: 8px 10px;
+          font-size: 9px;
           letter-spacing: 0.06em;
         }
 
