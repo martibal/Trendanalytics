@@ -19,6 +19,7 @@ import { readStorageObject } from "@/lib/storage";
 import { cx, urd } from "@/components/site/UrdDesignSystem";
 import HeroJsonPeek from "@/components/landing/HeroJsonPeek";
 import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
+import RegimeBriefsLandingSection from "@/components/site/RegimeBriefsLandingSection";
 
 import "server-only";
 
@@ -2314,6 +2315,8 @@ export default async function HomePage() {
 
         <WorkflowUseCaseSection />
       </section>
+
+        <RegimeBriefsLandingSection />
 
         <HeroJsonPeek />
 

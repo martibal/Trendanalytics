@@ -89,7 +89,7 @@ def main() -> None:
         CONFIDENCE_THRESHOLD,
     )
     from api.market_scorecard import compute_market_scorecard
-    from api.regime_engine import compute_regime
+    from api.regime_engine import compute_regime, reconcile_regime_with_scorecard
 
     out_root.mkdir(parents=True, exist_ok=True)
 
@@ -144,6 +144,7 @@ def main() -> None:
                 confidence_score=data_quality_seed,
                 confidence_threshold=CONFIDENCE_THRESHOLD,
             )
+            preliminary_regime = reconcile_regime_with_scorecard(preliminary_regime, preliminary_scorecard)
 
             confidence = _build_confidence_payload(
                 slice_df,
@@ -174,6 +175,7 @@ def main() -> None:
                 confidence_score=effective_confidence,
                 confidence_threshold=CONFIDENCE_THRESHOLD,
             )
+            regime = reconcile_regime_with_scorecard(regime, scorecard)
             status = _status_from_regime_and_scorecard(regime, scorecard)
 
             updated_through = confidence.get("updated_through") or _last_gold_date_iso(slice_df)

@@ -1,0 +1,143 @@
+{
+  "policy": "urd_atlas_brief_language_v1",
+  "version": "1.0",
+  "description": "Allowed narrative language and hard-blocked phrasing for Urd Atlas Regime Briefs V1. Narrative output must be descriptive, daily, non-intraday, non-predictive, and non-advisory.",
+  "required_guardrail_sentence": "Data cadence: daily, not intraday. This is descriptive regime context, not a prediction or recommendation.",
+  "allowed_labels": [
+    "STABLE",
+    "HEATING",
+    "CONGESTED",
+    "CHEAP",
+    "UNKNOWN/DEGRADED"
+  ],
+  "narrative_fields": [
+    "brief.headline",
+    "brief.plain",
+    "brief.advanced",
+    "cross_chain.brief.headline",
+    "cross_chain.brief.plain",
+    "cross_chain.brief.advanced",
+    "summary.headline",
+    "summary.text",
+    "chains[].headline"
+  ],
+  "excluded_fields": [
+    "schema",
+    "provenance",
+    "source paths",
+    "methodology fields",
+    "guardrails",
+    "validation metadata",
+    "links",
+    "plan_visibility"
+  ],
+  "hard_blocked_phrases": {
+    "direct_advice": [
+      "buy",
+      "sell",
+      "hold",
+      "trade",
+      "enter",
+      "exit",
+      "accumulate",
+      "reduce exposure",
+      "move funds",
+      "deploy now",
+      "avoid",
+      "switch to"
+    ],
+    "predictive_language": [
+      "will",
+      "will likely",
+      "is expected to",
+      "forecast",
+      "predicts",
+      "sets up",
+      "going forward this means",
+      "next week will"
+    ],
+    "trading_or_investment": [
+      "bullish",
+      "bearish",
+      "alpha",
+      "opportunity",
+      "signal",
+      "risk-on",
+      "risk-off",
+      "pump",
+      "dump",
+      "rally",
+      "crash",
+      "price action",
+      "returns"
+    ],
+    "normative_assessment": [
+      "good time",
+      "bad time",
+      "favorable",
+      "unfavorable",
+      "attractive",
+      "safe",
+      "best",
+      "worst",
+      "better to",
+      "should use",
+      "should avoid"
+    ],
+    "unsupported_causality": [
+      "caused the market to",
+      "means congestion will end",
+      "confirms that the market",
+      "guarantees",
+      "proves that"
+    ]
+  },
+  "use_with_care": [
+    "caution",
+    "risk",
+    "warning",
+    "alert",
+    "recommend",
+    "suggests",
+    "likely"
+  ],
+  "preferred_alternatives": {
+    "caution": "lower confidence support",
+    "risk": "degraded data support",
+    "warning": "degraded data support",
+    "alert": "published regime context",
+    "likely": "the latest published data shows"
+  },
+  "allowed_templates": {
+    "headlines": [
+      "{CHAIN} remained {LABEL}-dominant across the latest 7 published days.",
+      "{CHAIN} moved from {PREVIOUS_LABEL} into {LATEST_LABEL} during the latest published window.",
+      "{CHAIN} showed a mixed regime path across the latest 7 published days."
+    ],
+    "persistence": [
+      "The latest {LABEL} label has persisted for {N} published days.",
+      "The latest {LABEL} label is a one-day observation within the 7-day window.",
+      "The latest regime is recent rather than long-established."
+    ],
+    "drivers": [
+      "The change was primarily driven by {AXIS}.",
+      "Friction moved from {OLD_LEVEL} to {NEW_LEVEL}.",
+      "Capacity pressure moved from {OLD_LEVEL} to {NEW_LEVEL}.",
+      "Demand moved from {OLD_LEVEL} to {NEW_LEVEL}."
+    ],
+    "confidence": [
+      "Confidence strengthened across the latest 7 published days.",
+      "Confidence weakened across the latest 7 published days.",
+      "Confidence remained broadly stable across the latest 7 published days.",
+      "The latest label has lower confidence support than the dominant label earlier in the window."
+    ],
+    "cross_chain": [
+      "The latest published data shows chain-level divergence rather than a uniform cross-chain regime.",
+      "The latest published data by chain shows chain-level divergence rather than a uniform cross-chain regime.",
+      "{CHAIN_A} remained {PATTERN_A}, while {CHAIN_B} showed {PATTERN_B}.",
+      "The strongest contrast is between {CHAIN_A} and {CHAIN_B}.",
+      "The latest published data shows mixed conditions across supported chains.",
+      "Across each chain's latest published 7-day window, the data shows mixed conditions across supported chains."
+    ]
+  }
+}
