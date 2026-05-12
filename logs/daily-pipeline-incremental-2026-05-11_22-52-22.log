@@ -1,0 +1,639 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260511225222
+Username: DESKTOP-0FG1AOJ\mbals
+RunAs User: DESKTOP-0FG1AOJ\mbals
+Configuration Name: 
+Machine: DESKTOP-0FG1AOJ (Microsoft Windows NT 10.0.19045.0)
+Host Application: powershell -NoProfile -ExecutionPolicy Bypass -File .\run-daily-pipeline.ps1 -SkipPush
+Process ID: 23132
+PSVersion: 5.1.19041.6456
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.19041.6456
+BuildVersion: 10.0.19041.6456
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+[2026-05-11 22:52:22] STEP 1: Run full pipeline incremental
+[2026-05-11 22:52:22] === PIPELINE START ===
+[2026-05-11 22:52:22] Mode: incremental
+[2026-05-11 22:52:22] STEP -1: Download/sync RAW from AWS (JSON-aware minimal catch-up)
+[2026-05-11 22:52:22]   raw sync start: 2026-02-10 (lookback 90d)
+[2026-05-11 22:52:22]   published state root: D:\css\main\data\published\v1
+[INFO] Listing available days on S3: bitcoin/blocks
+[OK] bitcoin/blocks: nothing to download (missing_unpublished=0, skipped_existing=5, skipped_published=85)
+[INFO] Listing available days on S3: bitcoin/transactions
+[OK] bitcoin/transactions: nothing to download (missing_unpublished=0, skipped_existing=5, skipped_published=85)
+[INFO] Listing available days on S3: ethereum/blocks
+[OK] ethereum/blocks: nothing to download (missing_unpublished=0, skipped_existing=5, skipped_published=85)
+[INFO] Listing available days on S3: ethereum/transactions
+[OK] ethereum/transactions: nothing to download (missing_unpublished=0, skipped_existing=5, skipped_published=85)
+[INFO] Listing available days on S3: arbitrum/blocks
+[OK] arbitrum/blocks: nothing to download (missing_unpublished=0, skipped_existing=11, skipped_published=73)
+[INFO] Listing available days on S3: arbitrum/transactions
+[OK] arbitrum/transactions: nothing to download (missing_unpublished=0, skipped_existing=11, skipped_published=73)
+[INFO] Listing available days on S3: base/blocks
+[OK] base/blocks: nothing to download (missing_unpublished=0, skipped_existing=11, skipped_published=73)
+[INFO] Listing available days on S3: base/transactions
+[OK] base/transactions: nothing to download (missing_unpublished=0, skipped_existing=11, skipped_published=73)
+[DONE] report: D:\css\main\reports\download_up_to_date_minimal.json
+[2026-05-11 22:52:44] STEP 0: Probe latest raw day
+[2026-05-11 22:52:44] Latest raw day: 2026-05-10
+[2026-05-11 22:52:44] Latest published day: 2026-05-10
+[2026-05-11 22:52:44] Planned raw downloads from report: 0
+[2026-05-11 22:52:44] Start date: 2026-04-10
+[2026-05-11 22:52:44] STEP 1: Build daily features (feature_daily_agg.py)
+[2026-05-11 22:52:44] chain=bitcoin feature parquet up-to-date (no missing days)
+[2026-05-11 22:52:44] chain=ethereum feature parquet up-to-date (no missing days)
+[2026-05-11 22:52:44] chain=arbitrum feature parquet up-to-date (no missing days)
+[2026-05-11 22:52:44] chain=base feature parquet up-to-date (no missing days)
+[2026-05-11 22:52:44] Active chains for downstream build: bitcoin, ethereum, arbitrum, base
+[2026-05-11 22:52:44] STEP 2: Build GOLD timeseries
+[2026-05-11 22:52:44]   build gold timeseries: bitcoin
+2026-05-11 22:52:44,937 [GOLD_BUILDER] INFO: Wrote gold: D:\css\main\data\calculated\gold\bitcoin.parquet rows=31 cols=11 first=2026-04-10 last=202
+6-05-10
+2026-05-11 22:52:44,938 [GOLD_BUILDER] INFO: Wrote gold status: D:\css\main\pipeline\_work\prod\status\bitcoin.json
+[2026-05-11 22:52:44]   build gold timeseries: ethereum
+2026-05-11 22:52:45,228 [GOLD_BUILDER] INFO: Wrote gold: D:\css\main\data\calculated\gold\ethereum.parquet rows=31 cols=11 first=2026-04-10 last=20
+26-05-10
+2026-05-11 22:52:45,230 [GOLD_BUILDER] INFO: Wrote gold status: D:\css\main\pipeline\_work\prod\status\ethereum.json
+[2026-05-11 22:52:45]   build gold timeseries: arbitrum
+2026-05-11 22:52:45,502 [GOLD_BUILDER] INFO: Wrote gold: D:\css\main\data\calculated\gold\arbitrum.parquet rows=25 cols=11 first=2026-04-10 last=20
+26-05-04
+2026-05-11 22:52:45,504 [GOLD_BUILDER] INFO: Wrote gold status: D:\css\main\pipeline\_work\prod\status\arbitrum.json
+[2026-05-11 22:52:45]   build gold timeseries: base
+2026-05-11 22:52:45,787 [GOLD_BUILDER] INFO: Wrote gold: D:\css\main\data\calculated\gold\base.parquet rows=25 cols=11 first=2026-04-10 last=2026-0
+5-04
+2026-05-11 22:52:45,789 [GOLD_BUILDER] INFO: Wrote gold status: D:\css\main\pipeline\_work\prod\status\base.json
+[2026-05-11 22:52:45] STEP 3: Build GOLD weekly
+[2026-05-11 22:52:45]   build gold weekly: bitcoin
+2026-05-11 22:52:46,044 [GOLD_WEEKLY] INFO: Wrote weekly gold: D:\css\main\data\calculated\gold_weekly\bitcoin.parquet rows=5 first=2026-04-06 last
+=2026-05-04
+[2026-05-11 22:52:46]   build gold weekly: ethereum
+2026-05-11 22:52:46,298 [GOLD_WEEKLY] INFO: Wrote weekly gold: D:\css\main\data\calculated\gold_weekly\ethereum.parquet rows=5 first=2026-04-06 las
+t=2026-05-04
+[2026-05-11 22:52:46]   build gold weekly: arbitrum
+2026-05-11 22:52:46,549 [GOLD_WEEKLY] INFO: Wrote weekly gold: D:\css\main\data\calculated\gold_weekly\arbitrum.parquet rows=5 first=2026-04-06 las
+t=2026-05-04
+[2026-05-11 22:52:46]   build gold weekly: base
+2026-05-11 22:52:46,803 [GOLD_WEEKLY] INFO: Wrote weekly gold: D:\css\main\data\calculated\gold_weekly\base.parquet rows=5 first=2026-04-06 last=20
+26-05-04
+[2026-05-11 22:52:46] STEP 4: Sync GOLD json history + windows
+[SYNC] bitcoin: wrote 0 day-file(s), latest/lastXd refreshed (from day-files)
+[SYNC] ethereum: wrote 0 day-file(s), latest/lastXd refreshed (from day-files)
+[SYNC] arbitrum: wrote 0 day-file(s), latest/lastXd refreshed (from day-files)
+[SYNC] base: wrote 0 day-file(s), latest/lastXd refreshed (from day-files)
+[SYNC] done. chains=4 total_new_day_files=0
+[2026-05-11 22:52:47] STEP 5: Export DERIVED json history + windows
+[DERIVED] bitcoin: wrote 0 day-file(s), latest/lastXd refreshed
+[DERIVED] ethereum: wrote 0 day-file(s), latest/lastXd refreshed
+[DERIVED] arbitrum: wrote 0 day-file(s), latest/lastXd refreshed
+[DERIVED] base: wrote 0 day-file(s), latest/lastXd refreshed
+[DERIVED] Done. Total day-files written: 0
+[2026-05-11 22:52:48] STEP 6: Export META json history + windows
+[INFO] /data/css_json served via FileResponse route (not StaticFiles)
+[INFO] /data/css_json_meta served via FileResponse route (not StaticFiles)
+[WARN] WEB_DIST not found: D:\css\main\web\dist
+[2026-05-11 22:52:51] STEP 7: Publish artifacts -> data/published/v1
+[PUBLISH] landing export OK: D:\css\main\data\published\v1\landing
+[PUBLISH] OK dataset_id=2026-05-11.205251 revision_id=76 published_root=D:\css\main\data\published\v1
+[2026-05-11 22:53:00] STEP 8: Validate published dataset contract
+[VALIDATE] OK. Published dataset + contract look consistent (STRICT JSON, coverage + derived_definition present).
+[2026-05-11 22:53:01] STEP 9: Sync published dataset -> web public
+[2026-05-11 22:53:01] === SYNC WEB DATA START ===
+[2026-05-11 22:53:01] root        = D:\css\main
+[2026-05-11 22:53:01] published   = D:\css\main\data\published\v1
+[2026-05-11 22:53:01] targetWeb   = D:\css\main\web-v1-app
+[2026-05-11 22:53:01] dst         = D:\css\main\web-v1-app\public\data\published\v1
+[2026-05-11 22:53:01] dryRun      = False
+[2026-05-11 22:53:01] Mirror copy: D:\css\main\data\published\v1 -> D:\css\main\web-v1-app\public\data\published\v1
+[2026-05-11 22:53:06] === SYNC WEB DATA OK ===
+[2026-05-11 22:53:06] === PIPELINE OK ===
+[2026-05-11 22:53:06] STEP 2: Finalize V3 META/Brief JSON from existing local GOLD artifacts
+[2026-05-11 22:53:06] JSON finalizer start date: 2026-02-10 (90 day lookback)
+[regenerate_json_safe] SAFETY: this script does not call download tools and does not build parquet.
+[regenerate_json_safe] It uses existing local GOLD artifacts as input for regenerated META JSON.
+[regenerate_json_safe] root=D:\css\main
+[regenerate_json_safe] Running: C:\Users\mbals\AppData\Local\Programs\Python\Python311\python.exe D:\css\main\pipeline\tools\rebuild_meta_only.py -
+-root D:\css\main --mode rebuild --windows 7,30,90,180,365 --start 2026-02-10
+[rebuild_meta_only] root=D:\css\main
+[rebuild_meta_only] out_root=D:\css\main\data\calculated\meta
+[rebuild_meta_only] mode=rebuild
+[rebuild_meta_only] start=2026-02-10
+[rebuild_meta_only] windows=7,30,90,180,365
+[INFO] /data/css_json served via FileResponse route (not StaticFiles)
+[INFO] /data/css_json_meta served via FileResponse route (not StaticFiles)
+[WARN] WEB_DIST not found: D:\css\main\web\dist
+[regenerate_json_safe] Running: C:\Users\mbals\AppData\Local\Programs\Python\Python311\python.exe D:\css\main\pipeline\tools\publish_meta_only.py -
+-root D:\css\main --windows 7,30,90,180,365
+[INFO] /data/css_json served via FileResponse route (not StaticFiles)
+[INFO] /data/css_json_meta served via FileResponse route (not StaticFiles)
+[WARN] WEB_DIST not found: D:\css\main\web\dist
+[publish_meta_only] root=D:\css\main
+[publish_meta_only] calculated_meta=D:\css\main\data\calculated\meta
+[publish_meta_only] published_meta=D:\css\main\data\published\v1\meta
+[publish_meta_only] chains=['ethereum', 'bitcoin', 'base', 'arbitrum']
+[publish_meta_only] windows=[7, 30, 90, 180, 365]
+[publish_meta_only] dataset_id(reused if present)=2026-05-11.205251
+[publish_meta_only] revision_id(reused if present)=76
+[publish_meta_only] computed_at_utc(this run)=2026-05-11T20:53:30Z
+[publish_meta_only] chain=ethereum: copied=532 asof_src=2026-05-10 available=2024-12-01..2026-05-10 (526 days)
+[publish_meta_only] chain=bitcoin: copied=532 asof_src=2026-05-10 available=2024-12-01..2026-05-10 (526 days)
+[publish_meta_only] chain=base: copied=526 asof_src=2026-05-04 available=2024-12-01..2026-05-04 (520 days)
+[publish_meta_only] chain=arbitrum: copied=526 asof_src=2026-05-04 available=2024-12-01..2026-05-04 (520 days)
+[publish_meta_only] DONE: total_copied=2116
+[regenerate_json_safe] Running: C:\Users\mbals\AppData\Local\Programs\Python\Python311\python.exe D:\css\main\pipeline\tools\validate_meta_methodol
+ogy_safety.py --root D:\css\main
+[validate_meta_methodology_safety] meta_root=D:\css\main\data\published\v1\meta
+[validate_meta_methodology_safety] checked=2092
+[validate_meta_methodology_safety] label_counts={'STABLE': 925, 'CHEAP': 528, 'HEATING': 272, 'CONGESTED': 258, 'UNKNOWN/DEGRADED': 109}
+[validate_meta_methodology_safety] sanity_adjusted=0
+[validate_meta_methodology_safety] support_basis_counts={'n/a': 1034, 'regime_axes': 813, 'scorecard': 245}
+[validate_meta_methodology_safety] OK
+[regenerate_json_safe] Syncing published data -> web public: D:\css\main\data\published\v1 -> D:\css\main\web-v1-app\public\data\published\v1
+[regenerate_json_safe] Running: C:\Users\mbals\AppData\Local\Programs\Python\Python311\python.exe D:\css\main\web-v1-app\scripts\build_briefs\build
+_all_briefs.py --root public/data/published/v1
+Published root: D:\css\main\web-v1-app\public\data\published\v1
+Building chain 7-day briefs...
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\bitcoin\2026-05-10.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\bitcoin\latest.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\ethereum\2026-05-10.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\ethereum\latest.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\arbitrum\2026-05-04.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\arbitrum\latest.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\base\2026-05-04.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\base\latest.json
+Building site bundle from chain briefs...
+D:\css\main\web-v1-app\public\data\published\v1\briefs\site\latest.json
+Building cross-chain regime map...
+D:\css\main\web-v1-app\public\data\published\v1\briefs\cross-chain\2026-05-10.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\cross-chain\latest.json
+Refreshing site bundle with cross-chain summary...
+D:\css\main\web-v1-app\public\data\published\v1\briefs\site\latest.json
+Building briefs manifest...
+D:\css\main\web-v1-app\public\data\published\v1\briefs\manifest.json
+[regenerate_json_safe] DONE. Regenerated JSON only.
+[2026-05-11 22:54:09] STEP 2A: Validate canonical published META methodology
+[validate_meta_methodology_safety] meta_root=D:\css\main\data\published\v1\meta
+[validate_meta_methodology_safety] checked=2092
+[validate_meta_methodology_safety] label_counts={'STABLE': 925, 'CHEAP': 528, 'HEATING': 272, 'CONGESTED': 258, 'UNKNOWN/DEGRADED': 109}
+[validate_meta_methodology_safety] sanity_adjusted=0
+[validate_meta_methodology_safety] support_basis_counts={'n/a': 1034, 'regime_axes': 813, 'scorecard': 245}
+[validate_meta_methodology_safety] OK
+[2026-05-11 22:54:10] STEP 3: Publish web data
+
+==> Publish configuration
+RepoRoot      : D:\css\main
+WebAppRoot    : D:\css\main\web-v1-app
+SyncScriptPath: D:\css\main\sync-published-data.ps1
+SourceRoot    : D:\css\main\data\published\v1
+TargetRoot    : D:\css\main\web-v1-app\public\data\published\v1
+Branch        : main
+SkipBuild     : False
+SkipPush      : True
+DryRun        : False
+
+==> Running published-data sync
+
+==> Validating source and target paths
+Source: D:\css\main\data\published\v1
+Target: D:\css\main\web-v1-app\public\data\published\v1
+
+==> Removing previous deploy copy
+
+==> Copying published data as real files
+
+==> Verifying critical output
+Found dataset.json
+Found contract.json
+
+==> Checking for actual reparse points
+No actual reparse points detected.
+
+==> Git status for web app after sync
+Refresh index: 100% (34099/34099), done.
+ D web-v1-app/public/data/published/v1/briefs/chains/arbitrum/2026-05-04.json
+ D web-v1-app/public/data/published/v1/briefs/chains/arbitrum/latest.json
+ D web-v1-app/public/data/published/v1/briefs/chains/base/2026-05-04.json
+ D web-v1-app/public/data/published/v1/briefs/chains/base/latest.json
+ D web-v1-app/public/data/published/v1/briefs/chains/bitcoin/2026-05-10.json
+ D web-v1-app/public/data/published/v1/briefs/chains/bitcoin/latest.json
+ D web-v1-app/public/data/published/v1/briefs/chains/ethereum/2026-05-10.json
+ D web-v1-app/public/data/published/v1/briefs/chains/ethereum/latest.json
+ D web-v1-app/public/data/published/v1/briefs/cross-chain/2026-05-10.json
+ D web-v1-app/public/data/published/v1/briefs/cross-chain/latest.json
+ D web-v1-app/public/data/published/v1/briefs/manifest.json
+ D web-v1-app/public/data/published/v1/briefs/site/latest.json
+ M web-v1-app/public/data/published/v1/dataset.json
+ M web-v1-app/public/data/published/v1/derived/arbitrum/last180d.json
+ M web-v1-app/public/data/published/v1/derived/arbitrum/last30d.json
+ M web-v1-app/public/data/published/v1/derived/arbitrum/last365d.json
+ M web-v1-app/public/data/published/v1/derived/arbitrum/last7d.json
+ M web-v1-app/public/data/published/v1/derived/arbitrum/last90d.json
+ M web-v1-app/public/data/published/v1/derived/arbitrum/latest.json
+ M web-v1-app/public/data/published/v1/derived/arbitrum/manifest.json
+ M web-v1-app/public/data/published/v1/derived/base/last180d.json
+ M web-v1-app/public/data/published/v1/derived/base/last30d.json
+ M web-v1-app/public/data/published/v1/derived/base/last365d.json
+ M web-v1-app/public/data/published/v1/derived/base/last7d.json
+ M web-v1-app/public/data/published/v1/derived/base/last90d.json
+ M web-v1-app/public/data/published/v1/derived/base/latest.json
+ M web-v1-app/public/data/published/v1/derived/base/manifest.json
+ M web-v1-app/public/data/published/v1/derived/bitcoin/last180d.json
+ M web-v1-app/public/data/published/v1/derived/bitcoin/last30d.json
+ M web-v1-app/public/data/published/v1/derived/bitcoin/last365d.json
+ M web-v1-app/public/data/published/v1/derived/bitcoin/last7d.json
+ M web-v1-app/public/data/published/v1/derived/bitcoin/last90d.json
+ M web-v1-app/public/data/published/v1/derived/bitcoin/latest.json
+ M web-v1-app/public/data/published/v1/derived/bitcoin/manifest.json
+ M web-v1-app/public/data/published/v1/derived/ethereum/last180d.json
+ M web-v1-app/public/data/published/v1/derived/ethereum/last30d.json
+ M web-v1-app/public/data/published/v1/derived/ethereum/last365d.json
+ M web-v1-app/public/data/published/v1/derived/ethereum/last7d.json
+ M web-v1-app/public/data/published/v1/derived/ethereum/last90d.json
+ M web-v1-app/public/data/published/v1/derived/ethereum/latest.json
+ M web-v1-app/public/data/published/v1/derived/ethereum/manifest.json
+ M web-v1-app/public/data/published/v1/gold/arbitrum/manifest.json
+ M web-v1-app/public/data/published/v1/gold/base/manifest.json
+ M web-v1-app/public/data/published/v1/gold/bitcoin/manifest.json
+ M web-v1-app/public/data/published/v1/gold/ethereum/manifest.json
+ M web-v1-app/public/data/published/v1/index.json
+ M web-v1-app/public/data/published/v1/landing/arbitrum/hero.json
+ M web-v1-app/public/data/published/v1/landing/base/hero.json
+ M web-v1-app/public/data/published/v1/landing/bitcoin/hero.json
+ M web-v1-app/public/data/published/v1/landing/ethereum/hero.json
+ M web-v1-app/public/data/published/v1/landing/index.json
+ M web-v1-app/public/data/published/v1/latest.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-10.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-11.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-12.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-13.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-14.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-15.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-16.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-17.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-18.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-19.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-20.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-21.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-22.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-23.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-24.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-25.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-26.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-27.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-28.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/last180d.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/last365d.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/last90d.json
+ M web-v1-app/public/data/published/v1/meta/arbitrum/manifest.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-10.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-11.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-12.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-13.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-14.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-15.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-16.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-17.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-18.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-19.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-20.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-21.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-22.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-23.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-24.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-25.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-26.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-27.json
+ M web-v1-app/public/data/published/v1/meta/base/2026-02-28.json
+ M web-v1-app/public/data/published/v1/meta/base/last180d.json
+ M web-v1-app/public/data/published/v1/meta/base/last365d.json
+ M web-v1-app/public/data/published/v1/meta/base/last90d.json
+ M web-v1-app/public/data/published/v1/meta/base/manifest.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-10.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-11.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-12.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-13.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-14.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-15.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-16.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-17.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-18.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-19.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-20.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-21.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-22.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-23.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-24.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-25.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-26.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-27.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-28.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/last180d.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/last365d.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/last90d.json
+ M web-v1-app/public/data/published/v1/meta/bitcoin/manifest.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-10.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-11.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-12.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-13.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-14.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-15.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-16.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-17.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-18.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-19.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-20.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-21.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-22.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-23.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-24.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-25.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-26.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-27.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/2026-02-28.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/last180d.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/last365d.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/last90d.json
+ M web-v1-app/public/data/published/v1/meta/ethereum/manifest.json
+
+==> Sync complete
+Published data is now mirrored into the web app as real files.
+Next steps: npm run build, then git add/commit/push if the output looks correct.
+
+==> Running web app production build
+
+> web-v1-app@0.1.0 build
+> prisma generate && next build --webpack
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+
+✔ Generated Prisma Client (v6.19.2) to .\node_modules\@prisma\client in 204ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Interested in query caching in just a few lines of code? Try Accelerate today! https://pris.ly/tip-3-accelerate
+
+▲ Next.js 16.1.6 (webpack)
+- Environments: .env.local, .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 28.5s
+✓ Finished TypeScript in 31.7s
+✓ Collecting page data using 15 workers in 2.6s
+✓ Generating static pages using 15 workers (50/50) in 1619.6ms
+✓ Collecting build traces in 7.7s
+✓ Finalizing page optimization in 7.7s
+
+Route (app)                       Revalidate  Expire
+┌ ○ /
+├ ○ /_not-found
+├ ○ /about
+├ ○ /api-docs
+├ ○ /api-docs/getting-started
+├ ○ /api-docs/samples
+├ ○ /api-docs/schema
+├ ○ /api-docs/workflows
+├ ƒ /api/v1/checkout
+├ ƒ /api/v1/checkout/portal
+├ ƒ /api/v1/files/[...path]
+├ ○ /api/v1/glossary                      5m      1y
+├ ƒ /api/v1/keys
+├ ○ /api/v1/landing                       5m      1y
+├ ○ /api/v1/methodology/versions          5m      1y
+├ ○ /api/v1/status                        5m      1y
+├ ƒ /api/v1/summary/[chain]
+├ ○ /api/v1/thresholds/defaults           5m      1y
+├ ○ /api/v1/units                         5m      1y
+├ ƒ /api/v1/webhook
+├ ƒ /api/v1/whn/[chain]
+├ ○ /chains
+├ ƒ /chains/[chain]
+├ ƒ /chains/[chain]/history
+├ ƒ /dashboard
+├ ○ /faq
+├ ƒ /glossary
+├ ○ /methodology
+├ ○ /methodology/ai-controls
+├ ○ /methodology/boundaries
+├ ○ /methodology/changelog
+├ ○ /methodology/fields
+├ ○ /methodology/freshness
+├ ○ /methodology/integrity
+├ ○ /methodology/previously
+├ ○ /methodology/provenance
+├ ○ /methodology/reference
+├ ○ /methodology/verification
+├ ○ /mobile
+├ ○ /mobile/api-docs
+├ ƒ /mobile/chain/[chain]
+├ ƒ /mobile/dashboard
+├ ○ /mobile/methodology
+├ ○ /mobile/plans
+├ ○ /mobile/status
+├ ○ /mobile/thresholds
+├ ○ /mobile/track-record
+├ ○ /mobile/wiki
+├ ○ /privacy
+├ ○ /service
+├ ƒ /sign-in/[[...sign-in]]
+├ ƒ /sign-up/[[...sign-up]]
+├ ○ /status
+├ ○ /terms
+├ ○ /thresholds
+└ ƒ /track-record
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+==> Staging sync script and published data
+
+==> Pending staged changes
+D  web-v1-app/public/data/published/v1/briefs/chains/arbitrum/2026-05-04.json
+D  web-v1-app/public/data/published/v1/briefs/chains/arbitrum/latest.json
+D  web-v1-app/public/data/published/v1/briefs/chains/base/2026-05-04.json
+D  web-v1-app/public/data/published/v1/briefs/chains/base/latest.json
+D  web-v1-app/public/data/published/v1/briefs/chains/bitcoin/2026-05-10.json
+D  web-v1-app/public/data/published/v1/briefs/chains/bitcoin/latest.json
+D  web-v1-app/public/data/published/v1/briefs/chains/ethereum/2026-05-10.json
+D  web-v1-app/public/data/published/v1/briefs/chains/ethereum/latest.json
+D  web-v1-app/public/data/published/v1/briefs/cross-chain/2026-05-10.json
+D  web-v1-app/public/data/published/v1/briefs/cross-chain/latest.json
+D  web-v1-app/public/data/published/v1/briefs/manifest.json
+D  web-v1-app/public/data/published/v1/briefs/site/latest.json
+M  web-v1-app/public/data/published/v1/dataset.json
+M  web-v1-app/public/data/published/v1/derived/arbitrum/last180d.json
+M  web-v1-app/public/data/published/v1/derived/arbitrum/last30d.json
+M  web-v1-app/public/data/published/v1/derived/arbitrum/last365d.json
+M  web-v1-app/public/data/published/v1/derived/arbitrum/last7d.json
+M  web-v1-app/public/data/published/v1/derived/arbitrum/last90d.json
+M  web-v1-app/public/data/published/v1/derived/arbitrum/latest.json
+M  web-v1-app/public/data/published/v1/derived/arbitrum/manifest.json
+M  web-v1-app/public/data/published/v1/derived/base/last180d.json
+M  web-v1-app/public/data/published/v1/derived/base/last30d.json
+M  web-v1-app/public/data/published/v1/derived/base/last365d.json
+M  web-v1-app/public/data/published/v1/derived/base/last7d.json
+M  web-v1-app/public/data/published/v1/derived/base/last90d.json
+M  web-v1-app/public/data/published/v1/derived/base/latest.json
+M  web-v1-app/public/data/published/v1/derived/base/manifest.json
+M  web-v1-app/public/data/published/v1/derived/bitcoin/last180d.json
+M  web-v1-app/public/data/published/v1/derived/bitcoin/last30d.json
+M  web-v1-app/public/data/published/v1/derived/bitcoin/last365d.json
+M  web-v1-app/public/data/published/v1/derived/bitcoin/last7d.json
+M  web-v1-app/public/data/published/v1/derived/bitcoin/last90d.json
+M  web-v1-app/public/data/published/v1/derived/bitcoin/latest.json
+M  web-v1-app/public/data/published/v1/derived/bitcoin/manifest.json
+M  web-v1-app/public/data/published/v1/derived/ethereum/last180d.json
+M  web-v1-app/public/data/published/v1/derived/ethereum/last30d.json
+M  web-v1-app/public/data/published/v1/derived/ethereum/last365d.json
+M  web-v1-app/public/data/published/v1/derived/ethereum/last7d.json
+M  web-v1-app/public/data/published/v1/derived/ethereum/last90d.json
+M  web-v1-app/public/data/published/v1/derived/ethereum/latest.json
+M  web-v1-app/public/data/published/v1/derived/ethereum/manifest.json
+M  web-v1-app/public/data/published/v1/gold/arbitrum/manifest.json
+M  web-v1-app/public/data/published/v1/gold/base/manifest.json
+M  web-v1-app/public/data/published/v1/gold/bitcoin/manifest.json
+M  web-v1-app/public/data/published/v1/gold/ethereum/manifest.json
+M  web-v1-app/public/data/published/v1/index.json
+M  web-v1-app/public/data/published/v1/landing/arbitrum/hero.json
+M  web-v1-app/public/data/published/v1/landing/base/hero.json
+M  web-v1-app/public/data/published/v1/landing/bitcoin/hero.json
+M  web-v1-app/public/data/published/v1/landing/ethereum/hero.json
+M  web-v1-app/public/data/published/v1/landing/index.json
+M  web-v1-app/public/data/published/v1/latest.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-10.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-11.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-12.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-13.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-14.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-15.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-16.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-17.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-18.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-19.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-20.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-21.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-22.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-23.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-24.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-25.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-26.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-27.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/2026-02-28.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/last180d.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/last365d.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/last90d.json
+M  web-v1-app/public/data/published/v1/meta/arbitrum/manifest.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-10.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-11.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-12.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-13.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-14.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-15.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-16.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-17.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-18.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-19.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-20.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-21.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-22.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-23.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-24.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-25.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-26.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-27.json
+M  web-v1-app/public/data/published/v1/meta/base/2026-02-28.json
+M  web-v1-app/public/data/published/v1/meta/base/last180d.json
+M  web-v1-app/public/data/published/v1/meta/base/last365d.json
+M  web-v1-app/public/data/published/v1/meta/base/last90d.json
+M  web-v1-app/public/data/published/v1/meta/base/manifest.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-10.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-11.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-12.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-13.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-14.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-15.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-16.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-17.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-18.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-19.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-20.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-21.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-22.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-23.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-24.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-25.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-26.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-27.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/2026-02-28.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/last180d.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/last365d.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/last90d.json
+M  web-v1-app/public/data/published/v1/meta/bitcoin/manifest.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-10.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-11.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-12.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-13.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-14.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-15.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-16.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-17.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-18.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-19.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-20.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-21.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-22.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-23.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-24.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-25.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-26.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-27.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/2026-02-28.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/last180d.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/last365d.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/last90d.json
+M  web-v1-app/public/data/published/v1/meta/ethereum/manifest.json
+
+==> Skipping commit/push because -SkipPush was provided
+[2026-05-11 22:56:15] STEP 3A: Rebuild Regime Briefs in web-v1-app public data
+Published root: D:\css\main\web-v1-app\public\data\published\v1
+Building chain 7-day briefs...
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\bitcoin\2026-05-10.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\bitcoin\latest.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\ethereum\2026-05-10.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\ethereum\latest.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\arbitrum\2026-05-04.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\arbitrum\latest.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\base\2026-05-04.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\chains\base\latest.json
+Building site bundle from chain briefs...
+D:\css\main\web-v1-app\public\data\published\v1\briefs\site\latest.json
+Building cross-chain regime map...
+D:\css\main\web-v1-app\public\data\published\v1\briefs\cross-chain\2026-05-10.json
+D:\css\main\web-v1-app\public\data\published\v1\briefs\cross-chain\latest.json
+Refreshing site bundle with cross-chain summary...
+D:\css\main\web-v1-app\public\data\published\v1\briefs\site\latest.json
+Building briefs manifest...
+D:\css\main\web-v1-app\public\data\published\v1\briefs\manifest.json
+[2026-05-11 22:56:16] STEP 3B: Validate web-v1-app published META methodology
+[validate_meta_methodology_safety] meta_root=D:\css\main\web-v1-app\public\data\published\v1\meta
+[validate_meta_methodology_safety] checked=2092
+[validate_meta_methodology_safety] label_counts={'STABLE': 925, 'CHEAP': 528, 'HEATING': 272, 'CONGESTED': 258, 'UNKNOWN/DEGRADED': 109}
+[validate_meta_methodology_safety] sanity_adjusted=0
+[validate_meta_methodology_safety] support_basis_counts={'n/a': 1034, 'regime_axes': 813, 'scorecard': 245}
+[validate_meta_methodology_safety] OK
+[2026-05-11 22:56:16] STEP 2B: SkipPush mode detected - ensure local commit exists for published snapshot
+[2026-05-11 22:56:16] Local branch is already ahead of origin/main by 7 commit(s); no new local commit needed here
+[2026-05-11 22:56:16] === DAILY INCREMENTAL PIPELINE OK ===
+[2026-05-11 22:56:16] STEP 4: Cleanup skipped because CleanupEphemeralRaw/CSS_CLEANUP_EPHEMERAL_RAW is not enabled
+**********************
+Windows PowerShell transcript end
+End time: 20260511225616
+**********************

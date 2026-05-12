@@ -1,67 +1,22 @@
-import React, { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import Image from "next/image";
-
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { computeHistoryDepthDays } from "@/lib/historyDepth";
-import {
-  confidenceBand,
-  confidenceChipClass,
-  fmtConfidence,
-  fmtDate,
-  rowTakeaway,
-  statusChipClass,
-  type SurfaceRowDisplay,
-} from "@/lib/landingSurface";
 import { readStorageObject } from "@/lib/storage";
-import { cx, urd } from "@/components/site/UrdDesignSystem";
-import HeroJsonPeek from "@/components/landing/HeroJsonPeek";
-import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
-import RegimeBriefsLandingSection from "@/components/site/RegimeBriefsLandingSection";
+import { loadSiteBriefBundle } from "@/lib/briefs/loadSiteBriefBundle";
+import type {
+  RegimeLabel,
+  SiteBriefBundle,
+  SiteBriefChain,
+  SiteBriefSeries,
+  SiteBriefSeriesDay,
+} from "@/lib/briefs/types";
 
 import "server-only";
 
-const WHITEPAPER_HREF = "/whitepaper/Urd_Atlas_Whitepaper.pdf";
-
-type LandingApiChain = {
-  chain?: string;
-  label?: string;
-  name?: string;
-  status_label?: string;
-  confidence_score?: number | null;
-  lag_days?: number | null;
-  as_of?: string | null;
-};
-
-type LandingApiResponse =
-  | { chains?: LandingApiChain[] }
-  | { items?: LandingApiChain[] }
-  | { data?: LandingApiChain[] };
-
-type StatusApiRow = {
-  chain: string;
-  name: string;
-  label: string;
-  as_of: string | null;
-  display_asof?: string | null;
-  regime_asof?: string | null;
-  lag_days: number | null;
-  status: "ok" | "warn" | "fail" | "unknown";
-  published_regime: string | null;
-  confidence_score: number | null;
-  expected_delay_days: number;
-};
-
-type StatusApiResponse = {
-  ok: boolean;
-  generated_at_utc: string;
-  chains?: StatusApiRow[];
-};
-
 type LandingHero = {
-  chain?: string;
   display_asof?: string;
   regime_asof?: string;
   asof?: {
@@ -78,85 +33,120 @@ type LandingHero = {
 type MetaLatest = {
   date?: string;
   updated_through?: string;
-  confidence?: {
-    lag_days_vs_utc_today?: number;
-    confidence_score?: number;
+  status?: {
+    label?: string;
+    one_liner?: string;
   };
-  status?: { label?: string };
-  regime?: { asof_date?: string };
+  regime?: {
+    asof_date?: string;
+    drivers?: Array<{ metric?: string; axis?: string; trend?: string; pct_90d?: number; z_robust?: number }>;
+  };
+  confidence?: {
+    confidence_score?: number | null;
+    lag_days_vs_utc_today?: number | null;
+  };
 };
 
-type MetaDriver = {
-  axis?: string;
-  metric?: string;
-  trend?: string;
-  z_robust?: number | null;
-  pct_90d?: number | null;
-  momentum_7d_vs_30d?: number | null;
-  current?: number | null;
+type LatestContextRow = {
+  chain: ChainId;
+  shortLabel: string;
+  name: string;
+  icon: string;
+  label: RegimeLabel;
+  confidence: number | null;
+  updatedThrough: string | null;
+  oneLiner: string;
+  days: SiteBriefSeriesDay[];
 };
 
-type DerivedLatest = Record<string, unknown>;
+type JsonLayer = "gold" | "derived" | "meta" | "brief";
 
-type PrimaryChangeDisplay = {
-  label: string;
-  value: string;
-  tone: "up" | "down" | "flat" | "limited";
+type JsonSample = {
+  layer: JsonLayer;
+  chain: ChainId;
+  date: string | null;
+  path: string;
+  code: string;
 };
+
+const CHAIN_ORDER: ChainId[] = ["bitcoin", "ethereum", "arbitrum", "base"];
+const SAMPLE_CHAIN: ChainId = "bitcoin";
+
+const REGIME_COLORS: Record<RegimeLabel, { text: string; border: string; bg: string; dot: string }> = {
+  STABLE: { text: "text-[#10B981]", border: "border-[#10B981]/55", bg: "bg-[#10B981]/10", dot: "bg-[#10B981]" },
+  HEATING: { text: "text-[#F59E0B]", border: "border-[#F59E0B]/60", bg: "bg-[#F59E0B]/10", dot: "bg-[#F59E0B]" },
+  CONGESTED: { text: "text-[#F43F5E]", border: "border-[#F43F5E]/60", bg: "bg-[#F43F5E]/10", dot: "bg-[#F43F5E]" },
+  CHEAP: { text: "text-[#0EA5E9]", border: "border-[#0EA5E9]/60", bg: "bg-[#0EA5E9]/10", dot: "bg-[#0EA5E9]" },
+  "UNKNOWN/DEGRADED": { text: "text-[#64748B]", border: "border-[#64748B]", bg: "bg-[#64748B]/12", dot: "bg-[#64748B]" },
+};
+
+const DARK_REGIME_COLORS: Record<RegimeLabel, { text: string; border: string; bg: string; stroke: string }> = {
+  STABLE: { text: "text-[#10B981]", border: "border-[#10B981]/45", bg: "bg-[#10B981]/10", stroke: "#10B981" },
+  HEATING: { text: "text-[#F59E0B]", border: "border-[#F59E0B]/45", bg: "bg-[#F59E0B]/10", stroke: "#F59E0B" },
+  CONGESTED: { text: "text-[#F43F5E]", border: "border-[#F43F5E]/45", bg: "bg-[#F43F5E]/10", stroke: "#F43F5E" },
+  CHEAP: { text: "text-[#0EA5E9]", border: "border-[#0EA5E9]/45", bg: "bg-[#0EA5E9]/10", stroke: "#0EA5E9" },
+  "UNKNOWN/DEGRADED": { text: "text-[#94A3B8]", border: "border-[#64748B]/60", bg: "bg-[#64748B]/14", stroke: "#64748B" },
+};
+
+
+const RAW_METRICS: Array<{ metric: string; value: string; d1: string; d7: string }> = [
+  { metric: "active_addresses", value: "478,231", d1: "+18%", d7: "+34%" },
+  { metric: "transactions", value: "1.24M", d1: "+12%", d7: "+28%" },
+  { metric: "fees_native", value: "3.421", d1: "+32%", d7: "+45%" },
+  { metric: "contract_calls", value: "5.60M", d1: "+9%", d7: "+22%" },
+  { metric: "gas_used", value: "12.6B", d1: "+14%", d7: "+31%" },
+  { metric: "blob_tx", value: "21,134", d1: "+41%", d7: "+67%" },
+];
+
+const VOCABULARY: Array<{ label: RegimeLabel; title: string; body: string }> = [
+  { label: "STABLE", title: "Normal, balanced conditions", body: "No meaningful chain-relative stress or acceleration." },
+  { label: "HEATING", title: "Activity building", body: "Demand or activity is running above baseline." },
+  { label: "CONGESTED", title: "Friction or capacity pressure", body: "Fees, utilization, or pressure indicators are elevated." },
+  { label: "CHEAP", title: "Lower-friction conditions", body: "Fee or friction evidence is below recent baseline." },
+  { label: "UNKNOWN/DEGRADED", title: "Insufficient support", body: "Data quality or evidence is not strong enough to label confidently." },
+];
 
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
   return new TextDecoder("utf-8").decode(new Uint8Array(buffer));
 }
 
-async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
-  const result = await readStorageObject(storagePath);
+async function readPublishedJson<T>(path: string): Promise<T | null> {
+  const result = await readStorageObject(path);
   if (!result) return null;
 
   try {
-    const raw = arrayBufferToUtf8(result.body);
-    const json = JSON.parse(raw);
-    if (!json || typeof json !== "object") return null;
-    return json as T;
+    return JSON.parse(arrayBufferToUtf8(result.body)) as T;
   } catch {
     return null;
   }
 }
 
-function extractLandingChains(payload: LandingApiResponse | null): LandingApiChain[] {
-  if (!payload) return [];
-  if (Array.isArray((payload as { chains?: LandingApiChain[] }).chains)) {
-    return (payload as { chains?: LandingApiChain[] }).chains ?? [];
-  }
-  if (Array.isArray((payload as { items?: LandingApiChain[] }).items)) {
-    return (payload as { items?: LandingApiChain[] }).items ?? [];
-  }
-  if (Array.isArray((payload as { data?: LandingApiChain[] }).data)) {
-    return (payload as { data?: LandingApiChain[] }).data ?? [];
-  }
-  return [];
+function coerceRegimeLabel(value: unknown): RegimeLabel {
+  const normalized = String(value ?? "UNKNOWN/DEGRADED").toUpperCase();
+  if (normalized === "STABLE") return "STABLE";
+  if (normalized === "HEATING") return "HEATING";
+  if (normalized === "CONGESTED") return "CONGESTED";
+  if (normalized === "CHEAP") return "CHEAP";
+  return "UNKNOWN/DEGRADED";
 }
 
-function parseIsoDayToUtcMs(date?: string): number | null {
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const [y, m, d] = date.split("-").map(Number);
-  const ms = Date.UTC(y, m - 1, d);
-  return Number.isFinite(ms) ? ms : null;
+function formatConfidence(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  const pct = Math.abs(value) <= 1 ? value * 100 : value;
+  return `${Math.round(Math.max(0, Math.min(100, pct)))}%`;
 }
 
-function utcTodayMs(): number {
-  const now = new Date();
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-}
-
-function lagDaysFromIsoDay(date?: string): number | null {
-  const asOfMs = parseIsoDayToUtcMs(date);
-  if (asOfMs === null) return null;
-  const diff = utcTodayMs() - asOfMs;
-  return Math.max(0, Math.floor(diff / 86400000));
-}
-
-function expectedDelayDays(chain: ChainId): number {
-  return chain === "arbitrum" || chain === "base" ? 7 : 1;
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(parsed);
 }
 
 function heroDisplayAsOf(hero?: LandingHero | null): string | null {
@@ -171,2402 +161,1353 @@ function heroDisplayAsOf(hero?: LandingHero | null): string | null {
   );
 }
 
-function heroRegimeAsOf(hero?: LandingHero | null): string | null {
-  return hero?.regime_asof ?? hero?.asof?.regime ?? hero?.asof?.meta_actual ?? null;
+function seriesFor(bundle: SiteBriefBundle | null, chain: ChainId): SiteBriefSeriesDay[] {
+  return bundle?.series_30d.find((series) => series.chain === chain)?.days ?? [];
 }
 
-async function buildLandingHeroMap(): Promise<Map<string, LandingHero | null>> {
-  const heroes = await Promise.all(
-    CHAIN_LIST.map(async (chain) => {
-      const hero = await readPublishedJson<LandingHero>(`data/published/v1/landing/${chain.id}/hero.json`);
-      return [chain.id, hero] as const;
-    }),
-  );
-
-  return new Map(heroes);
+function chainBrief(bundle: SiteBriefBundle | null, chain: ChainId): SiteBriefChain | null {
+  return bundle?.chains.find((item) => item.chain === chain) ?? null;
 }
 
-function classifyStatus(params: {
-  chain: ChainId;
-  lagDays: number | null;
-  asOf: string | null;
-}): StatusApiRow["status"] {
-  const { chain, lagDays, asOf } = params;
-  if (!asOf || lagDays === null) return "unknown";
-  const expected = expectedDelayDays(chain);
-  if (lagDays <= expected) return "ok";
-  if (lagDays <= expected + 2) return "warn";
-  return "fail";
+function sparklinePath(days: SiteBriefSeriesDay[], width = 116, height = 32): string {
+  const usable = days.slice(-14).filter((day) => typeof day.confidence_score === "number");
+  if (usable.length < 2) return "";
+
+  const values = usable.map((day) => Math.max(0, Math.min(1, day.confidence_score ?? 0)));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+
+  return values
+    .map((value, index) => {
+      const x = (index / (values.length - 1)) * width;
+      const y = height - ((value - min) / range) * (height - 4) - 2;
+      return `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
 }
 
-function withLandingHero(row: StatusApiRow, hero?: LandingHero | null): StatusApiRow {
-  const displayAsOf = heroDisplayAsOf(hero);
-  const regimeAsOf = heroRegimeAsOf(hero);
-  const finalAsOf = displayAsOf ?? row.display_asof ?? row.as_of ?? null;
-  const finalLag = displayAsOf ? lagDaysFromIsoDay(displayAsOf) : row.lag_days;
-
-  return {
-    ...row,
-    as_of: finalAsOf,
-    display_asof: displayAsOf ?? row.display_asof ?? null,
-    regime_asof: regimeAsOf ?? row.regime_asof ?? null,
-    lag_days: finalLag,
-    status: classifyStatus({
-      chain: row.chain as ChainId,
-      lagDays: finalLag,
-      asOf: finalAsOf,
-    }),
-  };
+function sparklineStroke(row: LatestContextRow): string {
+  return DARK_REGIME_COLORS[row.label]?.stroke ?? "#93c5fd";
 }
 
-async function buildMetaFallbackRows(): Promise<StatusApiRow[]> {
-  return Promise.all(
-    CHAIN_LIST.map(async (chain) => {
-      const meta = await readPublishedJson<MetaLatest>(`data/published/v1/meta/${chain.id}/latest.json`);
-      const asOf = meta?.date ?? meta?.updated_through ?? meta?.regime?.asof_date ?? null;
-      const lagDays =
-        typeof meta?.confidence?.lag_days_vs_utc_today === "number"
-          ? meta.confidence.lag_days_vs_utc_today
-          : lagDaysFromIsoDay(asOf ?? undefined);
+async function buildLatestContextRows(bundle: SiteBriefBundle | null): Promise<LatestContextRow[]> {
+  const rows = await Promise.all(
+    CHAIN_ORDER.map(async (chainId) => {
+      const chain = CHAIN_LIST.find((item) => item.id === chainId)!;
+      const [meta, hero] = await Promise.all([
+        readPublishedJson<MetaLatest>(`data/published/v1/meta/${chainId}/latest.json`),
+        readPublishedJson<LandingHero>(`data/published/v1/landing/${chainId}/hero.json`),
+      ]);
+      const brief = chainBrief(bundle, chainId);
+      const days = seriesFor(bundle, chainId);
+      const latestSeriesDay = days.at(-1);
+      const label = coerceRegimeLabel(meta?.status?.label ?? brief?.label ?? latestSeriesDay?.label);
+      const confidence =
+        typeof meta?.confidence?.confidence_score === "number"
+          ? meta.confidence.confidence_score
+          : brief?.confidence?.latest ?? latestSeriesDay?.confidence_score ?? null;
+      const updatedThrough = heroDisplayAsOf(hero) ?? meta?.updated_through ?? meta?.date ?? brief?.updated_through ?? null;
 
       return {
-        chain: chain.id,
+        chain: chainId,
+        shortLabel: chain.label,
         name: chain.name,
-        label: chain.label,
-        as_of: asOf,
-        display_asof: null,
-        regime_asof: meta?.regime?.asof_date ?? null,
-        lag_days: lagDays,
-        status: classifyStatus({ chain: chain.id, lagDays, asOf }),
-        published_regime: meta?.status?.label ?? null,
-        confidence_score:
-          typeof meta?.confidence?.confidence_score === "number"
-            ? meta.confidence.confidence_score
-            : null,
-        expected_delay_days: expectedDelayDays(chain.id),
-      };
-    }),
-  );
-}
-
-async function buildPrimaryChangeMap(): Promise<Map<string, PrimaryChangeDisplay>> {
-  const entries = await Promise.all(
-    CHAIN_LIST.map(async (chain) => {
-      const [meta, derived] = await Promise.all([
-        readPublishedJson<MetaLatest>(`data/published/v1/meta/${chain.id}/latest.json`),
-        readPublishedJson<DerivedLatest>(`data/published/v1/derived/${chain.id}/latest.json`),
-      ]);
-
-      const confidenceScore =
-        typeof meta?.confidence?.confidence_score === "number" ? meta.confidence.confidence_score : null;
-
-      return [
-        chain.id,
-        buildPrimaryChangeDisplay({
-          chainId: chain.id,
-          meta,
-          derived,
-          confidenceScore,
-        }),
-      ] as const;
+        icon: chain.icon,
+        label,
+        confidence,
+        updatedThrough,
+        oneLiner:
+          meta?.status?.one_liner ??
+          brief?.headline ??
+          "Published context available for this chain.",
+        days,
+      } satisfies LatestContextRow;
     }),
   );
 
-  return new Map(entries);
+  return rows;
 }
 
-function statusText(status: StatusApiRow["status"]) {
-  if (status === "ok") return "OK";
-  if (status === "warn") return "WARN";
-  if (status === "fail") return "FAIL";
-  return "UNKNOWN";
+function compactOneLiner(value: string): string {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= 84) return cleaned;
+  return `${cleaned.slice(0, 81).trim()}…`;
 }
 
-function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
-  const band = confidenceBand(row.confidence_score);
+function jsonExcerpt(value: unknown): string {
+  return JSON.stringify(value, null, 2)
+    .split("\n")
+    .slice(0, 15)
+    .join("\n");
+}
+
+function samplePath(layer: JsonLayer, chain: ChainId, date: string | null): string {
+  if (layer === "brief") return `data/published/v1/briefs/chains/${chain}/latest.json`;
+  if (date) return `data/published/v1/${layer}/${chain}/${date}.json`;
+  return `data/published/v1/${layer}/${chain}/latest.json`;
+}
+
+function extractJsonDate(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const candidates = [record.date, record.updated_through, record.as_of];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(candidate)) return candidate;
+  }
+  return null;
+}
+
+async function readJsonSample(layer: JsonLayer, chain: ChainId, date: string | null): Promise<JsonSample> {
+  const path = samplePath(layer, chain, date);
+  const json = await readPublishedJson<unknown>(path);
+
+  if (!json) {
+    return {
+      layer,
+      chain,
+      date,
+      path,
+      code: JSON.stringify(
+        {
+          sample_unavailable: true,
+          layer,
+          chain,
+          attempted_path: `/${path}`,
+        },
+        null,
+        2,
+      ),
+    };
+  }
 
   return {
-    chain: row.chain,
-    href: `/chains/${row.chain}`,
-    label: row.label,
-    name: row.name,
-    status: row.status,
-    statusText: statusText(row.status),
-    statusClass: statusChipClass(row.status),
-    statusTooltip: "",
-    publishedRegime: row.published_regime,
-    publishedRegimeTooltip: "",
-    confidenceValue: fmtConfidence(row.confidence_score),
-    confidenceBand: band,
-    confidenceClass: confidenceChipClass(band),
-    confidenceTooltip: "",
-    asOf: fmtDate(row.display_asof ?? row.as_of),
-    asOfTooltip: "",
-    lagValue: row.lag_days !== null ? `${row.lag_days}d` : "—",
-    lagTooltip: "",
-    takeaway: rowTakeaway({
-      status: row.status,
-      publishedRegime: row.published_regime,
-      confidenceScore: row.confidence_score,
-    }),
+    layer,
+    chain,
+    date: extractJsonDate(json) ?? date,
+    path,
+    code: jsonExcerpt(json),
   };
 }
 
-function formatDataLoad(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
+async function buildJsonSamples(): Promise<JsonSample[]> {
+  const metaLatest = await readPublishedJson<MetaLatest>(`data/published/v1/meta/${SAMPLE_CHAIN}/latest.json`);
+  const date = metaLatest?.date ?? metaLatest?.updated_through ?? null;
 
-  const formatter = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Oslo",
-    year: "numeric",
-    month: "2-digit",
+  return Promise.all([
+    readJsonSample("gold", SAMPLE_CHAIN, date),
+    readJsonSample("derived", SAMPLE_CHAIN, date),
+    readJsonSample("meta", SAMPLE_CHAIN, date),
+    readJsonSample("brief", SAMPLE_CHAIN, date),
+  ]);
+}
+
+function latestUpdatedThrough(rows: LatestContextRow[]): string {
+  const dates = rows.map((row) => row.updatedThrough).filter((value): value is string => Boolean(value));
+  if (dates.length === 0) return "—";
+  return dates.sort().at(-1) ?? "—";
+}
+
+function datasetPublishedAt(dataset: DatasetManifest | null): string {
+  if (!dataset?.published_at) return "Updated daily";
+  const parsed = new Date(dataset.published_at);
+  if (Number.isNaN(parsed.getTime())) return "Updated daily";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
     day: "2-digit",
+    month: "short",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  });
-
-  return `${formatter.format(date)} Oslo time`;
-}
-
-function shellClassName(extra?: string) {
-  return `w-full px-5 sm:px-7 lg:px-10 2xl:px-16 ${extra ?? ""}`.trim();
-}
-
-function SectionShell(props: {
-  children: ReactNode;
-  className?: string;
-  widthClassName?: string;
-}) {
-  return (
-    <div className={shellClassName(props.className)}>
-      <div className={props.widthClassName ?? "w-full"}>{props.children}</div>
-    </div>
-  );
-}
-
-function numericConfidence(row: SurfaceRowDisplay): number | null {
-  const raw = Number.parseFloat(row.confidenceValue);
-  if (!Number.isFinite(raw)) return null;
-  if (raw > 1) return Math.max(0, Math.min(100, Math.round(raw)));
-  return Math.max(0, Math.min(100, Math.round(raw * 100)));
-}
-
-function shortDisplayDate(value: string): string {
-  if (!value || value === "—") return "Updated —";
-  const parsed = new Date(`${value}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return `Updated ${value}`;
-  return `Data updated through ${new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(parsed)}`;
-}
-
-function regimeTextClass(regime: string | null | undefined): string {
-  const value = (regime ?? "").toUpperCase();
-  if (value === "STABLE") return "text-[#1f8a68]";
-  if (value === "HEATING") return "text-[#b96a2a]";
-  if (value === "CONGESTED") return "text-[#b35353]";
-  if (value === "CHEAP") return "text-blue-600";
-  return "text-slate-500";
-}
-
-function prettyRegime(regime: string | null | undefined): string {
-  return (regime ?? "UNKNOWN").toUpperCase();
+  }).format(parsed);
 }
 
 
-type PrimaryDriverLike = {
-  label?: string;
-  value?: string;
-  tone?: "up" | "down" | "flat" | "limited";
-};
-
-function confidenceVisualState(confidence: number | null) {
-  if (confidence === null) {
-    return {
-      valueClass: "text-slate-500",
-      noteClass: "text-slate-500",
-      note: "Confidence unavailable. Use the chain page for full context.",
-    };
-  }
-
-  if (confidence >= 70) {
-    return {
-      valueClass: "text-emerald-600",
-      noteClass: "text-emerald-700",
-      note: "High confidence. Low need for manual cross-check.",
-    };
-  }
-
-  if (confidence >= 55) {
-    return {
-      valueClass: "text-amber-500",
-      noteClass: "text-amber-700",
-      note: "Usable confidence. A quick cross-check is recommended.",
-    };
-  }
-
-  if (confidence >= 40) {
-    return {
-      valueClass: "text-orange-500",
-      noteClass: "text-orange-700",
-      note: "Caution. Verify against the chain page before relying on this signal.",
-    };
-  }
-
-  return {
-    valueClass: "text-rose-600",
-    noteClass: "text-rose-700",
-    note: "Degraded confidence. Treat this as tentative and cross-check carefully.",
-  };
-}
-
-function primaryDriverValueClass(tone?: PrimaryDriverLike["tone"]) {
-  if (tone === "up") return "text-emerald-600";
-  if (tone === "down") return "text-rose-600";
-  if (tone === "limited") return "text-amber-700";
-  return "text-slate-600";
-}
-
-function splitPrimaryDriverValue(value?: string): { name: string; change: string } {
-  const safeValue = value?.trim();
-  if (!safeValue) return { name: "No clear driver", change: "—" };
-
-  const vsIndex = safeValue.search(/\s[+-]?\d+(?:\.\d+)?%?\s+vs\s+/i);
-  if (vsIndex > 0) {
-    return {
-      name: safeValue.slice(0, vsIndex).trim(),
-      change: safeValue.slice(vsIndex).trim(),
-    };
-  }
-
-  const percentileIndex = safeValue.search(/\s\d+(?:st|nd|rd|th)\s+pct\.?$/i);
-  if (percentileIndex > 0) {
-    return {
-      name: safeValue.slice(0, percentileIndex).trim(),
-      change: safeValue.slice(percentileIndex).trim(),
-    };
-  }
-
-  const highVsIndex = safeValue.search(/\shigh\s+vs\s+/i);
-  if (highVsIndex > 0) {
-    return {
-      name: safeValue.slice(0, highVsIndex).trim(),
-      change: safeValue.slice(highVsIndex).trim(),
-    };
-  }
-
-  const lowVsIndex = safeValue.search(/\slow\s+vs\s+/i);
-  if (lowVsIndex > 0) {
-    return {
-      name: safeValue.slice(0, lowVsIndex).trim(),
-      change: safeValue.slice(lowVsIndex).trim(),
-    };
-  }
-
-  const elevatedIndex = safeValue.search(/\selevated$/i);
-  if (elevatedIndex > 0) {
-    return {
-      name: safeValue.slice(0, elevatedIndex).trim(),
-      change: "elevated",
-    };
-  }
-
-  const depressedIndex = safeValue.search(/\sdepressed$/i);
-  if (depressedIndex > 0) {
-    return {
-      name: safeValue.slice(0, depressedIndex).trim(),
-      change: "depressed",
-    };
-  }
-
-  return {
-    name: safeValue,
-    change: "current driver",
-  };
-}
-
-function numericFromUnknown(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const parsed = Number.parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-}
-
-function formatSignedPercent(value: number): string {
-  const rounded = Math.round(value);
-  if (rounded > 0) return `+${rounded}%`;
-  return `${rounded}%`;
-}
-
-function metricDisplayName(metric: string): string {
-  const normalized = metric.toLowerCase();
-
-  const labels: Record<string, string> = {
-    tx_count_daily: "Activity",
-    unique_active_addresses: "Active addresses",
-    median_fee_native: "Fees",
-    median_tx_fee_native: "Fees",
-    failed_tx_rate: "Failure rate",
-    gas_utilization_pct: "Gas utilization",
-    median_gas_price: "Gas price",
-    avg_block_time_sec: "Block time",
-    block_count_daily: "Block count",
-  };
-
-  return labels[normalized] ?? normalized.replaceAll("_", " ");
-}
-
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
-}
-
-function metricLookupKeys(metric: string): string[] {
-  const normalized = metric.toLowerCase();
-
-  const aliases: Record<string, string[]> = {
-    tx_count_daily: ["tx_count_daily", "transaction_count", "transactions_daily"],
-    unique_active_addresses: ["unique_active_addresses", "active_addresses", "daily_active_addresses"],
-    median_fee_native: ["median_fee_native", "median_tx_fee_native"],
-    median_tx_fee_native: ["median_tx_fee_native", "median_fee_native"],
-    failed_tx_rate: ["failed_tx_rate", "failure_rate", "failed_transaction_rate"],
-    gas_utilization_pct: ["gas_utilization_pct", "gas_utilization", "gas_used_ratio"],
-    median_gas_price: ["median_gas_price", "gas_price_median"],
-    avg_block_time_sec: ["avg_block_time_sec", "block_time_sec", "average_block_time_sec"],
-    block_count_daily: ["block_count_daily", "blocks_daily"],
-  };
-
-  return Array.from(new Set([normalized, ...(aliases[normalized] ?? [])]));
-}
-
-function derivedContainers(derived: DerivedLatest | null): Record<string, unknown>[] {
-  if (!derived) return [];
-
-  const root = asRecord(derived);
-  if (!root) return [];
-
-  return [
-    root,
-    asRecord(root.metrics),
-    asRecord(root.values),
-    asRecord(root.derived),
-    asRecord(root.data),
-  ].filter((item): item is Record<string, unknown> => item !== null);
-}
-
-function readDerivedMetricNumber(
-  derived: DerivedLatest | null,
-  metric: string,
-  suffix: "ma7" | "ma30",
-): number | null {
-  const containers = derivedContainers(derived);
-  const metrics = metricLookupKeys(metric);
-
-  const suffixKeys =
-    suffix === "ma7"
-      ? ["ma7", "ma_7", "rolling_7d", "rolling7"]
-      : ["ma30", "ma_30", "rolling_30d", "rolling30"];
-
-  for (const container of containers) {
-    for (const metricKey of metrics) {
-      const flatKeys =
-        suffix === "ma7"
-          ? [`${metricKey}__ma7`, `${metricKey}_ma7`, `${metricKey}__rolling_7d`]
-          : [`${metricKey}__ma30`, `${metricKey}_ma30`, `${metricKey}__rolling_30d`];
-
-      for (const flatKey of flatKeys) {
-        const value = numericFromUnknown(container[flatKey]);
-        if (value !== null) return value;
-      }
-
-      const nested = asRecord(container[metricKey]);
-      if (nested) {
-        for (const suffixKey of suffixKeys) {
-          const value = numericFromUnknown(nested[suffixKey]);
-          if (value !== null) return value;
-        }
-      }
-    }
-  }
-
-  return null;
-}
-
-function normalizePercentile(value: number): number {
-  if (!Number.isFinite(value)) return 50;
-
-  // Supports both 0..1 and 0..100 percentile formats.
-  const percentile = value <= 1 ? value * 100 : value;
-
-  return Math.max(0, Math.min(100, Math.round(percentile)));
-}
-
-function driverPercentileText(metric: string, pct_90d: number): PrimaryChangeDisplay {
-  const percentile = normalizePercentile(pct_90d);
-  const metricName = metricDisplayName(metric);
-
-  if (percentile >= 95) {
-    return {
-      label: "Primary driver",
-      value: `${metricName} high vs 90d`,
-      tone: "up",
-    };
-  }
-
-  if (percentile >= 70) {
-    return {
-      label: "Primary driver",
-      value: `${metricName} ${percentile}th pct.`,
-      tone: "up",
-    };
-  }
-
-  if (percentile <= 5) {
-    return {
-      label: "Primary driver",
-      value: `${metricName} low vs 90d`,
-      tone: "down",
-    };
-  }
-
-  if (percentile <= 30) {
-    return {
-      label: "Primary driver",
-      value: `${metricName} ${percentile}th pct.`,
-      tone: "down",
-    };
-  }
-
-  return {
-    label: "Primary driver",
-    value: `${metricName} central range`,
-    tone: "flat",
-  };
-}
-
-function driverZScoreText(metric: string, zRobust: number): PrimaryChangeDisplay {
-  const metricName = metricDisplayName(metric);
-
-  if (zRobust >= 1) {
-    return {
-      label: "Primary driver",
-      value: `${metricName} elevated`,
-      tone: "up",
-    };
-  }
-
-  if (zRobust <= -1) {
-    return {
-      label: "Primary driver",
-      value: `${metricName} depressed`,
-      tone: "down",
-    };
-  }
-
-  return {
-    label: "Primary driver",
-    value: `${metricName} near baseline`,
-    tone: "flat",
-  };
-}
-
-function excludedPrimaryChangeMetrics(chainId: ChainId): Set<string> {
-  const globallyExcluded = [
-    "avg_block_time_sec",
-    "block_time_sec",
-    "average_block_time_sec",
-    "block_count_daily",
-    "blocks_daily",
-  ];
-
-  if (chainId === "base") {
-    return new Set([
-      ...globallyExcluded,
-    ]);
-  }
-
-  return new Set(globallyExcluded);
-}
-
-function choosePrimaryDrivers(chainId: ChainId, meta: MetaLatest | null): MetaDriver[] {
-  const rawDrivers = (meta as { regime?: { drivers?: unknown } } | null)?.regime?.drivers;
-  if (!Array.isArray(rawDrivers)) return [];
-
-  const excluded = excludedPrimaryChangeMetrics(chainId);
-
-  const drivers = rawDrivers.filter(
-    (driver): driver is MetaDriver =>
-      !!driver &&
-      typeof driver === "object" &&
-      typeof (driver as MetaDriver).metric === "string" &&
-      !excluded.has(((driver as MetaDriver).metric as string).toLowerCase()),
-  );
-
-  return [...drivers].sort((a, b) => {
-    const aZ = Math.abs(a.z_robust ?? 0);
-    const bZ = Math.abs(b.z_robust ?? 0);
-
-    if (bZ !== aZ) return bZ - aZ;
-
-    const aPct =
-      typeof a.pct_90d === "number"
-        ? Math.abs(normalizePercentile(a.pct_90d) - 50)
-        : 0;
-
-    const bPct =
-      typeof b.pct_90d === "number"
-        ? Math.abs(normalizePercentile(b.pct_90d) - 50)
-        : 0;
-
-    return bPct - aPct;
-  });
-}
-
-function buildPrimaryChangeDisplay(params: {
-  chainId: ChainId;
-  meta: MetaLatest | null;
-  derived: DerivedLatest | null;
-  confidenceScore: number | null;
-}): PrimaryChangeDisplay {
-  const { chainId, meta, derived, confidenceScore } = params;
-
-  if (confidenceScore !== null && confidenceScore < 0.4) {
-    return {
-      label: "Primary driver",
-      value: "Coverage-limited signal",
-      tone: "limited",
-    };
-  }
-
-  const drivers = choosePrimaryDrivers(chainId, meta);
-
-  if (drivers.length === 0) {
-    return {
-      label: "Primary driver",
-      value: "No clear driver",
-      tone: "limited",
-    };
-  }
-
-  // First pass: prefer actual MA7 vs MA30 movement when available and material.
-  for (const driver of drivers) {
-    const metric = driver.metric;
-    if (!metric) continue;
-
-    const ma7 = readDerivedMetricNumber(derived, metric, "ma7");
-    const ma30 = readDerivedMetricNumber(derived, metric, "ma30");
-
-    if (ma7 !== null && ma30 !== null && ma30 !== 0) {
-      const changePct = ((ma7 - ma30) / Math.abs(ma30)) * 100;
-      const absChange = Math.abs(changePct);
-
-      if (absChange >= 0.75) {
-        return {
-          label: "Primary driver",
-          value: `${metricDisplayName(metric)} ${formatSignedPercent(changePct)} vs 30d`,
-          tone: changePct > 0 ? "up" : "down",
-        };
-      }
-    }
-
-    if (typeof driver.momentum_7d_vs_30d === "number" && Number.isFinite(driver.momentum_7d_vs_30d)) {
-      const changePct = driver.momentum_7d_vs_30d * 100;
-      const absChange = Math.abs(changePct);
-
-      if (absChange >= 0.75) {
-        return {
-          label: "Primary driver",
-          value: `${metricDisplayName(metric)} ${formatSignedPercent(changePct)} vs 30d`,
-          tone: changePct > 0 ? "up" : "down",
-        };
-      }
-    }
-  }
-
-  // Second pass: if MA movement is not material, show historical position.
-  // This prevents Base from showing "No material 7d shift" when the driver is
-  // still meaningfully high/low in the distribution.
-  for (const driver of drivers) {
-    const metric = driver.metric;
-    if (!metric) continue;
-
-    if (typeof driver.pct_90d === "number" && Number.isFinite(driver.pct_90d)) {
-      const percentile = normalizePercentile(driver.pct_90d);
-
-      if (percentile >= 70 || percentile <= 30) {
-        return driverPercentileText(metric, driver.pct_90d);
-      }
-    }
-  }
-
-  // Third pass: use robust z-score if percentile is not available/extreme.
-  for (const driver of drivers) {
-    const metric = driver.metric;
-    if (!metric) continue;
-
-    if (typeof driver.z_robust === "number" && Number.isFinite(driver.z_robust)) {
-      if (Math.abs(driver.z_robust) >= 1) {
-        return driverZScoreText(metric, driver.z_robust);
-      }
-    }
-  }
-
-  // Final fallback: still show the model-selected driver, but without pretending
-  // that there is a material 7d-vs-30d change.
-  const fallback = drivers[0];
-
-  return {
-    label: "Primary driver",
-    value: fallback.metric
-      ? `${metricDisplayName(fallback.metric)} ${fallback.trend ?? "driver"}`
-      : "No clear driver",
-    tone: "flat",
-  };
-}
-
-function primaryChangeToneClass(tone: PrimaryChangeDisplay["tone"]): string {
-  if (tone === "up") return "text-blue-700";
-  if (tone === "down") return "text-sky-700";
-  if (tone === "limited") return "text-amber-700";
-  return "text-[#557099]";
-}
-
-function ChainLogo({ chain }: { chain: string }) {
-  if (chain === "ethereum") {
-    return (
-      <span
-        className="relative inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef3fb] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
-        aria-hidden="true"
-      >
-        <svg viewBox="0 0 34 34" className="h-8 w-8">
-          <path d="M17 2.5 8.5 17.1 17 22.2l8.5-5.1L17 2.5Z" fill="#2b374c" />
-          <path d="M17 2.5v19.7l8.5-5.1L17 2.5Z" fill="#61708b" />
-          <path d="m8.5 18.8 8.5 12.7 8.5-12.7-8.5 5.1-8.5-5.1Z" fill="#202b3e" />
-          <path d="M17 23.9v7.6l8.5-12.7-8.5 5.1Z" fill="#56647d" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (chain === "arbitrum") {
-    return (
-      <span
-        className="relative inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef3fb] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
-        aria-hidden="true"
-      >
-        <svg viewBox="0 0 34 34" className="h-9 w-9">
-          <path d="m17 2.8 12.3 7.1v14.2L17 31.2 4.7 24.1V9.9L17 2.8Z" fill="#15263d" />
-          <path d="M9.6 23.5 18.7 7.7h3.6l-9.1 15.8H9.6Z" fill="#69a7ff" />
-          <path d="M16.2 25.8 24 12.3h3.4l-7.8 13.5h-3.4Z" fill="#ffffff" opacity="0.86" />
-          <path d="m6.8 11.2 2.7-1.6v14.8l-2.7-1.5V11.2Z" fill="#8dbbff" opacity="0.55" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (chain === "base") {
-    return (
-      <span
-        className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef3fb] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
-        aria-hidden="true"
-      >
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#1b66ff]">
-          <span className="h-3.5 w-3.5 rounded-full bg-white" />
-        </span>
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#f7931a] text-[26px] font-black text-white shadow-[0_10px_22px_rgba(247,147,26,0.24)]"
-      aria-hidden="true"
-    >
-      ₿
-    </span>
-  );
-}
-
-function ArrowIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
-      <path
-        d="M8 12h8m0 0-3.2-3.2M16 12l-3.2 3.2"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function MiniIcon({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] border border-blue-500/25 bg-blue-500/8 text-blue-600">
-      {children}
-    </span>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M7 3v3M17 3v3M5 9h14M6.5 5.5h11A1.5 1.5 0 0 1 19 7v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18V7a1.5 1.5 0 0 1 1.5-1.5Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path d="M9 13h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function TriangleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path d="m12 4 8.5 15h-17L12 4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-      <path d="M12 10v4m0 3h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ApiIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M8 8 4 12l4 4M16 8l4 4-4 4M13.5 5.5l-3 13"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M12 3.8 18.5 6v5.6c0 4.1-2.6 7.1-6.5 8.6-3.9-1.5-6.5-4.5-6.5-8.6V6L12 3.8Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="m9.5 12.1 1.7 1.7 3.6-4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function StatusCard({
-  row,
-  primaryDriver,
-  primaryChange,
-}: {
-  row: SurfaceRowDisplay;
-  primaryDriver?: PrimaryDriverLike;
-  primaryChange?: PrimaryDriverLike;
-}) {
-  const confidence = numericConfidence(row);
-  const regime = prettyRegime(row.publishedRegime);
-  const confidenceState = confidenceVisualState(confidence);
-
-  const displayedPrimaryDriver = primaryDriver ?? primaryChange ?? null;
-
-  return (
-    <Link href={row.href} className={urd.landingChainCard}>
-      <span className={urd.landingChainCardGlow} />
-      <span className={urd.landingChainCardOrb} />
-      <span className={urd.landingChainCardSheen} />
-
-      <div className={urd.landingChainCardContent}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <ChainLogo chain={row.chain} />
-            <div className="min-w-0 pt-0.5">
-              <div className="text-[21px] font-black tracking-[-0.04em] text-[#071d3b] drop-shadow-[0_1px_0_rgba(255,255,255,0.9)]">
-                {row.name}
-              </div>
-              <div
-                className={`mt-1.5 text-[13px] font-black uppercase tracking-[0.08em] ${regimeTextClass(
-                  row.publishedRegime
-                )}`}
-              >
-                {regime}
-              </div>
-            </div>
-          </div>
-
-          {displayedPrimaryDriver ? (
-            <div className={urd.landingChainDriverPanel}>
-              <div className="text-[11px] font-black uppercase tracking-[0.13em] text-[#082247]">
-                {displayedPrimaryDriver.label ?? "Primary driver"}
-              </div>
-
-              <div
-                className={`mt-1 text-[15px] font-black leading-[1.14] ${primaryDriverValueClass(
-                  displayedPrimaryDriver.tone
-                )}`}
-              >
-                {splitPrimaryDriverValue(displayedPrimaryDriver.value).name}
-              </div>
-
-              <div
-                className={`mt-0.5 text-[15px] font-black leading-[1.14] ${primaryDriverValueClass(
-                  displayedPrimaryDriver.tone
-                )}`}
-              >
-                {splitPrimaryDriverValue(displayedPrimaryDriver.value).change}
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        <div className={urd.landingChainConfidencePanel}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-[12px] font-black uppercase tracking-[0.13em] text-[#4f6f96]">
-              Confidence
-            </div>
-            <div
-              className={cx(
-                "rounded-full border border-white/70 bg-white/54 px-2.5 py-1 text-[13px] font-black leading-none shadow-[0_6px_14px_rgba(8,34,71,0.08)]",
-                confidenceState.valueClass,
-              )}
-            >
-              {confidence !== null ? `${confidence}%` : "—"}
-            </div>
-          </div>
-          <div className={`mt-3 text-[12px] font-semibold leading-5 ${confidenceState.noteClass}`}>
-            {confidenceState.note}
-          </div>
-        </div>
-
-        <div className={urd.landingChainFooter}>
-          <span>{shortDisplayDate(row.asOf).replace("Updated ", "Data updated through ")}</span>
-          <span className="text-[#0a55c2] transition group-hover:translate-x-0.5">
-            <ArrowIcon />
-          </span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-
-type BuyerDecision = {
-  question: string;
-  answer: string;
-  bullets: string[];
-};
-
-const BUYER_DECISIONS: BuyerDecision[] = [
-  {
-    question: "Why a category at all?",
-    answer:
-      "A raw number forces the reader to do the interpretation work every time. A regime category is the interpretation, applied by a documented rule and available as a stable join key.",
-    bullets: [
-      "Numbers require interpretation every time. Categories are the interpretation, already done.",
-      "A category is reproducible between people; a raw score alone is not.",
-      "A backtest, research note, and LP report can all refer to an Ethereum CONGESTED day and mean the same thing.",
-      "The category does not hide the evidence: drivers, z-scores, percentiles, confidence, and freshness remain exposed.",
-    ],
-  },
-  {
-    question: "Why daily resolution instead of hourly or weekly?",
-    answer:
-      "A regime state that lasts 15 minutes is not a regime. Daily publication is frequent enough to be operationally useful and slow enough that each label has substance beyond transient spikes.",
-    bullets: [
-      "Sub-daily signals often capture noise with a timestamp; daily labels mark events that persisted through a publication cycle.",
-      "A CONGESTED day is a day, not a 15-minute spike.",
-      "Weekly labels would be too slow for many risk and research workflows that need to react within the same work week.",
-      "Daily cadence is the compromise: timely enough to use, conservative enough to avoid naming every spike.",
-    ],
-  },
-  {
-    question: "Why these four chains?",
-    answer:
-      "BTC, ETH, ARB, and BASE were chosen to cover distinct on-chain topologies while preserving a comparable schema and chain-specific rulesets.",
-    bullets: [
-      "Bitcoin represents a UTXO settlement chain where fee pressure and confirmation pacing are primary stress signals.",
-      "Ethereum represents an EVM L1 where gas utilization and friction are central state variables.",
-      "Arbitrum and Base provide two L2 surfaces for studying L2 versus L1 divergence under a shared reference schema.",
-      "New chains should be added only when they can be calibrated with the same level of methodological control.",
-    ],
-  },
-  {
-    question: "Why 90 and 365 days of history?",
-    answer:
-      "History length is an analytical capability boundary, not a pricing decoration. Ninety days is enough to verify whether a strategy splits meaningfully by regime. Three hundred sixty-five days is the minimum useful surface for most regime-conditioned modelling.",
-    bullets: [
-      "90 days is enough for basic regime segmentation and pre-purchase validation.",
-      "365 days captures seasonality, regime transitions, and cross-chain divergence better than a short window.",
-      "30 days is usually too short to contain enough regime changes to serve as evidence.",
-      "Longer history can be layered in when a workflow requires deeper archival backtesting.",
-    ],
-  },
-  {
-    question: "Why JSON instead of only dashboards, charts, or prose?",
-    answer:
-      "The product is an input to your existing analytical systems, not a replacement workspace. JSON lets Urd Atlas become a column in your own dataset instead of another tool your team must log into.",
-    bullets: [
-      "You own the files and can integrate them into your own database, backtests, notebooks, or reports.",
-      "Charts are useful for inspection; JSON is what working analysts and engineers can automate.",
-      "A regime label can be joined to returns, flows, internal risk flags, or research datasets.",
-      "Chain pages exist for human inspection, but the subscriber product is the structured reference data.",
-    ],
-  },
-  {
-    question: "Why a confidence gate, and why 0.40?",
-    answer:
-      "UNKNOWN/DEGRADED is not an excuse for weak data; it is an explicit refusal to publish a named state when the evidence surface is not strong enough. The 0.40 gate is the minimum evidence threshold for a named classification to pass through.",
-    bullets: [
-      "Urd Atlas does not publish a confident-looking label when the data does not support one.",
-      "0.40 is not a statement that raw data is wrong; it is a named-state publication threshold.",
-      "Low-confidence days remain machine-readable instead of being smoothed away.",
-      "A backtest can filter on confidence_score >= threshold in one place instead of manually repairing labels later.",
-    ],
-  },
-];
-
-function BuyerDecisionSection() {
-  return (
-    <section className="relative bg-[linear-gradient(180deg,#f5f9ff_0%,#eaf5ff_100%)] py-12">
-      <SectionShell>
-        <div className="max-w-[960px]">
-          <div className="text-[13px] font-black uppercase tracking-[0.14em] text-[#1d5fce]">
-            Product choices
-          </div>
-          <h2 className="mt-3 text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447] sm:text-[40px]">
-            Why we made the decisions we made
-          </h2>
-          <p className="mt-4 max-w-[860px] text-[17px] font-semibold leading-8 text-[#37547b]">
-            Every product is a sequence of choices. These are ours, and the reasoning behind each one.
-          </p>
-        </div>
-
-        <div className="mt-8 grid gap-4 lg:grid-cols-2">
-          {BUYER_DECISIONS.map((item, index) => (
-            <details
-              key={item.question}
-              className="group rounded-[24px] border border-[#b8d8ff]/80 bg-white/82 p-0 shadow-[0_18px_55px_rgba(13,36,71,0.08)] backdrop-blur transition open:bg-white open:shadow-[0_24px_72px_rgba(13,36,71,0.12)]"
-            >
-              <summary className="flex cursor-pointer list-none items-start gap-4 px-5 py-5 marker:hidden sm:px-6 [&::-webkit-details-marker]:hidden">
-                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#2f7cff]/24 bg-[#2f7cff]/10 text-[13px] font-black text-[#1d5fce]">
-                  {index + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[18px] font-black leading-6 tracking-[-0.02em] text-[#0d2447]">
-                    {item.question}
-                  </span>
-                  <span className="mt-2 block text-[14px] font-semibold leading-6 text-[#557099]">
-                    {item.answer}
-                  </span>
-                </span>
-                <span className="mt-1 text-[20px] font-black leading-none text-[#2f7cff] transition group-open:rotate-45">
-                  +
-                </span>
-              </summary>
-
-              <div className="border-t border-[#cfe4fb] px-5 pb-5 pt-4 sm:px-6">
-                <ul className="grid gap-3 text-[14px] font-semibold leading-6 text-[#37547b]">
-                  {item.bullets.map((bullet) => (
-                    <li key={bullet} className="flex gap-3">
-                      <span className="mt-[0.55rem] h-1.5 w-1.5 shrink-0 rounded-full bg-[#2f7cff]" />
-                      <span>{bullet}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </details>
-          ))}
-        </div>
-      </SectionShell>
-    </section>
-  );
-}
-
-
-const WORKFLOW_IMAGES = [
-  {
-    title: "Start with the data you already have",
-    src: "/landing-workflows/urd-atlas-workflow-1.png",
-    alt:
-      "Example existing dataset with price, strategy, and risk fields before Urd Atlas regime context is joined.",
-  },
-  {
-    title: "Join in daily Urd Atlas regime data",
-    src: "/landing-workflows/urd-atlas-workflow-2.png",
-    alt:
-      "Example dataset after joining Urd Atlas regime, confidence, and evidence fields by date and chain.",
-  },
-  {
-    title: "Segment, filter, and report by regime",
-    src: "/landing-workflows/urd-atlas-workflow-3.png",
-    alt:
-      "Example downstream analysis using Urd Atlas regime labels to segment, filter, and report by network conditions.",
-  },
-];
-
-const REGIME_STATES = [
-  {
-    label: "STABLE",
-    tone: "border-emerald-300 bg-emerald-50 text-emerald-800",
-    description:
-      "The network is behaving as expected. Activity, fees, and capacity are within normal range for this chain.",
-  },
-  {
-    label: "HEATING",
-    tone: "border-amber-300 bg-amber-50 text-amber-900",
-    description:
-      "Demand is rising above normal and showing directional momentum. The network is warming up.",
-  },
-  {
-    label: "CONGESTED",
-    tone: "border-rose-300 bg-rose-50 text-rose-800",
-    description:
-      "The network is under significant pressure. Fees and capacity are elevated beyond typical levels.",
-  },
-  {
-    label: "CHEAP",
-    tone: "border-cyan-300 bg-cyan-50 text-cyan-800",
-    description:
-      "Both fees and capacity pressure are low. Quiet conditions relative to recent history.",
-  },
-  {
-    label: "UNKNOWN/DEGRADED",
-    tone: "border-slate-300 bg-slate-50 text-slate-800",
-    description:
-      "The data was not strong enough to support a confident label that day. Urd Atlas publishes this explicitly instead of forcing a classification.",
-  },
-];
-
-const ANALYST_QUESTIONS = [
-  {
-    question: "What is a regime label?",
-    answer:
-      "A regime label is a daily name for the network condition of a chain. It turns a set of activity, fee, capacity, confidence, and driver fields into a stable category that can be joined to your own data.",
-  },
-  {
-    question: "Compared to what is something normal?",
-    answer:
-      "Each chain is compared to its own recent history. Ethereum is not judged against Bitcoin, and Base is not judged against Ethereum. The label is chain-relative, not price-relative.",
-  },
-  {
-    question: "I already have price data. What does this add?",
-    answer:
-      "Price data tells you what the market paid. Urd Atlas tells you what kind of network day it was when that happened. That gives you a second dimension for research, backtests, monitoring, and reporting.",
-  },
-  {
-    question: "Can I build this myself with Glassnode or Dune?",
-    answer:
-      "You can build parts of it if you maintain the ingestion, normalization, thresholds, label rules, confidence gate, versioning, and verification surface yourself. Urd Atlas sells that maintained reference layer directly as daily JSON.",
-  },
-  {
-    question: "How do I know the thresholds are trustworthy?",
-    answer:
-      "The thresholds are published, the methodology is versioned, and every named label is tied to evidence fields and a determinism hash. You do not have to accept the label alone; the supporting fields are shipped with it.",
-  },
-  {
-    question: "Yesterday's data — is that not outdated?",
-    answer:
-      "This is not an intraday trading feed. It is daily reference data for regime context. The point is to classify the day as a whole, not react to every short-lived spike.",
-  },
-  {
-    question: "What about the seven-day delay on ARB and BASE?",
-    answer:
-      "The delay is exposed rather than hidden. ARB and BASE are useful for historical, cross-chain, and regime-conditioned analysis, but their freshness status should be checked before operational use.",
-  },
-  {
-    question: "What is a confidence score?",
-    answer:
-      "Confidence measures how strongly the available evidence supports the published label. If confidence is too low, Urd Atlas publishes UNKNOWN/DEGRADED instead of pretending the label is stronger than the data supports.",
-  },
-];
-
-function RegimeDefinitionLine() {
-  return (
-    <div className="mt-8 text-center">
-      <p className="mx-auto max-w-[1320px] text-[20px] font-black leading-8 tracking-[-0.02em] text-white sm:text-[24px] sm:leading-9">
-        A regime is a simple answer to one question: is this blockchain behaving normally right now, or has something meaningfully shifted?
-        <span className="text-cyan-200"> Not the price — the network itself.</span>
-      </p>
-    </div>
-  );
-}
-
-function WorkflowUseCaseSection() {
-  return (
-    <div id="workflow-use-case" className="relative px-4 pb-8 pt-2 sm:px-6 lg:px-8 2xl:px-10">
-      <div className="mx-auto max-w-[1680px]">
-        <div className="max-w-[1120px]">
-          <h2 className="text-[36px] font-black leading-tight tracking-[-0.04em] text-white sm:text-[46px]">
-            A regime column for the data you already have.
-          </h2>
-          <p className="mt-4 max-w-[980px] text-[18px] font-semibold leading-8 text-white/76">
-            Your data tells you what happened. Urd Atlas tells you what kind of day it was when it happened — and that context changes what you can learn from your own data.
-          </p>
-        </div>
-
-        <div className="mt-8 flex flex-col items-center gap-2 text-center">
-          <div className="text-[13px] font-black uppercase tracking-[0.14em] text-cyan-300">
-            Example downstream workflow
-          </div>
-          <div className="text-[12px] font-bold uppercase tracking-[0.13em] text-cyan-200/62">
-            Illustrative example. Hypothetical data.
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">
-          {WORKFLOW_IMAGES.map((item, index) => (
-            <figure key={item.src} className="overflow-hidden">
-              <a
-                href={`#workflow-image-${index + 1}`}
-                className="group block"
-                aria-label={`${item.title}. Click to open a larger preview.`}
-              >
-                <div className="relative aspect-[4/3] w-full rounded-[28px] bg-[#06182d] shadow-[0_30px_88px_rgba(0,0,0,0.48)] ring-1 ring-white/8">
-                  <Image
-                    src={item.src}
-                    alt={item.alt}
-                    fill
-                    sizes="(min-width: 1800px) 520px, (min-width: 1536px) 31vw, (min-width: 1280px) 46vw, 100vw"
-                    className="object-contain p-1 transition duration-300 group-hover:scale-[1.01]"
-                  />
-                  <div className="absolute inset-x-4 bottom-4 inline-flex w-fit items-center rounded-full border border-white/25 bg-[#031329]/82 px-3 py-1 text-[11px] font-black uppercase tracking-[0.11em] text-white shadow-[0_10px_30px_rgba(0,0,0,0.28)]">
-                    Click to enlarge
-                  </div>
-                </div>
-              </a>
-              <figcaption className="flex items-start gap-3 px-1 py-4">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#2f7cff] text-[14px] font-black text-white">
-                  {index + 1}
-                </span>
-                <span className="pt-1 text-[15px] font-black leading-5 text-white">
-                  {item.title}
-                </span>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-
-        <RegimeDefinitionLine />
-
-      </div>
-
-      {WORKFLOW_IMAGES.map((item, index) => (
-          <div
-            key={`${item.src}-modal`}
-            id={`workflow-image-${index + 1}`}
-            className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-[#031329]/0 p-4 opacity-0 transition duration-200 target:pointer-events-auto target:bg-[#031329]/78 target:opacity-100"
-          >
-            <a
-              href="#workflow-use-case"
-              aria-label="Close enlarged workflow image"
-              className="absolute inset-0 block"
-            />
-            <div className="relative z-[1] w-full max-w-[1280px] overflow-hidden rounded-[28px] border border-white/18 bg-[#071a31] shadow-[0_36px_120px_rgba(0,0,0,0.48)]">
-              <div className="flex items-center justify-between gap-4 border-b border-white/12 px-5 py-4 sm:px-6">
-                <div>
-                  <div className="text-[12px] font-black uppercase tracking-[0.13em] text-cyan-200/82">
-                    Workflow example {index + 1}
-                  </div>
-                  <div className="mt-1 text-[18px] font-black leading-6 tracking-[-0.02em] text-white">
-                    {item.title}
-                  </div>
-                </div>
-                <a
-                  href="#workflow-use-case"
-                  className="inline-flex h-10 items-center justify-center rounded-full border border-white/18 bg-white/8 px-4 text-[12px] font-black uppercase tracking-[0.1em] text-white transition hover:bg-white/14"
-                >
-                  Close
-                </a>
-              </div>
-              <div className="relative aspect-[16/10] w-full bg-[#06182d]">
-                <Image
-                  src={item.src}
-                  alt={item.alt}
-                  fill
-                  sizes="100vw"
-                  className="object-contain"
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-    </div>
-  );
-}
-
-function RegimeStatesSection() {
-  return (
-    <section className="relative bg-[linear-gradient(180deg,#f5f9ff_0%,#eaf5ff_100%)] py-12">
-      <SectionShell>
-        <div className="max-w-[960px]">
-          <div className="text-[13px] font-black uppercase tracking-[0.14em] text-[#1d5fce]">
-            Regime vocabulary
-          </div>
-          <h2 className="mt-3 text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447] sm:text-[40px]">
-            What kind of day was it?
-          </h2>
-          <p className="mt-4 max-w-[860px] text-[17px] font-semibold leading-8 text-[#37547b]">
-            Each daily label is a plain-language name for how the network behaved relative to its own recent history.
-          </p>
-        </div>
-
-        <div className="mt-8 grid gap-4 lg:grid-cols-5">
-          {REGIME_STATES.map((state) => (
-            <div
-              key={state.label}
-              className="rounded-[24px] border border-[#b8d8ff]/80 bg-white/82 p-5 shadow-[0_18px_55px_rgba(13,36,71,0.08)] backdrop-blur"
-            >
-              <div className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.11em] ${state.tone}`}>
-                {state.label}
-              </div>
-              <p className="mt-4 text-[14px] font-semibold leading-6 text-[#37547b]">
-                {state.description}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <p className="mt-6 rounded-[22px] border border-[#b8d8ff]/70 bg-white/74 px-5 py-4 text-[15px] font-bold leading-7 text-[#0d2447] shadow-[0_16px_45px_rgba(13,36,71,0.07)]">
-          All states are chain-relative — compared to that chain&apos;s own recent history, not to other chains or to price.
-        </p>
-      </SectionShell>
-    </section>
-  );
-}
-
-function DailyResolutionSection() {
-  return (
-    <section className="relative bg-[#eaf5ff] py-8">
-      <SectionShell>
-        <div className="rounded-[28px] border border-[#b8d8ff] bg-white/82 p-6 shadow-[0_18px_55px_rgba(13,36,71,0.08)] backdrop-blur md:p-7">
-          <div className="text-[13px] font-black uppercase tracking-[0.14em] text-[#1d5fce]">
-            Why daily?
-          </div>
-          <p className="mt-3 max-w-[980px] text-[18px] font-semibold leading-8 text-[#37547b]">
-            Regime does not change in an hour. A CONGESTED day is a day — not a 15-minute spike. Daily resolution is frequent enough to be operationally useful and slow enough that each label has substance beyond transient noise. If you need sub-hourly data for intraday trading, this is not the right product.
-          </p>
-        </div>
-      </SectionShell>
-    </section>
-  );
-}
-
-function AnalystQuestionsSection() {
-  return (
-    <section className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_100%)] py-12">
-      <SectionShell>
-        <div className="max-w-[960px]">
-          <div className="text-[13px] font-black uppercase tracking-[0.14em] text-[#1d5fce]">
-            Buyer questions
-          </div>
-          <h2 className="mt-3 text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447] sm:text-[40px]">
-            Questions analysts ask before subscribing
-          </h2>
-          <p className="mt-4 max-w-[820px] text-[17px] font-semibold leading-8 text-[#37547b]">
-            Direct answers to the objections that matter before you add an external regime layer to your own workflow.
-          </p>
-        </div>
-
-        <div className="mt-8 grid gap-4 lg:grid-cols-2">
-          {ANALYST_QUESTIONS.map((item) => (
-            <details
-              key={item.question}
-              className="group rounded-[24px] border border-[#b8d8ff]/80 bg-white/82 p-0 shadow-[0_18px_55px_rgba(13,36,71,0.08)] backdrop-blur transition open:bg-white open:shadow-[0_24px_72px_rgba(13,36,71,0.12)]"
-            >
-              <summary className="flex cursor-pointer list-none items-start gap-4 px-5 py-5 marker:hidden sm:px-6 [&::-webkit-details-marker]:hidden">
-                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#2f7cff]/24 bg-[#2f7cff]/10 text-[18px] font-black leading-none text-[#1d5fce]">
-                  ?
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[18px] font-black leading-6 tracking-[-0.02em] text-[#0d2447]">
-                    {item.question}
-                  </span>
-                  <span className="mt-2 block text-[14px] font-semibold leading-6 text-[#557099]">
-                    {item.answer}
-                  </span>
-                </span>
-                <span className="mt-1 text-[20px] font-black leading-none text-[#2f7cff] transition group-open:rotate-45">
-                  +
-                </span>
-              </summary>
-            </details>
-          ))}
-        </div>
-      </SectionShell>
-    </section>
-  );
-}
-
-
-type JsonLayerTone = "gold" | "meta" | "derived";
-type JsonExampleConfidence = "high" | "degraded";
-type JsonExampleKey = `${JsonLayerTone}_${JsonExampleConfidence}`;
-
-type JsonExampleFile = {
-  code: string;
-  sourcePath: string;
-  chain: string | null;
-  date: string | null;
-  confidenceScore: number | null;
-};
-
-type JsonExampleCodeMap = Record<JsonExampleKey, JsonExampleFile>;
-
-type MetaManifest = {
-  available_days?: unknown;
-  available_dates?: unknown;
-  dates?: unknown;
-  latest?: unknown;
-};
-
-type ConfidenceCandidate = {
+type RealBriefExample = {
   chain: ChainId;
-  date: string;
-  score: number;
+  chainName: string;
+  chainLabel: string;
+  icon: string;
+  windowStart: string;
+  windowEnd: string;
+  updatedThrough: string;
+  latestLabel: RegimeLabel;
+  latestConfidence: number | null;
+  dominantLabel: RegimeLabel;
+  dominantLabelDays: number | null;
+  latestLabelRunDays: number | null;
+  labelChanges: number | null;
+  volatility: string;
+  primaryAxis: string;
+  demand: string;
+  friction: string;
+  capacity: string;
+  confidenceDirection: string;
+  averageConfidence7d: number | null;
+  movementType: string;
+  persistence: string;
+  headline: string;
+  plain: string;
+  advanced: string;
+  validationStatus: string;
+  labels: RegimeLabel[];
 };
 
-const JSON_LAYER_TONES: JsonLayerTone[] = ["gold", "meta", "derived"];
-const EXAMPLE_SCAN_DAYS = 420;
-
-function asPlainRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
+function safeRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-function getNestedValue(source: unknown, pathParts: readonly string[]): unknown {
-  let current: unknown = source;
-
-  for (const part of pathParts) {
-    const record = asPlainRecord(current);
-    if (!record) return undefined;
-    current = record[part];
-  }
-
-  return current;
+function stringField(record: Record<string, unknown>, key: string, fallback = "—"): string {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-function toFiniteNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-
-  return null;
+function numberField(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function normalizeConfidenceToPercent(score: number | null): number | null {
-  if (score === null || !Number.isFinite(score)) return null;
-  const percent = Math.abs(score) <= 1 ? score * 100 : score;
-  return Math.max(0, Math.min(100, percent));
+function formatRawValue(value: string): string {
+  if (!value || value === "—") return "—";
+  return value.replace(/_/g, " ");
 }
 
-function formatExampleConfidence(score: number | null): string {
-  const percent = normalizeConfidenceToPercent(score);
-  if (percent === null) return "—";
-  return `${Math.round(percent)}%`;
+function briefCompletenessScore(briefAny: Record<string, unknown>): number {
+  const window = safeRecord(briefAny.window);
+  const latest = safeRecord(briefAny.latest);
+  const regimePath = safeRecord(briefAny.regime_path);
+  const drivers = safeRecord(briefAny.drivers);
+  const confidence = safeRecord(briefAny.confidence);
+  const movement = safeRecord(briefAny.movement);
+  const briefText = safeRecord(briefAny.brief);
+  const validation = safeRecord(briefAny.validation);
+  const labels = Array.isArray(regimePath.labels) ? regimePath.labels : [];
+
+  let score = 0;
+  if (briefAny.brief_status === "published") score += 20;
+  if (stringField(window, "start_date") !== "—") score += 8;
+  if (stringField(window, "end_date") !== "—") score += 8;
+  if (labels.length >= 7) score += 18;
+  if (stringField(briefText, "headline") !== "—") score += 12;
+  if (stringField(briefText, "plain") !== "—") score += 12;
+  if (stringField(briefText, "advanced") !== "—") score += 10;
+  if (numberField(confidence, "average_7d") != null) score += 8;
+  if (numberField(latest, "confidence_score") != null) score += 8;
+  if (stringField(regimePath, "dominant_label") !== "—") score += 6;
+  if (stringField(drivers, "primary_axis") !== "—") score += 5;
+  if (stringField(drivers, "demand") !== "—") score += 3;
+  if (stringField(drivers, "friction") !== "—") score += 3;
+  if (stringField(drivers, "capacity") !== "—") score += 3;
+  if (stringField(movement, "type") !== "—") score += 4;
+  if (stringField(validation, "language_validation_status") === "passed") score += 4;
+  if (coerceRegimeLabel(latest.label ?? latest.status) !== "UNKNOWN/DEGRADED") score += 8;
+
+  return score;
 }
 
-function extractConfidenceScore(meta: unknown): number | null {
-  const candidates: unknown[] = [
-    getNestedValue(meta, ["confidence", "confidence_score"]),
-    getNestedValue(meta, ["confidence", "score"]),
-    getNestedValue(meta, ["confidence_score"]),
-    getNestedValue(meta, ["scorecard", "confidence_score"]),
-    getNestedValue(meta, ["publish_confidence", "confidence_score"]),
-    getNestedValue(meta, ["publish_confidence", "score"]),
-  ];
+function realBriefExampleFromRecord(briefAny: Record<string, unknown>): RealBriefExample {
+  const chainId = String(briefAny.chain ?? "bitcoin") as ChainId;
+  const chain = CHAIN_LIST.find((item) => item.id === chainId);
 
-  for (const candidate of candidates) {
-    const parsed = toFiniteNumber(candidate);
-    if (parsed !== null) return parsed;
-  }
+  const window = safeRecord(briefAny.window);
+  const latest = safeRecord(briefAny.latest);
+  const regimePath = safeRecord(briefAny.regime_path);
+  const drivers = safeRecord(briefAny.drivers);
+  const confidence = safeRecord(briefAny.confidence);
+  const movement = safeRecord(briefAny.movement);
+  const briefText = safeRecord(briefAny.brief);
+  const validation = safeRecord(briefAny.validation);
 
-  return null;
+  const labelsRaw = Array.isArray(regimePath.labels) ? regimePath.labels : [];
+  const labels = labelsRaw.map(coerceRegimeLabel).slice(-7);
+  const latestLabel = coerceRegimeLabel(latest.label ?? latest.status ?? regimePath.dominant_label);
+
+  return {
+    chain: chainId,
+    chainName: chain?.name ?? chainId,
+    chainLabel: chain?.label ?? chainId.toUpperCase(),
+    icon: chain?.icon ?? "•",
+    windowStart: stringField(window, "start_date", "latest window"),
+    windowEnd: stringField(window, "end_date", "latest window"),
+    updatedThrough: stringField(window, "updated_through", stringField(window, "end_date", "latest")),
+    latestLabel,
+    latestConfidence: numberField(latest, "confidence_score"),
+    dominantLabel: coerceRegimeLabel(regimePath.dominant_label ?? latestLabel),
+    dominantLabelDays: numberField(regimePath, "dominant_label_days"),
+    latestLabelRunDays: numberField(regimePath, "latest_label_run_days"),
+    labelChanges: numberField(regimePath, "label_changes"),
+    volatility: stringField(regimePath, "volatility", "not specified"),
+    primaryAxis: stringField(drivers, "primary_axis", "not specified"),
+    demand: stringField(drivers, "demand", "not specified"),
+    friction: stringField(drivers, "friction", "not specified"),
+    capacity: stringField(drivers, "capacity", "not specified"),
+    confidenceDirection: stringField(confidence, "direction", "not specified"),
+    averageConfidence7d: numberField(confidence, "average_7d"),
+    movementType: stringField(movement, "type", "not specified"),
+    persistence: stringField(movement, "persistence", "not specified"),
+    headline: stringField(briefText, "headline", "Latest Brief headline available in JSON."),
+    plain: stringField(briefText, "plain", "Latest Brief plain-language summary available in JSON."),
+    advanced: stringField(briefText, "advanced", "Latest Brief advanced context available in JSON."),
+    validationStatus: stringField(validation, "language_validation_status", "not specified"),
+    labels: labels.length ? labels : [latestLabel],
+  };
 }
 
-function extractIsoDateFromJson(json: unknown): string | null {
-  if (typeof json === "string" && /^\d{4}-\d{2}-\d{2}$/.test(json)) {
-    return json;
-  }
-
-  const candidates: unknown[] = [
-    getNestedValue(json, ["date"]),
-    getNestedValue(json, ["as_of"]),
-    getNestedValue(json, ["updated_through"]),
-    getNestedValue(json, ["regime", "asof_date"]),
-    getNestedValue(json, ["asof", "display"]),
-    getNestedValue(json, ["asof", "latest_available"]),
-    getNestedValue(json, ["latest", "date"]),
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-function extractManifestDates(manifest: MetaManifest | null): string[] {
-  if (!manifest) return [];
-
-  const rawDates =
-    (Array.isArray(manifest.available_days) && manifest.available_days) ||
-    (Array.isArray(manifest.available_dates) && manifest.available_dates) ||
-    (Array.isArray(manifest.dates) && manifest.dates) ||
-    [];
-
-  const dateSet = new Set<string>();
-
-  for (const value of rawDates) {
-    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      dateSet.add(value);
-    }
-  }
-
-  const latestDate = extractIsoDateFromJson(manifest.latest);
-  if (latestDate) dateSet.add(latestDate);
-
-  return Array.from(dateSet).sort();
-}
-
-async function readMetaCandidateDates(chain: ChainId): Promise<string[]> {
-  const manifest = await readPublishedJson<MetaManifest>(`data/published/v1/meta/${chain}/manifest.json`);
-  const manifestDates = extractManifestDates(manifest);
-
-  if (manifestDates.length > 0) {
-    return manifestDates.slice(-EXAMPLE_SCAN_DAYS);
-  }
-
-  const latest = await readPublishedJson<unknown>(`data/published/v1/meta/${chain}/latest.json`);
-  const latestDate = extractIsoDateFromJson(latest);
-  return latestDate ? [latestDate] : [];
-}
-
-function publishedLayerPath(layer: JsonLayerTone, candidate: ConfidenceCandidate): string {
-  return `data/published/v1/${layer}/${candidate.chain}/${candidate.date}.json`;
-}
-
-async function hasAllLayerFiles(candidate: ConfidenceCandidate): Promise<boolean> {
-  const checks = await Promise.all(
-    JSON_LAYER_TONES.map((layer) => readStorageObject(publishedLayerPath(layer, candidate))),
-  );
-
-  return checks.every(Boolean);
-}
-
-async function buildConfidenceCandidates(): Promise<ConfidenceCandidate[]> {
-  const nested = await Promise.all(
-    CHAIN_LIST.map(async (chain) => {
-      const dates = await readMetaCandidateDates(chain.id);
-      const candidates = await Promise.all(
-        dates.map(async (date) => {
-          const meta = await readPublishedJson<unknown>(`data/published/v1/meta/${chain.id}/${date}.json`);
-          const score = extractConfidenceScore(meta);
-
-          if (score === null) return null;
-
-          return {
-            chain: chain.id,
-            date,
-            score,
-          } satisfies ConfidenceCandidate;
-        }),
-      );
-
-      const readableCandidates = candidates.filter(
-        (candidate): candidate is ConfidenceCandidate => candidate !== null,
-      );
-
-      if (readableCandidates.length > 0) {
-        return readableCandidates;
-      }
-
-      const latest = await readPublishedJson<unknown>(`data/published/v1/meta/${chain.id}/latest.json`);
-      const latestScore = extractConfidenceScore(latest);
-      const latestDate = extractIsoDateFromJson(latest);
-
-      if (latestScore === null || !latestDate) {
-        return [];
-      }
-
-      return [
-        {
-          chain: chain.id,
-          date: latestDate,
-          score: latestScore,
-        } satisfies ConfidenceCandidate,
-      ];
+async function buildBriefExample(bundle: SiteBriefBundle | null): Promise<RealBriefExample | null> {
+  const chainPreference: ChainId[] = ["bitcoin", "base", "arbitrum", "ethereum"];
+  const fullBriefs = await Promise.all(
+    chainPreference.map(async (chain) => {
+      const record = await readPublishedJson<Record<string, unknown>>(`data/published/v1/briefs/chains/${chain}/latest.json`);
+      return record ? { chain, record, score: briefCompletenessScore(record) } : null;
     }),
   );
 
-  return nested.flat();
-}
+  const selectedFull = fullBriefs
+    .filter((item): item is { chain: ChainId; record: Record<string, unknown>; score: number } => Boolean(item))
+    .sort((a, b) => b.score - a.score)[0];
 
-async function selectConfidenceCandidate(
-  candidates: ConfidenceCandidate[],
-  confidence: JsonExampleConfidence,
-): Promise<ConfidenceCandidate | null> {
-  const sorted = [...candidates].sort((a, b) =>
-    confidence === "high" ? b.score - a.score : a.score - b.score,
-  );
-
-  for (const candidate of sorted) {
-    if (await hasAllLayerFiles(candidate)) {
-      return candidate;
-    }
+  if (selectedFull && selectedFull.score >= 70) {
+    return realBriefExampleFromRecord(selectedFull.record);
   }
 
-  return sorted[0] ?? null;
+  const siteBriefs = (bundle?.chains ?? []) as unknown as Record<string, unknown>[];
+  const selectedSite = siteBriefs
+    .map((record) => ({ record, score: briefCompletenessScore(record) }))
+    .sort((a, b) => b.score - a.score)[0];
+
+  return selectedSite ? realBriefExampleFromRecord(selectedSite.record) : null;
 }
 
-function unavailableExample(params: {
-  layer: JsonLayerTone;
-  confidence: JsonExampleConfidence;
-  candidate: ConfidenceCandidate | null;
-  sourcePath: string;
-  reason: string;
-}): JsonExampleFile {
-  return {
-    sourcePath: `/${params.sourcePath}`,
-    chain: params.candidate?.chain ?? null,
-    date: params.candidate?.date ?? null,
-    confidenceScore: params.candidate?.score ?? null,
-    code: JSON.stringify(
-      {
-        error: "json_example_unavailable",
-        layer: params.layer,
-        confidence_example: params.confidence,
-        selected_chain: params.candidate?.chain ?? null,
-        selected_date: params.candidate?.date ?? null,
-        selected_meta_confidence_score: params.candidate?.score ?? null,
-        attempted_source_path: `/${params.sourcePath}`,
-        reason: params.reason,
-      },
-      null,
-      2,
-    ),
-  };
+// ─── Layout shells ────────────────────────────────────────────────────────────
+
+function PageShell({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`mx-auto w-full max-w-[1200px] px-8 sm:px-10 ${className}`}>{children}</div>;
 }
 
-async function readExampleFileForCandidate(
-  layer: JsonLayerTone,
-  confidence: JsonExampleConfidence,
-  candidate: ConfidenceCandidate | null,
-): Promise<JsonExampleFile> {
-  if (!candidate) {
-    return unavailableExample({
-      layer,
-      confidence,
-      candidate,
-      sourcePath: `data/published/v1/${layer}/<chain>/<date>.json`,
-      reason: "No Meta files with readable confidence_score were found.",
-    });
-  }
+// ─── Regime Pills ─────────────────────────────────────────────────────────────
 
-  const sourcePath = publishedLayerPath(layer, candidate);
-  const result = await readStorageObject(sourcePath);
-
-  if (!result) {
-    return unavailableExample({
-      layer,
-      confidence,
-      candidate,
-      sourcePath,
-      reason: "The selected Meta confidence date exists, but the matching layer file was not found.",
-    });
-  }
-
-  try {
-    const raw = arrayBufferToUtf8(result.body);
-    const parsed: unknown = JSON.parse(raw);
-
-    return {
-      code: JSON.stringify(parsed, null, 2),
-      sourcePath: `/${sourcePath}`,
-      chain: candidate.chain,
-      date: candidate.date,
-      confidenceScore: candidate.score,
-    };
-  } catch {
-    return unavailableExample({
-      layer,
-      confidence,
-      candidate,
-      sourcePath,
-      reason: "The selected layer file exists, but it is not valid JSON.",
-    });
-  }
-}
-
-async function buildJsonExampleCodeMap(): Promise<JsonExampleCodeMap> {
-  const candidates = await buildConfidenceCandidates();
-  const highCandidate = await selectConfidenceCandidate(candidates, "high");
-  const degradedCandidate = await selectConfidenceCandidate(candidates, "degraded");
-
-  const [goldHigh, goldDegraded, metaHigh, metaDegraded, derivedHigh, derivedDegraded] =
-    await Promise.all([
-      readExampleFileForCandidate("gold", "high", highCandidate),
-      readExampleFileForCandidate("gold", "degraded", degradedCandidate),
-      readExampleFileForCandidate("meta", "high", highCandidate),
-      readExampleFileForCandidate("meta", "degraded", degradedCandidate),
-      readExampleFileForCandidate("derived", "high", highCandidate),
-      readExampleFileForCandidate("derived", "degraded", degradedCandidate),
-    ]);
-
-  return {
-    gold_high: goldHigh,
-    gold_degraded: goldDegraded,
-    meta_high: metaHigh,
-    meta_degraded: metaDegraded,
-    derived_high: derivedHigh,
-    derived_degraded: derivedDegraded,
-  };
-}
-
-function jsonLayerToneClasses(tone: JsonLayerTone) {
-  if (tone === "gold") {
-    return {
-      card: "border-yellow-300/24 bg-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_22px_60px_rgba(3,19,41,0.24)]",
-      badge: "border-yellow-300/35 bg-yellow-300/10 text-yellow-200",
-      title: "text-yellow-200",
-      bullet: "text-yellow-300",
-    };
-  }
-
-  if (tone === "meta") {
-    return {
-      card: "border-cyan-300/24 bg-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_22px_60px_rgba(3,19,41,0.24)]",
-      badge: "border-cyan-300/35 bg-cyan-300/10 text-cyan-200",
-      title: "text-cyan-200",
-      bullet: "text-cyan-300",
-    };
-  }
-
-  return {
-    card: "border-emerald-300/24 bg-[#031329] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_22px_60px_rgba(3,19,41,0.24)]",
-    badge: "border-emerald-300/35 bg-emerald-300/10 text-emerald-200",
-    title: "text-emerald-200",
-    bullet: "text-emerald-300",
-  };
-}
-
-function JsonLayerCard(props: {
-  tone: JsonLayerTone;
-  title: string;
-  subtitle: string;
-  description: string;
-}) {
-  const tone = jsonLayerToneClasses(props.tone);
-
+function RegimePill({ label, dark = false }: { label: RegimeLabel; dark?: boolean }) {
+  const colors = dark ? DARK_REGIME_COLORS[label] : REGIME_COLORS[label];
+  const unknownClass = label === "UNKNOWN/DEGRADED" ? "border-2" : "border";
   return (
-    <div className={`rounded-[14px] border p-4 ${tone.card}`}>
-      <div className={`inline-flex rounded-full border px-3 py-1 text-[12px] font-black ${tone.badge}`}>
-        {props.title}
+    <span className={`inline-flex whitespace-nowrap items-center rounded-md ${unknownClass} px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.04em] ${colors.border} ${colors.bg} ${colors.text}`}>
+      {label === "UNKNOWN/DEGRADED" ? "UNKNOWN" : label}
+    </span>
+  );
+}
+
+function BriefRegimeChip({ label, compact = false }: { label: RegimeLabel; compact?: boolean }) {
+  const colors = REGIME_COLORS[label];
+  const display = label === "UNKNOWN/DEGRADED" ? "UNKNOWN" : label;
+  const compactClass = compact ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-[11px]";
+  return (
+    <span className={`inline-flex max-w-full shrink-0 items-center whitespace-nowrap rounded-full border ${compactClass} font-black uppercase tracking-[0.04em] ${colors.border} ${colors.bg} ${colors.text}`}>
+      {display}
+    </span>
+  );
+}
+
+function briefLabelNote(label: RegimeLabel): string | null {
+  return label === "UNKNOWN/DEGRADED" ? "degraded / low support" : null;
+}
+
+function prettyBriefValue(value: string): string {
+  return formatRawValue(value).replace(/\s+/g, " ").trim();
+}
+
+// ─── Hero ─────────────────────────────────────────────────────────────────────
+
+function LatestContextWidget({ rows }: { rows: LatestContextRow[] }) {
+  return (
+    <aside className="min-w-0 overflow-hidden text-white">
+      <div className="mb-5 flex items-start justify-between gap-4 border-b border-white/18 pb-5">
+        <div>
+          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/90">Latest Published Context</div>
+          <div className="mt-1.5 text-[11px] font-normal text-white/58">Daily, not intraday</div>
+        </div>
+        <div className="text-right text-[11px] font-normal text-white/70">
+          Updated through<br /><span className="font-bold text-white/75">{formatDate(latestUpdatedThrough(rows))}</span>
+        </div>
       </div>
 
-      <div className="mt-4 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {props.subtitle}
+      <div className="divide-y divide-white/8">
+        {rows.map((row) => {
+          const path = sparklinePath(row.days);
+          return (
+            <Link key={row.chain} href={`/chains/${row.chain}`} className="grid min-w-0 grid-cols-[28px_minmax(40px,52px)_minmax(70px,88px)_46px_minmax(64px,1fr)] items-center gap-2.5 py-4 transition hover:text-[#93c5fd]">
+              <span className="min-w-0 text-[18px] font-black text-white/80">{row.icon}</span>
+              <div className="min-w-0 truncate text-[14px] font-black text-white">{row.shortLabel}</div>
+              <span className={`inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.06em] ${DARK_REGIME_COLORS[row.label].text}`}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: sparklineStroke(row) }} />
+                {row.label === "UNKNOWN/DEGRADED" ? "UNKNOWN" : row.label}
+              </span>
+              <div className={`min-w-0 text-[13px] font-black ${DARK_REGIME_COLORS[row.label].text}`}>{formatConfidence(row.confidence)}</div>
+              <svg viewBox="0 0 116 32" className="hidden h-8 w-full min-w-0 max-w-[92px] sm:block" aria-hidden="true">
+                <path d="M0 31.5H116" stroke="rgba(255,255,255,0.10)" />
+                {path ? <path d={path} fill="none" stroke={sparklineStroke(row)} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /> : null}
+              </svg>
+            </Link>
+          );
+        })}
       </div>
+      <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/16 pt-4 text-[11px] font-normal text-white/58">
+        <span>Labels are chain-relative, not price-relative.</span>
+        <Link href="/track-record" className="font-bold text-white/76 transition hover:text-white">View history →</Link>
+      </div>
+    </aside>
+  );
+}
 
-      <p className="mt-3 text-[14px] font-semibold leading-7 text-slate-200">
-        {props.description}
-      </p>
+function HeroSection({ rows }: { rows: LatestContextRow[] }) {
+  return (
+    <section className="relative isolate overflow-hidden bg-[#07111f] text-white">
+      {/* Radial glows */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_15%_0%,rgba(37,99,235,0.28),transparent_40%),radial-gradient(ellipse_at_80%_20%,rgba(37,99,235,0.12),transparent_35%)]" />
+
+      <PageShell className="relative z-10 grid gap-12 pb-[72px] pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(440px,0.65fr)] lg:items-start lg:gap-16">
+        {/* Left: headline + CTAs */}
+        <div>
+          <div className="mb-4 text-[11px] font-black uppercase tracking-[0.22em] text-white/65">Daily regime context for blockchain</div>
+          <h1 className="max-w-[680px] text-[54px] font-black leading-[0.96] tracking-[-0.055em] text-white sm:text-[68px] lg:text-[82px]">
+            Separate blockchain noise from structural change.
+          </h1>
+          <p className="mt-7 max-w-[580px] text-[16px] font-normal leading-8 text-white/76">
+            Daily Gold, Derived, Meta, and Brief JSON for BTC, ETH, ARB, and BASE. Use it directly, or join regime context to your own data by chain and date. No price data. No forecasts. No recommendations.
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <a href="#json" className="inline-flex h-11 items-center justify-center rounded-lg bg-[#B46A22] px-6 text-[14px] font-bold text-[#F7F3E8] transition hover:bg-[#9E5B1C]">
+              Inspect real JSON samples
+            </a>
+            <Link href="/api-docs" className="inline-flex h-11 items-center justify-center rounded-lg border border-white/20 px-6 text-[14px] font-bold text-white/80 transition hover:border-white/40 hover:text-white">
+              Get started with API →
+            </Link>
+          </div>
+
+          <a href="#methodology" className="mt-6 inline-flex text-[12px] font-semibold text-white/58 underline decoration-white/15 underline-offset-4 transition hover:text-white/70">
+            Unsure? Start with the methodological choices →
+          </a>
+
+          <div className="mt-7 flex flex-wrap gap-6 text-[12px] font-semibold text-white/65">
+            <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#6FB7E8]/70" />Daily JSON files</div>
+            <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#6FB7E8]/70" />Versioned methodology</div>
+            <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#6FB7E8]/70" />Hash-anchored labels</div>
+          </div>
+        </div>
+
+        {/* Right: live context widget */}
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-white/24 bg-white/[0.10] p-5 backdrop-blur-sm sm:p-6 lg:p-7">
+          <LatestContextWidget rows={rows} />
+        </div>
+      </PageShell>
+
+      {/* Price strip – sits at bottom of dark hero */}
+      <PageShell className="relative z-10 -mt-[52px] pb-0">
+        <div className="grid border-y border-white/18 py-5 text-white md:grid-cols-3 md:divide-x md:divide-white/10">
+          <PriceStripItem title="Free" price="$0" note="Public charts & sample JSON" />
+          <PriceStripItem title="Single Chain" price="$49/mo" note="One chain · full JSON" />
+          <PriceStripItem title="Full Access" price="$149/mo" note="All chains · full access" />
+        </div>
+      </PageShell>
+    </section>
+  );
+}
+
+function PriceStripItem({ title, price, note }: { title: string; price: string; note: string }) {
+  return (
+    <a href="#pricing" className="block px-0 py-5 transition hover:text-[#93c5fd] md:px-10 md:first:pl-0 md:last:pr-0">
+      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/58">{title}</div>
+      <div className="mt-1.5 text-[30px] font-black tracking-[-0.05em] text-white">{price}</div>
+      <div className="mt-0.5 text-[12px] font-normal text-white/70">{note}</div>
+    </a>
+  );
+}
+
+// ─── Section title ─────────────────────────────────────────────────────────────
+
+function SectionTitle({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }) {
+  return (
+    <div className="max-w-3xl">
+      {eyebrow ? <div className="mb-3 text-[11px] font-black uppercase tracking-[0.2em] text-[#B46A22]">{eyebrow}</div> : null}
+      <h2 className="text-[34px] font-bold leading-tight tracking-[-0.025em] text-[#061B36] sm:text-[42px]">{title}</h2>
+      {subtitle ? <p className="mt-2 max-w-2xl text-[15px] font-normal leading-7 text-[#475569]">{subtitle}</p> : null}
     </div>
   );
 }
 
-function JsonExamplePickerModal() {
-  const layers: Array<{
-    tone: JsonLayerTone;
-    title: string;
-    description: string;
-  }> = [
-    {
-      tone: "gold",
-      title: "Gold",
-      description: "Daily observation data for the selected chain and date.",
-    },
-    {
-      tone: "meta",
-      title: "Meta",
-      description: "Regime label, confidence, freshness, and driver context for downstream analysis.",
-    },
-    {
-      tone: "derived",
-      title: "Derived",
-      description: "Deterministic rolling baselines and trend context built from Gold.",
-    },
+// ─── Paths section ─────────────────────────────────────────────────────────────
+
+function PathsSection() {
+  return (
+    // Alternating section: white background
+    <section id="paths" className="border-y border-slate-300 bg-white py-10 lg:py-12">
+      <PageShell>
+        <SectionTitle
+          eyebrow="Two paths"
+          title="One source of truth."
+          subtitle="Same published data layer. Different ways to use it."
+        />
+        <div className="mt-4 grid gap-0 rounded-2xl border border-[#061B36]/18 bg-[#F7F3E8] lg:grid-cols-2">
+          {/* Path A */}
+          <div className="p-10 lg:border-r lg:border-slate-300">
+            <div className="mb-3 text-[11px] font-black uppercase tracking-[0.16em] text-[#B46A22]">Path A</div>
+            <h3 className="text-[26px] font-bold tracking-[-0.02em] text-[#061B36]">Have your own pipeline?</h3>
+            <p className="mt-1 text-[13px] font-bold text-[#B46A22]">Enrich your existing stack</p>
+            <p className="mt-5 text-[15px] font-normal leading-7 text-[#475569]">
+              Join Urd Atlas JSON to your daily rows by chain and date. Add regime, confidence, and drivers to your own models, dashboards, and reports.
+            </p>
+            <ul className="mt-6 grid gap-2.5">
+              {["Clean, machine-readable JSON", "Stable schemas and field definitions", "Built for joins, storage, and automation"].map((b) => (
+                <li key={b} className="flex items-center gap-3 text-[14px] font-semibold text-[#334155]">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#B46A22]" />{b}
+                </li>
+              ))}
+            </ul>
+            <a href="#workflow" className="mt-8 inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-5 text-[13px] font-bold text-[#061B36] transition hover:border-slate-400 hover:bg-slate-50">
+              See join workflow →
+            </a>
+          </div>
+
+          {/* Path B — highlighted */}
+          <div className="relative rounded-b-2xl bg-[#061B36] p-10 lg:rounded-r-2xl lg:rounded-bl-none">
+            <div className="mb-3 text-[11px] font-black uppercase tracking-[0.16em] text-[#6FB7E8]">Path B</div>
+            <h3 className="text-[26px] font-bold tracking-[-0.02em] text-white">No pipeline? Use Briefs.</h3>
+            <p className="mt-1 text-[13px] font-bold text-[#6FB7E8]">Read the published context directly</p>
+            <p className="mt-5 text-[15px] font-normal leading-7 text-white/76">
+              Briefs summarize what changed, what drove it, and whether the latest label looks isolated or persistent. No infrastructure required.
+            </p>
+            <ul className="mt-6 grid gap-2.5">
+              {["One readable brief per chain", "Plain-language weekly context", "Built from the same published Meta data"].map((b) => (
+                <li key={b} className="flex items-center gap-3 text-[14px] font-semibold text-white/80">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#6FB7E8]" />{b}
+                </li>
+              ))}
+            </ul>
+            <Link href="/briefs" className="mt-8 inline-flex h-10 items-center justify-center rounded-lg bg-[#B46A22] px-5 text-[13px] font-bold text-[#F7F3E8] transition hover:bg-[#9E5B1C]">
+              Read today's Brief →
+            </Link>
+          </div>
+        </div>
+      </PageShell>
+    </section>
+  );
+}
+
+// ─── Brief contrast section ────────────────────────────────────────────────────
+
+function BriefMetricRow({ label, value, note }: { label: string; value: ReactNode; note?: string | null }) {
+  return (
+    <div className="grid gap-2 border-b border-slate-200 py-3 last:border-b-0 sm:grid-cols-[150px_minmax(0,1fr)]">
+      <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">{label}</div>
+      <div className="min-w-0">
+        <div className="text-[14px] font-bold leading-6 text-slate-900">{value}</div>
+        {note ? <div className="mt-0.5 text-[11px] font-normal leading-5 text-slate-600">{note}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function BriefTextRow({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="grid gap-2 border-t border-slate-200 py-4 first:border-t-0 sm:grid-cols-[132px_minmax(0,1fr)]">
+      <div className="text-[13px] font-bold text-slate-700">{title}</div>
+      <div className="text-[14px] font-normal leading-7 text-slate-600">{body}</div>
+    </div>
+  );
+}
+
+function RegimeText({ label }: { label: RegimeLabel }) {
+  const colors = REGIME_COLORS[label];
+  return (
+    <span className={`inline-flex items-center gap-2 whitespace-nowrap text-[12px] font-black uppercase tracking-[0.12em] ${colors.text}`}>
+      <span className={`h-2 w-2 rounded-full ${colors.dot}`} />
+      {label === "UNKNOWN/DEGRADED" ? "UNKNOWN" : label}
+    </span>
+  );
+}
+
+function BriefTimelineClean({ labels }: { labels: RegimeLabel[] }) {
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-600">regime path</div>
+        <div className="text-[11px] font-normal text-slate-600">{labels.length} published days</div>
+      </div>
+      <div className="grid grid-cols-7 items-start gap-2">
+        {labels.map((label, index) => {
+          const color = REGIME_COLORS[label];
+          return (
+            <div key={`${label}-${index}`} className="min-w-0">
+              <div className="mb-2 text-[10px] font-bold text-slate-300">D{index + 1}</div>
+              <div className={`h-1.5 w-full rounded-full ${color.dot}`} />
+              <div className={`mt-2 truncate text-[9px] font-black uppercase tracking-[0.06em] ${color.text}`}>
+                {label === "UNKNOWN/DEGRADED" ? "UNK" : label}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ProblemMark({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-2 text-[13px] font-semibold text-slate-700">
+      <span className="text-[12px] font-black text-rose-500">×</span>
+      <span>{text}</span>
+    </div>
+  );
+}
+
+function BriefContrastSection({ example }: { example: RealBriefExample | null }) {
+  return (
+    // Alternating section: slate-50 background
+    <section className="border-y border-slate-200 bg-[#DDE8F1] py-10 lg:py-12">
+      <PageShell>
+        <SectionTitle
+          eyebrow="The difference"
+          title="Without a Brief / With a Brief"
+          subtitle="A Brief turns published Meta data into a readable, checkable weekly context layer."
+        />
+
+        <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:items-start">
+          {/* Left: raw data */}
+          <div>
+            <div className="mb-6 flex items-end justify-between gap-4">
+              <div>
+                <h3 className="text-[22px] font-bold text-[#061B36]">Without a Brief</h3>
+                <p className="mt-1 text-[13px] text-slate-700">Raw daily metrics. Different units. No summary layer.</p>
+              </div>
+              <span className="text-[11px] font-bold text-[#B46A22]">112+ more metrics</span>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-[#061B36]/18 bg-[#F7F3E8]">
+              <table className="w-full min-w-[420px] border-collapse font-mono text-[12px] text-slate-800">
+                <thead className="bg-slate-100 text-left text-[10px] uppercase tracking-[0.12em] text-slate-700">
+                  <tr className="border-b border-slate-200">
+                    <th className="px-5 py-3 pr-5">metric</th>
+                    <th className="px-5 py-3 pr-5">value</th>
+                    <th className="px-5 py-3 pr-5">Δ1d</th>
+                    <th className="px-5 py-3">Δ7d</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {RAW_METRICS.map((row) => (
+                    <tr key={row.metric} className="hover:bg-slate-100/70">
+                      <td className="px-5 py-3 pr-5 font-semibold text-slate-600">{row.metric}</td>
+                      <td className="px-5 py-3 pr-5">{row.value}</td>
+                      <td className="px-5 py-3 pr-5 text-emerald-600">{row.d1}</td>
+                      <td className="px-5 py-3 text-emerald-600">{row.d7}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
+              <ProblemMark text="Too many moving parts" />
+              <ProblemMark text="Where is the signal?" />
+              <ProblemMark text="Hard to explain quickly" />
+            </div>
+          </div>
+
+          {/* Right: brief */}
+          <div className="rounded-2xl bg-[#F7F3E8] p-8 shadow-[0_8px_40px_rgba(15,23,42,0.14),0_1px_4px_rgba(15,23,42,0.08)]">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-[22px] font-bold text-[#061B36]">With a Brief</h3>
+                <p className="mt-1 text-[13px] text-slate-700">A real latest-published chain brief, built from published Meta data.</p>
+              </div>
+              <Link href="/briefs" className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-[#B46A22] px-5 text-[13px] font-bold text-[#F7F3E8] transition hover:bg-[#9E5B1C]">
+                Read today's Brief →
+              </Link>
+            </div>
+
+            {example ? (
+              <div>
+                <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-start md:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="text-[28px]">{example.icon}</span>
+                    <div className="min-w-0">
+                      <div className="text-[20px] font-bold text-[#061B36]">{example.chainName}</div>
+                      <div className="mt-0.5 text-[12px] text-slate-600">
+                        Real latest 7-day Brief · {example.windowStart} to {example.windowEnd}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-row items-center gap-3 md:flex-col md:items-end md:gap-1.5">
+                    <RegimeText label={example.latestLabel} />
+                    <div className="text-[12px] font-bold text-slate-700">
+                      Confidence {typeof example.latestConfidence === "number" ? example.latestConfidence.toFixed(3) : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <BriefTimelineClean labels={example.labels} />
+                </div>
+
+                <div className="mt-4 grid gap-6 lg:grid-cols-2">
+                  <div>
+                    <BriefMetricRow label="dominant label" note={`${example.dominantLabelDays ?? "—"}/7 days${briefLabelNote(example.dominantLabel) ? ` · ${briefLabelNote(example.dominantLabel)}` : ""}`} value={<RegimeText label={example.dominantLabel} />} />
+                    <BriefMetricRow label="label changes" note={`volatility: ${prettyBriefValue(example.volatility)}`} value={example.labelChanges ?? "—"} />
+                    <BriefMetricRow label="latest run" note="published days" value={example.latestLabelRunDays ?? "—"} />
+                    <BriefMetricRow label="avg confidence" note={prettyBriefValue(example.confidenceDirection)} value={typeof example.averageConfidence7d === "number" ? example.averageConfidence7d.toFixed(3) : "—"} />
+                  </div>
+                  <div>
+                    <BriefMetricRow label="demand" note={`primary axis: ${prettyBriefValue(example.primaryAxis)}`} value={prettyBriefValue(example.demand)} />
+                    <BriefMetricRow label="friction" note="drivers.friction" value={prettyBriefValue(example.friction)} />
+                    <BriefMetricRow label="capacity" note="drivers.capacity" value={prettyBriefValue(example.capacity)} />
+                    <BriefMetricRow label="movement" note={`persistence: ${prettyBriefValue(example.persistence)}`} value={`type: ${prettyBriefValue(example.movementType)}`} />
+                  </div>
+                </div>
+
+                <div className="mt-4 divide-y divide-slate-100 border-t border-slate-200">
+                  <BriefTextRow title="Headline" body={example.headline} />
+                  <BriefTextRow title="Plain summary" body={example.plain} />
+                  <BriefTextRow title="Validation" body={`${prettyBriefValue(example.validationStatus)} · daily, not intraday`} />
+                </div>
+              </div>
+            ) : (
+              <div className="text-[14px] leading-7 text-slate-600">
+                Latest Brief data was not available in the site bundle. The Briefs section will populate when chain Brief JSON is present.
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-wrap gap-6 border-t border-slate-200 pt-5">
+              <Link href="/briefs" className="text-[13px] font-bold text-[#B46A22] hover:text-[#9E5B1C]">Open Briefs →</Link>
+              <a href="#json" className="text-[13px] font-bold text-[#B46A22] hover:text-[#9E5B1C]">Inspect Brief JSON →</a>
+            </div>
+          </div>
+        </div>
+      </PageShell>
+    </section>
+  );
+}
+
+// ─── Pipeline workflow ─────────────────────────────────────────────────────────
+
+function ChainLogoDot({ label, tone }: { label: string; tone: "btc" | "eth" | "arb" | "base" }) {
+  const classes: Record<typeof tone, string> = {
+    btc: "bg-[#f59e0b] text-white",
+    eth: "bg-[#8aa7ff] text-white",
+    arb: "bg-[#1f6feb] text-white",
+    base: "bg-[#315dff] text-white",
+  };
+  return (
+    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black ${classes[tone]}`}>
+      {label}
+    </span>
+  );
+}
+
+function WorkflowGlyph({ step }: { step: string }) {
+  if (step === "1") {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2 rounded-lg border border-[#061B36]/18 bg-[#F7F3E8] px-2.5 py-1.5 font-mono text-[10px] font-bold text-slate-600 shadow-sm">
+          <span className="text-slate-300">{`{}`}</span> gold_btc_2025-05-23.json
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border border-[#061B36]/18 bg-[#F7F3E8] px-2.5 py-1.5 font-mono text-[10px] font-bold text-slate-600 shadow-sm">
+          <span className="text-slate-300">{`{}`}</span> meta_eth_2025-05-23.json
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border border-[#061B36]/18 bg-[#F7F3E8] px-2.5 py-1.5 font-mono text-[10px] font-bold text-slate-700 shadow-sm">
+          <span className="text-slate-300">{`{}`}</span> brief_base_2025-05-23.json
+        </div>
+        <div className="mt-1 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2">
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            <ChainLogoDot label="₿" tone="btc" /><span className="text-[10px] font-black text-white">BTC</span>
+            <ChainLogoDot label="Ξ" tone="eth" /><span className="text-[10px] font-black text-white">ETH</span>
+            <ChainLogoDot label="A" tone="arb" /><span className="text-[10px] font-black text-white">ARB</span>
+            <ChainLogoDot label="B" tone="base" /><span className="text-[10px] font-black text-white">BASE</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "2") {
+    const rows = [
+      ["₿ BTC", "2025-05-23", "STABLE", "0.748"],
+      ["Ξ ETH", "2025-05-23", "HEATING", "0.612"],
+      ["B BASE", "2025-05-23", "CHEAP", "0.327"],
+    ];
+    return (
+      <div className="overflow-hidden rounded-xl border border-[#061B36]/18 bg-[#F7F3E8] shadow-sm">
+        <table className="w-full text-left text-[11px]">
+          <thead className="bg-slate-50 text-[10px] font-black text-slate-700">
+            <tr>
+              <th className="border-r border-slate-200 px-3 py-2">chain</th>
+              <th className="border-r border-slate-200 px-3 py-2">date</th>
+              <th className="border-r border-slate-200 px-3 py-2">label</th>
+              <th className="px-3 py-2">conf</th>
+            </tr>
+          </thead>
+          <tbody className="font-mono text-[10px] font-bold text-slate-700">
+            {rows.map((row) => (
+              <tr key={row.join("-")} className="border-t border-slate-200">
+                <td className="border-r border-slate-200 px-3 py-2">{row[0]}</td>
+                <td className="border-r border-slate-200 px-3 py-2">{row[1]}</td>
+                <td className={`border-r border-slate-200 px-3 py-2 font-black ${row[2] === "STABLE" ? "text-emerald-600" : row[2] === "HEATING" ? "text-amber-600" : "text-sky-600"}`}>{row[2]}</td>
+                <td className="px-3 py-2">{row[3]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="flex items-center justify-between border-t border-slate-200 px-3 py-2 text-[11px] font-bold text-emerald-600">
+          <span>3 rows loaded</span>
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 text-emerald-500 text-[10px]">✓</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "3") {
+    return (
+      <div className="grid gap-3">
+        <div className="grid grid-cols-[1fr_32px_1fr] items-center gap-2">
+          <div className="overflow-hidden rounded-xl border border-[#061B36]/18 bg-[#F7F3E8] text-center shadow-sm">
+            <div className="bg-slate-50 px-3 py-2 text-[10px] font-black text-slate-600">Your rows</div>
+            <div className="grid grid-cols-2 border-t border-slate-200 font-mono text-[10px] font-bold text-slate-700">
+              <span className="border-r border-slate-200 px-2 py-2">chain</span>
+              <span className="px-2 py-2">date</span>
+              <span className="border-r border-slate-200 px-2 py-2">BTC</span>
+              <span className="px-2 py-2">2025-05-23</span>
+            </div>
+          </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-[16px] font-black text-white">→</div>
+          <div className="overflow-hidden rounded-xl border border-[#061B36]/18 bg-[#F7F3E8] text-center shadow-sm">
+            <div className="bg-slate-50 px-3 py-2 text-[10px] font-black text-slate-600">Urd Atlas</div>
+            <div className="grid grid-cols-2 border-t border-slate-200 font-mono text-[10px] font-bold text-slate-700">
+              <span className="border-r border-slate-200 px-2 py-2">label</span>
+              <span className="px-2 py-2">conf</span>
+              <span className="border-r border-slate-200 px-2 py-2 text-emerald-600">STABLE</span>
+              <span className="px-2 py-2">0.748</span>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center">
+          <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-600">Joined result</div>
+          <div className="mt-0.5 font-mono text-[11px] font-bold text-slate-700">BTC · 2025-05-23 · STABLE · 0.748</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "4") {
+    return (
+      <div className="rounded-xl border border-[#061B36]/18 bg-[#F7F3E8] p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.1em] text-slate-600">
+          <span>Share of days (%)</span><span>30d</span>
+        </div>
+        <div className="grid grid-cols-[22px_1fr] gap-2">
+          <div className="flex flex-col justify-between text-right text-[9px] font-bold text-slate-300">
+            <span>60</span><span>40</span><span>20</span><span>0</span>
+          </div>
+          <div className="relative h-[88px] border-b border-l border-slate-200">
+            <div className="absolute inset-x-0 top-[33%] border-t border-dashed border-slate-200" />
+            <div className="absolute inset-x-0 top-[66%] border-t border-dashed border-slate-200" />
+            <div className="absolute bottom-0 left-[6%] flex w-[18%] flex-col items-center">
+              <span className="mb-1 text-[10px] font-black text-emerald-600">42%</span>
+              <div className="h-[56px] w-full rounded-t-md bg-emerald-500" />
+            </div>
+            <div className="absolute bottom-0 left-[32%] flex w-[18%] flex-col items-center">
+              <span className="mb-1 text-[10px] font-black text-amber-600">26%</span>
+              <div className="h-[38px] w-full rounded-t-md bg-amber-400" />
+            </div>
+            <div className="absolute bottom-0 left-[58%] flex w-[18%] flex-col items-center">
+              <span className="mb-1 text-[10px] font-black text-rose-600">18%</span>
+              <div className="h-[28px] w-full rounded-t-md bg-rose-500" />
+            </div>
+            <div className="absolute bottom-0 left-[82%] flex w-[14%] flex-col items-center">
+              <span className="mb-1 text-[10px] font-black text-sky-600">14%</span>
+              <div className="h-[22px] w-full rounded-t-md bg-sky-500" />
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 grid grid-cols-4 gap-1 text-center text-[9px] font-black uppercase tracking-[0.06em]">
+          <span className="text-emerald-600">STABLE</span>
+          <span className="text-amber-600">HEATING</span>
+          <span className="text-rose-600">CONGEST</span>
+          <span className="text-sky-600">CHEAP</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-[#061B36]/18 bg-[#F7F3E8] p-4 shadow-sm">
+      <div className="text-[12px] font-bold text-slate-700">Urd Atlas Daily Report</div>
+      <div className="mt-3 grid gap-2 font-mono text-[10px] text-slate-600">
+        <div className="flex justify-between"><span>date:</span><span className="text-blue-600">2025-05-23</span></div>
+        <div className="flex justify-between"><span>determinism_hash:</span><span className="text-blue-600">81b295000696</span></div>
+        <div className="flex justify-between"><span>chains:</span><span>BTC, ETH, ARB, BASE</span></div>
+        <div className="flex justify-between"><span>layers:</span><span>gold, derived, meta, brief</span></div>
+      </div>
+      <div className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700">
+        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white text-[9px]">✓</span>
+        Verified & reproducible
+      </div>
+    </div>
+  );
+}
+
+function PipelineWorkflowSection() {
+  const steps = [
+    ["1", "Ingest", "Pull daily JSON by chain and date."],
+    ["2", "Store / Parse", "Load stable schemas into your tables."],
+    ["3", "Join by chain + date", "Align Urd Atlas context with your rows."],
+    ["4", "Analyze / Segment", "Compare your data by label and confidence."],
+    ["5", "Archive / Report", "Keep a reproducible record of results."],
   ];
 
   return (
-    <div
-      id="json-example-picker"
-      className="fixed inset-0 z-[100] hidden items-center justify-center bg-[#020817]/82 px-5 py-8 backdrop-blur-sm [&:target]:flex"
-    >
-      <a href="#close-json-example" className="absolute inset-0" aria-label="Close JSON example picker" />
-
-      <section className="relative w-full max-w-[1040px] rounded-[26px] border border-white/12 bg-[#061426] p-6 text-white shadow-[0_32px_120px_rgba(0,0,0,0.56)] sm:p-8">
-        <div className="flex items-start justify-between gap-5">
-          <div>
-            <div className="inline-flex rounded-full border border-cyan-300/35 bg-cyan-300/10 px-4 py-1.5 text-[13px] font-black uppercase tracking-[0.14em] text-cyan-200">
-              Historical JSON examples
+    // Alternating section: white background
+    <section id="workflow" className="border-y border-slate-300 bg-white py-10 lg:py-12">
+      <PageShell>
+        <SectionTitle
+          eyebrow="For pipeline users"
+          title="A stable daily workflow"
+          subtitle="A compact reference workflow: ingest, join, segment, and report with the same published keys every day."
+        />
+        <div className="mt-4 grid gap-5 lg:grid-cols-5 lg:gap-4">
+          {steps.map(([number, title, body], index) => (
+            <div key={number} className="relative flex flex-col rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">Step {number}</div>
+              <h3 className="text-[14px] font-bold leading-5 text-[#061B36]">{title}</h3>
+              <p className="mt-1.5 text-[12px] font-normal leading-5 text-slate-600">{body}</p>
+              <div className="mt-4 overflow-hidden"><WorkflowGlyph step={number} /></div>
+              {index < steps.length - 1 ? (
+                <div className="absolute -right-2.5 top-8 hidden text-slate-300 lg:block text-[18px]">›</div>
+              ) : null}
             </div>
-            <h3 className="mt-5 max-w-[760px] text-[34px] font-black tracking-[-0.045em] text-white">
-              Inspect real Gold, Derived, and Meta reference files before you read the full page.
-            </h3>
-            <p className="mt-3 max-w-[760px] text-[15px] font-semibold leading-7 text-slate-300">
-              Choose a reference layer and then compare a high-confidence example with a low-confidence / degraded example.
-              These are read from the published JSON archive, not hardcoded demo snippets.
-            </p>
-          </div>
+          ))}
+        </div>
+      </PageShell>
+    </section>
+  );
+}
 
-          <a
-            href="#close-json-example"
-            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-white/12 px-4 text-[13px] font-black text-white transition hover:bg-white/8"
-          >
-            Close
-          </a>
+// ─── What you receive ─────────────────────────────────────────────────────────
+
+function LayerPreview({ layer }: { layer: string }) {
+  if (layer === "Gold") {
+    return (
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-[#061B36]">
+        <div className="flex items-center justify-between border-b border-white/18 px-4 py-2">
+          <span className="text-[10px] font-black uppercase tracking-[0.1em] text-amber-400">Gold JSON excerpt</span>
+          <span className="text-[10px] font-bold text-white/30">daily</span>
+        </div>
+        <pre className="p-4 font-mono text-[11px] leading-6"><code>
+          <span className="text-white/58">{"{"}</span>{"\n"}
+          <span className="text-sky-300">{"  \"chain\""}</span><span className="text-white/58">{": "}</span><span className="text-emerald-300">{"\"bitcoin\""}</span>{",\n"}
+          <span className="text-sky-300">{"  \"date\""}</span><span className="text-white/58">{": "}</span><span className="text-emerald-300">{"\"2025-05-23\""}</span>{",\n"}
+          <span className="text-sky-300">{"  \"tx_count_daily\""}</span><span className="text-white/58">{": "}</span><span className="text-violet-300">{"1284567"}</span>{",\n"}
+          <span className="text-sky-300">{"  \"unique_active_addresses\""}</span><span className="text-white/58">{": "}</span><span className="text-violet-300">{"964321"}</span>{",\n"}
+          <span className="text-sky-300">{"  \"median_tx_fee_native\""}</span><span className="text-white/58">{": "}</span><span className="text-violet-300">{"0.000031"}</span>{",\n"}
+          <span className="text-sky-300">{"  \"avg_block_time_sec\""}</span><span className="text-white/58">{": "}</span><span className="text-violet-300">{"596.4"}</span>{"\n"}
+          <span className="text-white/58">{"}"}</span>
+        </code></pre>
+      </div>
+    );
+  }
+
+  if (layer === "Derived") {
+    return (
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-[#061B36] p-4">
+        <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.1em]">
+          <span className="text-[#6FB7E8]">Normalized transactions</span><span className="text-white/30">last 30d</span>
+        </div>
+        <svg viewBox="0 0 260 110" className="h-[100px] w-full" aria-hidden="true">
+          <path d="M34 10V88H250" stroke="rgba(255,255,255,0.15)" />
+          {[28, 50, 70].map((y) => <path key={y} d={`M34 ${y}H250`} stroke="rgba(255,255,255,0.06)" strokeDasharray="4 5" />)}
+          <path d="M38 72 L48 40 L57 88 L66 38 L76 52 L85 72 L96 28 L106 76 L116 44 L126 62 L136 34 L146 70 L156 40 L166 50 L176 32 L186 72 L196 44 L206 58 L216 36 L226 50 L238 38" fill="none" stroke="#38bdf8" strokeWidth="1.5" opacity="0.6" />
+          <path d="M38 68 C62 58, 82 54, 108 52 S160 46, 238 50" fill="none" stroke="#34d399" strokeWidth="2.5" />
+          <path d="M38 72 C72 70, 104 66, 136 62 S202 58, 238 56" fill="none" stroke="#94a3b8" strokeWidth="3.5" opacity="0.6" />
+        </svg>
+        <div className="mt-2 flex flex-wrap gap-4 text-[10px] font-bold uppercase tracking-[0.1em]">
+          <span className="flex items-center gap-1.5 text-sky-400"><span className="h-1.5 w-4 rounded-full bg-sky-400" />RAW</span>
+          <span className="flex items-center gap-1.5 text-emerald-400"><span className="h-1.5 w-4 rounded-full bg-emerald-400" />MA7</span>
+          <span className="flex items-center gap-1.5 text-slate-600"><span className="h-1.5 w-4 rounded-full bg-slate-400" />MA30</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (layer === "Meta") {
+    return (
+      <div className="overflow-hidden rounded-xl border border-[#061B36]/18 bg-[#F7F3E8]">
+        <div className="grid grid-cols-[1fr_90px] border-b border-slate-200">
+          <div className="bg-emerald-600 px-5 py-4 text-center text-[22px] font-black text-white">STABLE</div>
+          <div className="flex flex-col items-center justify-center bg-white px-3 py-3">
+            <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-600">Confidence</div>
+            <div className="text-[26px] font-black text-slate-900">0.748</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 divide-x divide-slate-100 text-center">
+          <div className="px-3 py-3"><div className="text-[10px] font-black text-slate-600">Demand</div><div className="mt-1.5 text-[12px] font-bold text-emerald-600">Normal</div></div>
+          <div className="px-3 py-3"><div className="text-[10px] font-black text-slate-600">Friction</div><div className="mt-1.5 text-[12px] font-bold text-emerald-600">Normal</div></div>
+          <div className="px-3 py-3"><div className="text-[10px] font-black text-slate-600">Capacity</div><div className="mt-1.5 text-[12px] font-bold text-blue-600">Balanced</div></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Briefs
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#061B36]/18 bg-[#F7F3E8]">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <div className="text-[11px] font-black text-violet-600">What changed</div>
+        <p className="mt-1 text-[12px] leading-5 text-slate-600">Activity and fees increased while capacity remained available.</p>
+      </div>
+      <div className="border-b border-slate-200 px-4 py-3">
+        <div className="text-[11px] font-black text-violet-600">Why it matters</div>
+        <p className="mt-1 text-[12px] leading-5 text-slate-600">Stronger demand was handled without material congestion.</p>
+      </div>
+      <div className="px-4 py-3">
+        <div className="text-[11px] font-black text-violet-600">Persistence</div>
+        <div className="mt-2 flex items-center gap-3">
+          <div className="text-[26px] font-black text-violet-600">62%</div>
+          <div className="flex-1">
+            <div className="relative h-5 rounded-full bg-slate-100">
+              <div className="absolute inset-y-1 left-1 w-[60%] rounded-full bg-violet-500" />
+            </div>
+            <div className="mt-1 flex justify-between text-[9px] font-bold text-slate-300">
+              <span>0%</span><span>50%</span><span>100%</span>
+            </div>
+          </div>
+        </div>
+        <p className="mt-1 text-[11px] text-slate-600">62% of similar episodes lasted 7+ days.</p>
+      </div>
+    </div>
+  );
+}
+
+function WhatYouReceiveSection() {
+  const items: Array<[string, string, string, string, string]> = [
+    ["Gold", "Canonical daily measurements", "gold_YYYY-MM-DD.json", "Raw chain facts close to the source.", "#D97706"],
+    ["Derived", "Normalized metrics and baselines", "derived_YYYY-MM-DD.json", "Comparable trend features built from Gold.", "#6FB7E8"],
+    ["Meta", "Regime, confidence, drivers", "meta_YYYY-MM-DD.json", "The interpretive layer used by dashboards and pipelines.", "#16A34A"],
+    ["Briefs", "7-day context and summaries", "brief_YYYY-MM-DD.json", "Human-readable context built from Meta.", "#7C3AED"],
+  ];
+
+  return (
+    // Alternating section: slate-50 background
+    <section className="border-y border-slate-200 bg-[#DDE8F1] py-10 lg:py-12">
+      <PageShell>
+        <SectionTitle
+          eyebrow="Daily output"
+          title="What you receive every day"
+          subtitle="Four layers, one published data product — each with a different role in the workflow."
+        />
+        <div className="mt-4 grid gap-6 lg:grid-cols-4">
+          {items.map(([title, headline, filename, body, accent]) => (
+            <article key={title} className="border-t-[3px] pt-4" style={{ borderColor: accent }}>
+              <div className="text-[20px] font-bold text-[#061B36]">{title}</div>
+              <div className="mt-1.5 text-[12px] font-bold" style={{ color: accent }}>{headline}</div>
+              <p className="mt-2 text-[12px] font-normal leading-6 text-slate-700">{body}</p>
+              <div className="mt-4"><LayerPreview layer={title} /></div>
+              <div className="mt-3 font-mono text-[11px] font-semibold text-slate-600">{filename}</div>
+            </article>
+          ))}
+        </div>
+      </PageShell>
+    </section>
+  );
+}
+
+// ─── Regime vocabulary ────────────────────────────────────────────────────────
+
+function RegimeVocabularySection() {
+  return (
+    // Alternating section: dark background for strong contrast
+    <section className="border-y border-[#1e293b] bg-[#08111f] py-10 lg:py-12">
+      <PageShell>
+        <div className="max-w-3xl">
+          <div className="mb-4 text-[11px] font-black uppercase tracking-[0.2em] text-[#6FB7E8]">Regime vocabulary</div>
+          <h2 className="text-[38px] font-bold leading-tight tracking-[-0.025em] text-white sm:text-[46px]">Five states. Chain-relative. Not price.</h2>
+          <p className="mt-5 max-w-2xl text-[16px] font-normal leading-8 text-white/70">
+            Labels describe current network conditions relative to each chain's own recent history. They are not price labels, trading signals, or forecasts.
+          </p>
         </div>
 
-        <div className="mt-8 grid gap-4 lg:grid-cols-3">
-          {layers.map((layer) => {
-            const tone = jsonLayerToneClasses(layer.tone);
-
+        <div className="mt-4 grid gap-5 lg:grid-cols-5">
+          {VOCABULARY.map((item) => {
+            const colors = DARK_REGIME_COLORS[item.label];
             return (
-              <div key={layer.tone} className={`rounded-[20px] border p-5 ${tone.card}`}>
-                <div className={`inline-flex rounded-full border px-3 py-1 text-[12px] font-black ${tone.badge}`}>
-                  {layer.title}
+              <div key={item.label} className="border-t border-white/18 pt-6">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colors.stroke }} />
+                  <span className={`text-[11px] font-black uppercase tracking-[0.16em] ${colors.text}`}>{item.label === "UNKNOWN/DEGRADED" ? "UNKNOWN" : item.label}</span>
                 </div>
-                <h4 className={`mt-4 text-[26px] font-black tracking-[-0.035em] ${tone.title}`}>
-                  {layer.title}
-                </h4>
-                <p className="mt-2 min-h-[54px] text-[14px] font-semibold leading-6 text-slate-300">
-                  {layer.description}
-                </p>
-
-                <div className="mt-5 grid gap-3">
-                  <a
-                    href={`#json-${layer.tone}-high`}
-                    className="inline-flex h-11 items-center justify-between rounded-full border border-cyan-300/35 bg-cyan-300/12 px-4 text-[13px] font-black text-cyan-100 transition hover:bg-cyan-300/18"
-                  >
-                    High confidence
-                    <span aria-hidden="true">→</span>
-                  </a>
-                  <a
-                    href={`#json-${layer.tone}-degraded`}
-                    className="inline-flex h-11 items-center justify-between rounded-full border border-amber-300/40 bg-amber-300/12 px-4 text-[13px] font-black text-amber-100 transition hover:bg-amber-300/18"
-                  >
-                    Low confidence / degraded
-                    <span aria-hidden="true">→</span>
-                  </a>
-                </div>
+                <h3 className="mt-4 text-[14px] font-bold leading-5 text-white">{item.title}</h3>
+                <p className="mt-2 text-[13px] font-normal leading-6 text-white/58">{item.body}</p>
               </div>
             );
           })}
         </div>
-      </section>
-    </div>
+      </PageShell>
+    </section>
   );
 }
 
-function JsonExampleModal(props: {
-  tone: JsonLayerTone;
-  confidence: JsonExampleConfidence;
-  title: string;
-  subtitle: string;
-  example: JsonExampleFile;
-}) {
-  const tone = jsonLayerToneClasses(props.tone);
-  const isDegraded = props.confidence === "degraded";
+// ─── JSON samples ─────────────────────────────────────────────────────────────
+
+function JsonSamplesSection({ samples }: { samples: JsonSample[] }) {
+  // Simple keyword-based syntax highlight for JSON display
+  function highlightJson(code: string): string {
+    return code
+      .replace(/("[\w_]+")(\s*:)/g, '<span class="text-sky-300">$1</span><span class="text-slate-600">$2</span>')
+      .replace(/:\s*(".*?")/g, ': <span class="text-emerald-300">$1</span>')
+      .replace(/:\s*(true|false|null)/g, ': <span class="text-amber-300">$1</span>')
+      .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="text-violet-300">$1</span>');
+  }
+
+  const LAYER_ACCENT: Record<string, string> = {
+    gold: "#D97706",
+    derived: "#6FB7E8",
+    meta: "#16A34A",
+    brief: "#7C3AED",
+  };
 
   return (
-    <div
-      id={`json-${props.tone}-${props.confidence}`}
-      className="fixed inset-0 z-[100] hidden items-center justify-center bg-[#020817]/82 px-5 py-8 backdrop-blur-sm [&:target]:flex"
-    >
-      <a href="#close-json-example" className="absolute inset-0" aria-label="Close JSON example" />
+    <section id="json" className="border-y border-[#1e293b] bg-[#08111f] py-10 lg:py-12">
+      <PageShell>
+        {/* Title in dark context */}
+        <div className="mb-10">
+          <div className="mb-3 text-[11px] font-black uppercase tracking-[0.2em] text-[#6FB7E8]">Real data</div>
+          <h2 className="text-[36px] font-bold leading-tight tracking-[-0.025em] text-white sm:text-[44px]">Inspect the actual JSON</h2>
+          <p className="mt-4 max-w-2xl text-[15px] font-normal leading-7 text-white/70">
+            Real files, stable keys, downloadable samples. Built for users who want to verify the schema before subscribing.
+          </p>
+        </div>
 
-      <section className="relative w-full max-w-[980px] rounded-[26px] border border-white/12 bg-[#061426] p-6 shadow-[0_32px_120px_rgba(0,0,0,0.56)] sm:p-8">
-        <div className="flex items-start justify-between gap-5">
-          <div>
-            <div className={`inline-flex rounded-full border px-4 py-1.5 text-[13px] font-black ${tone.badge}`}>
-              {props.title}
-            </div>
-
-            <h3 className={`mt-5 text-[34px] font-black tracking-[-0.045em] ${tone.title}`}>
-              {isDegraded ? "Low confidence / degraded" : "High confidence"} {props.title} example
-            </h3>
-
-            <p className="mt-2 max-w-[720px] text-[15px] leading-7 text-slate-400">
-              {props.subtitle}
-            </p>
-
-            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[12px] font-semibold text-slate-400">
-          
-              <span>Chain/date: <span className="text-slate-200">{props.example.chain ?? "—"} / {props.example.date ?? "—"}</span></span>
-              <span>Meta confidence: <span className="text-slate-200">{formatExampleConfidence(props.example.confidenceScore)}</span></span>
-            </div>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <a
-                href={`#json-${props.tone}-high`}
-                className={`inline-flex h-10 items-center rounded-full border px-4 text-[13px] font-black transition ${
-                  props.confidence === "high"
-                    ? "border-cyan-300/40 bg-cyan-300/14 text-cyan-100"
-                    : "border-white/12 text-slate-300 hover:bg-white/8"
-                }`}
+        <div className="grid gap-4 lg:grid-cols-4">
+          {samples.map((sample) => {
+            const accent = LAYER_ACCENT[sample.layer] ?? "#B46A22";
+            return (
+              <article
+                key={sample.layer}
+                className="flex flex-col overflow-hidden rounded-xl border border-white/18 bg-[#050b14]"
               >
-                High confidence example
-              </a>
-
-              <a
-                href={`#json-${props.tone}-degraded`}
-                className={`inline-flex h-10 items-center rounded-full border px-4 text-[13px] font-black transition ${
-                  props.confidence === "degraded"
-                    ? "border-amber-300/45 bg-amber-300/12 text-amber-100"
-                    : "border-white/12 text-slate-300 hover:bg-white/8"
-                }`}
-              >
-                Low confidence / degraded example
-              </a>
-            </div>
-          </div>
-
-          <a
-            href="#close-json-example"
-            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-white/12 px-4 text-[13px] font-black text-white transition hover:bg-white/8"
-          >
-            Close
-          </a>
+                {/* Card header */}
+                <div className="flex items-center justify-between border-b border-white/18 px-4 py-3" style={{ borderTopWidth: 2, borderTopColor: accent }}>
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-white">{sample.layer}</div>
+                    <div className="mt-0.5 text-[10px] text-white/58">{sample.chain} · {sample.date ?? "latest"}</div>
+                  </div>
+                  <a href={`/${sample.path}`} className="text-[11px] font-bold text-[#6FB7E8] transition hover:text-[#6FB7E8]">
+                    ZIP ↓
+                  </a>
+                </div>
+                {/* Code block */}
+                <pre
+                  className="flex-1 overflow-hidden p-4 font-mono text-[11px] leading-[1.7] text-white"
+                  dangerouslySetInnerHTML={{ __html: highlightJson(sample.code) }}
+                />
+              </article>
+            );
+          })}
         </div>
 
-        <pre className="mt-7 max-h-[62vh] overflow-auto rounded-[18px] border border-white/10 bg-[#020b18] p-5 font-mono text-[13px] leading-7 text-slate-100">
-          <code>{props.example.code}</code>
-        </pre>
-      </section>
-    </div>
+        <div className="mt-4 flex flex-wrap gap-8 border-t border-white/18 pt-6">
+          <Link href="/api-docs/samples" className="text-[13px] font-bold text-[#6FB7E8] transition hover:text-[#6FB7E8]">Download full sample pack →</Link>
+          <Link href="/api-docs/schema" className="text-[13px] font-bold text-[#6FB7E8] transition hover:text-[#6FB7E8]">View schema reference →</Link>
+        </div>
+      </PageShell>
+    </section>
   );
 }
 
-function FeaturePill(props: { icon: ReactNode; title: string; note: string }) {
-  return (       
-    <div className="grid min-w-0 grid-cols-[46px_minmax(0,1fr)] gap-4 border-r border-[#cbdced] px-5 py-4 last:border-r-0">
-     <MiniIcon>{props.icon}</MiniIcon>
-      <div className="min-w-0">
-        <div className="text-[17px] font-extrabold text-[#0d2447]">{props.title}</div>
-        <div className="mt-1.5 text-[14px] font-medium leading-5 text-[#536e99]">{props.note}</div>
-      </div>
-    </div>
-  );
-}
+// ─── Methodology & FAQ ────────────────────────────────────────────────────────
 
-function StepItem(props: { number: string; title: string; note: string }) {
-  return (
-    <div className="relative grid grid-cols-[68px_minmax(0,1fr)] gap-5 text-left">
-      <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-[34px] font-semibold text-blue-600">
-        {props.number}
-      </span>
-      <div>
-        <div className="text-[20px] font-extrabold text-[#0d2447]">{props.title}</div>
-        <div className="mt-2 text-[18px] leading-7 text-[#557099]">{props.note}</div>
-      </div>
-    </div>
-  );
-}
+function MethodologyFaqSection() {
+  const methodology = [
+    ["Why daily, not intraday?", "Daily cadence reduces sensitivity to short-lived spikes and keeps the product focused on regime context rather than monitoring."],
+    ["How are labels determined?", "Labels are derived from documented demand, friction, and capacity evidence with deterministic rules and confidence gates."],
+    ["What does confidence mean?", "Confidence reflects evidence support, data quality, and agreement. It is not a probability of future outcomes."],
+    ["How do you handle degraded data?", "Low support or incomplete evidence is surfaced as UNKNOWN/DEGRADED rather than forced into a stronger label."],
+    ["Can I verify the output?", "Published rows include methodology versioning, provenance fields, and determinism hashes."],
+  ];
 
-function PlanCard(props: {
-  tone: "free" | "basic" | "pro";
-  name: string;
-  price: string;
-  pill: string;
-  headline: string;
-  body: string;
-  bestFor: string;
-  href: string;
-  cta: string;
-  badge?: string;
-}) {
-  const isFeatured = Boolean(props.badge);
-
-  const cardClass = isFeatured
-    ? "border border-[#2f7cff]/55 bg-[linear-gradient(145deg,rgba(20,42,86,0.98)_0%,rgba(36,82,156,0.92)_42%,rgba(20,42,86,0.98)_100%)] shadow-[inset_0_1px_0_rgba(140,180,255,0.28),inset_0_-1px_0_rgba(255,255,255,0.05),0_28px_70px_rgba(8,40,100,0.42)]"
-    : "border border-[#89a9d1]/28 bg-[linear-gradient(145deg,rgba(22,34,54,0.96)_0%,rgba(55,78,112,0.88)_40%,rgba(30,47,73,0.96)_72%,rgba(18,29,47,0.98)_100%)] shadow-[inset_0_1px_0_rgba(210,230,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.03),0_22px_60px_rgba(3,14,32,0.32)]";
-
-  const pillClass =
-    "border border-[#b8d1f0]/22 bg-[linear-gradient(180deg,rgba(210,228,248,0.14)_0%,rgba(150,181,214,0.08)_100%)] text-[#e3efff] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]";
-
-  const buttonClass = isFeatured
-    ? "border border-white/30 bg-white text-[#0d2447] shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_10px_24px_rgba(255,255,255,0.18)] hover:bg-[#eaf3fb]"
-    : "border border-[#9fc1ea]/30 bg-[linear-gradient(180deg,rgba(176,205,236,0.16)_0%,rgba(107,146,191,0.12)_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-[linear-gradient(180deg,rgba(176,205,236,0.22)_0%,rgba(107,146,191,0.16)_100%)]";
+  const questions = [
+    ["What does this add beyond price data?", "Urd Atlas labels network conditions, not market price. It adds chain-relative context to your own analysis."],
+    ["Could I build this myself?", "Yes, with enough pipeline work. The value is consistent publication, methodology, history, and ready-to-use JSON."],
+    ["Is yesterday's data too late?", "The product is daily context, not intraday alerting. BTC/ETH are near prior-day; L2s can lag more."],
+    ["Can I join it to my own data?", "Yes. The join key is chain + date, with stable JSON fields for regime, confidence, and drivers."],
+    ["Can I inspect examples before paying?", "Yes. Samples, schema, methodology, and public track record are visible before subscription."],
+  ];
 
   return (
-    <article className={`relative flex min-h-[405px] flex-col rounded-[28px] p-8 ${cardClass}`}>
-      {props.badge ? (
-        <div className="absolute -top-3 left-7 inline-flex rounded-full border border-[#2f7cff]/45 bg-[#2f7cff] px-3.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_8px_18px_rgba(47,124,255,0.42)]">
-          {props.badge}
+    // Alternating section: slate-50 background
+    <section id="methodology" className="border-y border-slate-200 bg-[#DDE8F1] py-10 lg:py-12">
+      <PageShell>
+        <div className="grid gap-16 lg:grid-cols-2">
+          <FaqColumn title="Methodological choices" subtitle="Built to be checked, not trusted blindly." items={methodology} />
+          <FaqColumn title="Questions analysts ask before subscribing" subtitle="Direct answers before the pricing decision." items={questions} />
         </div>
-      ) : null}
+      </PageShell>
+    </section>
+  );
+}
 
-      <div className="flex items-start justify-between gap-5">
-        <h3 className="text-[15px] font-black uppercase tracking-[0.22em] text-white">
-          {props.name}
-        </h3>
-        <div className={`rounded-full px-4 py-1.5 text-[12px] font-black ${pillClass}`}>
-          {props.pill}
-        </div>
+function FaqColumn({ title, subtitle, items }: { title: string; subtitle: string; items: string[][] }) {
+  return (
+    <article>
+      <h2 className="text-[32px] font-bold tracking-[-0.025em] text-[#061B36]">{title}</h2>
+      <p className="mt-3 text-[15px] text-slate-600">{subtitle}</p>
+      <div className="mt-8">
+        {items.map(([question, answer]) => (
+          <details key={question} className="group border-b border-slate-200 py-5">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[14px] font-semibold text-[#061B36]">
+              {question}
+              <span className="shrink-0 text-[#B46A22] transition group-open:rotate-45">+</span>
+            </summary>
+            <p className="mt-4 text-[13px] font-normal leading-7 text-slate-700">{answer}</p>
+          </details>
+        ))}
       </div>
-
-      <div className="mt-5 text-[46px] font-black leading-none tracking-[-0.055em] text-white">
-        {props.price}
-      </div>
-
-      <p className="mt-7 text-[19px] font-black leading-7 text-white">
-        {props.headline}
-      </p>
-
-      <p className="mt-4 max-w-[460px] text-[16px] font-medium leading-7 text-[#eef5ff]">
-        {props.body}
-      </p>
-
-      <p className="mt-auto pt-8 text-[16px] leading-7 text-[#bfd2ea]">
-        {props.bestFor}
-      </p>
-
-      <Link
-        href={props.href}
-        className={`mt-7 inline-flex h-[52px] w-fit items-center justify-center rounded-full px-7 text-[15px] font-black transition ${buttonClass}`}
-      >
-        {props.cta}
-      </Link>
     </article>
   );
 }
 
-export default async function HomePage() {
-  const dataset: DatasetManifest | null = await readDatasetManifest();
+// ─── Pricing ──────────────────────────────────────────────────────────────────
 
-  const [
-    landingPayload,
-    statusPayload,
-    metaFallbackRows,
-    historyDepthDays,
-    landingHeroMap,
-    jsonExampleCodeMap,
-    primaryChangeMap,
-  ] = await Promise.all([
-    readPublishedJson<LandingApiResponse>("data/published/v1/landing/index.json"),
-    readPublishedJson<StatusApiResponse>("data/published/v1/status/index.json"),
-    buildMetaFallbackRows(),
+function PricingSection({ publishedDays }: { publishedDays: string }) {
+  const plans = [
+    {
+      title: "Free",
+      price: "$0",
+      period: "",
+      note: "Public charts & sample JSON",
+      bullets: ["Public chain context", "Sample JSON", "Limited history", "Community support"],
+      cta: "Get started",
+      href: "/status",
+      featured: false,
+    },
+    {
+      title: "Single Chain",
+      price: "$49",
+      period: "/mo",
+      note: "One chain · full JSON",
+      bullets: ["One chain of your choice", "Gold, Derived, Meta, Brief JSON", "Historical access", "Email support"],
+      cta: "Choose a chain",
+      href: "/api/v1/checkout?plan=basic",
+      featured: false,
+    },
+    {
+      title: "Full Access",
+      price: "$149",
+      period: "/mo",
+      note: "All chains · full access",
+      bullets: ["BTC, ETH, ARB, BASE", "Cross-chain Briefs", `${publishedDays} published-day archive`, "Priority support"],
+      cta: "Get full access",
+      href: "/api/v1/checkout?plan=pro",
+      featured: true,
+    },
+  ];
+
+  return (
+    <section id="pricing" className="border-y border-[#061B36]/20 bg-[#DDE8F1] py-10 lg:py-12">
+      <PageShell>
+        <SectionTitle
+          eyebrow="Pricing"
+          title="Simple, transparent pricing"
+          subtitle="All paid plans include daily Gold, Derived, Meta, and Brief JSON. Start free; upgrade when you need API access."
+        />
+        <div className="mt-4 grid gap-6 lg:grid-cols-3">
+          {plans.map((plan) => (
+            <div
+              key={plan.title}
+              className="relative rounded-2xl border border-[#6FB7E8]/70 bg-[#061B36] p-8 text-[#F7F3E8]"
+            >
+              <div className="text-[13px] font-black uppercase tracking-[0.08em] text-[#F7F3E8]">
+                {plan.title}
+              </div>
+              <div className="mt-4 flex items-end gap-1">
+                <span className="text-[52px] font-black tracking-[-0.06em] text-[#F7F3E8]">{plan.price}</span>
+                {plan.period ? <span className="mb-3 text-[16px] font-normal text-[#F7F3E8]/72">{plan.period}</span> : null}
+              </div>
+              <p className="mt-1 text-[13px] font-black text-[#6FB7E8]">{plan.note}</p>
+              <ul className="mt-7 grid min-h-[120px] gap-3 text-[13px]">
+                {plan.bullets.map((bullet) => (
+                  <li key={bullet} className="flex gap-3 text-[#F7F3E8]/86">
+                    <span className="text-[#B46A22]">✓</span>
+                    <span>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href={plan.href}
+                className="mt-8 inline-flex w-full items-center justify-center rounded-xl bg-[#B46A22] py-3 text-[14px] font-bold text-[#F7F3E8] transition hover:bg-[#9f5f1f]"
+              >
+                {plan.cta} →
+              </Link>
+            </div>
+          ))}
+        </div>
+      </PageShell>
+    </section>
+  );
+}
+
+// ─── Footer ───────────────────────────────────────────────────────────────────
+
+function SiteFooter() {
+  return (
+    <footer className="border-t border-slate-200 border-t border-slate-300 bg-[#DDE8F1] py-8">
+      <PageShell className="flex flex-col gap-5 text-[13px] text-slate-600 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <img src="/web-bilder/ygg-transparent.png" alt="" className="h-7 w-7 object-contain opacity-40" />
+          <span>© 2026 Urd Atlas. On-chain reference data. No price data. No forecasts. No recommendations.</span>
+        </div>
+        <div className="flex flex-wrap gap-5">
+          <Link href="/status" className="hover:text-slate-700">Status</Link>
+          <Link href="/privacy" className="hover:text-slate-700">Privacy</Link>
+          <Link href="/terms" className="hover:text-slate-700">Terms</Link>
+          <Link href="/api-docs" className="hover:text-slate-700">Docs</Link>
+        </div>
+      </PageShell>
+    </footer>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default async function HomePage() {
+  const [bundle, dataset, historyDepthDays, samples] = await Promise.all([
+    loadSiteBriefBundle(),
+    readDatasetManifest().catch(() => null),
     computeHistoryDepthDays().catch(() => null),
-    buildLandingHeroMap(),
-    buildJsonExampleCodeMap(),
-    buildPrimaryChangeMap(),
+    buildJsonSamples(),
   ]);
 
-  const landingChains = extractLandingChains(landingPayload);
-  const statusRows =
-    Array.isArray(statusPayload?.chains) && statusPayload.chains.length > 0
-      ? statusPayload.chains.map((row) => withLandingHero(row, landingHeroMap.get(row.chain)))
-      : [];
-
-  const landingFallbackRows: StatusApiRow[] = CHAIN_LIST.map((chain) => {
-    const landing = landingChains.find((row) => row.chain === chain.id);
-    const hero = landingHeroMap.get(chain.id);
-    const displayAsOf = heroDisplayAsOf(hero);
-    const asOf = displayAsOf ?? landing?.as_of ?? null;
-    const lagDays =
-      displayAsOf !== null
-        ? lagDaysFromIsoDay(asOf ?? undefined)
-        : landing?.lag_days ?? lagDaysFromIsoDay(asOf ?? undefined);
-
-    return {
-      chain: chain.id,
-      name: landing?.name ?? chain.name,
-      label: landing?.label ?? chain.label,
-      as_of: asOf,
-      display_asof: displayAsOf,
-      regime_asof: heroRegimeAsOf(hero),
-      lag_days: lagDays,
-      status: classifyStatus({ chain: chain.id, lagDays, asOf }),
-      published_regime: landing?.status_label ?? null,
-      confidence_score: landing?.confidence_score ?? null,
-      expected_delay_days: expectedDelayDays(chain.id),
-    };
-  });
-
-  const normalizedMetaFallbackRows = metaFallbackRows.map((row) =>
-    withLandingHero(row, landingHeroMap.get(row.chain)),
-  );
-
-  const rows =
-    statusRows.length > 0
-      ? statusRows
-      : metaFallbackRows.some(
-          (row) =>
-            row.published_regime !== null ||
-            row.confidence_score !== null ||
-            row.as_of !== null ||
-            row.lag_days !== null,
-        )
-      ? normalizedMetaFallbackRows
-      : landingFallbackRows;
-
-  const displayRows = rows.map(toSurfaceRowDisplay);
+  const rows = await buildLatestContextRows(bundle);
+  const briefExample = await buildBriefExample(bundle);
   const publishedDays =
     typeof historyDepthDays === "number" && Number.isFinite(historyDepthDays)
       ? historyDepthDays.toLocaleString("en-GB")
-      : "412";
-  const lastDataLoad =
-    formatDataLoad(statusPayload?.generated_at_utc) ?? formatDataLoad(dataset?.published_at ?? null) ?? "Updated daily";
+      : "published";
+  const datasetStamp = datasetPublishedAt(dataset);
 
   return (
-    <main className="min-h-screen bg-[#edf6ff] text-[#0a1d3a]">
-      <section className="relative isolate overflow-hidden bg-[#031329] text-white">
-        <div className="relative z-20 border-b border-white/8 bg-[#031329]/96 px-4 py-2 text-center text-[14px] font-semibold leading-6 text-white/82">
-          Three subscription levels: Free, Single Chain $49/mo, and Research $149/mo.{" "}
-          <a
-            href="#pricing"
-            className="font-extrabold text-blue-300 underline decoration-blue-300/40 underline-offset-4 hover:text-blue-200"
-          >
-            Click for more
-          </a>
-          <span className="mx-2 text-white/35">·</span>
-          <a
-            href={WHITEPAPER_HREF}
-            download
-            className="font-extrabold text-cyan-200 underline decoration-cyan-200/40 underline-offset-4 hover:text-white"
-          >
-            Download whitepaper
-          </a>
-          .
-        </div>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_8%,rgba(44,109,255,0.12),transparent_28%),linear-gradient(180deg,#031329_0%,#041327_100%)]" />
+    <main className="min-h-screen bg-[#DDE8F1] text-[#061B36]">
+      <HeroSection rows={rows} />
 
-          <div className="pointer-events-none absolute right-[4%] top-[86px] hidden lg:block">
-            <div className="relative h-[250px] w-[250px] opacity-[0.24] xl:h-[360px] xl:w-[360px]">
-              <Image
-                src="/web-bilder/ygg-transparent.png"
-                alt=""
-                fill
-                sizes="(min-width: 1280px) 360px, 250px"
-                className="object-contain"
-                priority
-              />
-            </div>
-          </div>
+      {/* Publication marker */}
+      <div className="border-y border-slate-200 bg-[#DDE8F1] py-3 text-center text-[11px] font-semibold text-slate-600">
+        Dataset publication marker: {datasetStamp}. Data cadence is daily, not intraday.
+      </div>
 
-        <SectionShell className="relative pb-6 pt-[78px] md:pb-8 md:pt-[90px] lg:pb-6 lg:pt-[96px]">
-
-            <div className="max-w-[820px]">
-              <h1 className="max-w-[820px] text-[48px] font-black leading-[0.98] tracking-[-0.055em] text-white sm:text-[54px] lg:text-[62px]">
-                Separate blockchain noise
-                <span className="block text-[#2f7cff]">from structural change.</span>
-              </h1>
-              <p className="mt-6 max-w-[820px] text-[19px] font-semibold leading-7 text-white/88 sm:text-[20px]">
-                A daily regime label for your blockchain data. JSON. Versioned. Hash-anchored. Joins on date and chain.
-              </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-
-
-              <Link
-                href="/methodology"
-                className="inline-flex h-12 min-w-[240px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_14px_30px_rgba(37,99,235,0.32)] transition hover:bg-blue-700"
-              >
-                Methodology & JSON fields →
-              </Link>
-              <Link
-                href="/api-docs"
-                className="inline-flex h-12 min-w-[170px] items-center justify-center rounded-[8px] bg-blue-600 px-6 text-[14px] font-extrabold text-white shadow-[0_14px_30px_rgba(37,99,235,0.32)] transition hover:bg-blue-700"
-              >
-                View API Docs
-              </Link>
-              <Link
-                href="/api-docs/samples"
-                className="inline-flex h-12 min-w-[190px] items-center justify-center rounded-[8px] border border-blue-300/45 bg-white/8 px-6 text-[14px] font-extrabold text-blue-100 shadow-[0_14px_30px_rgba(3,19,41,0.22)] transition hover:bg-white/14 hover:text-white"
-              >
-                Open sample pack →
-              </Link>
-            </div>
-
-          </div>
-        </SectionShell>
-
-        <WorkflowUseCaseSection />
-      </section>
-
-        <RegimeBriefsLandingSection />
-
-        <HeroJsonPeek />
-
-        <RegimeStatesSection />
-
-        <DailyResolutionSection />
-
-        <section className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_100%)] py-10">
-          <SectionShell>
-            <div className="flex items-start justify-between gap-6">
-              <div>
-                <div className="text-[13px] font-black uppercase tracking-[0.12em] text-[#0d2447]">
-                  Today&apos;s published labels
-                </div>
-                <p className="mt-1 text-[14px] font-medium leading-5 text-[#557099]">
-                  Published by the latest pipeline run. Click any chain card to open the full chain view and history.
-                </p>
-              </div>
-
-              <p className="shrink-0 pt-0.5 text-right text-[13px] font-medium leading-5 text-[#7187a8]">
-                Last data load: {lastDataLoad}
-              </p>
-            </div>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {displayRows.slice(0, 4).map((row) => (
-                <StatusCard
-                  key={row.chain}
-                  row={row}
-                  primaryChange={primaryChangeMap.get(row.chain)}
-                />
-              ))}
-            </div>
-          </SectionShell>
-        </section>
-
-        <BuyerDecisionSection />
-
-        <AnalystQuestionsSection />
-
-        <WhoThisIsFor />
-
-      <section className="relative bg-[linear-gradient(180deg,#eaf5ff_0%,#f5f9ff_58%,#eef6ff_100%)] pb-0 pt-10">
-        <SectionShell>
-
-
-
-
-            <div
-              id="json-layers"
-              className="mt-16 scroll-mt-20 px-0 py-0 text-[#0d2447]"
-            >
-            <div className="max-w-[1200px]">
-              <h2 className="text-[34px] font-black leading-tight tracking-[-0.04em] text-[#0d2447]">
-                Reference data delivered as JSON
-              </h2>
-              <p className="mt-4 max-w-[980px] text-[17px] font-medium leading-8 text-[#37547b]">
-                Each chain is published as three compact reference layers with distinct roles: Gold observations, Derived transforms, and Meta regime and confidence context.
-              </p>
-            </div>
-
-            <div className="mt-8 grid gap-5 lg:grid-cols-3">
-              <JsonLayerCard
-                tone="gold"
-                title="Gold"
-                subtitle="Raw observations"
-                description="Gold is built around factual daily on-chain metrics: activity, fees, utilization, friction, and network usage."
-              />
-
-              <JsonLayerCard
-                tone="meta"
-                title="Meta"
-                subtitle="Regime reference layer"
-                description="Meta is the reference layer for the published regime label, confidence score, freshness, and the drivers explaining why the label fired."
-              />
-
-              <JsonLayerCard
-                tone="derived"
-                title="Derived"
-                subtitle="Trend baselines"
-                description="Derived is built around moving averages and relative-position metrics that separate short-term noise from structural change."
-              />
-            </div>
-
-            <div className="mt-8 rounded-[28px] border border-[#9cc7ff]/60 bg-[linear-gradient(135deg,rgba(255,255,255,0.92)_0%,rgba(234,245,255,0.86)_52%,rgba(218,237,255,0.80)_100%)] p-6 shadow-[0_22px_70px_rgba(13,36,71,0.12)] backdrop-blur md:p-7 lg:grid lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)] lg:items-center lg:gap-8">
-              <div>
-                <div className="inline-flex rounded-full border border-[#2f7cff]/22 bg-[#2f7cff]/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#1d5fce]">
-                  Public sample pack
-                </div>
-                <h3 className="mt-4 max-w-[760px] text-[28px] font-black leading-tight tracking-[-0.035em] text-[#0d2447]">
-                  Test it against your own data before you subscribe.
-                </h3>
-                <p className="mt-3 max-w-[820px] text-[16px] font-semibold leading-7 text-[#37547b]">
-                  We cannot prove our thresholds are the only right ones. What we can prove is that they are consistent, published, and that every named label we publish is verifiable against its determinism hash. Download the sample pack, run the verification script, and join it against your own historical data. That is the only honest way to know whether this is useful for you.
-                </p>
-              </div>
-
-              <div className="mt-6 rounded-[22px] border border-[#c7dcf5] bg-white/82 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_12px_34px_rgba(13,36,71,0.08)] lg:mt-0">
-                <div className="grid gap-2 text-[13px] font-bold leading-5 text-[#48688f]">
-                  <div className="flex items-center justify-between gap-4 rounded-[14px] bg-[#edf6ff] px-4 py-3">
-                    <span>Gold / Derived / Meta</span>
-                    <span className="text-[#0d2447]">real JSON</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-[14px] bg-[#edf6ff] px-4 py-3">
-                    <span>High + degraded examples</span>
-                    <span className="text-[#0d2447]">pre-purchase</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-[14px] bg-[#edf6ff] px-4 py-3">
-                    <span>Verification-ready fields</span>
-                    <span className="text-[#0d2447]">audit path</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                  <Link
-                    href="/api-docs/samples"
-                    className="inline-flex h-11 items-center justify-center rounded-full bg-[#2f7cff] px-5 text-[13px] font-black text-white shadow-[0_14px_34px_rgba(47,124,255,0.24)] transition hover:-translate-y-0.5 hover:bg-[#2368dd]"
-                  >
-                    Open sample pack →
-                  </Link>
-                  <a
-                    href="#json-example-picker"
-                    className="inline-flex h-11 items-center justify-center rounded-full border border-[#2f7cff]/25 bg-white px-5 text-[13px] font-black text-[#1d5fce] transition hover:-translate-y-0.5 hover:bg-[#eef6ff]"
-                  >
-                    View examples →
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <div
-              id="json-after-example"
-              className="mt-8 scroll-mt-24 rounded-[22px] border border-[#b8d8ff] bg-white/76 px-5 py-4 shadow-[0_18px_55px_rgba(13,36,71,0.10)] backdrop-blur sm:flex sm:items-center sm:justify-between sm:gap-6"
-            >
-              <p className="text-[15px] font-extrabold leading-7 text-[#0d2447]">
-                This is what subscribers receive every day.
-              </p>
-              <a
-                href="#pricing"
-                className="mt-3 inline-flex h-11 items-center justify-center rounded-full border border-[#2f7cff]/25 bg-[#2f7cff] px-5 text-[13px] font-black text-white shadow-[0_14px_34px_rgba(47,124,255,0.24)] transition hover:-translate-y-0.5 hover:bg-[#2368dd] sm:mt-0"
-              >
-                See plans →
-              </a>
-            </div>
-          </div>
-
-          <JsonExamplePickerModal />
-
-          <JsonExampleModal
-            tone="gold"
-            confidence="high"
-            title="Gold"
-            subtitle="Gold is factual daily data. This example uses the date selected from the highest readable Meta confidence score."
-            example={jsonExampleCodeMap.gold_high}
-          />
-          
-
-          <JsonExampleModal
-            tone="gold"
-            confidence="degraded"
-            title="Gold"
-            subtitle="Gold remains factual. This example uses the date selected from the lowest readable Meta confidence score."
-            example={jsonExampleCodeMap.gold_degraded}
-          />
-
-          <JsonExampleModal
-            tone="meta"
-            confidence="high"
-            title="Meta"
-            subtitle="Meta directly carries confidence, regime, freshness, and driver context. This example is selected from the highest readable confidence score."
-            example={jsonExampleCodeMap.meta_high}
-          />
-          <JsonExampleModal
-            tone="meta"
-            confidence="degraded"
-            title="Meta"
-            subtitle="This degraded Meta example is selected from the lowest readable confidence score, so users can inspect caveats and weaker evidence directly."
-            example={jsonExampleCodeMap.meta_degraded}
-          />
-
-          <JsonExampleModal
-            tone="derived"
-            confidence="high"
-            title="Derived"
-            subtitle="Derived fields are calculated from Gold. This example uses the same high-confidence chain/date selected from Meta."
-            example={jsonExampleCodeMap.derived_high}
-          />
-          <JsonExampleModal
-            tone="derived"
-            confidence="degraded"
-            title="Derived"
-            subtitle="This degraded Derived example uses the same low-confidence chain/date selected from Meta."
-            example={jsonExampleCodeMap.derived_degraded}
-          />
-
-          <div className="mt-14 px-2 text-center">
-            <h2 className="text-[26px] font-black tracking-[-0.02em] text-[#0d2447]">
-              Get started in 3 easy steps
-            </h2>
-            <div className="mx-auto mt-7 grid max-w-[900px] gap-6 md:grid-cols-3 md:gap-8">
-              <StepItem number="1" title="Choose a plan" note="Pick the right plan for your needs" />
-              <StepItem number="2" title="Get API access" note="Instant access to the JSON API" />
-              <StepItem number="3" title="Pull JSON" note="Integrate and start building" />
-            </div>
-          </div>
-
-          <div className="mt-14 -mx-5 bg-[#031329] px-5 py-10 sm:-mx-7 sm:px-7 lg:-mx-10 lg:px-10 2xl:-mx-16 2xl:px-16">
-            <div id="pricing" className="mx-auto w-full">
-              <div className="grid gap-7 xl:grid-cols-3">
-                <PlanCard
-                  tone="free"
-                  name="Free"
-                  price="$0"
-                  pill="Public surface"
-                  headline="Full web surface — no API access."
-                  body="Track record, status, methodology, glossary, thresholds, and schema reference. The same published reference data subscribers receive — readable on-site, not downloadable."
-                  bestFor="Best for: exploring the product before subscribing."
-                  href="/status"
-                  cta="Open public surface →"
-                />
-                <PlanCard
-                  tone="basic"
-                  name="Single Chain"
-                  price="$49/mo"
-                  pill="1 chain · 90d · JSON"
-                  headline="One chain. API access. 90-day history."
-                  body="Daily on-chain reference data for one chain of your choice — BTC, ETH, ARB, or BASE. Gold, Derived, and Meta JSON delivered via authenticated API."
-                  bestFor="Best for: independent analysts validating the dataset against one chain."
-                  href="/api/v1/checkout?plan=basic"
-                  cta="Start Single Chain →"
-                />
-                <PlanCard
-                  tone="pro"
-                  name="Research"
-                  price="$149/mo"
-                  pill="4 chains · 365d · JSON"
-                  headline="All four chains. API access. 365-day history."
-                  body="Daily on-chain reference data across BTC, ETH, ARB, and BASE. Gold, Derived, and Meta JSON delivered via authenticated API. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
-                  bestFor="Best for: multi-chain research, backtesting, and production pipelines."
-                  href="/api/v1/checkout?plan=pro"
-                  cta="Start Research →"
-              
-                />
-              </div>
-            </div>
-
-          </div>
-
-        </SectionShell>
-      </section>
+      {/* Alternating sections: white → slate-50 → white → slate-50 → dark → white → slate-50 → white */}
+      <PathsSection />           {/* white */}
+      <BriefContrastSection example={briefExample} />  {/* slate-50 */}
+      <PipelineWorkflowSection />  {/* white */}
+      <WhatYouReceiveSection />   {/* slate-50 */}
+      <RegimeVocabularySection />  {/* dark navy */}
+      <JsonSamplesSection samples={samples} />  {/* white + dark inner */}
+      <MethodologyFaqSection />   {/* slate-50 */}
+      <PricingSection publishedDays={publishedDays} />  {/* white */}
+      <SiteFooter />
     </main>
   );
 }
