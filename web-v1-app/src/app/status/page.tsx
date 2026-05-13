@@ -5,21 +5,10 @@ import Link from "next/link";
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { readStorageObject } from "@/lib/storage";
-import RegimeBadge from "@/components/RegimeBadge";
-import StalenessBar from "@/components/ui/StalenessBar";
 import ChainIcon from "@/components/ChainIcon";
-
-import ShortFullContent from "@/components/site/ShortFullContent";
-
-import PageHero from "@/components/site/PageHero";
-import { UrdContainer, UrdPage, cx } from "@/components/site/UrdDesignSystem";
-import { UrdHashModal, UrdHashModalClose, UrdHashModalTrigger } from "@/components/site/UrdHashModal";
+import { UrdContainer, UrdPage } from "@/components/site/UrdDesignSystem";
 
 import "server-only";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 type StatusRow = {
   chain: ChainId;
@@ -56,9 +45,7 @@ type MetaLatest = {
   profile?: { label?: string };
 };
 
-// ---------------------------------------------------------------------------
-// Shared UI primitives
-// ---------------------------------------------------------------------------
+type ExplainPair = { basic: ReactNode; advanced: ReactNode; traceability?: ReactNode };
 
 function ModalStyles() {
   return (
@@ -67,6 +54,8 @@ function ModalStyles() {
         __html: `
           .ta-modal { display: none; }
           .ta-modal:target { display: flex; }
+          .ta-summary { list-style: none; }
+          .ta-summary::-webkit-details-marker { display: none; }
         `,
       }}
     />
@@ -74,14 +63,19 @@ function ModalStyles() {
 }
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return <code className="rounded border border-[var(--urd-border)] bg-[var(--urd-raised)] px-1 py-0.5 text-[var(--urd-text-strong)] font-mono text-xs">{children}</code>;
+  return <code className="font-mono text-[12px] text-[#D9AB4A]">{children}</code>;
 }
 
-function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
-  return <UrdHashModalTrigger id={id}>{label}</UrdHashModalTrigger>;
+function TextLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      className="inline-flex items-center gap-2 border-b border-[rgba(196,146,48,.20)] pb-[1px] font-mono text-[11px] uppercase tracking-[0.08em] text-[#C49230] transition hover:border-[#C49230] hover:text-[#D9AB4A]"
+    >
+      {children}
+    </a>
+  );
 }
-
-type ExplainPair = { basic: ReactNode; advanced: ReactNode; traceability?: ReactNode };
 
 function ExplainModal({
   id,
@@ -95,44 +89,47 @@ function ExplainModal({
   pair: ExplainPair;
 }) {
   return (
-    <UrdHashModal id={id}>
-      <UrdHashModalClose className={"fixed inset-0 z-40 bg-[#031329]/55 backdrop-blur-sm"} ariaLabel="Close dialog">
-        <span className="sr-only">Close dialog</span>
-      </UrdHashModalClose>
-      <div className={"fixed left-1/2 top-1/2 z-50 flex max-h-[86vh] w-[min(92vw,980px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-[#9db8d4] bg-[#e1eefb] text-[#0a1d3a] shadow-[0_30px_90px_rgba(3,19,41,0.35)]"}>
-        <div className={"flex items-start justify-between gap-6 border-b border-[#9db8d4] bg-[#d5e8f8] px-6 py-5"}>
+    <div id={id} className="ta-modal fixed inset-0 z-[180] items-center justify-center p-4">
+      <a href="#" className="absolute inset-0 bg-[#080F1A]/88" aria-label="Close dialog" />
+      <div className="relative z-10 flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-[8px] border border-[rgba(232,224,208,.14)] bg-[#111E30]">
+        <div className="flex items-start justify-between gap-6 border-b border-[rgba(232,224,208,.07)] px-6 py-5">
           <div>
-            <h3 className="text-2xl font-black text-[var(--urd-text-strong)]">{title}</h3>
-            {subtitle ? <div className="mt-2 text-sm font-semibold leading-6 text-[var(--urd-text-body)]">{subtitle}</div> : null}
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Status page</div>
+            <h3 className="mt-2 font-[var(--serif)] text-[30px] leading-[1.1] text-[#E8E0D0]">{title}</h3>
+            {subtitle ? (
+              <div className="mt-3 max-w-3xl text-[14px] leading-7 text-[#7A8A96]">{subtitle}</div>
+            ) : null}
           </div>
-          <UrdHashModalClose className={"inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#9db8d4] bg-[#eef6ff] text-xl font-semibold text-[#0a1d3a] shadow-sm transition hover:bg-white"}>×</UrdHashModalClose>
+          <a
+            href="#"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[3px] border border-[rgba(232,224,208,.14)] font-mono text-[14px] text-[#E8E0D0] transition hover:border-[rgba(232,224,208,.22)] hover:bg-[#162840]"
+            aria-label="Close dialog"
+          >
+            ×
+          </a>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
-          <div className={"grid gap-4 md:grid-cols-2"}>
-            <section className={"rounded-2xl border border-[#9db8d4] bg-[#eef6ff] p-4 text-[#0a1d3a] shadow-sm"}>
-              <div className={cx("text-xs font-semibold uppercase tracking-[0.16em] text-[#0d2447]", "text-emerald-800")}>Basic</div>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.basic}</div>
+        <div className="overflow-y-auto px-6 py-6">
+          <div className="grid gap-10 lg:grid-cols-2">
+            <section>
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Basic</div>
+              <div className="mt-3 text-[15px] leading-[1.82] text-[#7A8A96]">{pair.basic}</div>
             </section>
-            <details className={"rounded-2xl border border-[#9db8d4] bg-[#dcecf8] p-4 text-[#0a1d3a] shadow-sm"} open>
-              <summary className={cx("text-xs font-semibold uppercase tracking-[0.16em] text-[#0d2447]", "cursor-pointer list-none")}>Advanced</summary>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.advanced}</div>
-            </details>
+            <section>
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Advanced</div>
+              <div className="mt-3 text-[15px] leading-[1.82] text-[#7A8A96]">{pair.advanced}</div>
+            </section>
           </div>
           {pair.traceability ? (
-            <div className="mt-4 rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-raised)] p-5">
-              <div className={"text-xs font-semibold uppercase tracking-[0.16em] text-[#0d2447]"}>Traceability</div>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.traceability}</div>
-            </div>
+            <section className="mt-8 border-t border-[rgba(232,224,208,.07)] pt-6">
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Traceability</div>
+              <div className="mt-3 text-[14px] leading-[1.82] text-[#7A8A96]">{pair.traceability}</div>
+            </section>
           ) : null}
         </div>
       </div>
-    </UrdHashModal>
+    </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Data helpers
-// ---------------------------------------------------------------------------
 
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
   return new TextDecoder("utf-8").decode(new Uint8Array(buffer));
@@ -164,7 +161,12 @@ function parseIsoDayToOsloMs(date?: string | null): number | null {
 
 function osloTodayMs(): number {
   const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Oslo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
   const get = (t: string) => Number(parts.find((part) => part.type === t)?.value ?? "0");
   return Date.UTC(get("year"), get("month") - 1, get("day"));
 }
@@ -177,37 +179,52 @@ function lagDaysFromIsoDay(date?: string | null): number | null {
 }
 
 function heroDisplayAsOf(hero?: LandingHero | null): string | null {
-  return hero?.display_asof ?? hero?.asof?.display ?? hero?.asof?.latest_available ?? hero?.asof?.gold ?? hero?.asof?.derived ?? hero?.asof?.meta ?? null;
+  return (
+    hero?.display_asof ??
+    hero?.asof?.display ??
+    hero?.asof?.latest_available ??
+    hero?.asof?.gold ??
+    hero?.asof?.derived ??
+    hero?.asof?.meta ??
+    null
+  );
 }
 
 function confidenceBand(v?: number | null) {
-  if (typeof v !== "number") return "—";
+  if (typeof v !== "number") return "Unknown";
   if (v >= 0.7) return "Good";
   if (v >= 0.4) return "Caution";
   return "Degraded";
 }
 
-function bandChipClass(band: string) {
-  const base = "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium";
-  if (band === "Good") return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-800`;
-  if (band === "Caution") return `${base} border-amber-500/25 bg-amber-500/10 text-amber-800`;
-  if (band === "Degraded") return `${base} border-red-500/25 bg-red-500/10 text-red-800`;
-  return `${base} border-[var(--urd-border-soft)] bg-[var(--urd-raised)] text-[var(--urd-text-body)]`;
-}
-
-function healthChipClass(kind: "ok" | "warn" | "fail" | "unknown") {
-  const base = "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide";
-  if (kind === "ok") return `${base} border-emerald-500/25 bg-emerald-500/10 text-emerald-800`;
-  if (kind === "warn") return `${base} border-amber-500/25 bg-amber-500/10 text-amber-800`;
-  if (kind === "fail") return `${base} border-red-500/25 bg-red-500/10 text-red-800`;
-  return `${base} border-[var(--urd-border-soft)] bg-[var(--urd-raised)] text-[var(--urd-text-body)]`;
-}
-
 function healthText(kind: "ok" | "warn" | "fail" | "unknown") {
+  if (kind === "ok") return "On schedule";
+  if (kind === "warn") return "Soft staleness";
+  if (kind === "fail") return "Delayed";
+  return "Unknown";
+}
+
+function healthLabel(kind: "ok" | "warn" | "fail" | "unknown") {
   if (kind === "ok") return "OK";
   if (kind === "warn") return "WARN";
   if (kind === "fail") return "FAIL";
   return "UNKNOWN";
+}
+
+function healthClass(kind: "ok" | "warn" | "fail" | "unknown") {
+  if (kind === "ok") return "text-[#10B981]";
+  if (kind === "warn") return "text-[#C4843C]";
+  if (kind === "fail") return "text-[#9E4040]";
+  return "text-[#525E6E]";
+}
+
+function regimeClass(label?: string | null) {
+  const value = (label ?? "").toUpperCase();
+  if (value === "STABLE") return "text-[#10B981]";
+  if (value === "HEATING") return "text-[#C4843C]";
+  if (value === "CONGESTED") return "text-[#9E4040]";
+  if (value === "CHEAP") return "text-[#3D7099]";
+  return "text-[#525E6E]";
 }
 
 function datasetNotes(dataset: DatasetManifest | null): string[] {
@@ -252,82 +269,79 @@ async function buildStatusRows(): Promise<StatusRow[]> {
         lag_days: lagDays,
         status: deriveHealth({ lagDays, asOf, expectedDelayDays: delay }),
         published_regime: meta?.status?.label ?? meta?.regime?.label ?? null,
-        confidence_score: typeof meta?.confidence?.confidence_score === "number"
-          ? meta.confidence.confidence_score
-          : null,
+        confidence_score:
+          typeof meta?.confidence?.confidence_score === "number" ? meta.confidence.confidence_score : null,
         expected_delay_days: delay,
       };
     })
   );
 }
 
-// ---------------------------------------------------------------------------
-// Explanations
-// ---------------------------------------------------------------------------
+function chainNarrative(row: StatusRow) {
+  const band = confidenceBand(row.confidence_score);
+  if (row.status === "ok" && band === "Good") {
+    return "Published data is on its expected schedule and the evidence quality behind the label is strong.";
+  }
+  if (row.status === "ok" && band === "Caution") {
+    return "Published data is current, but evidence quality is moderate rather than strong. The row is usable, with more caution in interpretation.";
+  }
+  if (row.status === "ok" && band === "Degraded") {
+    return "Published data is current, but the evidence quality is degraded. Freshness is not the issue here; confidence is.";
+  }
+  if (row.status === "warn") {
+    return "Published data is slightly behind the chain’s usual cadence. The row is still shown, but freshness should be read with more caution.";
+  }
+  if (row.status === "fail") {
+    return "Published data is beyond the normal freshness boundary for this chain. Treat the latest row as delayed until the next expected publication arrives.";
+  }
+  return "Freshness cannot be classified from the latest available publication metadata.";
+}
+
+function cadenceCopy(chain: ChainId) {
+  if (chain === "arbitrum" || chain === "base") {
+    return "Expected ~7d · soft warning > 10d · hard fail > 15d";
+  }
+  return "Expected ~1d · soft warning > 2d · hard fail > 4d";
+}
 
 const howToReadExplain: ExplainPair = {
   basic: (
     <>
       <p>
-        This page answers one question: <span className="font-medium text-[var(--urd-text-strong)]">are
-        the published data files current and usable right now?</span> It does not say
-        anything about what markets are doing or what you should do.
+        This page answers one question: <span className="text-[#E8E0D0]">are the published data files current and usable right now?</span>
+        It does not say anything about what markets are doing or what a subscriber should do.
       </p>
-      <p className="mt-3">
-        Each chain shows two separate things that are easy to confuse:
-      </p>
-      <ul className="mt-2 list-disc space-y-2 pl-5">
+      <p className="mt-4">Each chain shows two separate things that are easy to confuse.</p>
+      <ul className="mt-4 list-disc space-y-2 pl-5">
         <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Health</span> is about freshness —
-          how old is the published row compared to what we expect? Bitcoin and Ethereum
-          should update roughly daily. Arbitrum and Base update roughly weekly by design.
-          If a chain falls behind its expected schedule, health degrades from OK to WARN
-          to FAIL.
+          <span className="text-[#E8E0D0]">Health</span> is freshness relative to expected cadence.
+          Bitcoin and Ethereum should update roughly daily. Arbitrum and Base update roughly weekly by design.
         </li>
         <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Confidence</span> is about evidence
-          quality — how strongly does the available data support the published regime
-          label? A row can be perfectly fresh but still have low confidence if the
-          underlying data is patchy or ambiguous.
+          <span className="text-[#E8E0D0]">Confidence</span> is evidence quality for the published label.
+          A row can be fresh and still degraded if the evidence surface is weak.
         </li>
       </ul>
-      <p className="mt-3">
-        A chain with Health OK and Confidence Good is the most reliable reading. A chain
-        with Health FAIL or Confidence Degraded should be read with caution.
-      </p>
     </>
   ),
   advanced: (
     <>
       <p>
-        The status page evaluates two orthogonal quality dimensions per chain. Health is
-        a staleness classification derived from{" "}
-        <InlineCode>confidence.lag_days_vs_utc_today</InlineCode> against the
-        chain-specific publication cadence policy (BTC/ETH: 1-day expected, warn at +2d,
-        fail at +4d; ARB/BASE: 7-day expected, warn at +9d, fail at +11d). Confidence is
-        a composite evidence-strength scalar from the meta layer, independent of lag.
+        Health is derived at render time from lag versus the chain-specific publication policy. Confidence is read from the latest
+        published meta artifact and measures the evidentiary strength behind the label.
       </p>
-      <p className="mt-3">
-        These dimensions can diverge in meaningful ways. A chain with lag = 0 and
-        confidence = 0.35 is fresh but epistemically weak — the data is current but the
-        evidence surface does not support a named regime label. Conversely, a chain with
-        lag = 5 and confidence = 0.85 is delayed but internally coherent — when it was
-        published, it was well-supported. The page surfaces both dimensions to prevent
-        either from silently masking the other.
-      </p>
-      <p className="mt-3">
-        Health is derived server-side at page render time, not read from a pre-computed
-        status field. The classification is: lag ≤ expected → OK; lag ≤ expected + 2 →
-        WARN; lag &gt; expected + 2 → FAIL; missing lag or as-of → UNKNOWN.
+      <p className="mt-4">
+        These dimensions are orthogonal. A chain can be delayed but internally coherent, or fresh but epistemically weak.
+        Both are shown to keep operational freshness from masking evidence quality and vice versa.
       </p>
     </>
   ),
   traceability: (
-    <ul className="list-disc pl-5">
-      <li>Source: latest published Meta artifact for each chain</li>
+    <ul className="list-disc space-y-2 pl-5">
+      <li>Source: latest published meta artifact per chain</li>
       <li>Lag field: <InlineCode>confidence.lag_days_vs_utc_today</InlineCode></li>
       <li>Confidence field: <InlineCode>confidence.confidence_score</InlineCode></li>
-      <li>Health derived at render time — not read from a pre-computed field</li>
+      <li>Health is derived at render time, not read from a stored status field</li>
     </ul>
   ),
 };
@@ -336,57 +350,33 @@ const cadenceExplain: ExplainPair = {
   basic: (
     <>
       <p>
-        Different blockchains publish at different speeds. This is not a bug — it is a
-        deliberate policy based on how long it takes to process each chain's data.
+        Different chains publish at different speeds by design. That means lag must always be interpreted relative to policy.
       </p>
-      <ul className="mt-3 list-disc space-y-2 pl-5">
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Bitcoin and Ethereum</span> — expected
-          to update roughly every day. If the data is more than 2 days behind, you will
-          see a yellow WARN. More than 4 days behind shows a red FAIL.
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Arbitrum and Base</span> — published
-          with an expected 7-day delay by design. Seeing "7 days lag" for these chains is
-          completely normal. WARN only shows above 10 days, FAIL above 15 days.
-        </li>
+      <ul className="mt-4 list-disc space-y-2 pl-5">
+        <li><span className="text-[#E8E0D0]">Bitcoin and Ethereum</span> are expected roughly daily.</li>
+        <li><span className="text-[#E8E0D0]">Arbitrum and Base</span> are intentionally published with an expected 7-day delay.</li>
       </ul>
-      <p className="mt-3">
-        The pipeline is generally scheduled to run twice daily, around 09:00 and 21:00
-        Europe/Oslo. These are expected publish windows, not guaranteed timestamps.
-      </p>
-      <p className="mt-3">
-        When you see a persistent banner on an Arbitrum or Base chain page saying the
-        data is 7 days old — that is expected behaviour, not a problem.
+      <p className="mt-4">
+        The operational pipeline generally checks for new upstream data twice daily around 09:00 and 21:00 Europe/Oslo.
       </p>
     </>
   ),
   advanced: (
     <>
       <p>
-        Publication cadence is chain-specific by design: BTC and ETH expect 1-day lag; ARB and BASE expect 7-day lag. The staleness thresholds are calibrated relative to expected lag, not relative to zero — which is why the same absolute lag value can be normal for one chain and anomalous for another.
+        BTC and ETH use a daily cadence policy: expected 1 day, soft warning above 2 days, hard fail above 4 days.
+        ARB and BASE use a weekly cadence policy: expected 7 days, soft warning above 10 days, hard fail above 15 days.
       </p>
-      <p className="mt-3">
-        The operational pipeline is generally scheduled to publish around 09:00 and 21:00
-        Europe/Oslo. In practice, visible availability can move slightly because of
-        AWS upstream publication timing, chain-specific lag characteristics, deployment timing, or
-        processing time. Urd Atlas checks for newly available upstream data twice daily.
-      </p>
-      <p className="mt-3">
-        The staleness classification table is: for BTC/ETH, soft warn at lag &gt; 2d,
-        hard fail at lag &gt; 4d; for ARB/BASE, soft warn at lag &gt; 10d, hard fail
-        at lag &gt; 15d. These thresholds are also used by the{" "}
-        <InlineCode>StalenessBar</InlineCode> component on individual chain pages, so
-        the status page and chain pages are consistent.
+      <p className="mt-4">
+        This is why the same absolute lag value can be normal for one chain and anomalous for another.
       </p>
     </>
   ),
   traceability: (
-    <ul className="list-disc pl-5">
-      <li>Expected publish windows: around 09:00 and 21:00 Europe/Oslo</li>
-      <li>BTC/ETH: expected 1d · warn &gt;2d · fail &gt;4d</li>
-      <li>ARB/BASE: expected 7d · warn &gt;10d · fail &gt;15d</li>
-      <li>Source: chain-specific public cadence policy described on this page</li>
+    <ul className="list-disc space-y-2 pl-5">
+      <li>Expected windows: around 09:00 and 21:00 Europe/Oslo</li>
+      <li>BTC / ETH: expected 1d · warn &gt; 2d · fail &gt; 4d</li>
+      <li>ARB / BASE: expected 7d · warn &gt; 10d · fail &gt; 15d</li>
     </ul>
   ),
 };
@@ -395,52 +385,27 @@ const confidenceExplain: ExplainPair = {
   basic: (
     <>
       <p>
-        The confidence score on this page is the same number shown on each chain page.
-        It tells you how well the available on-chain data supports the published regime
-        label — not how fresh the data is.
+        Confidence measures how strongly the available data supports the published label.
       </p>
-      <ul className="mt-3 list-disc space-y-2 pl-5">
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Good (≥ 0.70)</span> — strong
-          evidence. The regime label is well-supported and the scorecard can be read
-          normally.
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Caution (0.40–0.69)</span> — moderate
-          evidence. The label is still published but scorecard scores are pulled toward
-          neutral to avoid over-interpretation.
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Degraded (&lt; 0.40)</span> — weak
-          evidence. The published label is UNKNOWN/DEGRADED regardless of what the raw
-          metrics show.
-        </li>
+      <ul className="mt-4 list-disc space-y-2 pl-5">
+        <li><span className="text-[#E8E0D0]">Good</span> (≥ 0.70) means strong evidence.</li>
+        <li><span className="text-[#E8E0D0]">Caution</span> (0.40–0.69) means moderate evidence.</li>
+        <li><span className="text-[#E8E0D0]">Degraded</span> (&lt; 0.40) means weak evidence.</li>
       </ul>
     </>
   ),
   advanced: (
     <>
       <p>
-        Confidence is the geometric mean of <InlineCode>data_quality_score</InlineCode>{" "}
-        and <InlineCode>label_confidence_score</InlineCode>. Data quality reflects
-        completeness and coverage of the metric space; label confidence reflects how
-        strongly the evidence distinguishes the published label from adjacent labels.
+        Confidence is shown here as an operational diagnostic, not as a market signal.
+        It indicates how well the evidence surface distinguishes the published label from adjacent labels.
       </p>
-      <p className="mt-3">
-        On the status page, confidence is shown as a diagnostic alongside freshness —
-        not as a standalone signal. The most important operational use is identifying
-        chains where confidence has fallen below 0.40, which forces UNKNOWN/DEGRADED
-        regardless of axis structure. A subscriber whose pipeline depends on regime
-        labels should monitor this field to detect periods where published labels are
-        epistemically unreliable.
+      <p className="mt-4">
+        A degraded score means the row may still be published for traceability, but the label should be treated as low-trust.
       </p>
     </>
   ),
 };
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 
 export default async function StatusPage() {
   const dataset: DatasetManifest | null = await readDatasetManifest();
@@ -450,342 +415,346 @@ export default async function StatusPage() {
   const okCount = rows.filter((r) => r.status === "ok").length;
   const warnCount = rows.filter((r) => r.status === "warn").length;
   const failCount = rows.filter((r) => r.status === "fail").length;
-  const overallHealth = failCount > 0 ? "fail" : warnCount > 0 ? "warn" : "ok";
+  const goodConfidence = rows.filter((r) => confidenceBand(r.confidence_score) === "Good").length;
+  const degradedConfidence = rows.filter((r) => confidenceBand(r.confidence_score) === "Degraded").length;
 
   return (
-    <UrdPage>
-      <PageHero
-        eyebrow="System health"
-        title="Status"
-        summary="Freshness and confidence for every published chain. This page answers whether the published on-chain reference data is current and usable right now — not what to do about it."
-      />
-
-      <UrdContainer className="py-10">
+    <UrdPage className="bg-[#080F1A] text-[#E8E0D0]">
       <ModalStyles />
 
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="mb-10 rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
-        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="max-w-3xl">
-              <div className="text-xs font-medium uppercase tracking-[0.18em] text-blue-700">
-                System health
-              </div>
-              <h1 className="mt-3 text-4xl font-semibold leading-tight text-[var(--urd-text-strong)] sm:text-5xl">
-                Status
+      <header className="relative overflow-hidden border-b border-[rgba(232,224,208,.07)] bg-[linear-gradient(180deg,#080F1A_0%,#0D1F35_100%)]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_0%,rgba(42,110,122,.14),transparent_28rem),radial-gradient(circle_at_88%_10%,rgba(196,146,48,.08),transparent_26rem)]" />
+        <UrdContainer className="relative py-16 sm:py-20">
+          <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">System health</div>
+              <h1 className="mt-6 max-w-4xl font-[var(--serif)] text-[clamp(48px,5.5vw,82px)] font-normal leading-[1.02] tracking-[-0.035em] text-[#E8E0D0]">
+                Read <em className="text-[#D9AB4A] not-italic">freshness</em> and evidence quality
+                <br />
+                without confusing them.
               </h1>
-              <p className="mt-4 text-lg leading-8 text-[var(--urd-text-body)]">
-                Freshness and confidence for every published chain. This page answers
-                whether the published on-chain reference data is current and usable right now — not
-                what to do about it. Expected refresh windows are around 09:00 and 21:00
-                Europe/Oslo.
+              <p className="mt-6 max-w-3xl text-[15px] leading-[1.82] text-[#7A8A96]">
+                Status shows whether the latest published rows are current enough for operational use,
+                and whether confidence is strong enough for the published label to be read normally.
+                No price data. No forecasts. No recommendations.
               </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <MoreLink id="how-to-read-modal" label="How to read this page" />
-                <MoreLink id="cadence-modal" label="Publication cadence" />
-                <MoreLink id="confidence-modal" label="What confidence means here" />
+              <div className="mt-8 flex flex-wrap gap-6">
+                <TextLink href="#how-to-read">How to read this page →</TextLink>
+                <TextLink href="#cadence">Publication cadence →</TextLink>
+                <TextLink href="#confidence">Confidence bands →</TextLink>
+              </div>
+              <div className="mt-8 text-[14px] leading-7 text-[#7A8A96]">
+                Expected publish windows around <span className="text-[#E8E0D0]">09:00</span> and <span className="text-[#E8E0D0]">21:00 Europe/Oslo</span>.
               </div>
             </div>
 
-            {/* Overall health + dataset card */}
-            <div className="min-w-[220px] space-y-3">
-              <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-4 text-xs text-[var(--urd-text-body)]">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">
-                    Overall
-                  </div>
-                  <span className={healthChipClass(overallHealth)}>
-                    {healthText(overallHealth)}
-                  </span>
+            <section className="rounded-[5px] border border-[rgba(232,224,208,.14)] border-t-[rgba(196,146,48,.20)] bg-[#111E30] p-5">
+              <div className="flex items-center justify-between gap-4 border-b border-[rgba(232,224,208,.07)] pb-4">
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Latest published context</div>
+                  <div className="mt-2 text-[14px] leading-6 text-[#7A8A96]">Chain-relative freshness, not price-relative.</div>
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <div className="text-xl font-semibold text-emerald-800">{okCount}</div>
-                    <div className="text-[var(--urd-text-body)]">OK</div>
-                  </div>
-                  <div>
-                    <div className="text-xl font-semibold text-amber-800">{warnCount}</div>
-                    <div className="text-[var(--urd-text-body)]">WARN</div>
-                  </div>
-                  <div>
-                    <div className="text-xl font-semibold text-red-800">{failCount}</div>
-                    <div className="text-[var(--urd-text-body)]">FAIL</div>
-                  </div>
+                <div className="text-right font-mono text-[11px] leading-6 text-[#7A8A96]">
+                  {dataset?.published_at ? (
+                    <>
+                      <div>Published {dataset.published_at.slice(0, 10)}</div>
+                      {dataset?.version ? <div>Revision {dataset.version}</div> : null}
+                    </>
+                  ) : (
+                    <div>Latest dataset manifest loaded</div>
+                  )}
                 </div>
               </div>
-
-              <div className="rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-4 text-xs text-[var(--urd-text-body)]">
-                <div className="font-medium uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">Dataset</div>
-                {dataset?.version ? (
-                  <div className="mt-2">Revision <span className="font-semibold text-[var(--urd-text-strong)]">{dataset.version}</span></div>
-                ) : null}
-                {dataset?.published_at ? (
-                  <div className="mt-1">Published <span className="font-semibold text-[var(--urd-text-strong)]">{dataset.published_at.slice(0, 10)}</span></div>
-                ) : null}
-                {dataset?.methodology_version ? (
-                  <div className="mt-1">Methodology <InlineCode>{dataset.methodology_version}</InlineCode></div>
-                ) : null}
-                <div className="mt-1">
-                  Expected windows <span className="font-semibold text-[var(--urd-text-strong)]">~09:00 / ~21:00 Europe/Oslo</span>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-4 py-5 sm:grid-cols-3">
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Chains</div>
+                  <div className="mt-2 font-[var(--serif)] text-[34px] leading-none text-[#E8E0D0]">4</div>
                 </div>
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">On schedule</div>
+                  <div className="mt-2 font-[var(--serif)] text-[34px] leading-none text-[#10B981]">{okCount}</div>
+                </div>
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Delayed</div>
+                  <div className="mt-2 font-[var(--serif)] text-[34px] leading-none text-[#C4843C]">{warnCount + failCount}</div>
+                </div>
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Good confidence</div>
+                  <div className="mt-2 font-[var(--serif)] text-[34px] leading-none text-[#E8E0D0]">{goodConfidence}</div>
+                </div>
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Degraded confidence</div>
+                  <div className="mt-2 font-[var(--serif)] text-[34px] leading-none text-[#9E4040]">{degradedConfidence}</div>
+                </div>
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Methodology</div>
+                  <div className="mt-2 font-mono text-[13px] text-[#E8E0D0]">{dataset?.methodology_version ?? "v1"}</div>
+                </div>
+              </div>
+              <div className="border-t border-[rgba(232,224,208,.07)] pt-4 text-[13px] leading-6 text-[#7A8A96]">
+                Health = freshness relative to expected cadence. Confidence = evidence quality for the published label.
+              </div>
+            </section>
+          </div>
+        </UrdContainer>
+      </header>
+
+      <UrdContainer className="py-12">
+        <section className="border-b border-[rgba(232,224,208,.07)] pb-10">
+          <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Reading map</div>
+              <h2 className="mt-4 font-[var(--serif)] text-[clamp(32px,3.8vw,54px)] font-normal leading-[1.08] tracking-[-0.025em] text-[#E8E0D0]">
+                Two dimensions.
+              </h2>
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="reveal">
+                <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Health</div>
+                <p className="mt-3 text-[15px] leading-[1.82] text-[#7A8A96]">
+                  Freshness relative to the chain-specific publication policy. BTC and ETH are expected roughly daily.
+                  ARB and BASE are expected roughly weekly.
+                </p>
+              </div>
+              <div className="reveal">
+                <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Confidence</div>
+                <p className="mt-3 text-[15px] leading-[1.82] text-[#7A8A96]">
+                  Evidence quality for the published label. A row can be current and still degraded,
+                  or delayed and still internally coherent.
+                </p>
               </div>
             </div>
           </div>
-
-          {/* Reading map */}
-          <div className="mt-6 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-                  Two separate dimensions
-                </div>
-                <div className="mt-2 text-sm text-[var(--urd-text-strong)]">
-                  <span className="font-medium text-[var(--urd-text-strong)]">Health</span> = freshness relative to expected cadence ·{" "}
-                  <span className="font-medium text-[var(--urd-text-strong)]">Confidence</span> = evidence quality for the published label
-                </div>
-              </div>
-              <MoreLink id="how-to-read-modal" label="Full explanation" />
-            </div>
-          </div>
-          <div className="mt-4 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4 text-sm leading-7 text-[var(--urd-text-body)]">
-            Operational expectations, support response target, and revision / correction policy are documented at <Link href="/service" className="underline text-blue-700">/service</Link>.
-          </div>
-        </div>
-      </section>
-
-      <ShortFullContent
-        pageKey="status"
-        summary={<>This page tells you whether the currently published rows are usable right now, how fresh they are, and whether confidence is holding up independently of freshness.</>}
-        bullets={[
-          <>Status answers health first: are rows on schedule, slightly delayed, or materially stale for their chain-specific cadence.</>,
-          <>Confidence is shown alongside freshness, but it is a different question: evidence quality for the published label, not recency.</>,
-          <>BTC/ETH and ARB/BASE use different expected delay policies, so lag must be interpreted relative to chain cadence.</>,
-        ]}
-        whyItMatters={<>A user should be able to decide quickly whether today’s published rows are operationally safe enough for their workflow before reading the full policy.</>}
-        fullContent={
-          <>
-      {/* ── Per-chain staleness banners ───────────────────────────────────── */}
-      <section className="mb-8 space-y-3">
-        {rows.map((row) => (
-          <StalenessBar
-            key={`stale-${row.chain}`}
-            chain={row.chain}
-            lagDays={row.lag_days}
-            asOfDate={row.as_of ?? "—"}
-            confidenceScore={row.confidence_score}
-            showWhenOk={true}
-          />
-        ))}
-      </section>
-
-      {/* ── Status table ─────────────────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border border-[var(--urd-border)] bg-[var(--urd-panel)] shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--urd-border)] px-6 py-5">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-              Current state
-            </div>
-            <h2 className="mt-1 text-3xl font-semibold">Per-chain overview</h2>
-            <p className="mt-2 text-sm leading-7 text-[var(--urd-text-body)]">
-              Regime, confidence, and freshness for each chain from the latest published
-              meta artifact.
-            </p>
-          </div>
-          <MoreLink id="cadence-modal" label="Expected cadence" />
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-[var(--urd-panel-strong)] text-left">
-              <tr>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Chain</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Regime</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Confidence</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Band</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Lag</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">As of</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Expected delay</th>
-                <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Health</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {rows.map((row) => {
-                const band = confidenceBand(row.confidence_score);
-                return (
-                  <tr key={row.chain} className="hover:bg-[var(--urd-raised)]">
-                    <td className="px-5 py-4">
-                      <Link
-                        href={`/chains/${row.chain}`}
-                        className="inline-flex items-center gap-3 hover:text-blue-700"
-                      >
-                        <ChainIcon chain={row.chain} className="h-7 w-7 text-xs" label={`${row.label} icon`} />
-                        <span className="font-medium">{row.label || row.name}</span>
-                      </Link>
-                    </td>
-                    <td className="px-5 py-4">
-                      <RegimeBadge label={row.published_regime ?? "—"} />
-                    </td>
-                    <td className="px-5 py-4 font-mono text-xs">
-                      {typeof row.confidence_score === "number"
-                        ? row.confidence_score.toFixed(3)
-                        : "—"}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={bandChipClass(band)}>{band}</span>
-                    </td>
-                    <td className="px-5 py-4 font-mono text-xs">
-                      {row.lag_days !== null ? `${row.lag_days}d` : "—"}
-                    </td>
-                    <td className="px-5 py-4 font-mono text-xs">{fmtDate(row.as_of)}</td>
-                    <td className="px-5 py-4 font-mono text-xs">
-                      {row.expected_delay_days === 0 ? "~1d" : `~${row.expected_delay_days}d`}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={healthChipClass(row.status)}>
-                        {healthText(row.status)}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="border-t border-[var(--urd-border)] px-5 py-3 text-xs text-[var(--urd-text-body)]">
-          Source: latest published Meta artifact per chain ·
-          Health is derived at render time from lag vs expected cadence
-        </div>
-      </section>
-
-      {/* ── Cadence reference ────────────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border border-[var(--urd-border)] bg-[var(--urd-panel)] p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-              Publication policy
-            </div>
-            <h2 className="mt-1 text-2xl font-semibold">Expected cadence per chain</h2>
-          </div>
-          <MoreLink id="cadence-modal" label="Full explanation" />
-        </div>
-
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          {[
-            {
-              chains: "Bitcoin · Ethereum",
-              expected: "~1 day",
-              warn: "> 2 days",
-              fail: "> 4 days",
-              note: "Daily updates. A 1-day lag is normal.",
-              color: "border-emerald-300 bg-emerald-50",
-            },
-            {
-              chains: "Arbitrum · Base",
-              expected: "~7 days",
-              warn: "> 10 days",
-              fail: "> 15 days",
-              note: "Published with an intentional 7-day delay. Seeing 7d lag is normal.",
-              color: "border-amber-300 bg-amber-50",
-            },
-          ].map(({ chains, expected, warn, fail, note, color }) => (
-            <div key={chains} className={`rounded-2xl border p-5 ${color}`}>
-              <div className="text-sm font-semibold text-[var(--urd-text-strong)]">{chains}</div>
-              <p className="mt-1 text-xs leading-5 text-[var(--urd-text-body)]">{note}</p>
-              <div className="mt-4 grid grid-cols-3 gap-3 text-center text-xs">
-                <div className="rounded-xl border border-emerald-500/20 bg-[var(--urd-raised)] px-2 py-2">
-                  <div className="font-semibold text-emerald-800">OK</div>
-                  <div className="mt-1 text-[var(--urd-text-body)]">≤ {expected}</div>
-                </div>
-                <div className="rounded-xl border border-amber-500/20 bg-[var(--urd-raised)] px-2 py-2">
-                  <div className="font-semibold text-amber-800">WARN</div>
-                  <div className="mt-1 text-[var(--urd-text-body)]">{warn}</div>
-                </div>
-                <div className="rounded-xl border border-red-500/20 bg-[var(--urd-raised)] px-2 py-2">
-                  <div className="font-semibold text-red-800">FAIL</div>
-                  <div className="mt-1 text-[var(--urd-text-body)]">{fail}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Dataset notes */}
-      {notes.length > 0 ? (
-        <section className="mb-8 rounded-3xl border border-amber-300 bg-amber-50 p-6 shadow-sm">
-          <div className="text-xs font-medium uppercase tracking-[0.14em] text-amber-800">
-            Dataset notes
-          </div>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[var(--urd-text-strong)]">
-            {notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {/* ── Navigation strip ─────────────────────────────────────────────── */}
-      <section className="mt-10 rounded-3xl border border-[var(--urd-border)] bg-[var(--urd-panel)] p-6 shadow-sm">
-        <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">Related</div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { href: "/chains", label: "Chains", desc: "Current regime for each network" },
-            { href: "/track-record", label: "Track Record", desc: "Historical label archive" },
-            { href: "/methodology", label: "Methodology", desc: "How labels are produced" },
-            { href: "/glossary", label: "Glossary", desc: "Definitions for every term" },
-          ].map(({ href, label, desc }) => (
+          <div className="mt-8 flex flex-wrap gap-6">
+            <TextLink href="#how-to-read-modal">Full explanation →</TextLink>
             <Link
-              key={href}
-              href={href}
-              className="group flex items-center justify-between rounded-2xl border bg-[var(--urd-raised)] px-4 py-3 transition hover:border-cyan-500/30 hover:bg-white"
+              href="/service"
+              className="inline-flex items-center gap-2 border-b border-[rgba(232,224,208,.07)] pb-[1px] font-mono text-[11px] uppercase tracking-[0.08em] text-[#7A8A96] transition hover:border-[rgba(232,224,208,.22)] hover:text-[#E8E0D0]"
             >
-              <div>
-                <div className="text-sm font-medium text-[var(--urd-text-strong)]">{label}</div>
-                <div className="mt-0.5 text-xs text-[var(--urd-text-body)]">{desc}</div>
-              </div>
-              <span className="text-xs text-[var(--urd-text-body)] transition group-hover:text-blue-700">→</span>
+              Service policy →
             </Link>
-          ))}
-        </div>
-      </section>
+          </div>
+        </section>
 
-      {/* ── Data contract ─────────────────────────────────────────────────── */}
-      <details className="mt-8 rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-panel)] p-5">
-        <summary className="cursor-pointer text-sm font-medium text-[var(--urd-text-body)] hover:text-[var(--urd-text-strong)]">
-          Data contract and traceability
-        </summary>
-        <div className="mt-4 grid gap-2 text-sm text-[var(--urd-text-body)]">
-          <div>Public provenance anchors: date / updated_through / methodology_version / published revision / regime.determinism_hash</div>
-          <div>Health classification is derived at render time — not read from a pre-computed status field.</div>
-          <div>Operational expectations and correction policy are documented on the service and provenance pages.</div>
-        </div>
-      </details>
+        <section className="border-b border-[rgba(232,224,208,.07)] py-12">
+          <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Current state</div>
+              <h2 className="mt-4 font-[var(--serif)] text-[clamp(32px,3.8vw,54px)] font-normal leading-[1.08] tracking-[-0.025em] text-[#E8E0D0]">
+                Per-chain overview.
+              </h2>
+            </div>
+            <div>
+              <div className="border-t border-[rgba(232,224,208,.07)]">
+                {rows.map((row) => {
+                  const band = confidenceBand(row.confidence_score);
+                  return (
+                    <article
+                      key={row.chain}
+                      className="group relative grid gap-6 border-b border-[rgba(232,224,208,.07)] py-7 transition hover:bg-[#162840]/40 md:grid-cols-[minmax(0,1fr)_240px] md:pl-0"
+                    >
+                      <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-transparent transition group-hover:bg-[#C49230]" />
+                      <div className="pl-4 transition group-hover:pl-6">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                          <Link
+                            href={`/chains/${row.chain}`}
+                            className="inline-flex items-center gap-3 text-[#E8E0D0] transition hover:text-[#D9AB4A]"
+                          >
+                            <ChainIcon chain={row.chain} className="h-7 w-7 text-xs" label={`${row.label} icon`} />
+                            <span className="font-mono text-[12px] uppercase tracking-[0.12em]">{row.label || row.name}</span>
+                          </Link>
+                          <span className={`font-mono text-[11px] uppercase tracking-[0.08em] ${regimeClass(row.published_regime)}`}>
+                            {row.published_regime ?? "UNKNOWN / DEGRADED"}
+                          </span>
+                          <span className={`font-mono text-[11px] uppercase tracking-[0.08em] ${healthClass(row.status)}`}>
+                            {healthLabel(row.status)}
+                          </span>
+                        </div>
+                        <h3 className="mt-4 font-[var(--serif)] text-[24px] leading-[1.2] text-[#E8E0D0]">
+                          {healthText(row.status)}
+                        </h3>
+                        <p className="mt-3 max-w-3xl text-[15px] leading-[1.82] text-[#7A8A96]">
+                          {chainNarrative(row)}
+                        </p>
+                        <div className="mt-4 text-[13px] leading-7 text-[#7A8A96]">
+                          <span className="text-[#E8E0D0]">Policy:</span> {cadenceCopy(row.chain)}
+                        </div>
+                      </div>
+                      <div className="border-t border-[rgba(232,224,208,.07)] pt-4 md:border-t-0 md:border-l md:border-[rgba(232,224,208,.07)] md:pl-6">
+                        <dl className="grid grid-cols-2 gap-x-4 gap-y-4 text-[13px] leading-6">
+                          <div>
+                            <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">As of</dt>
+                            <dd className="mt-1 text-[#E8E0D0]">{fmtDate(row.as_of)}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Observed lag</dt>
+                            <dd className="mt-1 text-[#E8E0D0]">{row.lag_days !== null ? `${row.lag_days}d` : "—"}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Confidence</dt>
+                            <dd className="mt-1 text-[#E8E0D0]">
+                              {typeof row.confidence_score === "number" ? row.confidence_score.toFixed(3) : "—"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Band</dt>
+                            <dd
+                              className={`mt-1 ${
+                                band === "Good"
+                                  ? "text-[#10B981]"
+                                  : band === "Caution"
+                                    ? "text-[#C4843C]"
+                                    : band === "Degraded"
+                                      ? "text-[#9E4040]"
+                                      : "text-[#525E6E]"
+                              }`}
+                            >
+                              {band}
+                            </dd>
+                          </div>
+                        </dl>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
 
-          </>
-        }
-      />
+        <section className="border-b border-[rgba(232,224,208,.07)] py-12" id="cadence">
+          <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Publication policy</div>
+              <h2 className="mt-4 font-[var(--serif)] text-[clamp(32px,3.8vw,54px)] font-normal leading-[1.08] tracking-[-0.025em] text-[#E8E0D0]">
+                Chain cadence.
+              </h2>
+            </div>
+            <div className="border-t border-[rgba(232,224,208,.07)]">
+              {[
+                {
+                  label: "Bitcoin · Ethereum",
+                  policy: "Expected ~1 day · soft warning above 2 days · hard fail above 4 days",
+                  note: "Daily publication policy. A one-day lag is normal.",
+                },
+                {
+                  label: "Arbitrum · Base",
+                  policy: "Expected ~7 days · soft warning above 10 days · hard fail above 15 days",
+                  note: "Weekly-style publication policy by design. Seeing 7d lag is normal.",
+                },
+              ].map((item) => (
+                <div key={item.label} className="border-b border-[rgba(232,224,208,.07)] py-6">
+                  <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#E8E0D0]">{item.label}</div>
+                  <div className="mt-3 text-[15px] leading-[1.82] text-[#7A8A96]">{item.note}</div>
+                  <div className="mt-3 font-mono text-[12px] text-[#C49230]">{item.policy}</div>
+                </div>
+              ))}
+              <div className="pt-6">
+                <TextLink href="#cadence-modal">Full cadence explanation →</TextLink>
+              </div>
+            </div>
+          </div>
+        </section>
 
-      {/* ── All modals ────────────────────────────────────────────────────── */}
+        {notes.length > 0 ? (
+          <section className="border-b border-[rgba(232,224,208,.07)] py-12">
+            <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Dataset notes</div>
+                <h2 className="mt-4 font-[var(--serif)] text-[clamp(32px,3.8vw,54px)] font-normal leading-[1.08] tracking-[-0.025em] text-[#E8E0D0]">
+                  Manifest notes.
+                </h2>
+              </div>
+              <div className="border-t border-[rgba(232,224,208,.07)]">
+                {notes.map((note) => (
+                  <div key={note} className="border-b border-[rgba(232,224,208,.07)] py-5 text-[15px] leading-[1.82] text-[#7A8A96]">
+                    {note}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="border-b border-[rgba(232,224,208,.07)] py-12">
+          <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Related</div>
+              <h2 className="mt-4 font-[var(--serif)] text-[clamp(32px,3.8vw,54px)] font-normal leading-[1.08] tracking-[-0.025em] text-[#E8E0D0]">
+                Next places to read.
+              </h2>
+            </div>
+            <div className="border-t border-[rgba(232,224,208,.07)]">
+              {[
+                { href: "/chains", label: "Chains", desc: "Current chain-by-chain regime context and history." },
+                { href: "/track-record", label: "Track record", desc: "Historical label archive and consistency view." },
+                { href: "/methodology", label: "Methodology", desc: "How the published layers and labels are produced." },
+                { href: "/glossary", label: "Glossary", desc: "Definitions for terms used across the product." },
+              ].map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="group relative block border-b border-[rgba(232,224,208,.07)] py-5 pl-4 transition hover:bg-[#162840]/40 hover:pl-6"
+                >
+                  <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-transparent transition group-hover:bg-[#C49230]" />
+                  <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#E8E0D0]">{item.label}</div>
+                  <div className="mt-2 text-[15px] leading-[1.82] text-[#7A8A96]">{item.desc}</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-12" id="how-to-read">
+          <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#C49230]">Traceability</div>
+              <h2 className="mt-4 font-[var(--serif)] text-[clamp(32px,3.8vw,54px)] font-normal leading-[1.08] tracking-[-0.025em] text-[#E8E0D0]">
+                Data contract.
+              </h2>
+            </div>
+            <div>
+              <details className="border-t border-b border-[rgba(232,224,208,.07)] py-4">
+                <summary className="ta-summary flex cursor-pointer items-center justify-between gap-4 font-mono text-[12px] uppercase tracking-[0.12em] text-[#E8E0D0]">
+                  <span>Provenance and operational notes</span>
+                  <span className="text-[#C49230]">+</span>
+                </summary>
+                <div className="pt-4 text-[15px] leading-[1.82] text-[#7A8A96]">
+                  <p>
+                    Public provenance anchors: <InlineCode>date</InlineCode>, <InlineCode>updated_through</InlineCode>, <InlineCode>methodology_version</InlineCode>, published revision, and <InlineCode>regime.determinism_hash</InlineCode>.
+                  </p>
+                  <p className="mt-4">
+                    Health classification is derived at render time. Confidence is read directly from the latest published meta artifact.
+                  </p>
+                </div>
+              </details>
+              <div className="mt-6 flex flex-wrap gap-6">
+                <TextLink href="#how-to-read-modal">Health vs confidence →</TextLink>
+                <TextLink href="#confidence-modal">Confidence bands →</TextLink>
+              </div>
+            </div>
+          </div>
+        </section>
+      </UrdContainer>
+
       <ExplainModal
         id="how-to-read-modal"
-        title="How to read this page"
-        subtitle="Health vs confidence — two separate dimensions that are easy to confuse."
+        title="How to read the status page"
+        subtitle="Freshness and confidence are separate operational questions."
         pair={howToReadExplain}
       />
       <ExplainModal
         id="cadence-modal"
         title="Publication cadence"
-        subtitle="Why some chains update daily and others weekly — and what lag thresholds mean."
+        subtitle="Lag has to be interpreted relative to chain-specific cadence, not relative to zero."
         pair={cadenceExplain}
       />
       <ExplainModal
         id="confidence-modal"
-        title="What confidence means on this page"
-        subtitle="Evidence quality for the published label — independent of freshness."
+        title="Confidence on this page"
+        subtitle="Confidence is evidence quality for the published label, independent of freshness."
         pair={confidenceExplain}
       />
-      </UrdContainer>
     </UrdPage>
   );
 }
