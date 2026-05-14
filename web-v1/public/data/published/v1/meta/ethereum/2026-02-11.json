@@ -15,7 +15,7 @@
     "date": "2026-02-11",
     "label_confidence_score": 0.5602079503230815,
     "lag_days_vs_asof_date": 0,
-    "lag_days_vs_utc_today": 43,
+    "lag_days_vs_utc_today": 89,
     "missing": false,
     "semantics": "combined_data_quality_and_label_stability",
     "source": "gold_history",
@@ -32,7 +32,7 @@
     "confidence_score": 1.0,
     "date": "2026-02-11",
     "lag_days_vs_asof_date": 0,
-    "lag_days_vs_utc_today": 43,
+    "lag_days_vs_utc_today": 89,
     "missing": false,
     "semantics": "data_quality_and_history_coverage_only"
   },
@@ -40,7 +40,7 @@
   "gold_status": {
     "chain": "ethereum",
     "features_lag_days_vs_utc_today": null,
-    "features_last_date": "2026-03-25",
+    "features_last_date": "2026-04-05",
     "missing": false,
     "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
   },
@@ -71,50 +71,25 @@
       "capacity": {
         "band_high": "NORMAL",
         "band_low": "LOW",
-        "trend": "HEATING"
+        "informative_count": 2,
+        "trend": "COOLING"
       },
       "demand": {
         "band_high": "EXTREME_HIGH",
         "band_low": "NORMAL",
+        "informative_count": 2,
         "trend": "HEATING"
       },
       "friction": {
         "band_high": "EXTREME_HIGH",
         "band_low": "NORMAL",
+        "informative_count": 2,
         "trend": "HEATING"
       }
     },
     "chain": "ethereum",
-    "determinism_hash": "e615c5b4fe74",
-    "drivers": [
-      {
-        "axis": "demand",
-        "current": 2466399.0,
-        "metric": "tx_count_daily",
-        "momentum_7d_vs_30d": 0.5481581630296857,
-        "pct_90d": 83.33333333333334,
-        "trend": "HEATING",
-        "z_robust": 4.473971082901054
-      },
-      {
-        "axis": "demand",
-        "current": 897576.0,
-        "metric": "unique_active_addresses",
-        "momentum_7d_vs_30d": -0.027256044837876914,
-        "pct_90d": 72.22222222222221,
-        "trend": "FLAT",
-        "z_robust": 3.194553694276567
-      },
-      {
-        "axis": "friction",
-        "current": 0.016110126544812902,
-        "metric": "failed_tx_rate",
-        "momentum_7d_vs_30d": 0.4377315018586174,
-        "pct_90d": 91.11111111111111,
-        "trend": "HEATING",
-        "z_robust": 1.6138183824955865
-      }
-    ],
+    "determinism_hash": "cd5ff0305547",
+    "drivers": [],
     "gate": {
       "confidence_score": 0.7484704071124533,
       "explanation": "OK",
@@ -122,9 +97,34 @@
       "threshold": 0.4,
       "type": "confidence_threshold"
     },
-    "label": "HEATING",
+    "label": "STABLE",
+    "methodology_notes": [
+      "Non-informative low-variance distributions are neutralized before band aggregation.",
+      "Raw block time is not used directly for congestion; blocktime_instability is used instead."
+    ],
     "missing": false,
     "ruleset_id": "eth_l1_v1",
+    "sanity": {
+      "adjusted": true,
+      "from_label": "HEATING",
+      "reason": "HEATING requires public scorecard support from demand=High.",
+      "scorecard_support": {
+        "capacity": {
+          "level": "Balanced",
+          "score": 54.90180424995768
+        },
+        "demand": {
+          "level": "Normal",
+          "score": 65.63809787230439
+        },
+        "friction": {
+          "level": "Normal",
+          "score": 43.46306203412558
+        }
+      },
+      "status": "adjusted",
+      "to_label": "STABLE"
+    },
     "signal_aliases": {
       "active_addresses": "unique_active_addresses",
       "blocktime_instability": "blocktime_instability",
@@ -134,19 +134,15 @@
       "utilization": "gas_utilization_pct"
     },
     "signals": {
-      "avg_block_time_sec": {
-        "axis": "capacity",
-        "current": 12.0,
-        "momentum_7d_vs_30d": 0.0,
-        "pct_90d": 44.44444444444444,
-        "z_robust": -2.0329681814167415
-      },
       "blocktime_instability": {
         "axis": "capacity",
         "current": 0.0,
         "current_raw": 12.0,
+        "informative": true,
         "momentum_7d_vs_30d": -1.0294820111346419,
-        "pct_90d": 21.11111111111111,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 10.555555555555555,
         "transform": {
           "formula": "rolling_mean(|bt - median_30| / median_30)",
           "input_metric": "avg_block_time_sec",
@@ -159,41 +155,57 @@
       "failed_tx_rate": {
         "axis": "friction",
         "current": 0.016110126544812902,
+        "informative": true,
         "momentum_7d_vs_30d": 0.4377315018586174,
-        "pct_90d": 91.11111111111111,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 90.55555555555556,
         "z_robust": 1.6138183824955865
       },
       "gas_utilization_pct": {
         "axis": "capacity",
         "current": 0.507525998864338,
+        "informative": true,
         "momentum_7d_vs_30d": 0.618915761403663,
-        "pct_90d": 62.22222222222222,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 61.66666666666667,
         "z_robust": 1.0543507673302426
       },
       "median_tx_fee_native": {
         "axis": "friction",
         "current": 5178566517744.0,
+        "informative": true,
         "momentum_7d_vs_30d": 0.22733463075691412,
-        "pct_90d": 40.0,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 39.44444444444444,
         "z_robust": -0.6778004202317418
       },
       "tx_count_daily": {
         "axis": "demand",
         "current": 2466399.0,
+        "informative": true,
         "momentum_7d_vs_30d": 0.5481581630296857,
-        "pct_90d": 83.33333333333334,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 82.77777777777777,
         "z_robust": 4.473971082901054
       },
       "unique_active_addresses": {
         "axis": "demand",
         "current": 897576.0,
+        "informative": true,
         "momentum_7d_vs_30d": -0.027256044837876914,
-        "pct_90d": 72.22222222222221,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 71.66666666666667,
         "z_robust": 3.194553694276567
       }
     },
     "window_days": 7
   },
+  "revision_id": 53019858,
   "scorecard": {
     "asof_date": "2026-02-11",
     "chain": "ethereum",
@@ -269,8 +281,8 @@
     "window_days": 7
   },
   "status": {
-    "color": "yellow",
-    "label": "HEATING",
+    "color": "green",
+    "label": "STABLE",
     "one_liner": "Demand: Normal; Friction: Normal; Capacity: Balanced"
   },
   "tier_used": "standard",

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
 
 const REGIME_LABELS = [
   {
@@ -85,9 +86,7 @@ export default function MobileMethodologyPage() {
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Methodology</div>
             <div className="mt-0.5 text-[14px] font-bold text-white">How the classification works</div>
           </div>
-          <Link href="/methodology?view=desktop" className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold text-slate-200">
-            Full docs ↗
-          </Link>
+          <MobileRouteMenu />
         </div>
       </header>
 

@@ -22,10 +22,10 @@ function Copy-Tree([string]$src, [string]$dst) {
   if (-not (Test-Path $src)) { throw "Source missing: $src" }
   Ensure-Dir $dst
 
-  Write-Log "Copy: $src -> $dst"
+  Write-Log "Mirror copy: $src -> $dst"
   if ($DryRun) { return }
 
-  robocopy $src $dst /E /NFL /NDL /NJH /NJS /NP /R:2 /W:1 | Out-Null
+  robocopy $src $dst /MIR /NFL /NDL /NJH /NJS /NP /R:2 /W:1 | Out-Null
   $rc = $LASTEXITCODE
   if ($rc -ge 8) { throw "Robocopy failed (exit code $rc) copying $src -> $dst" }
 }
@@ -42,16 +42,20 @@ try {
 
   $published = Join-Path $Root 'data\published\v1'
 
+  # Current app is web-v1-app. Keep old fallbacks for compatibility.
+  $webV1App = Join-Path $Root 'web-v1-app'
   $webV1 = Join-Path $Root 'web-v1'
   $webLegacy = Join-Path $Root 'web'
 
   $targetWeb = $null
-  if (Test-Path $webV1) {
+  if (Test-Path $webV1App) {
+    $targetWeb = $webV1App
+  } elseif (Test-Path $webV1) {
     $targetWeb = $webV1
   } elseif (Test-Path $webLegacy) {
     $targetWeb = $webLegacy
   } else {
-    throw "Neither web-v1 nor web folder found under root. Expected: $webV1 or $webLegacy"
+    throw "No web app folder found under root. Expected: $webV1App, $webV1 or $webLegacy"
   }
 
   $dst = Join-Path $targetWeb 'public\data\published\v1'

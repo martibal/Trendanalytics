@@ -3,346 +3,182 @@ import type { ReactNode } from "react";
 
 export const urd = {
   color: {
-    page: "#edf6ff",
-    hero: "#031329",
-    heroAccent: "#2f7cff",
-    text: "#0a1d3a",
-    textStrong: "#0d2447",
-    textBody: "#27476f",
-    textMuted: "#557099",
-    border: "#c9d9ea",
-    borderStrong: "#9db8d4",
-    surface: "#eaf3fb",
-    surfaceSoft: "#e7f1fb",
-    surfaceRaised: "#eef6ff",
-    inkStrong: "#071d3b",
-    chartRaw: "#2f7cff",
-    chartMA7: "#0046bf",
-    chartMA30: "#071d3b",
-    chartGrid: "#7fa8d4",
+    page: "#080F1A",
+    hero: "#0D1F35",
+    heroAccent: "#C49230",
+    text: "#E8E0D0",
+    textStrong: "#E8E0D0",
+    textBody: "#7A8A96",
+    textMuted: "#3A4A57",
+    border: "rgba(232,224,208,.07)",
+    borderStrong: "rgba(232,224,208,.14)",
+    surface: "#111E30",
+    surfaceSoft: "#0D1F35",
+    surfaceRaised: "#162840",
+    inkStrong: "#E8E0D0",
+    chartRaw: "#3D7099",
+    chartMA7: "#C49230",
+    chartMA30: "#2A6E7A",
+    chartGrid: "rgba(232,224,208,.14)",
   },
 
-  page: "min-h-screen bg-[#edf6ff] text-[#0a1d3a]",
-  container: "mx-auto max-w-6xl px-6 py-10",
+  page: "ua-page min-h-screen bg-background text-foreground",
+  container: "ua-page-shell py-12",
 
-  heroOuter: "relative overflow-hidden bg-[#031329] text-white",
-  heroContainer:
-    "relative mx-auto max-w-7xl px-6 pb-28 pt-24 sm:px-8 lg:px-10 lg:pb-32 lg:pt-28",
-  heroEyebrow:
-    "text-xs font-black uppercase tracking-[0.22em] text-cyan-300",
-  heroTitle:
-    "mt-7 max-w-5xl text-5xl font-black leading-[0.95] tracking-[-0.065em] text-white sm:text-6xl lg:text-7xl",
-  heroHighlight: "text-[#2f7cff]",
-  heroSummary:
-    "mt-8 max-w-3xl text-xl font-black leading-9 text-white",
+  heroOuter: "hero border-b border-[var(--line)]",
+  heroContainer: "page-shell hero-grid",
+  heroEyebrow: "eyebrow",
+  heroTitle: "ua-h1 mt-5 max-w-5xl",
+  heroHighlight: "text-[var(--gold2)] italic",
+  heroSummary: "lead mt-6",
 
-  section:
-    "rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]",
-  sectionTitle: "text-2xl font-black tracking-[-0.03em] text-[#0d2447]",
-  sectionBody: "mt-4 text-sm font-medium leading-7 text-[#27476f]",
+  section: "section",
+  sectionTitle: "ua-h2",
+  sectionBody: "mt-5 max-w-3xl text-[15px] leading-[1.78] text-[var(--ink2)]",
 
-  nav: "mb-8 overflow-x-auto rounded-2xl border border-[#c9d9ea] bg-[#e7f1fb] p-3",
-  navInner: "flex min-w-max flex-wrap gap-2",
-  navItem:
-    "rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1.5 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+  nav: "mb-8 border-y border-[var(--line)] py-3",
+  navInner: "flex min-w-max flex-wrap gap-5",
+  navItem: "text-link",
 
-  button:
-    "inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-black text-[#0d2447] transition hover:bg-white hover:text-blue-800",
+  button: "btn-ghost",
+  lightButton: "btn-ghost",
 
-  lightButton:
-    "inline-flex items-center justify-center rounded-full border border-[#8fb5d9] bg-[#d9ebfb] px-3 py-1.5 text-xs font-black text-[#0d2447] shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_6px_14px_rgba(8,34,71,0.08)] transition hover:bg-white hover:text-[#031329]",
+  code: "code-block inline-block px-2 py-1",
 
-  code:
-    "rounded border border-[#9db8d4] bg-[#f4f9ff] px-1.5 py-0.5 font-mono text-xs font-bold text-[#0d2447]",
-
-  tableWrap: "mt-5 overflow-x-auto rounded-2xl border border-[#b6cce3]",
+  tableWrap: "mt-5 overflow-x-auto border-y border-[var(--line)]",
   table: "w-full text-sm",
-  tableHead: "bg-[#dceaf8]",
-  tableTh:
-    "px-4 py-3 text-left text-xs font-black uppercase tracking-[0.12em] text-[#203c63]",
-  tableBody: "divide-y divide-[#b6cce3] bg-[#eaf3fb]",
-  tableTd: "px-4 py-3 text-[#27476f]",
+  tableHead: "border-b border-[var(--line)]",
+  tableTh: "px-0 py-3 pr-6 text-left font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--gold)]",
+  tableBody: "divide-y divide-[var(--line)]",
+  tableTd: "px-0 py-4 pr-6 text-[var(--ink2)]",
 
-  callout: "rounded-2xl border border-blue-300 bg-[#e7f1fb] p-5",
-  calloutTitle: "text-sm font-black text-blue-700",
-  calloutBody: "mt-3 text-sm font-semibold leading-7 text-[#0d2447]",
+  callout: "border-y border-[var(--line)] py-5",
+  calloutTitle: "meta-label",
+  calloutBody: "mt-3 max-w-3xl text-sm leading-7 text-[var(--ink2)]",
 
-  warning: "rounded-2xl border border-amber-400 bg-amber-50 p-5",
-  warningTitle: "text-sm font-black text-amber-700",
+  warning: "border-y border-[var(--gold-line)] py-5",
+  warningTitle: "meta-label text-[var(--gold)]",
 
-  chartCard:
-    "rounded-3xl border border-[#8fb5d9] bg-[#d9ebfb] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_16px_34px_rgba(8,34,71,0.10)]",
+  chartCard: "context-panel p-5 text-[var(--ink)]",
+  chartPanel: "context-panel text-[var(--ink)]",
 
-  chartPanel:
-    "rounded-2xl border border-[#9db8d4] bg-[#eef6ff] text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]",
+  landingChainCard: "interactive-row p-5",
+  landingChainCardGlow: "hidden",
+  landingChainCardOrb: "hidden",
+  landingChainCardSheen: "hidden",
+  landingChainCardContent: "relative z-10 flex h-full min-h-[246px] w-full flex-col",
+  landingChainDriverPanel: "border-y border-[var(--line)] py-2 text-right",
+  landingChainConfidencePanel: "mt-7 border-y border-[var(--line)] p-4",
+  landingChainFooter: "mt-auto flex items-center justify-between gap-3 pt-6 text-[13px] text-[var(--ink2)]",
 
-  landingChainCard:
-    "group relative isolate flex min-h-[286px] overflow-hidden rounded-[22px] border border-[#78a8d8] bg-[radial-gradient(circle_at_18%_10%,rgba(255,255,255,0.98)_0%,rgba(247,251,255,0.88)_24%,transparent_48%),linear-gradient(145deg,#f7fbff_0%,#dcecff_38%,#c1d9f1_100%)] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),inset_0_-1px_0_rgba(73,112,153,0.15),0_18px_36px_rgba(8,34,71,0.15),0_3px_10px_rgba(8,34,71,0.08)] ring-1 ring-white/70 transition duration-200 hover:-translate-y-1 hover:border-[#4f91d8] hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(73,112,153,0.16),0_24px_52px_rgba(8,34,71,0.22),0_8px_20px_rgba(47,124,255,0.16)]",
-  landingChainCardGlow:
-    "pointer-events-none absolute inset-x-6 top-0 z-0 h-px bg-gradient-to-r from-transparent via-white/95 to-transparent",
-  landingChainCardOrb:
-    "pointer-events-none absolute -right-16 -top-16 z-0 h-44 w-44 rounded-full bg-[#2f7cff]/14 blur-2xl transition group-hover:bg-[#2f7cff]/22",
-  landingChainCardSheen:
-    "pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.42)_26%,transparent_52%)] opacity-0 transition duration-300 group-hover:translate-x-6 group-hover:opacity-100",
-  landingChainCardContent:
-    "relative z-10 flex h-full min-h-[246px] w-full flex-col",
-  landingChainDriverPanel:
-    "max-w-[178px] shrink-0 rounded-2xl border border-white/70 bg-white/48 px-3 py-2 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_8px_18px_rgba(8,34,71,0.08)] backdrop-blur-sm",
-  landingChainConfidencePanel:
-    "mt-7 rounded-2xl border border-[#9bc2e8] bg-white/42 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_8px_18px_rgba(8,34,71,0.07)]",
-  landingChainFooter:
-    "mt-auto flex items-center justify-between gap-3 pt-6 text-[13px] font-bold text-[#31577f]",
-
-  modalOverlay: "absolute inset-0 bg-[#031329]/86 backdrop-blur-sm",
-  modalBackdrop: "absolute inset-0 bg-[#031329]\/86 backdrop-blur-sm",
-  modalPanel:
-    "relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-[#77a8d8] bg-[#cfe4f7] text-[#071d3b] shadow-[0_28px_80px_rgba(3,19,41,0.42),inset_0_1px_0_rgba(255,255,255,0.85)]",
-  modalHeader:
-    "flex shrink-0 items-start justify-between gap-4 border-b border-[#8fb5d9] bg-[#d9ebfb] px-6 py-5",
-  modalTitle: "text-2xl font-black tracking-[-0.03em] text-[#071d3b]",
-  modalSubtitle: "mt-2 text-sm font-semibold leading-6 text-[#27476f]",
-  modalClose:
-    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#77a8d8] bg-[#edf6ff] text-xl font-black text-[#0d2447] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition hover:bg-white hover:text-[#031329]",
+  modalOverlay: "absolute inset-0 bg-[rgba(8,15,26,.84)]",
+  modalBackdrop: "absolute inset-0 bg-[rgba(8,15,26,.84)]",
+  modalPanel: "modal-panel relative z-10 flex flex-col",
+  modalHeader: "modal-head",
+  modalTitle: "meta-label",
+  modalSubtitle: "mt-2 text-sm leading-6 text-[var(--ink2)]",
+  modalClose: "btn-ghost h-10 px-3",
   modalBody: "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5",
   modalGrid: "grid gap-4 lg:grid-cols-2",
-  modalInfoBox:
-    "rounded-3xl border border-[#78a8d8] bg-[#bfd9ef] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.68),0_10px_22px_rgba(8,34,71,0.08)]",
-  modalInfoBoxAlt:
-    "rounded-3xl border border-[#6fa1d2] bg-[#b7d4ec] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.62),0_10px_22px_rgba(8,34,71,0.08)]",
-  modalInfoLabel:
-    "text-xs font-black uppercase tracking-[0.18em] text-[#005be8]",
-  modalInfoBody: "mt-3 text-sm font-semibold leading-7 text-[#0d2447]",
-  modalBasicPanel:
-    "rounded-3xl border border-[#78a8d8] bg-[#bfd9ef] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.68),0_10px_22px_rgba(8,34,71,0.08)]",
-  modalAdvancedPanel:
-    "rounded-3xl border border-[#6fa1d2] bg-[#b7d4ec] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.62),0_10px_22px_rgba(8,34,71,0.08)]",
-  modalKicker:
-    "text-xs font-black uppercase tracking-[0.18em] text-[#005be8]",
-  infoPanel:
-    "rounded-3xl border border-[#78a8d8] bg-[#c5def4] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.66)]",
-  infoPanelStrong:
-    "rounded-3xl border border-[#78a8d8] bg-[#c5def4] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.66)]",
-  modalTraceBox:
-    "mt-4 rounded-3xl border border-[#78a8d8] bg-[#c5def4] p-5 text-[#071d3b] shadow-[inset_0_1px_0_rgba(255,255,255,0.66)]",
+  modalInfoBox: "border-y border-[var(--line)] p-5 text-[var(--ink)]",
+  modalInfoBoxAlt: "border-y border-[var(--line)] p-5 text-[var(--ink)]",
+  modalInfoLabel: "meta-label",
+  modalInfoBody: "mt-3 text-sm leading-7 text-[var(--ink2)]",
+  modalBasicPanel: "border-y border-[var(--line)] p-5 text-[var(--ink)]",
+  modalAdvancedPanel: "border-y border-[var(--line)] p-5 text-[var(--ink)]",
+  modalKicker: "meta-label",
+  infoPanel: "border-y border-[var(--line)] p-5 text-[var(--ink)]",
+  infoPanelStrong: "border-y border-[var(--line)] p-5 text-[var(--ink)]",
+  modalTraceBox: "mt-4 border-y border-[var(--line)] p-5 text-[var(--ink)]",
 } as const;
 
 export function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function UrdPage({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function UrdPage({ children, className }: { children: ReactNode; className?: string }) {
   return <main className={cx(urd.page, className)}>{children}</main>;
 }
 
-export function UrdContainer({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function UrdContainer({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cx(urd.container, className)}>{children}</div>;
 }
 
-export function UrdHero({
-  eyebrow,
-  title,
-  highlight,
-  summary,
-  children,
-}: {
-  eyebrow?: ReactNode;
-  title: ReactNode;
-  highlight?: ReactNode;
-  summary?: ReactNode;
-  children?: ReactNode;
-}) {
+export function UrdHero({ eyebrow, title, highlight, summary, children }: { eyebrow?: ReactNode; title: ReactNode; highlight?: ReactNode; summary?: ReactNode; children?: ReactNode }) {
   return (
     <section className={urd.heroOuter}>
       <div className={urd.heroContainer}>
-        {eyebrow ? <div className={urd.heroEyebrow}>{eyebrow}</div> : null}
-
-        <h1 className={urd.heroTitle}>
-          {title}
-          {highlight ? (
-            <>
-              <br />
-              <span className={urd.heroHighlight}>{highlight}</span>
-            </>
-          ) : null}
-        </h1>
-
-        {summary ? <div className={urd.heroSummary}>{summary}</div> : null}
-
-        {children ? <div className="mt-10">{children}</div> : null}
+        <div>
+          {eyebrow ? <div className={urd.heroEyebrow}>{eyebrow}</div> : null}
+          <h1 className={urd.heroTitle}>
+            {title}
+            {highlight ? <><br /><em className={urd.heroHighlight}>{highlight}</em></> : null}
+          </h1>
+          {summary ? <div className={urd.heroSummary}>{summary}</div> : null}
+          {children ? <div className="mt-8">{children}</div> : null}
+        </div>
       </div>
     </section>
   );
 }
 
-export function UrdSection({
-  title,
-  eyebrow,
-  children,
-  id,
-  className,
-}: {
-  title?: ReactNode;
-  eyebrow?: ReactNode;
-  children: ReactNode;
-  id?: string;
-  className?: string;
-}) {
+export function UrdSection({ title, eyebrow, children, id, className }: { title?: ReactNode; eyebrow?: ReactNode; children: ReactNode; id?: string; className?: string }) {
   return (
     <section id={id} className={cx(urd.section, className)}>
-      {eyebrow ? (
-        <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">
-          {eyebrow}
+      <div className="page-shell">
+        <div className="section-head">
+          <div>
+            {eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}
+            {title ? <h2 className={cx(urd.sectionTitle, eyebrow ? "mt-3" : undefined)}>{title}</h2> : null}
+          </div>
+          <div className={title || eyebrow ? urd.sectionBody : "text-sm leading-7 text-[var(--ink2)]"}>{children}</div>
         </div>
-      ) : null}
-
-      {title ? (
-        <h2 className={cx(urd.sectionTitle, eyebrow ? "mt-1" : undefined)}>
-          {title}
-        </h2>
-      ) : null}
-
-      <div className={title || eyebrow ? urd.sectionBody : "text-sm font-medium leading-7 text-[#27476f]"}>
-        {children}
       </div>
     </section>
   );
 }
 
-export function UrdPillLink({
-  href,
-  children,
-  className,
-}: {
-  href: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <Link href={href} className={cx(urd.navItem, className)}>
-      {children}
-    </Link>
-  );
+export function UrdPillLink({ href, children, className }: { href: string; children: ReactNode; className?: string }) {
+  return <Link href={href} className={cx(urd.navItem, className)}>{children}</Link>;
 }
 
-export function UrdButtonLink({
-  href,
-  children,
-  className,
-}: {
-  href: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <Link href={href} className={cx(urd.button, className)}>
-      {children}
-    </Link>
-  );
+export function UrdButtonLink({ href, children, className }: { href: string; children: ReactNode; className?: string }) {
+  return <Link href={href} className={cx(urd.button, className)}>{children}</Link>;
 }
 
 export function UrdInlineCode({ children }: { children: ReactNode }) {
   return <code className={urd.code}>{children}</code>;
 }
 
-export function UrdCallout({
-  title,
-  children,
-  tone = "info",
-}: {
-  title?: ReactNode;
-  children: ReactNode;
-  tone?: "info" | "warning";
-}) {
+export function UrdCallout({ title, children, tone = "info" }: { title?: ReactNode; children: ReactNode; tone?: "info" | "warning" }) {
   const isWarning = tone === "warning";
-
   return (
     <section className={isWarning ? urd.warning : urd.callout}>
-      {title ? (
-        <h3 className={isWarning ? urd.warningTitle : urd.calloutTitle}>
-          {title}
-        </h3>
-      ) : null}
+      {title ? <h3 className={isWarning ? urd.warningTitle : urd.calloutTitle}>{title}</h3> : null}
       <div className={urd.calloutBody}>{children}</div>
     </section>
   );
 }
 
-export function UrdTable({
-  headers,
-  rows,
-}: {
-  headers: ReactNode[];
-  rows: ReactNode[][];
-}) {
+export function UrdTable({ headers, rows }: { headers: ReactNode[]; rows: ReactNode[][] }) {
   return (
     <div className={urd.tableWrap}>
       <table className={urd.table}>
         <thead className={urd.tableHead}>
-          <tr>
-            {headers.map((header, i) => (
-              <th key={i} className={urd.tableTh}>
-                {header}
-              </th>
-            ))}
-          </tr>
+          <tr>{headers.map((header, i) => <th key={i} className={urd.tableTh}>{header}</th>)}</tr>
         </thead>
         <tbody className={urd.tableBody}>
-          {rows.map((row, i) => (
-            <tr key={i}>
-              {row.map((cell, j) => (
-                <td key={j} className={urd.tableTd}>
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} className={urd.tableTd}>{cell}</td>)}</tr>)}
         </tbody>
       </table>
     </div>
   );
 }
 
-
-export function UrdCard({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={cx(urd.section, className)}>
-      {children}
-    </section>
-  );
+export function UrdCard({ children, className }: { children: ReactNode; className?: string }) {
+  return <section className={cx("border-y border-[var(--line)] py-5", className)}>{children}</section>;
 }
-export function UrdDarkCard({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={cx(
-        "rounded-[26px] border border-white/8 bg-[#031329] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.32)]",
-        className,
-      )}
-    >
-      {children}
-    </section>
-  );
+
+export function UrdDarkCard({ children, className }: { children: ReactNode; className?: string }) {
+  return <section className={cx("context-panel p-5", className)}>{children}</section>;
 }

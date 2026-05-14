@@ -31,20 +31,65 @@ def _ensure_date(df: pd.DataFrame) -> pd.DataFrame:
     return d
 
 
+def _finite_values(x: np.ndarray) -> np.ndarray:
+    try:
+        arr = np.asarray(x, dtype=float)
+    except Exception:
+        arr = np.array([], dtype=float)
+    return arr[np.isfinite(arr)]
+
+
+def _series_is_informative(x: np.ndarray, *, min_points: int = 30, eps: float = 1e-12) -> bool:
+    """Return whether a historical distribution can safely drive a regime label.
+
+    This prevents the old failure mode where constant L2 fields such as
+    avg_block_time_sec=2.0 or failed_tx_rate=0.0 received pct_90d=100 and
+    therefore triggered EXTREME_HIGH / CONGESTED. Constant or near-constant
+    series are retained in the evidence surface but are neutralized for regime
+    classification.
+    """
+    vals = _finite_values(x)
+    if vals.size < int(min_points):
+        return False
+    if np.unique(vals).size <= 1:
+        return False
+    spread = float(np.nanmax(vals) - np.nanmin(vals))
+    if not math.isfinite(spread) or abs(spread) <= eps:
+        return False
+    med = float(np.nanmedian(vals))
+    mad = float(np.nanmedian(np.abs(vals - med)))
+    sd = float(np.nanstd(vals))
+    return bool((math.isfinite(mad) and mad > eps) or (math.isfinite(sd) and sd > eps))
+
+
 def _robust_z(x: np.ndarray, current: float) -> float:
-    med = np.nanmedian(x)
-    mad = np.nanmedian(np.abs(x - med))
-    if not math.isfinite(mad) or mad <= 1e-12:
+    vals = _finite_values(x)
+    if vals.size == 0:
         return 0.0
+    med = float(np.nanmedian(vals))
+    mad = float(np.nanmedian(np.abs(vals - med)))
+    if not math.isfinite(mad) or mad <= 1e-12:
+        sd = float(np.nanstd(vals))
+        if not math.isfinite(sd) or sd <= 1e-12:
+            return 0.0
+        return float((current - med) / sd)
     # 0.6745 makes MAD comparable to std for normal data
     return float(0.6745 * (current - med) / mad)
 
 
 def _percentile_rank(x: np.ndarray, current: float) -> float:
-    x = x[np.isfinite(x)]
-    if x.size == 0:
+    vals = _finite_values(x)
+    if vals.size == 0:
         return 50.0
-    return float((np.sum(x <= current) / x.size) * 100.0)
+    if not _series_is_informative(vals, min_points=min(30, max(1, vals.size))):
+        return 50.0
+
+    # Mid-rank percentile: ties get half weight. Constant series therefore
+    # cannot become pct_90d=100 by construction.
+    less = float(np.sum(vals < current))
+    equal = float(np.sum(vals == current))
+    pct = ((less + 0.5 * equal) / float(vals.size)) * 100.0
+    return float(max(0.0, min(100.0, pct)))
 
 
 def _window_values(s: pd.Series, n: int) -> np.ndarray:
@@ -75,18 +120,27 @@ def _signal_for_metric(d: pd.DataFrame, metric: str) -> Optional[Dict[str, Any]]
 
     hist180 = _window_values(s, 180)
     hist90 = _window_values(s, 90)
+    full = _window_values(s, max(len(s), 1))
+    baseline_for_stats = hist180 if hist180.size else full
+    baseline_for_pct = hist90 if hist90.size else full
 
-    z = _robust_z(hist180 if hist180.size else s.to_numpy(dtype=float), cur)
-    pct = _percentile_rank(hist90 if hist90.size else s.to_numpy(dtype=float), cur)
+    informative = _series_is_informative(baseline_for_pct)
 
-    m7 = _mean_last(s, 7)
-    m30 = _mean_last(s, 30)
-    if m7 is None or m30 is None:
-        mom = 0.0
+    if informative:
+        z = _robust_z(baseline_for_stats, cur)
+        pct = _percentile_rank(baseline_for_pct, cur)
+        m7 = _mean_last(s, 7)
+        m30 = _mean_last(s, 30)
+        if m7 is None or m30 is None:
+            mom = 0.0
+        else:
+            z7 = _robust_z(baseline_for_stats, m7)
+            z30 = _robust_z(baseline_for_stats, m30)
+            mom = float(z7 - z30)
     else:
-        z7 = _robust_z(hist180 if hist180.size else s.to_numpy(dtype=float), m7)
-        z30 = _robust_z(hist180 if hist180.size else s.to_numpy(dtype=float), m30)
-        mom = float(z7 - z30)
+        z = 0.0
+        pct = 50.0
+        mom = 0.0
 
     return {
         "metric": metric,
@@ -94,8 +148,10 @@ def _signal_for_metric(d: pd.DataFrame, metric: str) -> Optional[Dict[str, Any]]
         "z_robust": float(z),
         "pct_90d": float(pct),
         "momentum_7d_vs_30d": float(mom),
+        "informative": bool(informative),
+        "neutralized": bool(not informative),
+        "neutral_reason": None if informative else "low_variance_or_insufficient_distribution",
     }
-
 
 def _signal_for_blocktime_instability(
     d: pd.DataFrame,
@@ -143,18 +199,26 @@ def _signal_for_blocktime_instability(
 
     hist180 = _window_values(inst_ra, 180)
     hist90 = _window_values(inst_ra, 90)
+    full = _window_values(inst_ra, max(len(inst_ra), 1))
+    baseline_for_stats = hist180 if hist180.size else full
+    baseline_for_pct = hist90 if hist90.size else full
+    informative = _series_is_informative(baseline_for_pct)
 
-    z = _robust_z(hist180 if hist180.size else inst_ra.to_numpy(dtype=float), cur_inst)
-    pct = _percentile_rank(hist90 if hist90.size else inst_ra.to_numpy(dtype=float), cur_inst)
-
-    m7 = _mean_last(inst_ra, 7)
-    m30 = _mean_last(inst_ra, 30)
-    if m7 is None or m30 is None:
-        mom = 0.0
+    if informative:
+        z = _robust_z(baseline_for_stats, cur_inst)
+        pct = _percentile_rank(baseline_for_pct, cur_inst)
+        m7 = _mean_last(inst_ra, 7)
+        m30 = _mean_last(inst_ra, 30)
+        if m7 is None or m30 is None:
+            mom = 0.0
+        else:
+            z7 = _robust_z(baseline_for_stats, m7)
+            z30 = _robust_z(baseline_for_stats, m30)
+            mom = float(z7 - z30)
     else:
-        z7 = _robust_z(hist180 if hist180.size else inst_ra.to_numpy(dtype=float), m7)
-        z30 = _robust_z(hist180 if hist180.size else inst_ra.to_numpy(dtype=float), m30)
-        mom = float(z7 - z30)
+        z = 0.0
+        pct = 50.0
+        mom = 0.0
 
     return {
         "metric": "blocktime_instability",
@@ -163,6 +227,9 @@ def _signal_for_blocktime_instability(
         "z_robust": float(z),
         "pct_90d": float(pct),
         "momentum_7d_vs_30d": float(mom),
+        "informative": bool(informative),
+        "neutralized": bool(not informative),
+        "neutral_reason": None if informative else "low_variance_or_insufficient_distribution",
         "transform": {
             "type": "instability_proxy",
             "input_metric": col,
@@ -173,7 +240,9 @@ def _signal_for_blocktime_instability(
     }
 
 
-def _band(pct: float, z: float) -> str:
+def _band(pct: float, z: float, *, informative: bool = True) -> str:
+    if not informative:
+        return "NORMAL"
     if pct >= 90.0 or z >= 2.5:
         return "EXTREME_HIGH"
     if pct >= 80.0 or z >= 1.5:
@@ -208,21 +277,21 @@ PROFILE_SPECS: Dict[str, ProfileSpec] = {
         ruleset_id="eth_l1_v1",
         demand_metrics=("tx_count_daily", "unique_active_addresses"),
         friction_metrics=("median_tx_fee_native", "failed_tx_rate"),
-        capacity_metrics=("gas_utilization_pct", "avg_block_time_sec"),
+        capacity_metrics=("gas_utilization_pct",),
     ),
     "l2": ProfileSpec(
         profile_type="l2",
         ruleset_id="l2_v1",
         demand_metrics=("tx_count_daily", "unique_active_addresses"),
-        friction_metrics=("median_tx_fee_native", "failed_tx_rate"),
-        capacity_metrics=("capacity_util_pct", "avg_block_time_sec"),
+        friction_metrics=("median_tx_fee_native",),
+        capacity_metrics=("capacity_util_pct",),
     ),
     "btc": ProfileSpec(
         profile_type="btc",
         ruleset_id="btc_v1",
         demand_metrics=("tx_count_daily", "unique_active_addresses"),
         friction_metrics=("median_tx_fee_native",),
-        capacity_metrics=("avg_block_time_sec",),
+        capacity_metrics=(),
     ),
 }
 
@@ -256,14 +325,30 @@ SIGNAL_ALIASES_BY_PROFILE: Dict[str, Dict[str, str]] = {
 def _aggregate_axis(signals: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Contract semantics:
-    - band_high: strongest *high-side* (HIGH/EXTREME_HIGH). If none => NORMAL.
-    - band_low: strongest *low-side* (LOW/EXTREME_LOW). If none => NORMAL.
+    - Non-informative signals remain visible but cannot drive high/low bands.
+    - band_high: strongest informative high-side (HIGH/EXTREME_HIGH). If none => NORMAL.
+    - band_low: strongest informative low-side (LOW/EXTREME_LOW). If none => NORMAL.
     """
     if not signals:
-        return {"band_high": "NORMAL", "band_low": "NORMAL", "trend": "FLAT", "signals": []}
+        return {
+            "band_high": "NORMAL",
+            "band_low": "NORMAL",
+            "trend": "FLAT",
+            "signals": [],
+            "informative_count": 0,
+        }
 
-    # Explicitly enforce contract semantics, even if unexpected bands appear.
-    bands = [str(s.get("band", "NORMAL")) for s in signals]
+    informative = [s for s in signals if bool(s.get("informative", True))]
+    if not informative:
+        return {
+            "band_high": "NORMAL",
+            "band_low": "NORMAL",
+            "trend": "FLAT",
+            "signals": signals,
+            "informative_count": 0,
+        }
+
+    bands = [str(s.get("band", "NORMAL")) for s in informative]
 
     if "EXTREME_HIGH" in bands:
         band_high = "EXTREME_HIGH"
@@ -280,7 +365,7 @@ def _aggregate_axis(signals: List[Dict[str, Any]]) -> Dict[str, Any]:
         band_low = "NORMAL"
 
     top = sorted(
-        signals,
+        informative,
         key=lambda s: (
             abs(float(s.get("z_robust", 0.0))),
             abs(float(s.get("momentum_7d_vs_30d", s.get("momentum", 0.0)))),
@@ -290,8 +375,13 @@ def _aggregate_axis(signals: List[Dict[str, Any]]) -> Dict[str, Any]:
     )[:2]
     mom_avg = float(np.mean([float(t.get("momentum_7d_vs_30d", t.get("momentum", 0.0))) for t in top])) if top else 0.0
 
-    return {"band_high": band_high, "band_low": band_low, "trend": _trend(mom_avg), "signals": signals}
-
+    return {
+        "band_high": band_high,
+        "band_low": band_low,
+        "trend": _trend(mom_avg),
+        "signals": signals,
+        "informative_count": len(informative),
+    }
 
 def _driver_score(s: Dict[str, Any], weight: float) -> float:
     z = float(s.get("z_robust", 0.0))
@@ -339,7 +429,7 @@ def compute_regime(
     for m in spec.demand_metrics:
         sig = _signal_for_metric(d, m)
         if sig:
-            sig["band"] = _band(sig["pct_90d"], sig["z_robust"])
+            sig["band"] = _band(sig["pct_90d"], sig["z_robust"], informative=bool(sig.get("informative", True)))
             sig["trend"] = _trend(sig["momentum_7d_vs_30d"])
             demand.append(sig)
 
@@ -347,7 +437,7 @@ def compute_regime(
     for m in spec.friction_metrics:
         sig = _signal_for_metric(d, m)
         if sig:
-            sig["band"] = _band(sig["pct_90d"], sig["z_robust"])
+            sig["band"] = _band(sig["pct_90d"], sig["z_robust"], informative=bool(sig.get("informative", True)))
             sig["trend"] = _trend(sig["momentum_7d_vs_30d"])
             friction.append(sig)
 
@@ -355,7 +445,7 @@ def compute_regime(
     for m in spec.capacity_metrics:
         sig = _signal_for_metric(d, m)
         if sig:
-            sig["band"] = _band(sig["pct_90d"], sig["z_robust"])
+            sig["band"] = _band(sig["pct_90d"], sig["z_robust"], informative=bool(sig.get("informative", True)))
             sig["trend"] = _trend(sig["momentum_7d_vs_30d"])
             capacity.append(sig)
 
@@ -364,10 +454,11 @@ def compute_regime(
     inst_sig = _signal_for_blocktime_instability(d, col="avg_block_time_sec", window_days=int(window_days))
     if inst_sig:
         inst_sig["axis"] = "capacity"
-        inst_sig["band"] = _band(float(inst_sig["pct_90d"]), float(inst_sig["z_robust"]))
+        inst_sig["band"] = _band(float(inst_sig["pct_90d"]), float(inst_sig["z_robust"]), informative=bool(inst_sig.get("informative", True)))
         inst_sig["trend"] = _trend(float(inst_sig["momentum_7d_vs_30d"]))
-        # keep it out of axis aggregation arrays unless you explicitly want it (we don't, for now)
-        # capacity.append(inst_sig)  # intentionally NOT included to avoid regime changes
+        # Use instability, not raw block time, as the capacity signal.
+        # Non-informative instability is neutralized by _aggregate_axis.
+        capacity.append(inst_sig)
 
     # Full evidence surface
     signals: Dict[str, Any] = {}
@@ -380,6 +471,9 @@ def compute_regime(
             "pct_90d": s.get("pct_90d"),
             "z_robust": s.get("z_robust"),
             "momentum_7d_vs_30d": s.get("momentum_7d_vs_30d"),
+            "informative": bool(s.get("informative", True)),
+            "neutralized": bool(s.get("neutralized", False)),
+            "neutral_reason": s.get("neutral_reason"),
         }
         # carry optional extras (for transforms)
         if "current_raw" in s:
@@ -410,12 +504,19 @@ def compute_regime(
     def is_low(b: str) -> bool:
         return b in ("LOW", "EXTREME_LOW")
 
+    demand_high = is_high(ax_d["band_high"]) and int(ax_d.get("informative_count", 0)) > 0
+    friction_high = is_high(ax_f["band_high"]) and int(ax_f.get("informative_count", 0)) > 0
+    friction_low = is_low(ax_f["band_low"]) and int(ax_f.get("informative_count", 0)) > 0
+    capacity_high = is_high(ax_c["band_high"]) and int(ax_c.get("informative_count", 0)) > 0
+    capacity_low = is_low(ax_c["band_low"]) and int(ax_c.get("informative_count", 0)) > 0
+    capacity_extreme = is_extreme_high(ax_c["band_high"]) and int(ax_c.get("informative_count", 0)) > 0
+
     label = "STABLE"
-    if is_extreme_high(ax_c["band_high"]) or (is_high(ax_c["band_high"]) and is_high(ax_f["band_high"])):
+    if (friction_high and capacity_high) or (capacity_extreme and ax_c["trend"] == "HEATING"):
         label = "CONGESTED"
-    elif is_low(ax_f["band_low"]) and is_low(ax_c["band_low"]):
+    elif friction_low and (capacity_low or not capacity_high):
         label = "CHEAP"
-    elif is_high(ax_d["band_high"]) and (ax_d["trend"] == "HEATING" or ax_c["trend"] == "HEATING" or ax_f["trend"] == "HEATING"):
+    elif demand_high and ax_d["trend"] == "HEATING":
         label = "HEATING"
     else:
         label = "STABLE"
@@ -425,11 +526,14 @@ def compute_regime(
 
     candidates: List[Tuple[float, Dict[str, Any]]] = []
     for s in demand:
-        candidates.append((_driver_score(s, 1.0), {**s, "axis": "demand"}))
+        if bool(s.get("informative", True)):
+            candidates.append((_driver_score(s, 1.0), {**s, "axis": "demand"}))
     for s in friction:
-        candidates.append((_driver_score(s, 1.1), {**s, "axis": "friction"}))
+        if bool(s.get("informative", True)):
+            candidates.append((_driver_score(s, 1.1), {**s, "axis": "friction"}))
     for s in capacity:
-        candidates.append((_driver_score(s, 1.2), {**s, "axis": "capacity"}))
+        if bool(s.get("informative", True)):
+            candidates.append((_driver_score(s, 1.2), {**s, "axis": "capacity"}))
 
     def agrees(s: Dict[str, Any]) -> bool:
         b = s.get("band", "NORMAL")
@@ -458,6 +562,7 @@ def compute_regime(
                 "pct_90d": s["pct_90d"],
                 "trend": s["trend"],
                 "momentum_7d_vs_30d": s["momentum_7d_vs_30d"],
+                "informative": bool(s.get("informative", True)),
             }
         )
 
@@ -500,13 +605,187 @@ def compute_regime(
             ),
         },
         "axes": {
-            "demand": {"band_high": ax_d["band_high"], "band_low": ax_d["band_low"], "trend": ax_d["trend"]},
-            "friction": {"band_high": ax_f["band_high"], "band_low": ax_f["band_low"], "trend": ax_f["trend"]},
-            "capacity": {"band_high": ax_c["band_high"], "band_low": ax_c["band_low"], "trend": ax_c["trend"]},
+            "demand": {"band_high": ax_d["band_high"], "band_low": ax_d["band_low"], "trend": ax_d["trend"], "informative_count": ax_d.get("informative_count", 0)},
+            "friction": {"band_high": ax_f["band_high"], "band_low": ax_f["band_low"], "trend": ax_f["trend"], "informative_count": ax_f.get("informative_count", 0)},
+            "capacity": {"band_high": ax_c["band_high"], "band_low": ax_c["band_low"], "trend": ax_c["trend"], "informative_count": ax_c.get("informative_count", 0)},
         },
+        "methodology_notes": [
+            "Non-informative low-variance distributions are neutralized before band aggregation.",
+            "Raw block time is not used directly for congestion; blocktime_instability is used instead.",
+        ],
         "signals": signals,
         "signal_aliases": alias_to_signal,
     }
+
+
+def _scorecard_dimension_score(scorecard: Dict[str, Any], axis: str) -> Optional[float]:
+    try:
+        v = (((scorecard or {}).get("dimensions") or {}).get(axis) or {}).get("score")
+        if v is None:
+            return None
+        f = float(v)
+        if math.isfinite(f):
+            return f
+    except Exception:
+        pass
+    return None
+
+
+def _scorecard_dimension_level(scorecard: Dict[str, Any], axis: str) -> Optional[str]:
+    try:
+        v = (((scorecard or {}).get("dimensions") or {}).get(axis) or {}).get("level")
+        if v is not None:
+            return str(v)
+    except Exception:
+        pass
+    return None
+
+
+def _scorecard_regime_support(scorecard: Dict[str, Any], label: str) -> Tuple[bool, Dict[str, Any], str]:
+    """Return whether the public scorecard supports a regime label.
+
+    Newer scorecards expose scorecard.regime_support. For backward
+    compatibility we also evaluate dimension scores/levels directly.
+    """
+    support = (scorecard or {}).get("regime_support") or {}
+    details = support.get("details") or {
+        "demand": {
+            "score": _scorecard_dimension_score(scorecard, "demand"),
+            "level": _scorecard_dimension_level(scorecard, "demand"),
+        },
+        "friction": {
+            "score": _scorecard_dimension_score(scorecard, "friction"),
+            "level": _scorecard_dimension_level(scorecard, "friction"),
+        },
+        "capacity": {
+            "score": _scorecard_dimension_score(scorecard, "capacity"),
+            "level": _scorecard_dimension_level(scorecard, "capacity"),
+        },
+    }
+
+    if label == "CONGESTED":
+        if support.get("congested_supported") is True:
+            return True, details, "scorecard.regime_support.congested_supported"
+        friction_score = details.get("friction", {}).get("score")
+        capacity_score = details.get("capacity", {}).get("score")
+        friction_level = details.get("friction", {}).get("level")
+        capacity_level = details.get("capacity", {}).get("level")
+        ok = (
+            (friction_score is not None and float(friction_score) >= 67.0 and capacity_score is not None and float(capacity_score) >= 67.0)
+            or (friction_level == "High" and capacity_level == "Tight")
+        )
+        return bool(ok), details, "CONGESTED requires friction and capacity support."
+
+    if label == "CHEAP":
+        if support.get("cheap_supported") is True:
+            return True, details, "scorecard.regime_support.cheap_supported"
+        friction_score = details.get("friction", {}).get("score")
+        capacity_score = details.get("capacity", {}).get("score")
+        friction_level = details.get("friction", {}).get("level")
+        capacity_level = details.get("capacity", {}).get("level")
+        friction_low = (friction_score is not None and float(friction_score) <= 33.0) or friction_level == "Low"
+        capacity_tight = (capacity_score is not None and float(capacity_score) >= 67.0) or capacity_level == "Tight"
+        return bool(friction_low and not capacity_tight), details, "CHEAP requires low friction and no tight capacity."
+
+    if label == "HEATING":
+        if support.get("heating_supported") is True:
+            return True, details, "scorecard.regime_support.heating_supported"
+        demand_score = details.get("demand", {}).get("score")
+        demand_level = details.get("demand", {}).get("level")
+        ok = (demand_score is not None and float(demand_score) >= 67.0) or demand_level == "High"
+        return bool(ok), details, "HEATING requires demand support."
+
+    return True, details, "ok"
+
+
+def _regime_axis_support(regime: Dict[str, Any], label: str) -> Tuple[bool, Dict[str, Any], str]:
+    axes = (regime or {}).get("axes") or {}
+    d = axes.get("demand") or {}
+    f = axes.get("friction") or {}
+    c = axes.get("capacity") or {}
+
+    def high(axis: Dict[str, Any]) -> bool:
+        return str(axis.get("band_high")) in {"HIGH", "EXTREME_HIGH"} and int(axis.get("informative_count") or 0) > 0
+
+    def extreme_high(axis: Dict[str, Any]) -> bool:
+        return str(axis.get("band_high")) == "EXTREME_HIGH" and int(axis.get("informative_count") or 0) > 0
+
+    def low(axis: Dict[str, Any]) -> bool:
+        return str(axis.get("band_low")) in {"LOW", "EXTREME_LOW"} and int(axis.get("informative_count") or 0) > 0
+
+    def heating(axis: Dict[str, Any]) -> bool:
+        return str(axis.get("trend")) == "HEATING"
+
+    details = {"demand": d, "friction": f, "capacity": c}
+
+    if label == "CONGESTED":
+        ok = bool((high(f) and high(c)) or (extreme_high(c) and heating(c)))
+        return ok, details, "regime axes require informative friction/capacity support."
+    if label == "CHEAP":
+        ok = bool(low(f) and not high(c))
+        return ok, details, "regime axes require informative low friction and no high capacity pressure."
+    if label == "HEATING":
+        ok = bool(high(d) and heating(d))
+        return ok, details, "regime axes require informative demand high with HEATING trend."
+    return True, details, "ok"
+
+
+def reconcile_regime_with_scorecard(regime: Dict[str, Any], scorecard: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep public labels and the public scorecard epistemically aligned.
+
+    The previous safety patch degraded many legitimate non-STABLE labels because
+    the scorecard was not profile-aware. The scorecard is now profile-aware and
+    exposes explicit regime_support flags. This function therefore only degrades
+    a non-STABLE label when BOTH conditions hold:
+      1) the profile-aware public scorecard does not support the label, and
+      2) the regime axis facts do not independently support the label.
+
+    UNKNOWN/DEGRADED is never upgraded. STABLE is left unchanged.
+    """
+    if not isinstance(regime, dict):
+        return regime
+
+    label = str(regime.get("label") or "STABLE")
+    if label in ("UNKNOWN/DEGRADED", "STABLE"):
+        out = dict(regime)
+        out.setdefault("sanity", {"status": "ok", "adjusted": False})
+        return out
+
+    scorecard_ok, scorecard_details, scorecard_reason = _scorecard_regime_support(scorecard, label)
+    axis_ok, axis_details, axis_reason = _regime_axis_support(regime, label)
+
+    out = dict(regime)
+    if scorecard_ok or axis_ok:
+        out["sanity"] = {
+            "status": "ok",
+            "adjusted": False,
+            "support_basis": "scorecard" if scorecard_ok else "regime_axes",
+            "scorecard_support": scorecard_details,
+            "axis_support": axis_details,
+            "support_reason": scorecard_reason if scorecard_ok else axis_reason,
+        }
+        return out
+
+    previous_label = label
+    out["label"] = "STABLE"
+    out["determinism_hash"] = stable_sha256_12(json_dumps_canonical({
+        "chain": out.get("chain"),
+        "ruleset_id": out.get("ruleset_id"),
+        "label": "STABLE",
+        "asof_date": out.get("asof_date"),
+        "sanity_adjusted_from": previous_label,
+    }))
+    out["drivers"] = []
+    out["sanity"] = {
+        "status": "adjusted",
+        "adjusted": True,
+        "from_label": previous_label,
+        "to_label": "STABLE",
+        "reason": f"{scorecard_reason} {axis_reason}",
+        "scorecard_support": scorecard_details,
+        "axis_support": axis_details,
+    }
+    return out
 
 
 def json_dumps_canonical(obj: Any) -> str:

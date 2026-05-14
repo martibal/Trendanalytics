@@ -7,7 +7,8 @@ param(
     [string]$LogDirectory = "",
     [switch]$SkipBuild,
     [switch]$SkipPush,
-    [switch]$CleanupEphemeralRaw
+    [switch]$CleanupEphemeralRaw,
+    [int]$JsonFinalizerLookbackDays = 90
 )
 
 Set-StrictMode -Version Latest
@@ -137,6 +138,118 @@ function Invoke-Native {
     }
 }
 
+
+function Resolve-PythonExecutable {
+    $envPython = [Environment]::GetEnvironmentVariable("CSS_PYTHON")
+    if (-not [string]::IsNullOrWhiteSpace($envPython)) {
+        return $envPython
+    }
+    return "python"
+}
+
+function Get-FinalizerLookbackDays {
+    param([int]$DefaultValue)
+
+    $envValue = [Environment]::GetEnvironmentVariable("CSS_JSON_FINALIZER_LOOKBACK_DAYS")
+    if (-not [string]::IsNullOrWhiteSpace($envValue)) {
+        $parsed = 0
+        if ([int]::TryParse($envValue.Trim(), [ref]$parsed) -and $parsed -gt 0) {
+            return $parsed
+        }
+        Write-Log "WARN: CSS_JSON_FINALIZER_LOOKBACK_DAYS is not a positive integer: $envValue. Using $DefaultValue."
+    }
+
+    if ($DefaultValue -gt 0) {
+        return $DefaultValue
+    }
+
+    return 90
+}
+
+function Invoke-SafeJsonFinalizer {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [int]$LookbackDays = 90
+    )
+
+    $finalizer = Join-Path $RepoRoot "pipeline\tools\regenerate_json_safe.py"
+    Ensure-PathExists -PathValue $finalizer -Label "V3 safe JSON finalizer"
+
+    $validator = Join-Path $RepoRoot "pipeline\tools\validate_meta_methodology_safety.py"
+    Ensure-PathExists -PathValue $validator -Label "META methodology validator"
+
+    $python = Resolve-PythonExecutable
+    $days = Get-FinalizerLookbackDays -DefaultValue $LookbackDays
+    $start = (Get-Date).ToUniversalTime().Date.AddDays(-1 * $days).ToString("yyyy-MM-dd")
+
+    Write-Log "STEP 2: Finalize V3 META/Brief JSON from existing local GOLD artifacts"
+    Write-Log "JSON finalizer start date: $start ($days day lookback)"
+
+    Invoke-Native -WorkingDirectory $RepoRoot -FilePath $python -Arguments @(
+        $finalizer,
+        "--root", $RepoRoot,
+        "--start", $start
+    )
+
+    Write-Log "STEP 2A: Validate canonical published META methodology"
+    Invoke-Native -WorkingDirectory $RepoRoot -FilePath $python -Arguments @(
+        $validator,
+        "--root", $RepoRoot
+    )
+}
+
+function Invoke-WebBriefsBuilderIfPresent {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $webRoot = Join-Path $RepoRoot "web-v1-app"
+    $briefBuilder = Join-Path $webRoot "scripts\build_briefs\build_all_briefs.py"
+    $publishedRoot = Join-Path $webRoot "public\data\published\v1"
+
+    if (-not (Test-Path -LiteralPath $webRoot)) {
+        Write-Log "Web app folder not found, skipping web Regime Briefs builder: $webRoot"
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath $briefBuilder)) {
+        Write-Log "Web Regime Briefs builder not found, skipping: $briefBuilder"
+        return
+    }
+
+    Ensure-PathExists -PathValue $publishedRoot -Label "web-v1-app published data root"
+
+    $python = Resolve-PythonExecutable
+    Write-Log "STEP 3A: Rebuild Regime Briefs in web-v1-app public data"
+    Invoke-Native -WorkingDirectory $webRoot -FilePath $python -Arguments @(
+        $briefBuilder,
+        "--root", $publishedRoot
+    )
+}
+
+function Validate-WebPublishedMetaIfPresent {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $validator = Join-Path $RepoRoot "pipeline\tools\validate_meta_methodology_safety.py"
+    $webMetaRoot = Join-Path $RepoRoot "web-v1-app\public\data\published\v1\meta"
+
+    if (-not (Test-Path -LiteralPath $validator)) {
+        Write-Log "META methodology validator not found, skipping web META validation: $validator"
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath $webMetaRoot)) {
+        Write-Log "web-v1-app META root not found, skipping web META validation: $webMetaRoot"
+        return
+    }
+
+    $python = Resolve-PythonExecutable
+    Write-Log "STEP 3B: Validate web-v1-app published META methodology"
+    Invoke-Native -WorkingDirectory $RepoRoot -FilePath $python -Arguments @(
+        $validator,
+        "--root", $RepoRoot,
+        "--meta-root", $webMetaRoot
+    )
+}
+
 function Invoke-Git {
     param(
         [Parameter(Mandatory = $true)][string]$WorkingDirectory,
@@ -245,6 +358,7 @@ Write-Log "LogDirectory        : $LogDirectory"
 Write-Log "SkipBuild           : $SkipBuild"
 Write-Log "SkipPush            : $SkipPush"
 Write-Log "CleanupEphemeralRaw : $cleanupEnabled"
+Write-Log "JsonFinalizerLookbackDays: $JsonFinalizerLookbackDays"
 if (-not [string]::IsNullOrWhiteSpace($rawRootForCleanup)) {
     Write-Log "CSS_RAW_ROOT        : $rawRootForCleanup"
 }
@@ -263,7 +377,9 @@ try {
         "-Mode", "incremental"
     )
 
-    Write-Log "STEP 2: Publish web data"
+    Invoke-SafeJsonFinalizer -RepoRoot $RootDir -LookbackDays $JsonFinalizerLookbackDays
+
+    Write-Log "STEP 3: Publish web data"
     $publishArgs = @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -279,6 +395,9 @@ try {
 
     Invoke-Native -WorkingDirectory $RootDir -FilePath "powershell" -Arguments $publishArgs
 
+    Invoke-WebBriefsBuilderIfPresent -RepoRoot $RootDir
+    Validate-WebPublishedMetaIfPresent -RepoRoot $RootDir
+
     if ($SkipPush) {
         Commit-PublishedSnapshotIfNeeded -RepoRoot $RootDir
     }
@@ -292,11 +411,11 @@ catch {
 }
 finally {
     if ($cleanupEnabled) {
-        Write-Log "STEP 3: Cleanup raw/parquet (always)"
+        Write-Log "STEP 4: Cleanup raw/parquet (always)"
         Cleanup-ParquetAndRaw -RepoRoot $RootDir -RawRootOverride $rawRootForCleanup
     }
     else {
-        Write-Log "STEP 3: Cleanup skipped because CleanupEphemeralRaw/CSS_CLEANUP_EPHEMERAL_RAW is not enabled"
+        Write-Log "STEP 4: Cleanup skipped because CleanupEphemeralRaw/CSS_CLEANUP_EPHEMERAL_RAW is not enabled"
     }
 
     if ($transcriptStarted) {

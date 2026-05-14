@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
 
 const BAND_ROWS = [
   { band: "Extreme high", pct: "≥ 95th percentile", z: "≥ +2.5", color: "#FF4444", bg: "rgba(255,68,68,0.08)" },
@@ -44,9 +45,7 @@ export default function MobileThresholdsPage() {
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Thresholds</div>
             <div className="text-[14px] font-bold text-white">Published classification rules</div>
           </div>
-          <Link href="/thresholds?view=desktop" className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold text-slate-200">
-            Full ↗
-          </Link>
+          <MobileRouteMenu />
         </div>
       </header>
 

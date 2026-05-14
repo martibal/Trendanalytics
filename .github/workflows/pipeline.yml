@@ -22,6 +22,8 @@ jobs:
     env:
       CSS_PYTHON: python
       CSS_SYNC_WEB: "0"
+      CSS_RAW_LOOKBACK_DAYS: "90"
+      CSS_JSON_FINALIZER_LOOKBACK_DAYS: "90"
       CSS_CLEANUP_EPHEMERAL_RAW: "1"
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -112,10 +114,25 @@ jobs:
           $global:LASTEXITCODE = 0
           exit 0
 
-      - name: Run daily incremental pipeline (commit locally, no push)
+      - name: Run daily incremental pipeline with V3 JSON finalizer (commit locally, no push)
         shell: pwsh
         run: |
           powershell -ExecutionPolicy Bypass -File .\run-daily-pipeline.ps1 -SkipPush
+
+      - name: Verify V3 methodology output before push
+        if: success()
+        shell: pwsh
+        run: |
+          python pipeline/tools/validate_meta_methodology_safety.py --root .
+          python pipeline/tools/validate_meta_methodology_safety.py --root . --meta-root web-v1-app/public/data/published/v1/meta
+
+          if (!(Test-Path "web-v1-app/public/data/published/v1/meta")) {
+            throw "Missing web-v1-app published META output."
+          }
+
+          if (!(Test-Path "web-v1-app/public/data/published/v1/briefs/site/latest.json")) {
+            throw "Missing Regime Briefs site bundle: web-v1-app/public/data/published/v1/briefs/site/latest.json"
+          }
 
       - name: Push local published-data commit with remote sync
         id: push_data

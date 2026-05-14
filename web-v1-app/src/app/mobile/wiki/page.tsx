@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
 import MobileWikiClient from "@/components/mobile/MobileWikiClient";
 import { WIKI_ENTRIES, WIKI_CATEGORIES } from "@/lib/mobile/wiki";
 
@@ -13,7 +14,7 @@ export default function MobileWikiPage() {
               <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Wiki</div>
               <div className="mt-0.5 text-[13px] font-bold text-white">Terms, labels, confidence, and fields</div>
             </div>
-            <Link href="/glossary?view=desktop" className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold text-slate-200">Desktop</Link>
+            <MobileRouteMenu />
           </div>
           <div className="mt-2 text-[11px] text-slate-500">{WIKI_ENTRIES.length} mobile-friendly entries</div>
         </div>

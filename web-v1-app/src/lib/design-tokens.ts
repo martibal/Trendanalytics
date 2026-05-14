@@ -55,22 +55,22 @@ export type ThemeColorScale = {
 };
 
 export const DESIGN_TOKEN_VALUES = {
-  "--color-bg-primary": "#0A0E1A",
-  "--color-bg-card": "#0F1B2D",
-  "--color-bg-light": "#F4F8FC",
-  "--color-accent": "#00D4FF",
-  "--color-text-primary": "#F1F5F9",
-  "--color-text-secondary": "#94A3B8",
-  "--color-border": "#1E2D3D",
-  "--color-regime-stable": "#00FF88",
-  "--color-regime-heating": "#FFD700",
-  "--color-regime-congested": "#FF4444",
-  "--color-regime-cheap": "#3B82F6",
-  "--color-regime-unknown": "#6B7280",
-  "--color-chain-bitcoin": "#F7931A",
-  "--color-chain-ethereum": "#627EEA",
-  "--color-chain-arbitrum": "#28A0F0",
-  "--color-chain-base": "#0052FF",
+  "--color-bg-primary": "#080F1A",
+  "--color-bg-card": "#111E30",
+  "--color-bg-light": "#0D1F35",
+  "--color-accent": "#C49230",
+  "--color-text-primary": "#E8E0D0",
+  "--color-text-secondary": "#7A8A96",
+  "--color-border": "#3A4A57",
+  "--color-regime-stable": "#10B981",
+  "--color-regime-heating": "#C4843C",
+  "--color-regime-congested": "#9E4040",
+  "--color-regime-cheap": "#3D7099",
+  "--color-regime-unknown": "#525E6E",
+  "--color-chain-bitcoin": "#C49230",
+  "--color-chain-ethereum": "#7A8A96",
+  "--color-chain-arbitrum": "#3D7099",
+  "--color-chain-base": "#2A6E7A",
 } as const satisfies Record<DesignTokenName, HexColor>;
 
 export const DESIGN_TOKENS: readonly DesignTokenEntry[] = [

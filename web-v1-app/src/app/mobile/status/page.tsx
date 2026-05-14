@@ -5,6 +5,7 @@ import { readDatasetManifest } from "@/lib/dataset";
 import { computeHistoryDepthDays } from "@/lib/historyDepth";
 import { parseMobileChainState, regimeColor, CHAIN_COLORS, type MobileChainState } from "@/lib/mobile/data";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
 import "server-only";
 
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
@@ -74,9 +75,7 @@ export default async function MobileStatusPage() {
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Status</div>
             <div className="text-[14px] font-bold text-white">Pipeline and freshness</div>
           </div>
-          <Link href="/status?view=desktop" className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold text-slate-200">
-            Full ↗
-          </Link>
+          <MobileRouteMenu />
         </div>
       </header>
 
