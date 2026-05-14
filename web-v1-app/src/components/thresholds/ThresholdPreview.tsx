@@ -2,6 +2,15 @@
 
 import { ThresholdControlValues } from "./ThresholdControls";
 
+function PreviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="data-row grid-cols-[1fr_auto] py-4">
+      <span className="text-[var(--ink)] font-medium text-sm">{label}</span>
+      <span className="font-mono text-[12px] text-[var(--ink2)] text-right">{value}</span>
+    </div>
+  );
+}
+
 export default function ThresholdPreview({
   values,
   isCustom = false,
@@ -10,68 +19,25 @@ export default function ThresholdPreview({
   isCustom?: boolean;
 }) {
   return (
-    <section className="rounded-2xl border border-[#9db8d4] bg-[#e7f1fb] p-6">
-      <div className="flex items-start justify-between gap-4">
+    <section aria-label="Threshold preview">
+      <div className="flex items-start justify-between gap-4 mb-2">
         <div>
-          <h2 className="text-lg font-black text-[#0d2447]">
-            Threshold preview
-          </h2>
-
-          <p className="mt-2 text-sm text-[#27476f]">
-            Human-readable preview of threshold logic.
+          <div className="eyebrow mb-3">Threshold preview</div>
+          <p className="text-sm text-[var(--ink2)]">
+            Human-readable summary of the current threshold configuration.
           </p>
         </div>
-
-        {isCustom ? (
-          <span className="rounded-full border border-[#9db8d4] bg-[#dceaf8] px-3 py-1 text-xs font-bold text-[#0d2447]">
-            Custom
-          </span>
-        ) : null}
+        {isCustom && (
+          <span className="ua-vf-tab is-active flex-shrink-0">Custom</span>
+        )}
       </div>
 
-      <div className="mt-6 space-y-4">
-        <div className="rounded-xl border border-[#9db8d4] bg-[#dceaf8] p-4 text-[#0d2447]">
-          <strong>Confidence gate</strong>
-          <div className="mt-1 text-sm text-[#27476f]">
-            Below {values.confidence_threshold}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-[#9db8d4] bg-[#dceaf8] p-4 text-[#0d2447]">
-          <strong>Persistence rule</strong>
-          <div className="mt-1 text-sm text-[#27476f]">
-            {values.min_persist_days} days
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-[#9db8d4] bg-[#dceaf8] p-4 text-[#0d2447]">
-          <strong>High band</strong>
-          <div className="mt-1 text-sm text-[#27476f]">
-            pct ≥ {values.high_pct}, z ≥ {values.high_z}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-[#9db8d4] bg-[#dceaf8] p-4 text-[#0d2447]">
-          <strong>Extreme high</strong>
-          <div className="mt-1 text-sm text-[#27476f]">
-            pct ≥ {values.extreme_high_pct}, z ≥ {values.extreme_high_z}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-[#9db8d4] bg-[#dceaf8] p-4 text-[#0d2447]">
-          <strong>Low band</strong>
-          <div className="mt-1 text-sm text-[#27476f]">
-            pct ≤ {values.low_pct}, z ≤ {values.low_z}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-[#9db8d4] bg-[#dceaf8] p-4 text-[#0d2447]">
-          <strong>Extreme low</strong>
-          <div className="mt-1 text-sm text-[#27476f]">
-            pct ≤ {values.extreme_low_pct}, z ≤ {values.extreme_low_z}
-          </div>
-        </div>
-      </div>
+      <PreviewRow label="Confidence gate" value={`Below ${values.confidence_threshold}`} />
+      <PreviewRow label="Persistence rule" value={`${values.min_persist_days} days`} />
+      <PreviewRow label="High band" value={`pct ≥ ${values.high_pct}, z ≥ ${values.high_z}`} />
+      <PreviewRow label="Extreme high" value={`pct ≥ ${values.extreme_high_pct}, z ≥ ${values.extreme_high_z}`} />
+      <PreviewRow label="Low band" value={`pct ≤ ${values.low_pct}, z ≤ ${values.low_z}`} />
+      <PreviewRow label="Extreme low" value={`pct ≤ ${values.extreme_low_pct}, z ≤ ${values.extreme_low_z}`} />
     </section>
   );
 }
