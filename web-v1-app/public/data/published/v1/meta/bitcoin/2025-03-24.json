@@ -10,12 +10,12 @@
       "recent_density": 1.0,
       "recent_metric_coverage": 0.6
     },
-    "confidence_score": 0.5269185539578717,
+    "confidence_score": 0.7049614029835264,
     "data_quality_score": 0.8,
     "date": "2025-03-24",
-    "label_confidence_score": 0.34705395313131815,
+    "label_confidence_score": 0.6212132246206272,
     "lag_days_vs_asof_date": 0,
-    "lag_days_vs_utc_today": 413,
+    "lag_days_vs_utc_today": 367,
     "missing": false,
     "semantics": "combined_data_quality_and_label_stability",
     "source": "gold_history",
@@ -32,7 +32,7 @@
     "confidence_score": 0.8,
     "date": "2025-03-24",
     "lag_days_vs_asof_date": 0,
-    "lag_days_vs_utc_today": 413,
+    "lag_days_vs_utc_today": 367,
     "missing": false,
     "semantics": "data_quality_and_history_coverage_only"
   },
@@ -40,7 +40,7 @@
   "gold_status": {
     "chain": "bitcoin",
     "features_lag_days_vs_utc_today": null,
-    "features_last_date": "2026-04-05",
+    "features_last_date": "2026-03-25",
     "missing": false,
     "note": "Fallback status derived from gold JSON (no pipeline ml_status present)."
   },
@@ -65,7 +65,7 @@
     "type": "btc"
   },
   "publish_confidence": {
-    "confidence_score": 0.5269185539578717,
+    "confidence_score": 0.7049614029835264,
     "eligible": true,
     "missing": false,
     "reason": "combined_confidence_threshold",
@@ -77,106 +77,62 @@
     "axes": {
       "capacity": {
         "band_high": "NORMAL",
-        "band_low": "EXTREME_LOW",
-        "informative_count": 1,
-        "trend": "COOLING"
+        "band_low": "NORMAL",
+        "trend": "FLAT"
       },
       "demand": {
         "band_high": "EXTREME_HIGH",
         "band_low": "NORMAL",
-        "informative_count": 1,
         "trend": "HEATING"
       },
       "friction": {
         "band_high": "NORMAL",
         "band_low": "NORMAL",
-        "informative_count": 1,
         "trend": "COOLING"
       }
     },
     "chain": "bitcoin",
-    "determinism_hash": "d4a4254639ce",
+    "determinism_hash": "62d1b01242d7",
     "drivers": [
       {
         "axis": "demand",
         "current": 483673.0,
-        "informative": true,
         "metric": "tx_count_daily",
         "momentum_7d_vs_30d": 0.20857904372207936,
-        "pct_90d": 90.55555555555556,
+        "pct_90d": 91.11111111111111,
         "trend": "HEATING",
         "z_robust": 1.3662461976047904
       }
     ],
     "gate": {
-      "confidence_score": 0.5269185539578717,
+      "confidence_score": 0.7049614029835264,
       "explanation": "OK",
       "status": "ok",
       "threshold": 0.4,
       "type": "confidence_threshold"
     },
     "label": "HEATING",
-    "methodology_notes": [
-      "Non-informative low-variance distributions are neutralized before band aggregation.",
-      "Raw block time is not used directly for congestion; blocktime_instability is used instead."
-    ],
     "missing": false,
     "ruleset_id": "btc_v1",
-    "sanity": {
-      "adjusted": false,
-      "axis_support": {
-        "capacity": {
-          "band_high": "NORMAL",
-          "band_low": "EXTREME_LOW",
-          "informative_count": 1,
-          "trend": "COOLING"
-        },
-        "demand": {
-          "band_high": "EXTREME_HIGH",
-          "band_low": "NORMAL",
-          "informative_count": 1,
-          "trend": "HEATING"
-        },
-        "friction": {
-          "band_high": "NORMAL",
-          "band_low": "NORMAL",
-          "informative_count": 1,
-          "trend": "COOLING"
-        }
-      },
-      "scorecard_support": {
-        "capacity": {
-          "level": "Balanced",
-          "score": 35.79788107256905
-        },
-        "demand": {
-          "level": "Normal",
-          "score": 57.87176616695544
-        },
-        "friction": {
-          "level": "Normal",
-          "score": 43.62756852590546
-        }
-      },
-      "status": "ok",
-      "support_basis": "regime_axes",
-      "support_reason": "regime axes require informative demand high with HEATING trend."
-    },
     "signal_aliases": {
       "blocktime_instability": "blocktime_instability",
       "fee_burden_proxy": "median_tx_fee_native",
       "tx_count": "tx_count_daily"
     },
     "signals": {
+      "avg_block_time_sec": {
+        "axis": "capacity",
+        "current": 390.0,
+        "momentum_7d_vs_30d": -0.04192380952380945,
+        "pct_90d": 33.33333333333333,
+        "z_robust": -0.5122142857142857
+      },
       "blocktime_instability": {
         "axis": "capacity",
         "current": 0.041783619703454844,
         "current_raw": 390.0,
-        "informative": true,
         "momentum_7d_vs_30d": -0.6015925577375398,
-        "neutral_reason": null,
-        "neutralized": false,
-        "pct_90d": 2.7777777777777777,
+        "pct_90d": 3.3333333333333335,
         "transform": {
           "formula": "rolling_mean(|bt - median_30| / median_30)",
           "input_metric": "avg_block_time_sec",
@@ -189,162 +145,98 @@
       "median_tx_fee_native": {
         "axis": "friction",
         "current": 4.32e-06,
-        "informative": true,
         "momentum_7d_vs_30d": -0.3170685317460312,
-        "neutral_reason": null,
-        "neutralized": false,
-        "pct_90d": 20.555555555555554,
+        "pct_90d": 22.22222222222222,
         "z_robust": -0.689488888888889
       },
       "tx_count_daily": {
         "axis": "demand",
         "current": 483673.0,
-        "informative": true,
         "momentum_7d_vs_30d": 0.20857904372207936,
-        "neutral_reason": null,
-        "neutralized": false,
-        "pct_90d": 90.55555555555556,
+        "pct_90d": 91.11111111111111,
         "z_robust": 1.3662461976047904
       }
     },
     "window_days": 7
   },
-  "revision_id": 30236184,
   "scorecard": {
     "asof_date": "2025-03-24",
     "chain": "bitcoin",
-    "confidence_score": 0.5269185539578717,
+    "confidence_score": 0.7049614029835264,
     "dimensions": {
       "capacity": {
         "components": {
           "blocktime_instability": {
             "current": 390.0,
-            "informative": true,
-            "neutral_reason": null,
-            "neutralized": false,
-            "pct_lookback": 2.4096385542168677,
             "score_raw": 23.046842209761238,
-            "transform": {
-              "formula": "rolling_mean(|bt - median_30| / median_30)",
-              "input_metric": "avg_block_time_sec",
-              "type": "instability_proxy"
-            },
-            "transformed_current": 0.041783619703454844,
             "z": -1.2265853318977973
+          },
+          "utilization": {
+            "current": null,
+            "score_raw": null,
+            "z": null
           }
         },
-        "coverage_factor": 1.0,
-        "effective_confidence": 0.5269185539578717,
+        "coverage_factor": 0.5,
+        "effective_confidence": 0.3524807014917632,
         "level": "Balanced",
-        "score": 35.79788107256905,
+        "score": 40.49953203467846,
         "score_raw": 23.046842209761238
       },
       "demand": {
         "components": {
-          "tx_count_daily": {
+          "active_addresses": {
+            "current": null,
+            "score_raw": null,
+            "z": null
+          },
+          "tx_count": {
             "current": 483673.0,
-            "informative": true,
-            "neutral_reason": null,
-            "neutralized": false,
-            "pct_lookback": 72.16494845360825,
             "score_raw": 64.93924650750637,
             "z": 0.5886937118957797
+          },
+          "tx_per_user": {
+            "current": null,
+            "score_raw": null,
+            "z": null
           }
         },
-        "coverage_factor": 1.0,
-        "effective_confidence": 0.5269185539578717,
+        "coverage_factor": 0.3333333333333333,
+        "effective_confidence": 0.23498713432784213,
         "level": "Normal",
-        "score": 57.87176616695544,
+        "score": 53.510530725816146,
         "score_raw": 64.93924650750637
       },
       "friction": {
         "components": {
-          "median_tx_fee_native": {
-            "current": 4.32e-06,
-            "informative": true,
-            "neutral_reason": null,
-            "neutralized": false,
-            "pct_lookback": 23.711340206185564,
-            "score_raw": 37.906230619079636,
-            "z": -0.4681465263110967
+          "failed_tx_rate": {
+            "current": null,
+            "score_raw": null,
+            "z": null
+          },
+          "fee_burden_proxy": {
+            "current": null,
+            "score_raw": null,
+            "z": null
           }
         },
-        "coverage_factor": 1.0,
-        "effective_confidence": 0.5269185539578717,
+        "coverage_factor": 0.0,
+        "effective_confidence": 0.0,
         "level": "Normal",
-        "score": 43.62756852590546,
-        "score_raw": 37.906230619079636
+        "score": 50.0,
+        "score_raw": null
       }
     },
     "missing": false,
     "notes": {
-      "interpretation": "Scores are 0–100. 50 is neutral vs the chain's own history. Higher Demand means hotter usage; higher Friction means higher cost/failure; higher Capacity means tighter capacity pressure. Low confidence pulls scores toward 50. Scorecard components are profile-aware and aligned with regime classification."
-    },
-    "profile_type": "btc",
-    "regime_support": {
-      "cheap_supported": false,
-      "congested_supported": false,
-      "details": {
-        "capacity": {
-          "level": "Balanced",
-          "score": 35.79788107256905
-        },
-        "demand": {
-          "level": "Normal",
-          "score": 57.87176616695544
-        },
-        "friction": {
-          "level": "Normal",
-          "score": 43.62756852590546
-        }
-      },
-      "heating_supported": false
+      "interpretation": "Scores are 0–100. 50 is neutral vs the chain's own history. Higher Demand means hotter usage; higher Friction means higher cost/failure; higher Capacity means tighter capacity (pressure). Low confidence pulls scores toward 50."
     },
     "window_days": 7
   },
   "status": {
     "color": "yellow",
-    "explanation_support": {
-      "basis": "regime_axes",
-      "label": "HEATING",
-      "reason": "regime axes require informative demand high with HEATING trend.",
-      "regime_axes": {
-        "capacity": {
-          "band_high": "NORMAL",
-          "band_low": "EXTREME_LOW",
-          "informative_count": 1,
-          "trend": "COOLING"
-        },
-        "demand": {
-          "band_high": "EXTREME_HIGH",
-          "band_low": "NORMAL",
-          "informative_count": 1,
-          "trend": "HEATING"
-        },
-        "friction": {
-          "band_high": "NORMAL",
-          "band_low": "NORMAL",
-          "informative_count": 1,
-          "trend": "COOLING"
-        }
-      },
-      "scorecard": {
-        "capacity": {
-          "level": "Balanced",
-          "score": 35.79788107256905
-        },
-        "demand": {
-          "level": "Normal",
-          "score": 57.87176616695544
-        },
-        "friction": {
-          "level": "Normal",
-          "score": 43.62756852590546
-        }
-      }
-    },
     "label": "HEATING",
-    "one_liner": "Demand-led heating: regime-axis evidence shows elevated demand with a heating trend from published regime-axis evidence."
+    "one_liner": "Demand: Normal; Friction: Normal; Capacity: Balanced"
   },
   "tier_used": "standard",
   "updated_through": "2025-03-24"
