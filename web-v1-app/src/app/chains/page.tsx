@@ -131,10 +131,13 @@ async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
   }
 }
 
-function InlineCode({ children }: { children: string }) {
-  return <code className="rounded border border-[var(--urd-border)] bg-[var(--urd-raised)] px-1 py-0.5 text-[var(--urd-text-strong)]">{children}</code>;
+function InlineCode({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="code-block inline-block px-2 py-0.5 text-[12px]">
+      {children}
+    </code>
+  );
 }
-
 function fmtDate(d?: string) {
   return d ?? "—";
 }

@@ -1,37 +1,233 @@
 // src/app/dashboard/page.tsx
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
+
+import Link from "next/link";
 
 import { CHAIN_LIST } from "@/config/chains";
 import ApiKeyManagerClient from "@/components/dashboard/ApiKeyManagerClient";
-import PageHero from "@/components/site/PageHero";
-import {
-  UrdButtonLink,
-  UrdCallout,
-  UrdContainer,
-  UrdInlineCode,
-  UrdPage,
-  UrdSection,
-  cx,
-} from "@/components/site/UrdDesignSystem";
 import { getCurrentAccountView } from "@/lib/auth/account";
 import { getPersistedApiKeyDisplayRows } from "@/lib/auth/apiKeys";
 
 type DashboardSubscriptionState = "not_connected" | "inactive" | "active";
+type TokenTone = "ok" | "pending" | "quiet" | "blue" | "danger";
 
-function statusBadgeClass(status: DashboardSubscriptionState) {
-  const base =
-    "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-black capitalize";
-  if (status === "active") {
-    return `${base} border-emerald-500 bg-emerald-50 text-emerald-700`;
-  }
-  if (status === "inactive") {
-    return `${base} border-amber-400 bg-amber-50 text-amber-800`;
-  }
-  return `${base} border-[#9db8d4] bg-[#eef6ff] text-[#0d2447]`;
+const dashboardCss = `
+.ua-dashboard-page {
+  --urd-border: var(--line2);
+  --urd-border-soft: var(--line);
+  --urd-panel: transparent;
+  --urd-raised: transparent;
+  --urd-text-strong: var(--ink);
+  --urd-text-body: var(--ink2);
+  --urd-text-muted: var(--ink3);
 }
 
-function code(path: string) {
-  return <UrdInlineCode>{path}</UrdInlineCode>;
+.ua-dashboard-page .ua-dashboard-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 74px;
+  align-items: end;
+}
+
+.ua-dashboard-page .ua-dashboard-meta {
+  border-top: 1px solid var(--line2);
+  display: grid;
+  gap: 12px;
+  padding-top: 18px;
+}
+
+.ua-dashboard-page .ua-dashboard-meta-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink2);
+}
+
+.ua-dashboard-page .ua-dashboard-meta-row strong {
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.ua-dashboard-page .ua-dashboard-section-grid {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 64px;
+  align-items: start;
+}
+
+.ua-dashboard-page .ua-dashboard-note {
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.72;
+  color: var(--ink3);
+}
+
+.ua-dashboard-page .ua-dashboard-data-stack {
+  border-top: 1px solid var(--line);
+}
+
+.ua-dashboard-page .ua-dashboard-data-row {
+  grid-template-columns: 190px minmax(0, 1fr) auto;
+  gap: 28px;
+}
+
+.ua-dashboard-page .ua-dashboard-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.ua-dashboard-page .ua-dashboard-value {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.ua-dashboard-page .ua-dashboard-detail {
+  margin-top: 3px;
+  max-width: 680px;
+  color: var(--ink2);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.ua-dashboard-page .ua-dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.ua-dashboard-page .ua-dashboard-window-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  border-top: 1px solid var(--line);
+  padding: 18px 0 2px;
+}
+
+.ua-dashboard-page .ua-dashboard-window {
+  border-bottom: 2px solid var(--gold);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding-bottom: 4px;
+}
+
+.ua-dashboard-page .ua-dashboard-endpoint {
+  border-top: 1px solid var(--line);
+  color: var(--ink2);
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  padding: 18px 0;
+}
+
+.ua-dashboard-page .ua-dashboard-endpoint:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.ua-dashboard-page .ua-dashboard-endpoint span {
+  color: var(--gold2);
+}
+
+.ua-dashboard-page .ua-dashboard-api-keys > section {
+  background: transparent !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-radius: 0 !important;
+  border-color: var(--line) !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.ua-dashboard-page .ua-dashboard-api-keys form,
+.ua-dashboard-page .ua-dashboard-api-keys [class*="rounded-3xl"],
+.ua-dashboard-page .ua-dashboard-api-keys [class*="rounded-2xl"],
+.ua-dashboard-page .ua-dashboard-api-keys [class*="rounded-xl"] {
+  background: transparent !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-radius: 0 !important;
+  border-color: var(--line) !important;
+  box-shadow: none !important;
+}
+
+.ua-dashboard-page .ua-dashboard-api-keys h2 {
+  color: var(--gold) !important;
+  font-family: var(--mono) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  letter-spacing: .16em !important;
+  line-height: 1.6 !important;
+  text-transform: uppercase !important;
+}
+
+.ua-dashboard-page .ua-dashboard-api-keys p,
+.ua-dashboard-page .ua-dashboard-api-keys li,
+.ua-dashboard-page .ua-dashboard-api-keys label,
+.ua-dashboard-page .ua-dashboard-api-keys div {
+  color: inherit;
+}
+
+.ua-dashboard-page .ua-dashboard-api-keys input {
+  background: var(--surface0) !important;
+  border-color: var(--line2) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--ink) !important;
+}
+
+.ua-dashboard-page .ua-dashboard-api-keys input::placeholder {
+  color: var(--ink3) !important;
+}
+
+.ua-dashboard-page .ua-dashboard-api-keys button:not(:disabled) {
+  background: var(--gold) !important;
+  border-color: var(--gold) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--surface0) !important;
+}
+
+.ua-dashboard-page .ua-dashboard-api-keys button:not(:disabled):hover {
+  background: var(--gold2) !important;
+  border-color: var(--gold2) !important;
+}
+
+@media (max-width: 880px) {
+  .ua-dashboard-page .ua-dashboard-hero-grid,
+  .ua-dashboard-page .ua-dashboard-section-grid,
+  .ua-dashboard-page .ua-dashboard-data-row,
+  .ua-dashboard-page .ua-dashboard-meta-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ua-dashboard-page .ua-dashboard-hero-grid,
+  .ua-dashboard-page .ua-dashboard-section-grid {
+    gap: 28px;
+  }
+
+  .ua-dashboard-page .ua-dashboard-data-row {
+    gap: 7px;
+  }
+
+  .ua-dashboard-page .regime-token {
+    justify-self: start;
+  }
+}
+`;
+
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
 }
 
 function capabilityRows() {
@@ -122,47 +318,123 @@ function deriveLifecycleState(params: {
   };
 }
 
-function boolPill(value: boolean, yes = "yes", no = "no") {
-  return value ? (
-    <span className="inline-flex items-center rounded-full border border-emerald-500 bg-emerald-50 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-emerald-700">
-      {yes}
-    </span>
-  ) : (
-    <span className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#557099]">
-      {no}
-    </span>
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return "—";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return parsed.toLocaleString("en-GB", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function tokenToneForState(status: DashboardSubscriptionState): TokenTone {
+  if (status === "active") return "ok";
+  if (status === "inactive") return "pending";
+  return "quiet";
+}
+
+function tokenClass(tone: TokenTone) {
+  return cx(
+    "regime-token justify-self-end whitespace-nowrap",
+    tone === "ok" && "label-stable",
+    tone === "pending" && "label-heating",
+    tone === "blue" && "label-cheap",
+    tone === "danger" && "label-congested",
+    tone === "quiet" && "label-unknown",
   );
 }
 
-function SmallMetric({
-  label,
+function Token({ children, tone }: { children: ReactNode; tone: TokenTone }) {
+  return <span className={tokenClass(tone)}>{children}</span>;
+}
+
+function boolToken(value: boolean, yes = "yes", no = "no") {
+  return <Token tone={value ? "ok" : "quiet"}>{value ? yes : no}</Token>;
+}
+
+function Section({
+  eyebrow,
+  title,
+  note,
   children,
 }: {
-  label: string;
+  eyebrow: string;
+  title: ReactNode;
+  note: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-      <div className="text-xs font-black uppercase tracking-[0.12em] text-[#557099]">
-        {label}
+    <section className="section">
+      <div className="page-shell ua-dashboard-section-grid">
+        <aside>
+          <div className="eyebrow">{eyebrow}</div>
+          <h2 className="mt-3">{title}</h2>
+          <p className="ua-dashboard-note">{note}</p>
+        </aside>
+        <div className="min-w-0">{children}</div>
       </div>
-      <div className="mt-2 text-lg font-black text-[#0d2447]">{children}</div>
+    </section>
+  );
+}
+
+function DataStack({ children }: { children: ReactNode }) {
+  return <div className="ua-dashboard-data-stack">{children}</div>;
+}
+
+function DataRow({
+  label,
+  value,
+  detail,
+  token,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  detail?: ReactNode;
+  token?: ReactNode;
+}) {
+  return (
+    <div className="data-row ua-dashboard-data-row">
+      <div className="ua-dashboard-label">{label}</div>
+      <div className="min-w-0">
+        <div className="ua-dashboard-value">{value}</div>
+        {detail ? <p className="ua-dashboard-detail">{detail}</p> : null}
+      </div>
+      {token ? token : null}
     </div>
   );
 }
 
-function AccountRow({ label, value }: { label: string; value: ReactNode }) {
+function GoldLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <p>
-      <span className="font-black text-[#0d2447]">{label}: </span>
-      <span className="text-[#27476f]">{value}</span>
-    </p>
+    <Link href={href} className="btn-primary">
+      {children}
+    </Link>
   );
+}
+
+function GoldSubmitButton({ children }: { children: ReactNode }) {
+  return (
+    <button type="submit" className="btn-primary">
+      {children}
+    </button>
+  );
+}
+
+function CodePath({ children }: { children: ReactNode }) {
+  return <code className="code-block inline-block px-2 py-1">{children}</code>;
 }
 
 export default async function DashboardPage() {
   const accountView = await getCurrentAccountView();
-  const apiKeys = await getPersistedApiKeyDisplayRows(accountView.account?.accountId ?? null);
+  const apiKeys = await getPersistedApiKeyDisplayRows(
+    accountView.account?.accountId ?? null,
+  );
 
   const subscriptionState = deriveSubscriptionState({
     authConfigured: accountView.authConfigured,
@@ -193,73 +465,6 @@ export default async function DashboardPage() {
 
   const hasBillingPortalAccess = Boolean(accountView.account?.stripeCustomerId);
 
-  if (accountView.authConfigured && !accountView.isAuthenticated) {
-    return (
-      <UrdPage>
-        <PageHero
-          eyebrow="Subscriber area"
-          title="Dashboard"
-          highlight="Sign in to see your account"
-          summary="The dashboard is the subscriber control surface for account state, API keys, entitlement-aware JSON delivery, and billing context."
-        >
-          <div className="max-w-3xl rounded-3xl border border-white/15 bg-white/10 p-5 text-sm font-semibold leading-7 text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-            <div className="text-xs font-black uppercase tracking-[0.16em] text-cyan-200">
-              Account access
-            </div>
-            <div className="mt-2 text-base font-black text-white">
-              Sign in to inspect your subscriber state
-            </div>
-            <p className="mt-2">
-              Your dashboard shows the account, entitlement, API-key, and delivery settings used by
-              authenticated reference-data access.
-            </p>
-          </div>
-        </PageHero>
-
-        <UrdContainer className="space-y-8">
-          <UrdSection title="Sign in to see your account">
-            <div className="grid gap-6 lg:grid-cols-[1fr_0.75fr]">
-              <div className="space-y-4 text-sm font-semibold leading-7 text-[#27476f]">
-                <p>
-                  This dashboard is the authenticated workspace for subscribers. Once signed in,
-                  it shows your plan, entitled chains, history depth, allowed delivery windows,
-                  API keys, and billing-linkage state.
-                </p>
-                <p>
-                  Public methodology pages, status pages, and documentation remain available
-                  without signing in. Account-specific delivery controls are shown only after an
-                  authenticated session is present.
-                </p>
-                <div className="flex flex-wrap gap-3 pt-2">
-                  <UrdButtonLink href="/sign-in">Sign in</UrdButtonLink>
-                  <UrdButtonLink href="/api-docs">Read API docs</UrdButtonLink>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-                <div className="text-sm font-black text-[#0d2447]">What the dashboard does</div>
-                <ul className="mt-3 list-disc space-y-2 pl-5 text-sm font-semibold leading-7 text-[#27476f]">
-                  <li>Shows the subscriber account and entitlement snapshot used by file delivery.</li>
-                  <li>Displays entitled chains, history depth, and allowed JSON delivery windows.</li>
-                  <li>Provides API-key lifecycle controls for authenticated reference-data access.</li>
-                  <li>Separates subscriber delivery from the public descriptive website.</li>
-                </ul>
-              </div>
-            </div>
-          </UrdSection>
-
-          <UrdSection title="Public resources">
-            <div className="flex flex-wrap gap-3 text-sm">
-              <UrdButtonLink href="/status">Public status</UrdButtonLink>
-              <UrdButtonLink href="/methodology">Methodology</UrdButtonLink>
-              <UrdButtonLink href="/thresholds">Threshold simulator</UrdButtonLink>
-            </div>
-          </UrdSection>
-        </UrdContainer>
-      </UrdPage>
-    );
-  }
-
   const allowedWindows = [
     accountView.snapshot.maxWindowDays >= 0 ? "latest" : null,
     accountView.snapshot.maxWindowDays >= 7 ? "7d" : null,
@@ -269,308 +474,392 @@ export default async function DashboardPage() {
     accountView.snapshot.maxWindowDays >= 365 ? "365d" : null,
   ].filter((value): value is string => !!value);
 
+  if (accountView.authConfigured && !accountView.isAuthenticated) {
+    return (
+      <main className="ua-page ua-dashboard-page min-h-screen bg-background text-foreground">
+        <style dangerouslySetInnerHTML={{ __html: dashboardCss }} />
+
+        <header className="hero border-b border-[var(--line)]">
+          <div className="page-shell ua-dashboard-hero-grid">
+            <div>
+              <div className="eyebrow">Subscriber area</div>
+              <h1 className="mt-5 max-w-5xl">
+                Dashboard<br />
+                <em>Sign in to see your account</em>
+              </h1>
+              <p className="lead mt-6">
+                The dashboard is the subscriber control surface for account state,
+                API keys, entitlement-aware JSON delivery, and billing context.
+              </p>
+              <div className="ua-dashboard-actions">
+                <GoldLink href="/sign-in">Sign in</GoldLink>
+                <GoldLink href="/api-docs">Read API docs</GoldLink>
+              </div>
+            </div>
+
+            <div className="ua-dashboard-meta" aria-label="Dashboard access summary">
+              <div className="ua-dashboard-meta-row">
+                <strong>Access</strong>
+                <span>Authentication required</span>
+              </div>
+              <div className="ua-dashboard-meta-row">
+                <strong>Surface</strong>
+                <span>Subscriber account, API keys, billing portal</span>
+              </div>
+              <div className="ua-dashboard-meta-row">
+                <strong>Boundary</strong>
+                <span>Public methodology and status pages remain available without sign-in.</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <Section
+          eyebrow="01 / Access"
+          title="Sign in first"
+          note="Account-specific delivery controls are shown only after an authenticated session is present."
+        >
+          <DataStack>
+            <DataRow
+              label="Session"
+              value="No authenticated session"
+              detail="Once signed in, this page shows your plan, entitled chains, history depth, allowed delivery windows, API keys, and billing linkage state."
+              token={<Token tone="pending">required</Token>}
+            />
+            <DataRow
+              label="Public resources"
+              value="Documentation remains available"
+              detail="Methodology, thresholds, status, and API documentation can still be read without account access."
+              token={<Token tone="ok">open</Token>}
+            />
+          </DataStack>
+
+          <div className="ua-dashboard-actions">
+            <GoldLink href="/status">Public status</GoldLink>
+            <GoldLink href="/methodology">Methodology</GoldLink>
+            <GoldLink href="/thresholds">Threshold simulator</GoldLink>
+          </div>
+        </Section>
+      </main>
+    );
+  }
+
   return (
-    <UrdPage>
-      <PageHero
-        eyebrow="Subscriber area"
-        title="Dashboard"
-        highlight="JSON delivery control surface"
-        summary="This is the authenticated subscriber surface for JSON delivery, entitlement inspection, account context, and API key lifecycle. It is intentionally separate from the public descriptive website."
+    <main className="ua-page ua-dashboard-page min-h-screen bg-background text-foreground">
+      <style dangerouslySetInnerHTML={{ __html: dashboardCss }} />
+
+      <header className="hero border-b border-[var(--line)]">
+        <div className="page-shell ua-dashboard-hero-grid">
+          <div>
+            <div className="eyebrow">Subscriber area</div>
+            <h1 className="mt-5 max-w-5xl">
+              Dashboard<br />
+              <em>as delivery state</em>.
+            </h1>
+            <p className="lead mt-6">
+              Account, entitlement, API-key, and billing context for authenticated JSON delivery.
+              No decorative control panels; just the current subscriber state expressed in the same
+              calm data-language as the public reference pages.
+            </p>
+            <div className="ua-dashboard-actions">
+              <GoldLink href="/api-docs">Read API docs</GoldLink>
+              <GoldLink href="/status">Public status</GoldLink>
+            </div>
+          </div>
+
+          <div className="ua-dashboard-meta" aria-label="Current account summary">
+            <div className="ua-dashboard-meta-row">
+              <strong>Lifecycle</strong>
+              <span>{lifecycleState.label}</span>
+            </div>
+            <div className="ua-dashboard-meta-row">
+              <strong>Plan</strong>
+              <span>{accountView.tierLabel}</span>
+            </div>
+            <div className="ua-dashboard-meta-row">
+              <strong>Delivery</strong>
+              <span>Gold, Derived, Meta JSON</span>
+            </div>
+            <div className="ua-dashboard-meta-row">
+              <strong>Boundary</strong>
+              <span>Subscriber surface; public method pages remain separate.</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {!accountView.authConfigured ? (
+        <Section
+          eyebrow="Environment"
+          title="Dashboard shell"
+          note="This state is expected only before identity keys are connected in an environment."
+        >
+          <DataStack>
+            <DataRow
+              label="Auth configured"
+              value="Clerk environment variables are not configured yet"
+              detail="The route renders safely during development before identity is connected. Once Clerk keys are configured, this route becomes the authenticated subscriber area."
+              token={<Token tone="pending">partial</Token>}
+            />
+          </DataStack>
+        </Section>
+      ) : null}
+
+      <Section
+        eyebrow="01 / Lifecycle"
+        title="Account state"
+        note="Identity, account mapping, billing linkage, and entitlement readiness."
       >
-        <div className="max-w-3xl rounded-3xl border border-white/15 bg-white/10 p-5 text-sm font-semibold leading-7 text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-          <div className="text-xs font-black uppercase tracking-[0.16em] text-cyan-200">
-            Subscriber boundary
+        <DataStack>
+          <DataRow
+            label="Status"
+            value={lifecycleState.label}
+            detail={lifecycleState.detail}
+            token={
+              <Token tone={tokenToneForState(subscriptionState)}>
+                {subscriptionState.replace("_", " ")}
+              </Token>
+            }
+          />
+          <DataRow
+            label="Auth configured"
+            value="Identity provider configuration"
+            detail="The dashboard checks whether the identity provider keys are available for the current environment."
+            token={boolToken(accountView.authConfigured)}
+          />
+          <DataRow
+            label="Session"
+            value="Authenticated user session"
+            detail="Server-side account state can be resolved for this request only when the user is signed in."
+            token={boolToken(accountView.isAuthenticated, "active", "none")}
+          />
+          <DataRow
+            label="Account mapping"
+            value={accountView.account?.accountId ?? "No linked account"}
+            detail="This account ID is the server-side link between authentication, billing, API keys, and file delivery."
+            token={boolToken(!!accountView.account?.accountId, "linked", "missing")}
+          />
+          <DataRow
+            label="Billing linkage"
+            value={
+              accountView.account?.stripeCustomerId && accountView.account?.stripeSubscriptionId
+                ? "Stripe customer and subscription linked"
+                : "Billing linkage incomplete"
+            }
+            detail="Stripe remains the billing source of truth; Urd Atlas mirrors subscription state through webhook-synced entitlements."
+            token={boolToken(
+              !!accountView.account?.stripeCustomerId &&
+                !!accountView.account?.stripeSubscriptionId,
+              "linked",
+              "pending",
+            )}
+          />
+        </DataStack>
+      </Section>
+
+      <Section
+        eyebrow="02 / Entitlement"
+        title="Delivery scope"
+        note="The same entitlement snapshot should govern dashboard display and authenticated JSON access."
+      >
+        <DataStack>
+          <DataRow
+            label="Tier"
+            value={accountView.tierLabel}
+            detail="Plan tier currently reflected by the server-side account snapshot."
+            token={<Token tone={subscriptionState === "active" ? "ok" : "pending"}>{accountView.snapshot.status}</Token>}
+          />
+          <DataRow
+            label="Entitled chain"
+            value={entitledChain}
+            detail="Single Chain accounts are scoped to one chain; Research accounts cover all four chains."
+            token={<Token tone={accountView.snapshot.allowedChains.length > 0 ? "ok" : "quiet"}>{accountView.entitledChainLabel}</Token>}
+          />
+          <DataRow
+            label="History depth"
+            value={accountView.historyDepthLabel}
+            detail="Accessible historical window from the authenticated delivery endpoint."
+            token={<Token tone={accountView.snapshot.maxWindowDays > 0 ? "blue" : "quiet"}>{maxWindow}</Token>}
+          />
+          <DataRow
+            label="API keys"
+            value={`${apiKeys.length} linked to account`}
+            detail="Only partial identifiers are shown after creation; the full secret is displayed once."
+            token={<Token tone={apiKeys.length > 0 ? "ok" : "pending"}>{apiKeys.length}</Token>}
+          />
+        </DataStack>
+
+        <div className="ua-dashboard-window-list" aria-label="Allowed delivery windows">
+          {allowedWindows.length > 0 ? (
+            allowedWindows.map((window) => (
+              <span key={window} className="ua-dashboard-window">
+                {window}
+              </span>
+            ))
+          ) : (
+            <span className="ua-dashboard-window">No windows currently available</span>
+          )}
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="03 / Chains"
+        title="Entitled chains"
+        note="Chain access is displayed as rows because this is account state rather than marketing content."
+      >
+        <DataStack>
+          {CHAIN_LIST.map((chain) => {
+            const entitled = accountView.snapshot.allowedChains.includes(chain.id);
+            return (
+              <Fragment key={chain.id}>
+                <DataRow
+                  label={chain.name}
+                  value={
+                    <span className="inline-flex items-center gap-3">
+                      <span aria-hidden="true" className="text-[var(--gold2)]">
+                        {chain.icon}
+                      </span>
+                      <span>{chain.name}</span>
+                    </span>
+                  }
+                  detail={
+                    entitled
+                      ? "Gold, Derived, and Meta JSON delivery is enabled for this chain."
+                      : "This chain is outside the current entitlement scope."
+                  }
+                  token={<Token tone={entitled ? "ok" : "quiet"}>{entitled ? "enabled" : "not included"}</Token>}
+                />
+              </Fragment>
+            );
+          })}
+        </DataStack>
+      </Section>
+
+      <Section
+        eyebrow="04 / API keys"
+        title="Key lifecycle"
+        note="Create, rotate, and revoke delivery keys for authenticated JSON access."
+      >
+        <div className="ua-dashboard-api-keys">
+          <ApiKeyManagerClient
+            authConfigured={accountView.authConfigured}
+            isAuthenticated={accountView.isAuthenticated}
+            hasLinkedAccount={!!accountView.account?.accountId}
+            subscriptionActive={subscriptionState === "active"}
+            initialKeys={apiKeys.map((keyRow) => ({
+              id: keyRow.id,
+              label: keyRow.label,
+              prefix: keyRow.prefix,
+              last4: keyRow.last4,
+              status:
+                keyRow.status === "active" ||
+                keyRow.status === "suspended" ||
+                keyRow.status === "revoked"
+                  ? keyRow.status
+                  : "revoked",
+              createdAt: keyRow.createdAt,
+              lastUsedAt: keyRow.lastUsedAt,
+              tier: keyRow.tier,
+              entitledChain: keyRow.entitledChain,
+              maxWindowDays: keyRow.maxWindowDays,
+            }))}
+          />
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="05 / Billing"
+        title="Manage subscription"
+        note="Subscription cancellation, upgrades, payment methods, and invoices should stay self-serve through Stripe Customer Portal."
+      >
+        <DataStack>
+          <DataRow
+            label="Portal access"
+            value={hasBillingPortalAccess ? "Stripe Customer Portal available" : "Stripe Customer Portal not available yet"}
+            detail={
+              hasBillingPortalAccess
+                ? "Opening subscription management sends you to Stripe's hosted portal. Cancellation, plan changes, payment-method changes, and invoices happen there."
+                : "Billing management becomes available after checkout has created and linked a Stripe customer for this account."
+            }
+            token={<Token tone={hasBillingPortalAccess ? "ok" : "pending"}>{hasBillingPortalAccess ? "available" : "pending"}</Token>}
+          />
+          <DataRow
+            label="Billing source"
+            value="Stripe remains source of truth"
+            detail="Urd Atlas mirrors subscription status from Stripe through webhook-synced entitlements."
+            token={<Token tone="blue">webhook synced</Token>}
+          />
+          <DataRow
+            label="Current period end"
+            value={formatDateTime(accountView.account?.currentPeriodEnd)}
+            detail="Displayed when Stripe has supplied a current subscription period end for the account."
+            token={<Token tone={accountView.account?.currentPeriodEnd ? "blue" : "quiet"}>{accountView.account?.currentPeriodEnd ? "set" : "not set"}</Token>}
+          />
+        </DataStack>
+
+        <div className="ua-dashboard-actions">
+          {hasBillingPortalAccess ? (
+            <form action="/api/v1/checkout/portal" method="post">
+              <GoldSubmitButton>Manage subscription</GoldSubmitButton>
+            </form>
+          ) : (
+            <GoldLink href="/#plans">Choose a plan</GoldLink>
+          )}
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="06 / Plan matrix"
+        title="Capability reference"
+        note="A compact reference for how entitlement scope maps to delivery windows and history depth."
+      >
+        <DataStack>
+          {capabilityRows().map((row) => (
+            <Fragment key={row.tier}>
+              <DataRow
+                label={row.tier}
+                value={`${row.chains} · ${row.history}`}
+                detail={`Windows: ${row.windows}. Custom outputs: ${row.custom}.`}
+                token={<Token tone={row.tier === accountView.tierLabel ? "ok" : "quiet"}>{row.tier === accountView.tierLabel ? "current" : "reference"}</Token>}
+              />
+            </Fragment>
+          ))}
+        </DataStack>
+      </Section>
+
+      <Section
+        eyebrow="07 / Delivery paths"
+        title="Endpoint reference"
+        note="Examples only. Entitlement enforcement remains server-side on the authenticated file route."
+      >
+        <div>
+          <div className="ua-dashboard-endpoint">
+            <span>GET</span> /api/v1/files/meta/ethereum/latest.json
           </div>
-          <div className="mt-2 text-base font-black text-white">
-            Public site and subscriber delivery are separate surfaces
+          <div className="ua-dashboard-endpoint">
+            <span>GET</span> /api/v1/files/derived/bitcoin/90d/latest.json
           </div>
-          <p className="mt-2">
-            Dashboard state should mirror the same server-side entitlement model used by file delivery.
+          <div className="ua-dashboard-endpoint">
+            <span>GET</span> /api/v1/files/gold/base/365d/latest.json
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-3 text-sm leading-7 text-[var(--ink2)]">
+          <p>
+            Example header: <CodePath>X-API-Key: ua_key_xxxxxxxxx</CodePath>
+          </p>
+          <p>
+            Delivery validation should enforce chain entitlement, window depth, and subscription state.
+            Forbidden scope should return 403 rather than pretending the file does not exist.
           </p>
         </div>
-      </PageHero>
 
-      <UrdContainer className="space-y-8">
-        {!accountView.authConfigured ? (
-          <UrdCallout title="Dashboard shell is available" tone="warning">
-            <p>
-              Dashboard shell is available, but Clerk environment variables are not configured yet.
-            </p>
-            <p className="mt-2">
-              The route renders safely during development before identity is connected. Once Clerk keys
-              are configured, this route becomes the authenticated subscriber area.
-            </p>
-          </UrdCallout>
-        ) : null}
-
-        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <UrdSection title="Lifecycle snapshot">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <p className="max-w-2xl">
-                Current identity, billing-linkage, and entitlement readiness for this account surface.
-              </p>
-              <span className={statusBadgeClass(subscriptionState)}>
-                {subscriptionState.replace("_", " ")}
-              </span>
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-              <div className="text-sm font-black text-[#0d2447]">{lifecycleState.label}</div>
-              <p className="mt-2 text-sm font-semibold leading-7 text-[#27476f]">
-                {lifecycleState.detail}
-              </p>
-            </div>
-
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <SmallMetric label="Auth configured">{boolPill(accountView.authConfigured)}</SmallMetric>
-              <SmallMetric label="Authenticated session">{boolPill(accountView.isAuthenticated)}</SmallMetric>
-              <SmallMetric label="Account linked">{boolPill(!!accountView.account?.accountId)}</SmallMetric>
-              <SmallMetric label="Billing linked">
-                {boolPill(
-                  !!accountView.account?.stripeCustomerId &&
-                    !!accountView.account?.stripeSubscriptionId,
-                )}
-              </SmallMetric>
-            </div>
-          </UrdSection>
-
-          <UrdSection title="Current account model">
-            <div className="space-y-3 text-sm font-semibold leading-7">
-              <AccountRow label="Account ID" value={accountView.account?.accountId ?? "No linked account"} />
-              <AccountRow label="Stripe customer" value={accountView.account?.stripeCustomerId ?? "Not connected"} />
-              <AccountRow label="Stripe subscription" value={accountView.account?.stripeSubscriptionId ?? "Not connected"} />
-              <AccountRow label="Tier label" value={accountView.tierLabel} />
-              <AccountRow label="Entitled chain label" value={accountView.entitledChainLabel} />
-              <AccountRow label="History label" value={accountView.historyDepthLabel} />
-              <AccountRow label="API keys linked to account" value={apiKeys.length} />
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm font-semibold leading-7 text-[#27476f]">
-              This dashboard is intentionally bound to the same server-side account and entitlement
-              model used by authenticated file delivery.
-            </div>
-          </UrdSection>
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-          <div className="space-y-6">
-            <UrdSection title="Subscription snapshot">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <p className="max-w-2xl">
-                  Current entitlement surface for this account. Values come from the shared account
-                  model that is also used by billing sync and authenticated file-delivery routes.
-                </p>
-                <span className={statusBadgeClass(subscriptionState)}>
-                  {subscriptionState.replace("_", " ")}
-                </span>
-              </div>
-
-              <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <SmallMetric label="Tier">{accountView.tierLabel}</SmallMetric>
-                <SmallMetric label="Entitled chain">{entitledChain}</SmallMetric>
-                <SmallMetric label="Max window">{maxWindow}</SmallMetric>
-                <SmallMetric label="History depth">{accountView.historyDepthLabel}</SmallMetric>
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-                <div className="text-sm font-black text-[#0d2447]">Allowed windows</div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {allowedWindows.length > 0 ? (
-                    allowedWindows.map((window) => (
-                      <span
-                        key={window}
-                        className="inline-flex items-center rounded-full border border-emerald-500 bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-700"
-                      >
-                        {window}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-sm font-semibold text-[#557099]">
-                      No windows currently available
-                    </span>
-                  )}
-                </div>
-                <p className="mt-3 text-xs font-semibold leading-6 text-[#557099]">
-                  These window rules define what the account should be allowed to request through the
-                  authenticated file endpoint.
-                </p>
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-                <div className="text-sm font-black text-[#0d2447]">Entitled chains</div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {CHAIN_LIST.map((chain) => {
-                    const entitled = accountView.snapshot.allowedChains.includes(chain.id);
-                    return (
-                      <span
-                        key={chain.id}
-                        className={cx(
-                          "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-black",
-                          entitled
-                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                            : "border-[#9db8d4] bg-[#edf6ff] text-[#557099]",
-                        )}
-                      >
-                        <span aria-hidden="true">{chain.icon}</span>
-                        <span>{chain.name}</span>
-                      </span>
-                    );
-                  })}
-                </div>
-                <p className="mt-3 text-xs font-semibold leading-6 text-[#557099]">
-                  Normative rule: Single Chain is limited to one entitled chain; Research covers all four chains.
-                </p>
-              </div>
-            </UrdSection>
-
-            <ApiKeyManagerClient
-              authConfigured={accountView.authConfigured}
-              isAuthenticated={accountView.isAuthenticated}
-              hasLinkedAccount={!!accountView.account?.accountId}
-              subscriptionActive={subscriptionState === "active"}
-              initialKeys={apiKeys.map((keyRow) => ({
-                id: keyRow.id,
-                label: keyRow.label,
-                prefix: keyRow.prefix,
-                last4: keyRow.last4,
-                status:
-                  keyRow.status === "active" ||
-                  keyRow.status === "suspended" ||
-                  keyRow.status === "revoked"
-                    ? keyRow.status
-                    : "revoked",
-                createdAt: keyRow.createdAt,
-                lastUsedAt: keyRow.lastUsedAt,
-                tier: keyRow.tier,
-                entitledChain: keyRow.entitledChain,
-                maxWindowDays: keyRow.maxWindowDays,
-              }))}
-            />
-
-            <UrdSection title="Example delivery paths">
-              <p>
-                These examples document the target usage pattern for the authenticated file endpoint.
-                They are examples only; entitlement enforcement is implemented in the file-delivery route.
-              </p>
-
-              <div className="mt-5 space-y-3 text-sm">
-                <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-                  <div className="font-black text-[#0d2447]">Example curl</div>
-                  <div className="mt-2 overflow-x-auto whitespace-pre-wrap break-all rounded-xl border border-[#c9d9ea] bg-[#f4f9ff] p-3 font-mono text-sm font-bold text-[#0d2447]">
-                    {`curl -H "X-API-Key: ta_live_xxxxxxxxx" http://localhost:3000/api/v1/files/meta/bitcoin/90d/latest.json`}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-                  <div className="font-black text-[#0d2447]">Canonical example paths</div>
-                  <div className="mt-3 space-y-2 text-[#27476f]">
-                    <div>{code("/api/v1/files/gold/bitcoin/30d/latest.json")}</div>
-                    <div>{code("/api/v1/files/meta/ethereum/90d/latest.json")}</div>
-                    <div>{code("/api/v1/files/derived/base/365d/latest.json")}</div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-                  <div className="font-black text-[#0d2447]">Server-side enforcement boundary</div>
-                  <ul className="mt-2 list-disc pl-5 font-semibold leading-7 text-[#27476f]">
-                    <li>Chain entitlement must match the subscriber tier.</li>
-                    <li>Window entitlement must not exceed the allowed depth for the plan.</li>
-                    <li>History depth must respect plan plus any history add-on.</li>
-                    <li>Forbidden scope returns 403, not 404.</li>
-                  </ul>
-                </div>
-
-                <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4">
-                  <div className="font-black text-[#0d2447]">Traceability</div>
-                  <ul className="mt-2 list-disc pl-5 font-semibold leading-7 text-[#27476f]">
-                    <li>Dashboard state is derived from the shared account snapshot.</li>
-                    <li>API key rows come from the same server-side key source used by delivery validation.</li>
-                    <li>Lifecycle UI is now wired for create/revoke against the DB-backed key route.</li>
-                  </ul>
-                </div>
-              </div>
-            </UrdSection>
-          </div>
-
-          <aside className="space-y-6">
-            <UrdSection title="Plan matrix">
-              <div className="space-y-3">
-                {capabilityRows().map((row) => (
-                  <div key={row.tier} className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 text-sm">
-                    <div className="font-black text-[#0d2447]">{row.tier}</div>
-                    <div className="mt-2 grid gap-1 font-semibold leading-7 text-[#27476f]">
-                      <div><span className="font-black text-[#0d2447]">Chains:</span> {row.chains}</div>
-                      <div><span className="font-black text-[#0d2447]">Windows:</span> {row.windows}</div>
-                      <div><span className="font-black text-[#0d2447]">History:</span> {row.history}</div>
-                      <div><span className="font-black text-[#0d2447]">Custom outputs:</span> {row.custom}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </UrdSection>
-
-            <UrdSection title="Billing management">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <p>
-                  Manage your subscription, payment method, invoices, and cancellation directly through
-                  Stripe Customer Portal. Stripe remains the billing source of truth; Urd Atlas mirrors
-                  subscription state through webhook-synced entitlements.
-                </p>
-                <span className={statusBadgeClass(hasBillingPortalAccess ? "active" : "inactive")}>
-                  {hasBillingPortalAccess ? "active" : "inactive"}
-                </span>
-              </div>
-
-              <div className="mt-4 space-y-3 text-sm font-semibold leading-7 text-[#27476f]">
-                {hasBillingPortalAccess ? (
-                  <>
-                    <p>
-                      Opening billing management sends you to Stripe&apos;s hosted portal. Cancellation,
-                      payment-method changes, and invoice access happen there, then Stripe webhooks
-                      update this dashboard automatically.
-                    </p>
-
-                    <form action="/api/v1/checkout/portal" method="post">
-                      <button
-                        type="submit"
-                        className="inline-flex rounded-full border border-[#0b5cff] bg-[#0b5cff] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#084bd1]"
-                      >
-                        Manage billing
-                      </button>
-                    </form>
-
-                    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-4 font-semibold text-[#27476f]">
-                      Standard cancellations should be initiated through Stripe Customer Portal. Manual
-                      admin intervention is only needed for support cases, refunds, or failed syncs.
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p>
-                      Billing management becomes available after checkout has created and linked a Stripe
-                      customer for this account.
-                    </p>
-
-                    <div className="rounded-2xl border border-amber-400 bg-amber-50 p-4 font-semibold text-amber-900">
-                      No Stripe customer is connected to this account yet. Subscribe first, then return
-                      here to manage billing, invoices, and cancellation through Stripe.
-                    </div>
-                  </>
-                )}
-              </div>
-            </UrdSection>
-
-            <UrdSection title="Quick links">
-              <div className="flex flex-wrap gap-3 text-sm">
-                <UrdButtonLink href="/api-docs">API docs</UrdButtonLink>
-                <UrdButtonLink href="/status">Public status</UrdButtonLink>
-                <UrdButtonLink href="/methodology">Methodology</UrdButtonLink>
-                <UrdButtonLink href="/thresholds">Threshold simulator</UrdButtonLink>
-              </div>
-            </UrdSection>
-          </aside>
-        </section>
-      </UrdContainer>
-    </UrdPage>
+        <div className="ua-dashboard-actions">
+          <GoldLink href="/api-docs/schema">Schema reference</GoldLink>
+          <GoldLink href="/api-docs/workflows">Common workflows</GoldLink>
+          <GoldLink href="/status">Public status</GoldLink>
+        </div>
+      </Section>
+    </main>
   );
 }

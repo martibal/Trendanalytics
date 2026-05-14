@@ -14,8 +14,8 @@ import { getChainConfig, type ChainId } from "@/config/chains";
 import { getUnitLabel } from "@/config/units";
 import { currentDataSource, readStorageObject } from "@/lib/storage";
 
-import PageHero from "@/components/site/PageHero";
-import { UrdContainer, UrdPage } from "@/components/site/UrdDesignSystem";
+
+
 
 import "server-only";
 
@@ -159,7 +159,11 @@ function landingRegimeAsOf(hero?: LandingHero | null): string | null {
 
 
 function InlineCode({ children }: { children: React.ReactNode }) {
-  return <code className="rounded border border-[#9db8d4] bg-[#f4f9ff] px-1 py-0.5 !text-[#0d2447]">{children}</code>;
+  return (
+    <code className="code-block inline-block px-2 py-0.5 text-[12px]">
+      {children}
+    </code>
+  );
 }
 
 function ModalStyles() {
@@ -181,11 +185,8 @@ function ModalStyles() {
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
   return (
-    <a
-      href={`#${id}`}
-      className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-black !text-[#0d2447] hover:bg-white hover:text-blue-800"
-    >
-      {label}
+    <a href={`#${id}`} className="text-link">
+      {label} →
     </a>
   );
 }
@@ -196,19 +197,17 @@ function HeroInfoCard({
   children,
 }: {
   label: string;
-  value: ReactNode;
-  children?: ReactNode;
+  value: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-white/15 bg-white/[0.075] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_30px_rgba(0,0,0,0.16)] backdrop-blur">
-      <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-200/85">
-        {label}
-      </div>
-      <div className="mt-2 min-h-[28px] break-words text-base font-black leading-6 text-white">
+    <div className="fact-item">
+      <strong>{label}</strong>
+      <div className="mt-2 text-[var(--ink)] font-mono text-[13px] font-medium leading-snug break-words min-h-[28px]">
         {value}
       </div>
       {children ? (
-        <div className="mt-2 text-xs font-semibold leading-5 text-slate-300">
+        <div className="mt-2 text-[11px] leading-5 text-[var(--ink3)]">
           {children}
         </div>
       ) : null}
@@ -225,59 +224,36 @@ function ExplainModal({
 }: {
   id: string;
   title: string;
-  subtitle?: ReactNode;
-  pair: ExplainPair;
-  traceability?: ReactNode;
+  subtitle?: React.ReactNode;
+  pair: { basic: React.ReactNode; advanced: React.ReactNode };
+  traceability?: React.ReactNode;
 }) {
   return (
     <div id={id} className="ta-modal fixed inset-0 z-[80] items-center justify-center p-4">
-      <a
-        href="#"
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-        aria-label="Close dialog"
-      />
-      <div className="relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col rounded-3xl border border-[#b6cce3] bg-[#e7f1fb] shadow-2xl shadow-slate-950/30">
-        {/* Sticky header — always visible, never scrolls away */}
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#c9d9ea] px-6 py-5">
+      <a href="#" className="absolute inset-0 bg-[rgba(8,15,26,.84)]" aria-label="Close dialog" />
+      <div className="modal-panel relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden">
+        <div className="modal-head shrink-0">
           <div>
-            <h3 className="text-2xl font-semibold !text-[#0d2447]">{title}</h3>
-            {subtitle ? (
-              <div className="mt-2 text-sm leading-6 !text-[#27476f]">{subtitle}</div>
-            ) : null}
+            <h3 className="ua-h3 text-[var(--ink)]">{title}</h3>
+            {subtitle ? <div className="mt-2 text-sm leading-6 text-[var(--ink2)]">{subtitle}</div> : null}
           </div>
-          <a
-            href="#"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] text-xl !text-[#0d2447] hover:bg-white"
-            aria-label="Close dialog"
-          >
-            ×
-          </a>
+          <a href="#" className="btn-ghost h-10 px-3 shrink-0" aria-label="Close dialog">×</a>
         </div>
-
-        {/* Scrollable body */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <section className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-emerald-700">
-                Basic
-              </div>
-              <div className="mt-3 text-sm leading-7 !text-[#27476f]">{pair.basic}</div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <section className="border-t-2 border-[var(--c-stable)] pt-4">
+              <div className="eyebrow mb-3">Basic</div>
+              <div className="text-sm leading-7 text-[var(--ink2)]">{pair.basic}</div>
             </section>
-
-            <details className="rounded-2xl border border-[#9db8d4] bg-cyan-500/5 p-5" open>
-              <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
-                Advanced
-              </summary>
-              <div className="mt-3 text-sm leading-7 !text-[#27476f]">{pair.advanced}</div>
+            <details className="border-t-2 border-[var(--gold)] pt-4">
+              <summary className="eyebrow cursor-pointer mb-3">Advanced</summary>
+              <div className="text-sm leading-7 text-[var(--ink2)]">{pair.advanced}</div>
             </details>
           </div>
-
           {traceability ? (
-            <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] p-5">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
-                Traceability
-              </div>
-              <div className="mt-3 text-sm leading-7 !text-[#0d2447]">{traceability}</div>
+            <div className="mt-6 border-t border-[var(--line)] pt-5">
+              <div className="eyebrow mb-3">Traceability</div>
+              <div className="text-sm leading-7 text-[var(--ink2)]">{traceability}</div>
             </div>
           ) : null}
         </div>
@@ -1957,341 +1933,205 @@ export default async function ChainPage({
 
   const chainProfilePair = chainProfileCopy(chainId);
 
+ 
+  // Chain-specific focus text for hero
+  const chainFocus: Record<string, string> = {
+    bitcoin: "Watch tx_count_daily and median_tx_fee_native as the primary demand and friction signals. Block time (avg_block_time_sec) proxies capacity — BTC has no gas utilisation field. Fee spikes are episodic and sharp. Regime shifts on BTC are driven by block-space competition, not execution congestion.",
+    ethereum: "Watch gas_utilization_pct for capacity pressure and failed_tx_rate for execution friction alongside median_tx_fee_native. Demand reads from tx_count_daily and unique_active_addresses. EIP-1559 means base fees can move fast when utilisation crosses 50% sustained.",
+    arbitrum: "L2 fee structure separates local execution from L1 settlement cost. Watch tx_count_daily for demand and median_tx_fee_native for friction. gas_utilization_pct is hidden — capacity is proxied through block-time behaviour. A lag of ~7d is normal for this chain.",
+    base: "Same two-part fee environment as Arbitrum: local execution + L1 publishing cost. Watch tx_count_daily and median_tx_fee_native. A lag of ~7d is part of the expected publication cadence. Low local demand does not guarantee low total fee if L1 conditions worsen.",
+  };
+
   return (
-    <UrdPage>
-      <PageHero
-        eyebrow="Chain analysis"
-        title={displayName}
-        summary="Latest published reference row for this chain: regime, confidence, freshness, determinism, drivers, and metric history."
-      >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <HeroInfoCard label="Published regime" value={<RegimeBadge label={regimeLabel} statusColor={meta.status?.color} />}>
-            Named state from the latest Meta row.
-          </HeroInfoCard>
-
-          <HeroInfoCard
-            label="Confidence"
-            value={typeof conf === "number" ? conf.toFixed(3) : "—"}
-          >
-            {confBand} band · confidence is separate from freshness.
-          </HeroInfoCard>
-
-          <HeroInfoCard label="Data as of" value={fmtDate(asOf)}>
-            UTC date covered by the current published row.
-          </HeroInfoCard>
-
-          <HeroInfoCard
-            label="Observed lag"
-            value={typeof observedLagDays === "number" ? `${observedLagDays}d` : "—"}
-          >
-            Lag is checked against the expected cadence for this chain.
-          </HeroInfoCard>
-
-          <HeroInfoCard
-            label="Hash anchor"
-            value={
-              <span className="font-mono text-sm">
-                {meta.regime?.determinism_hash ?? "not issued"}
-              </span>
-            }
-          >
-            Named rows can be checked against the public payload.
-          </HeroInfoCard>
-        </div>
-      </PageHero>
-
-      <UrdContainer className="py-10 !text-[#0d2447] [&_p]:!text-[#27476f] [&_li]:!text-[#27476f] [&_h1]:!text-[#0d2447] [&_h2]:!text-[#0d2447] [&_h3]:!text-[#0d2447]">
+    <main className="ua-page">
       <ModalStyles />
 
-      <StalenessBar
-        chain={chainId}
-        lagDays={observedLagDays}
-        asOfDate={asOf ?? undefined}
-        confidenceScore={conf}
-      />
+      {/* ── Hero ── */}
+      <header className="border-b border-[var(--line)]" style={{ padding: "56px 0 0" }}>
+        <div className="page-shell">
 
-      {confNotice ? (
-        <section className={`mb-6 rounded-2xl border px-5 py-4 text-sm ${confidenceNoticeClass(confNotice.tone)}`}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          {/* Top row: title + KPIs */}
+          <div className="hero-grid" style={{ gap: "48px", alignItems: "start" }}>
+
+            {/* Left: title block */}
             <div>
-              <div className="font-medium">{confNotice.title}</div>
-              <p className={`mt-1 max-w-3xl ${confidenceNoticeMetaClass(confNotice.tone)}`}>
-                {confNotice.body}
+              <div className="eyebrow mb-3">Chain analysis</div>
+              <div className="flex items-center gap-3 mb-4">
+                <ChainIcon chain={chainId} className="h-8 w-8 text-sm" label={`${displayName} icon`} />
+                <h1 className="ua-h1" style={{ lineHeight: 1 }}>{displayName}</h1>
+              </div>
+
+              {/* Regime — large and prominent */}
+              <div style={{ marginBottom: "20px" }}>
+                <RegimeBadge label={regimeLabel} statusColor={meta.status?.color}
+                  className="text-[18px] tracking-[.12em] pb-[4px]" />
+              </div>
+
+              {oneLiner ? (
+                <p className="text-[var(--ink)] text-[16px] leading-7 max-w-lg" style={{ marginBottom: "20px" }}>
+                  {oneLiner}
+                </p>
+              ) : null}
+
+              {confNotice ? (
+                <div className="border-l-2 border-[var(--c-heating)] pl-4 py-1 mb-4">
+                  <div className="eyebrow text-[var(--c-heating)] mb-1">{confNotice.title}</div>
+                  <p className="text-sm text-[var(--ink2)]">{confNotice.body}</p>
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap gap-3 items-center" style={{ marginBottom: "32px" }}>
+                <Link href={`/chains/${chainId}/history`} className="btn-ghost">View history</Link>
+                <Link href="/methodology" className="text-link">Methodology →</Link>
+                <Link href="/glossary" className="text-link">Glossary →</Link>
+              </div>
+            </div>
+
+            {/* Right: context panel with key metrics */}
+            <aside className="context-panel" style={{ padding: "0" }}>
+              <div className="ua-vf-panel-head">
+                <div className="ua-vf-panel-title">Key metrics</div>
+                <div className="ua-vf-panel-date">as of {fmtDate(asOf)}</div>
+              </div>
+
+              {/* Confidence + lag + hash as data rows */}
+              <div style={{ padding: "0 18px 16px" }}>
+                <div className="data-row" style={{ gridTemplateColumns: "140px 1fr", padding: "14px 0" }}>
+                  <span className="font-mono text-[10px] text-[var(--ink3)] uppercase tracking-[.12em]">Confidence</span>
+                  <span className="font-mono text-[20px] text-[var(--ink)] font-medium">{typeof conf === "number" ? conf.toFixed(3) : "—"}
+                    <span className="font-mono text-[11px] text-[var(--ink3)] ml-2">{confBand}</span>
+                  </span>
+                </div>
+                <div className="data-row" style={{ gridTemplateColumns: "140px 1fr", padding: "14px 0" }}>
+                  <span className="font-mono text-[10px] text-[var(--ink3)] uppercase tracking-[.12em]">Observed lag</span>
+                  <span className="font-mono text-[20px] text-[var(--ink)] font-medium">{typeof observedLagDays === "number" ? `${observedLagDays}d` : "—"}</span>
+                </div>
+
+                {/* Scorecard scores inline if available */}
+                {dims ? (
+                  <>
+                    {([
+                      { label: "Demand", dim: dims.demand },
+                      { label: "Friction", dim: dims.friction },
+                      { label: "Capacity", dim: dims.capacity },
+                    ]).map(({ label, dim }) => (
+                      <div key={label} className="data-row" style={{ gridTemplateColumns: "140px 1fr 56px", padding: "14px 0" }}>
+                        <span className="font-mono text-[10px] text-[var(--ink3)] uppercase tracking-[.12em]">{label}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <div style={{
+                            height: "4px", background: "var(--line2)", borderRadius: "2px",
+                            flex: 1, maxWidth: "120px", position: "relative"
+                          }}>
+                            <div style={{
+                              position: "absolute", left: 0, top: 0, height: "4px",
+                              width: `${Math.min(100, Math.max(0, dim?.score ?? 50))}%`,
+                              background: (dim?.score ?? 50) > 65 ? "var(--c-heating)" : (dim?.score ?? 50) < 35 ? "var(--c-cheap)" : "var(--c-stable)",
+                              borderRadius: "2px"
+                            }} />
+                          </div>
+                          <span className="font-mono text-[11px] text-[var(--ink2)]">{dim?.level ?? "—"}</span>
+                        </div>
+                        <span className="font-mono text-[13px] text-[var(--ink)] text-right">{fmtScore100(dim?.score)}</span>
+                      </div>
+                    ))}
+                  </>
+                ) : null}
+
+                <div className="data-row" style={{ gridTemplateColumns: "140px 1fr", padding: "14px 0", borderBottom: 0 }}>
+                  <span className="font-mono text-[10px] text-[var(--ink3)] uppercase tracking-[.12em]">Hash</span>
+                  <span className="font-mono text-[10px] text-[var(--ink2)] break-all leading-5">{meta.regime?.determinism_hash ?? "—"}</span>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          {/* Focus strip — chain-specific interpretation guidance */}
+          <div className="border-t border-[var(--line)] mt-2 py-5">
+            <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "24px", alignItems: "start" }}>
+              <div className="eyebrow" style={{ paddingTop: "2px" }}>What to watch</div>
+              <p className="text-sm text-[var(--ink2)] max-w-3xl leading-7">
+                {chainFocus[chainId] ?? cfg.primer?.whatMakesItDifferent ?? cfg.subtitle}
               </p>
             </div>
-            <div className={`text-xs ${confidenceNoticeMetaClass(confNotice.tone)}`}>
-              Source: <InlineCode>confidence.confidence_score</InlineCode>
-              {typeof conf === "number" ? (
-                <>
-                  {" "}· Current value <span className="font-medium !text-[#0d2447]">{conf.toFixed(3)}</span>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      <header className="mb-8 space-y-5">
-        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-3">
-                  <ChainIcon
-                    chain={chainId}
-                    className="h-10 w-10 text-base"
-                    label={`${displayName} icon`}
-                  />
-                  <div className="min-w-0">
-                    <h1 className="truncate text-3xl font-semibold">{displayName}</h1>
-                    <div className="mt-1 text-sm !text-[#27476f]">{cfg.subtitle}</div>
-                  </div>
-                </div>
-
-                <div className="mt-5 max-w-3xl text-base leading-8 !text-[#27476f] [&_p]:!text-[#27476f]">
-                  {chainProfilePair.basic}
-                </div>
-              </div>
-
-              <div className="shrink-0">
-                <RegimeBadge label={regimeLabel} statusColor={meta.status?.color} />
-              </div>
-            </div>
-
-            {oneLiner ? (
-              <div className="mt-5 rounded-2xl border bg-[#eef6ff] p-4">
-                <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
-                  Current summary
-                </div>
-                <div className="mt-2 text-sm font-medium leading-7 !text-[#0d2447]">{oneLiner}</div>
-              </div>
-            ) : null}
-
-            <div className="mt-5 flex flex-wrap items-center gap-3 text-sm !text-[#27476f]">
-              <Link href={`/chains/${chainId}/history`} className="rounded-full border px-4 py-2 hover:!text-[#0d2447]">
-                View history
-              </Link>
-              <Link href="/methodology" className="hover:!text-[#0d2447] hover:underline">
-                Methodology
-              </Link>
-              <span>·</span>
-              <Link href="/glossary" className="hover:!text-[#0d2447] hover:underline">
-                Glossary
-              </Link>
-              <span>·</span>
-              <Link href="/thresholds" className="hover:!text-[#0d2447] hover:underline">
-                Thresholds
-              </Link>
-            </div>
           </div>
 
-          <aside className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
-                Chain profile
-              </div>
-              <MoreLink id={`profile-${chainId}`} />
-            </div>
-            <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
-              {chainId === "bitcoin"
-                ? "BTC is different because it does not expose the same execution and gas fields as Ethereum-style chains."
-                : "This page uses a chain-specific profile so each chain is explained through the metrics that actually make descriptive sense for that network."}
-            </div>
-            <div className="mt-4 rounded-2xl border bg-[#eef6ff] p-4 text-sm leading-7 !text-[#0d2447]">
-              This page therefore emphasizes the visible evidence that is most useful for understanding
-              how busy, costly, or constrained the chain currently looks.
-            </div>
-          </aside>
-        </section>
-
-        <section className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
-                Fast interpretation map
-              </div>
-              <div className="mt-2 text-sm !text-[#27476f]">
-                Freshness → Confidence → Regime → Scorecard → Drivers → Charts
-              </div>
-            </div>
-            <MoreLink id={`read-order-${chainId}`} />
-          </div>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-5">
-          <div className="rounded-[22px] border border-[#b8cce0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5fb_100%)] p-5 shadow-[0_10px_28px_rgba(13,36,71,0.08),inset_0_1px_0_rgba(255,255,255,0.92)]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="inline-flex items-center rounded-full border border-[#2f7cff]/20 bg-[#eaf2ff] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] !text-[#215bcb] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                Published regime
-              </div>
-              <MoreLink id={`regime-${chainId}`} />
-            </div>
-            <div className="mt-4">
-              <RegimeBadge label={regimeLabel} statusColor={meta.status?.color} />
-            </div>
-            <p className="mt-4 text-sm leading-7 !text-[#34567f] [&_p]:!text-[#34567f]">
-              Top-line descriptive state for the current published row.
-            </p>
-          </div>
-
-          <div className="rounded-[22px] border border-[#b8cce0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5fb_100%)] p-5 shadow-[0_10px_28px_rgba(13,36,71,0.08),inset_0_1px_0_rgba(255,255,255,0.92)]">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="inline-flex items-center rounded-full border border-[#2f7cff]/20 bg-[#eaf2ff] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] !text-[#215bcb] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                Confidence
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <span className={confidencePill(conf)}>{confBand}</span>
-                <MoreLink id={`confidence-${chainId}`} />
-              </div>
-            </div>
-            <div className="mt-4 text-[2.15rem] font-black leading-[0.95] tracking-[-0.035em] !text-[#082a57]">
-              {typeof conf === "number" ? conf.toFixed(3) : "—"}
-            </div>
-            <div className="mt-4 text-sm leading-7 !text-[#34567f] [&_p]:!text-[#34567f]">
-              Data quality {fmtNum(meta.confidence?.data_quality_score, 3)} · Label support{" "}
-              {fmtNum(meta.confidence?.label_confidence_score, 3)}
-            </div>
-          </div>
-
-          <div className="rounded-[22px] border border-[#b8cce0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5fb_100%)] p-5 shadow-[0_10px_28px_rgba(13,36,71,0.08),inset_0_1px_0_rgba(255,255,255,0.92)]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="inline-flex items-center rounded-full border border-[#2f7cff]/20 bg-[#eaf2ff] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] !text-[#215bcb] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                Data as of
-              </div>
-              <MoreLink id={`asof-${chainId}`} />
-            </div>
-            <div className="mt-4 break-words text-[2rem] font-black leading-[0.95] tracking-[-0.03em] !text-[1.85rem]">
-              {fmtDate(asOf)}
-            </div>
-            <div className="mt-4 text-sm leading-7 !text-[#34567f] [&_p]:!text-[#34567f]">
-              Check this before interpreting any label too strongly.
-            </div>
-          </div>
-
-          <div className="rounded-[22px] border border-[#b8cce0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5fb_100%)] p-5 shadow-[0_10px_28px_rgba(13,36,71,0.08),inset_0_1px_0_rgba(255,255,255,0.92)]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="inline-flex items-center rounded-full border border-[#2f7cff]/20 bg-[#eaf2ff] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] !text-[#215bcb] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                Observed lag
-              </div>
-              <MoreLink id={`lag-${chainId}`} />
-            </div>
-              <div className="mt-4 text-[2rem] font-black leading-[0.95] tracking-[-0.025em] !text-[#082a57]">
-                {typeof observedLagDays === "number" ? `${observedLagDays}d` : "—"}
-              </div>
-            <div className="mt-4 text-sm leading-7 !text-[#34567f] [&_p]:!text-[#34567f]">
-              Freshness is shown separately from confidence.
-            </div>
-          </div>
-
-          <div className="rounded-[22px] border border-[#b8cce0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5fb_100%)] p-5 shadow-[0_10px_28px_rgba(13,36,71,0.08),inset_0_1px_0_rgba(255,255,255,0.92)]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="inline-flex items-center rounded-full border border-[#2f7cff]/20 bg-[#eaf2ff] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] !text-[#215bcb] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                Determinism
-              </div>
-              <MoreLink id={`determinism-${chainId}`} />
-            </div>
-            <div className="mt-4 break-all text-[1.02rem] font-semibold leading-6 !text-[#082a57]">
-              {meta.regime?.determinism_hash ?? "—"}
-            </div>
-            <div className="mt-4 text-sm leading-7 !text-[#34567f] [&_p]:!text-[#34567f]">
-              Window days: <span className="font-semibold !text-[#082a57]">{meta.regime?.window_days ?? meta.scorecard?.window_days ?? "—"}</span>
-            </div>
-          </div>
-        </section>
+        </div>
       </header>
 
-      <section className="mt-10 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
-              Top of page
-            </div>
-            <h2 className="mt-1 text-3xl font-semibold">Latest signal view</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 !text-[#27476f]">
-              You are looking at the metrics driving the current regime classification —
-              transaction demand, fee levels, and capacity signals — plotted against their
-              own recent history. Use the window selector to change the time range.
-              Click any chart for a full explanation of what it measures and why it is shown.
-            </p>
-            <p className="mt-2 text-xs !text-[#0d2447]">
-              All chart windows are public. Paid plans give you the JSON files and API access behind these views.
-            </p>
-          </div>
+      <div className="page-shell" style={{ paddingTop: "56px", paddingBottom: "96px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "72px" }}>
 
-        </div>
-
-        {/* Upsell — raw data */}
-        <div className="mt-2 flex flex-wrap items-center gap-3 rounded-2xl border border-[#c9d9ea] bg-[#eef6ff] px-4 py-3">
-          <span className="text-xs !text-[#0d2447]">Want the raw data and regime signals behind these charts?</span>
-          <Link href="/#plans" className="inline-flex items-center rounded-full border border-[#9db8d4] bg-[#eef6ff] px-3 py-1 text-xs font-semibold !text-blue-700 hover:bg-white transition-colors">See plans →</Link>
-          <Link href="/sign-in" className="inline-flex items-center rounded-full border border-[#c9d9ea] bg-[#eef6ff] px-3 py-1 text-xs font-medium !text-[#557099] hover:!text-[#0d2447] transition-colors">Sign in free →</Link>
-        </div>
-
-        {!derivedPayload ? (
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 text-sm !text-[#27476f]">
-            No derived source found at <InlineCode>{derivedPath}</InlineCode>.
-          </div>
-        ) : charts.length === 0 ? (
-          <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-6 text-sm !text-[#27476f]">
-            Derived loaded from <InlineCode>{derivedPath}</InlineCode>, but no chartable series were
-            found for the selected metrics.
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {charts.map((c, index) => (
-              <section key={c.metric} id={`chart-${safeId(c.metric)}`} className="rounded-3xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
-                      Chart {index + 1}
+        {/* ── Chain intro ── */}
+        {cfg.primer ? (
+          <section className="border-t border-[var(--line)] pt-8">
+            <div className="section-head">
+              <div>
+                <div className="eyebrow mb-3">About {displayName}</div>
+                <MoreLink id={`profile-${chainId}`} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <p className="text-[var(--ink)] text-base leading-7">{cfg.primer.shortFact}</p>
+                <p className="text-[var(--ink2)] text-sm leading-7">{cfg.primer.whatMakesItDifferent}</p>
+                <div>
+                  <div className="eyebrow mb-3">Primary drivers</div>
+                  {cfg.primer.primaryDrivers.map((d, i) => (
+                    <div key={i} className="data-row" style={{ gridTemplateColumns: "1fr", padding: "12px 0" }}>
+                      <p className="text-sm text-[var(--ink2)] m-0">{d}</p>
                     </div>
-                    <h3 className="mt-2 text-2xl font-semibold">{labelForMetric(c.metric)}</h3>
-                    <div className="mt-2 text-sm leading-7 !text-[#27476f]">
-                      {topLineMetricNote(chainId, c.metric)}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="text-xs !text-[#27476f]">Units: {c.unitLabel ?? "—"}</div>
-                    {/* Per-chart window selector */}
-                    <nav className="flex flex-wrap items-center gap-1.5" aria-label={`Window for ${c.metric}`}>
-                      {[
-                        { w: 30, label: "30d" },
-                        { w: 90, label: "90d" },
-                        { w: 180, label: "180d" },
-                        { w: 365, label: "365d" },
-                      ].map(({ w, label }) => {
-                        const isActive = c.metricWindow === w;
-                        const newParams = new URLSearchParams();
-                        // Preserve other metric params
-                        charts.forEach((other) => {
-                          if (other.metric !== c.metric) {
-                            newParams.set(other.paramKey, String(other.metricWindow));
-                          }
-                        });
-                        newParams.set(c.paramKey, String(w));
-                        const href = `/chains/${chainId}?${newParams.toString()}#chart-${safeId(c.metric)}`;
-                        return (
-                          <Link
-                            key={w}
-                            href={href}
-                            prefetch={false}
-                            className={[
-                              "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition select-none",
-                              isActive
-                                ? "border-[#2f7cff] bg-[#dbeafe] !text-[#0d2447]"
-                                : "border-[#9db8d4] bg-[#eef6ff] !text-[#557099] hover:!text-[#0d2447]",
-                            ].join(" ")}
-                          >
-                            {label}
-                          </Link>
-                        );
-                      })}
-                    </nav>
-                  </div>
+                  ))}
                 </div>
+                {cfg.primer.caveats && cfg.primer.caveats.length > 0 ? (
+                  <div>
+                    <div className="eyebrow mb-3">Caveats</div>
+                    {cfg.primer.caveats.map((c, i) => (
+                      <div key={i} className="data-row" style={{ gridTemplateColumns: "1fr", padding: "12px 0" }}>
+                        <p className="text-sm text-[var(--ink2)] m-0">{c}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
-                <div className="mt-4">
+        {/* ── Charts ── */}
+        <section>
+          {!derivedPayload ? (
+            <p className="text-sm text-[var(--ink2)]">No derived source found at <InlineCode>{derivedPath}</InlineCode>.</p>
+          ) : charts.length === 0 ? (
+            <p className="text-sm text-[var(--ink2)]">No chartable series found for the selected metrics.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "56px" }}>
+              {charts.map((c, index) => (
+                <section key={c.metric} id={`chart-${safeId(c.metric)}`} className="border-t border-[var(--line)] pt-8">
+                  <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                    <div>
+                      <div className="eyebrow mb-2">Chart {index + 1}</div>
+                      <h3 className="ua-h3">{c.metric}</h3>
+                      <p className="text-sm text-[var(--ink2)] mt-2 max-w-xl">{topLineMetricNote(chainId, c.metric)}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="font-mono text-[10px] text-[var(--ink3)] uppercase tracking-[.1em]">Units: {c.unitLabel ?? "—"}</div>
+                      <nav className="flex flex-wrap gap-1.5" aria-label={`Window for ${c.metric}`}>
+                        {([30, 90, 180, 365] as const).map((w) => {
+                          const isActive = c.metricWindow === w;
+                          const newParams = new URLSearchParams();
+                          charts.forEach((other) => {
+                            if (other.metric !== c.metric) newParams.set(other.paramKey, String(other.metricWindow));
+                          });
+                          newParams.set(c.paramKey, String(w));
+                          return (
+                            <Link key={w} href={`/chains/${chainId}?${newParams.toString()}#chart-${safeId(c.metric)}`} prefetch={false}
+                              className={`ua-vf-tab ${isActive ? "is-active" : ""}`}>
+                              {w}d
+                            </Link>
+                          );
+                        })}
+                      </nav>
+                    </div>
+                  </div>
+
                   <MetricLineChart
                     title={c.metric}
                     subtitle={`MA: ${c.mDerivedPath} · Raw: ${c.mGoldPath} · Window: ${utcMsToIsoDay(c.mBounds.minMs)} → ${utcMsToIsoDay(c.mBounds.maxMs)} (${c.metricWindow} calendar days)`}
@@ -2299,397 +2139,229 @@ export default async function ChainPage({
                     data={c.data}
                     windowDays={c.metricWindow}
                   />
-                </div>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="text-base font-medium">How to read this chart</div>
-                      <MoreLink id={`chart-read-${safeId(chainId)}-${safeId(c.metric)}`} />
+                  <div className="mt-4 grid md:grid-cols-2 border-t border-[var(--line)]">
+                    <div style={{ padding: "18px 24px 18px 0", borderBottom: "1px solid var(--line)" }}>
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <span className="font-mono text-[11px] text-[var(--gold)] uppercase tracking-[.12em]">How to read</span>
+                        <MoreLink id={`chart-read-${safeId(chainId)}-${safeId(c.metric)}`} />
+                      </div>
+                      <p className="text-sm text-[var(--ink2)]">Use raw for day-to-day movement, MA7 for short smoothing, MA30 for broader baseline.</p>
                     </div>
-                    <div className="mt-2 text-sm leading-7 !text-[#27476f]">
-                      Use raw for day-to-day movement, MA7 for short smoothing, and MA30 for broader
-                      baseline.
+                    <div style={{ padding: "18px 0 18px 24px", borderBottom: "1px solid var(--line)", borderLeft: "1px solid var(--line)" }}>
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <span className="font-mono text-[11px] text-[var(--gold)] uppercase tracking-[.12em]">Why shown</span>
+                        <MoreLink id={`chart-why-${safeId(chainId)}-${safeId(c.metric)}`} />
+                      </div>
+                      <p className="text-sm text-[var(--ink2)]">{chartWhyShownOneLiner(c.metric, c.axis, regimeLabel)}</p>
                     </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="text-base font-medium">Why {c.metric} is shown</div>
-                      <MoreLink id={`chart-why-${safeId(chainId)}-${safeId(c.metric)}`} />
-                    </div>
-                    <div className="mt-2 text-sm leading-7 !text-[#27476f]">
-                      {chartWhyShownOneLiner(c.metric, c.axis, regimeLabel)}
-                    </div>
-                  </div>
-                </div>
-
-                <ExplainModal
-                  id={`chart-read-${safeId(chainId)}-${safeId(c.metric)}`}
-                  title={`How to read ${c.metric}`}
-                  subtitle={
-                    <>
-                      Window <InlineCode>{String(effectiveWindowDays)}d</InlineCode> · Units{" "}
-                      <InlineCode>{c.unitLabel ?? "—"}</InlineCode>
-                    </>
-                  }
-                  pair={chartReadExplanation(c.metric, effectiveWindowDays, c.unitLabel)}
-                  traceability={
-                    <ul className="list-disc pl-5">
-                      <li>Derived path: <InlineCode>{derivedPath}</InlineCode></li>
-                      <li>Gold path: <InlineCode>{goldPath}</InlineCode></li>
-                      <li>Metric key: <InlineCode>{c.metric}</InlineCode></li>
-                    </ul>
-                  }
-                />
-
-                <ExplainModal
-                  id={`chart-why-${safeId(chainId)}-${safeId(c.metric)}`}
-                  title={`Why ${c.metric} is shown`}
-                  subtitle={<>This popup explains why the chart is present on the page.</>}
-                  pair={metricReasonExplanation(c.metric, c.axis, chainId, regimeLabel)}
-                  traceability={
-                    <ul className="list-disc pl-5">
-                      <li>Metric: <InlineCode>{c.metric}</InlineCode></li>
-                      <li>Axis: <InlineCode>{c.axis ?? "—"}</InlineCode></li>
-                      <li>Visible chart source window: <InlineCode>{`${effectiveWindowDays}d`}</InlineCode></li>
-                    </ul>
-                  }
-                />
-              </section>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-10">
-        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-blue-700">
-          Deeper decomposition
-        </div>
-        <h2 className="mt-1 text-3xl font-semibold">Scorecard</h2>
-        <p className="mt-2 max-w-5xl text-sm leading-7 !text-[#27476f]">
-          The scorecard breaks the present state into Demand, Friction, and Capacity. This is where
-          the user should go when the top-line regime label feels too compressed or too blunt.
-        </p>
-
-        {meta.scorecard?.notes?.interpretation ? (
-          <div className="mt-4 rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-5 text-sm leading-7 !text-[#27476f]">
-            <span className="font-medium !text-[#0d2447]">Published interpretation note:</span>{" "}
-            {meta.scorecard.notes.interpretation}
-          </div>
-        ) : null}
-
-        {!dims ? (
-          <div className="mt-4 rounded-2xl border p-6 text-sm !text-[#27476f]">
-            No scorecard dimensions found in <InlineCode>scorecard.dimensions</InlineCode>.
-          </div>
-        ) : (
-          <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            {[
-              { key: "demand" as const, label: "Demand", dim: dims.demand },
-              { key: "friction" as const, label: "Friction", dim: dims.friction },
-              { key: "capacity" as const, label: "Capacity", dim: dims.capacity },
-            ].map(({ key, label, dim }) => {
-              const modalId = `scorecard-${safeId(chainId)}-${key}`;
-              return (
-                <div key={key} className="rounded-3xl border p-6 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm !text-[#27476f]">{label}</div>
-                    <div className="flex items-center gap-2">
-                      <span className={pillClass("neutral")}>{dim?.level ?? "—"}</span>
-                      <MoreLink id={modalId} />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-center">
-                    {typeof dim?.score === "number" && Number.isFinite(dim.score) ? (
-                      <ScoreGauge score={dim.score} label={label} note={String(dim.level ?? "—")} />
-                    ) : (
-                      <div className="py-10 text-sm !text-[#27476f]">Score not available</div>
-                    )}
-                  </div>
-
-                  <div className="mt-3 text-center text-2xl font-semibold">
-                    {fmtScore100(dim?.score)}
-                    <span className="ml-2 text-sm font-normal !text-[#27476f]">/ 100</span>
-                  </div>
-
-                  <div className="mt-4 text-sm leading-7 !text-[#27476f] [&_p]:!text-[#27476f]">
-                    Coverage: {fmtNum(dim?.coverage_factor, 3)} · Effective conf:{" "}
-                    {fmtNum(dim?.effective_confidence, 3)}
                   </div>
 
                   <ExplainModal
-                    id={modalId}
-                    title={`What ${label} means`}
-                    subtitle={
-                      <>
-                        Source <InlineCode>{`scorecard.dimensions.${key}`}</InlineCode> · Current level{" "}
-                        <InlineCode>{dim?.level ?? "—"}</InlineCode>
-                      </>
-                    }
-                    pair={scorecardAxisExplanation(key, dim)}
-                    traceability={
-                      <ul className="list-disc pl-5">
-                        <li>Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode></li>
-                        <li>Field: <InlineCode>{`scorecard.dimensions.${key}`}</InlineCode></li>
-                        <li>Coverage factor: <InlineCode>{fmtNum(dim?.coverage_factor, 3)}</InlineCode></li>
-                        <li>Effective confidence: <InlineCode>{fmtNum(dim?.effective_confidence, 3)}</InlineCode></li>
-                      </ul>
-                    }
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-10">
-        <h2 className="text-3xl font-semibold">Drivers</h2>
-        <p className="mt-2 max-w-5xl text-sm leading-7 !text-[#27476f]">
-          Drivers are the “because” behind the visible regime. They show which published metrics are
-          currently doing the most work in explaining the present state.
-        </p>
-
-        {topDrivers.length === 0 ? (
-          <div className="mt-4 rounded-2xl border p-6 text-sm !text-[#27476f]">
-            No drivers found in <InlineCode>regime.drivers[]</InlineCode>.
-          </div>
-        ) : (
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            {topDrivers.map((d, index) => {
-              const metricId = safeId(d.metric ?? `driver-${index}`);
-              return (
-                <section key={`${d.metric ?? "driver"}-${index}`} className="rounded-3xl border p-6 shadow-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm uppercase tracking-[0.14em] !text-[#27476f]">
-                        {d.axis ?? "—"}
-                      </div>
-                      <h3 className="mt-2 text-2xl font-semibold">{d.metric ?? "—"}</h3>
-                    </div>
-                    <span className={pillClass("good")}>{d.trend ?? "—"}</span>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
-                          z robust
-                        </div>
-                        <MoreLink id={`driver-z-${metricId}`} />
-                      </div>
-                      <div className="mt-3 text-3xl font-semibold">{fmtNum(d.z_robust, 2)}</div>
-                    </div>
-
-                    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
-                          90d percentile
-                        </div>
-                        <MoreLink id={`driver-pct-${metricId}`} />
-                      </div>
-                      <div className="mt-3 text-3xl font-semibold">{fmtPct0to100(d.pct_90d)}</div>
-                    </div>
-
-                    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
-                          Momentum 7d vs 30d
-                        </div>
-                        <MoreLink id={`driver-mom-${metricId}`} />
-                      </div>
-                      <div className="mt-3 text-3xl font-semibold">{fmtNum(d.momentum_7d_vs_30d, 3)}</div>
-                    </div>
-
-                    <div className="rounded-2xl border border-[#c9d9ea] bg-[#eaf3fb] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-medium uppercase tracking-[0.14em] !text-[#27476f]">
-                          Current value
-                        </div>
-                        <MoreLink id={`driver-current-${metricId}`} />
-                      </div>
-                      <div className="mt-3 text-3xl font-semibold">
-                        {typeof d.current === "number" ? String(d.current) : "—"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl border p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="text-base font-medium">Why {d.metric ?? "this metric"} is shown here</div>
-                      <MoreLink id={`driver-why-${metricId}`} />
-                    </div>
-                    <div className="mt-2 text-sm leading-7 !text-[#27476f]">
-                      This row is being used as visible evidence for the current descriptive state.
-                    </div>
-                  </div>
-
-                  <div className="mt-4 text-xs !text-[#27476f]">
-                    Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode> →{" "}
-                    <InlineCode>regime.drivers[]</InlineCode>
-                  </div>
-
-                  <ExplainModal
-                    id={`driver-z-${metricId}`}
-                    title={`Robust z-score for ${d.metric ?? "metric"}`}
-                    pair={statExplanation("z", d.z_robust)}
-                    traceability={<div>Field: <InlineCode>regime.drivers[].z_robust</InlineCode></div>}
+                    id={`chart-read-${safeId(chainId)}-${safeId(c.metric)}`}
+                    title={`How to read ${c.metric}`}
+                    subtitle={<>Window <InlineCode>{String(c.metricWindow)}d</InlineCode> · Units <InlineCode>{c.unitLabel ?? "—"}</InlineCode></>}
+                    pair={chartReadExplanation(c.metric, c.metricWindow, c.unitLabel)}
+                    traceability={<ul className="list-disc pl-5"><li>MA: <InlineCode>{c.mDerivedPath}</InlineCode></li><li>Raw: <InlineCode>{c.mGoldPath}</InlineCode></li><li>Metric: <InlineCode>{c.metric}</InlineCode></li></ul>}
                   />
                   <ExplainModal
-                    id={`driver-pct-${metricId}`}
-                    title={`90-day percentile for ${d.metric ?? "metric"}`}
-                    pair={statExplanation("pct", d.pct_90d)}
-                    traceability={<div>Field: <InlineCode>regime.drivers[].pct_90d</InlineCode></div>}
-                  />
-                  <ExplainModal
-                    id={`driver-mom-${metricId}`}
-                    title={`Momentum (7d vs 30d) for ${d.metric ?? "metric"}`}
-                    pair={statExplanation("mom", d.momentum_7d_vs_30d)}
-                    traceability={<div>Field: <InlineCode>regime.drivers[].momentum_7d_vs_30d</InlineCode></div>}
-                  />
-                  <ExplainModal
-                    id={`driver-current-${metricId}`}
-                    title={`Current raw value for ${d.metric ?? "metric"}`}
-                    pair={statExplanation("current", d.current)}
-                    traceability={<div>Field: <InlineCode>regime.drivers[].current</InlineCode></div>}
-                  />
-                  <ExplainModal
-                    id={`driver-why-${metricId}`}
-                    title={`Why ${d.metric ?? "this metric"} is shown`}
-                    subtitle={
-                      <>
-                        Axis <InlineCode>{d.axis ?? "—"}</InlineCode> · Trend <InlineCode>{d.trend ?? "—"}</InlineCode>
-                      </>
-                    }
-                    pair={metricReasonExplanation(d.metric ?? "metric", d.axis, chainId, regimeLabel)}
-                    traceability={
-                      <ul className="list-disc pl-5">
-                        <li>Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode></li>
-                        <li>Field: <InlineCode>regime.drivers[]</InlineCode></li>
-                        <li>Metric: <InlineCode>{d.metric ?? "—"}</InlineCode></li>
-                      </ul>
-                    }
+                    id={`chart-why-${safeId(chainId)}-${safeId(c.metric)}`}
+                    title={`Why ${c.metric} is shown`}
+                    pair={metricReasonExplanation(c.metric, c.axis, chainId, regimeLabel)}
+                    traceability={<ul className="list-disc pl-5"><li>Metric: <InlineCode>{c.metric}</InlineCode></li><li>Axis: <InlineCode>{c.axis ?? "—"}</InlineCode></li></ul>}
                   />
                 </section>
-              );
-            })}
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ── Scorecard ── */}
+        <section>
+          <div className="section-head mb-8">
+            <div>
+              <div className="eyebrow mb-3">Deeper decomposition</div>
+              <h2 className="ua-h2">Scorecard</h2>
+            </div>
+            <div>
+              <p className="text-[var(--ink2)] text-sm leading-7 max-w-xl">
+                The scorecard breaks the present state into Demand, Friction, and Capacity. This is where to go when the top-line label feels too compressed or too blunt.
+              </p>
+              {meta.scorecard?.notes?.interpretation ? (
+                <p className="mt-4 text-sm text-[var(--ink2)] border-l-2 border-[var(--line2)] pl-4">{meta.scorecard.notes.interpretation}</p>
+              ) : null}
+            </div>
           </div>
-        )}
-      </section>
 
-      <details className="mt-10 rounded-2xl border p-5">
-        <summary className="cursor-pointer text-sm font-medium">Data contract & traceability</summary>
-        <div className="mt-4 grid gap-2 text-sm !text-[#27476f]">
-          <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
-          <div>Meta path: <InlineCode>{metaPath}</InlineCode></div>
-          <div>Gold path: <InlineCode>{goldPath}</InlineCode></div>
-          <div>Derived path: <InlineCode>{derivedPath}</InlineCode></div>
-          <div>Runtime chart points use observed published dates inside the selected window.</div>
-          <div>Daily-file supplementation is preserved when a published window bundle is incomplete.</div>
+          {!dims ? (
+            <p className="text-sm text-[var(--ink2)]">No scorecard dimensions found in <InlineCode>scorecard.dimensions</InlineCode>.</p>
+          ) : (
+            <div className="fact-row" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+              {([
+                { key: "demand" as const, label: "Demand", dim: dims.demand },
+                { key: "friction" as const, label: "Friction", dim: dims.friction },
+                { key: "capacity" as const, label: "Capacity", dim: dims.capacity },
+              ]).map(({ key, label, dim }) => {
+                const modalId = `scorecard-${safeId(chainId)}-${key}`;
+                return (
+                  <div key={key} className="fact-item">
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <strong>{label}</strong>
+                      <div className="flex items-center gap-2">
+                        <span className="regime-token" style={{ color: "var(--ink2)" }}>{dim?.level ?? "—"}</span>
+                        <MoreLink id={modalId} />
+                      </div>
+                    </div>
+                    {typeof dim?.score === "number" && Number.isFinite(dim.score) ? (
+                      <div className="flex justify-center mb-4">
+                        <ScoreGauge score={dim.score} label={label} note={String(dim.level ?? "—")} />
+                      </div>
+                    ) : null}
+                    <div className="text-center mb-4">
+                      <span className="font-mono text-[28px] text-[var(--ink)]">{fmtScore100(dim?.score)}</span>
+                      <span className="text-[var(--ink3)] text-sm ml-1">/ 100</span>
+                    </div>
+                    <div className="text-[12px] text-[var(--ink3)]">
+                      Coverage: {fmtNum(dim?.coverage_factor, 3)} · Effective conf: {fmtNum(dim?.effective_confidence, 3)}
+                    </div>
+                    <ExplainModal
+                      id={modalId}
+                      title={`What ${label} means`}
+                      subtitle={<>Source <InlineCode>{`scorecard.dimensions.${key}`}</InlineCode> · Level <InlineCode>{dim?.level ?? "—"}</InlineCode></>}
+                      pair={scorecardAxisExplanation(key, dim)}
+                      traceability={<ul className="list-disc pl-5"><li>Source: <InlineCode>{metaPath}</InlineCode></li><li>Coverage: <InlineCode>{fmtNum(dim?.coverage_factor, 3)}</InlineCode></li><li>Effective confidence: <InlineCode>{fmtNum(dim?.effective_confidence, 3)}</InlineCode></li></ul>}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* ── Drivers ── */}
+        <section>
+          <div className="section-head mb-8">
+            <div>
+              <div className="eyebrow mb-3">Evidence layer</div>
+              <h2 className="ua-h2">Drivers</h2>
+            </div>
+            <p className="text-[var(--ink2)] text-sm leading-7 max-w-xl">
+              Drivers are the &ldquo;because&rdquo; behind the visible regime. They show which published metrics are currently doing the most work in explaining the present state.
+            </p>
+          </div>
+
+          {topDrivers.length === 0 ? (
+            <p className="text-sm text-[var(--ink2)]">No drivers found in <InlineCode>regime.drivers[]</InlineCode>.</p>
+          ) : (
+            <div className="grid lg:grid-cols-2 gap-x-12">
+              {topDrivers.map((d, index) => {
+                const metricId = safeId(d.metric ?? `driver-${index}`);
+                return (
+                  <section key={`${d.metric}-${index}`} className="border-t border-[var(--line)] pt-6 pb-6">
+                    <div className="flex items-start justify-between gap-3 mb-6">
+                      <div>
+                        <div className="eyebrow mb-1">{d.axis ?? "—"}</div>
+                        <h3 className="ua-h3">{d.metric ?? "—"}</h3>
+                      </div>
+                      <span className="regime-token" style={{ color: "var(--c-heating)" }}>{d.trend ?? "—"}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 border-t border-[var(--line)]">
+                      {([
+                        { label: "Z robust", value: fmtNum(d.z_robust, 2), id: `driver-z-${metricId}` },
+                        { label: "90d percentile", value: fmtPct0to100(d.pct_90d), id: `driver-pct-${metricId}` },
+                        { label: "Momentum 7d vs 30d", value: fmtNum(d.momentum_7d_vs_30d, 3), id: `driver-mom-${metricId}` },
+                        { label: "Current value", value: typeof d.current === "number" ? String(d.current) : "—", id: `driver-current-${metricId}` },
+                      ]).map(({ label, value, id }) => (
+                        <div key={id} className="border-b border-r border-[var(--line)] p-4">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <span className="font-mono text-[10px] text-[var(--gold)] uppercase tracking-[.1em]">{label}</span>
+                            <MoreLink id={id} />
+                          </div>
+                          <div className="font-mono text-[20px] text-[var(--ink)]">{value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-4 mt-2">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <span className="font-mono text-[11px] text-[var(--ink3)] uppercase tracking-[.1em]">Why {d.metric ?? "this metric"} is shown</span>
+                        <MoreLink id={`driver-why-${metricId}`} />
+                      </div>
+                      <p className="text-sm text-[var(--ink2)]">This row is being used as visible evidence for the current descriptive state.</p>
+                      <p className="mt-2 font-mono text-[10px] text-[var(--ink3)]">
+                        Source: <InlineCode>{metaPath}</InlineCode> → <InlineCode>regime.drivers[]</InlineCode>
+                      </p>
+                    </div>
+
+                    <ExplainModal id={`driver-z-${metricId}`} title={`Robust z-score for ${d.metric ?? "metric"}`} pair={statExplanation("z", d.z_robust)} traceability={<div>Field: <InlineCode>regime.drivers[].z_robust</InlineCode></div>} />
+                    <ExplainModal id={`driver-pct-${metricId}`} title={`90-day percentile for ${d.metric ?? "metric"}`} pair={statExplanation("pct", d.pct_90d)} traceability={<div>Field: <InlineCode>regime.drivers[].pct_90d</InlineCode></div>} />
+                    <ExplainModal id={`driver-mom-${metricId}`} title={`Momentum for ${d.metric ?? "metric"}`} pair={statExplanation("mom", d.momentum_7d_vs_30d)} traceability={<div>Field: <InlineCode>regime.drivers[].momentum_7d_vs_30d</InlineCode></div>} />
+                    <ExplainModal id={`driver-current-${metricId}`} title={`Current value for ${d.metric ?? "metric"}`} pair={statExplanation("current", d.current)} traceability={<div>Field: <InlineCode>regime.drivers[].current</InlineCode></div>} />
+                    <ExplainModal
+                      id={`driver-why-${metricId}`}
+                      title={`Why ${d.metric ?? "this metric"} is shown`}
+                      subtitle={<>Axis <InlineCode>{d.axis ?? "—"}</InlineCode> · Trend <InlineCode>{d.trend ?? "—"}</InlineCode></>}
+                      pair={metricReasonExplanation(d.metric ?? "metric", d.axis, chainId, regimeLabel)}
+                      traceability={<ul className="list-disc pl-5"><li>Source: <InlineCode>{metaPath}</InlineCode></li><li>Metric: <InlineCode>{d.metric ?? "—"}</InlineCode></li></ul>}
+                    />
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* ── Chain profile (moved to bottom) ── */}
+        <section className="border-t border-[var(--line)] pt-10">
+          <div className="section-head">
+            <div>
+              <div className="eyebrow mb-3">Chain profile</div>
+              <MoreLink id={`profile-${chainId}`} />
+            </div>
+            <div className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
+              {chainProfilePair.basic}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Data contract ── */}
+        <section className="border-t border-[var(--line)] pt-8">
+          <details>
+            <summary className="eyebrow cursor-pointer">Data contract &amp; traceability</summary>
+            <div className="mt-4 space-y-2 text-sm text-[var(--ink2)]">
+              <div>Data source: <InlineCode>{currentDataSource()}</InlineCode></div>
+              <div>Meta: <InlineCode>{metaPath}</InlineCode></div>
+              <div>Gold: <InlineCode>{goldPath}</InlineCode></div>
+              <div>Derived: <InlineCode>{derivedPath}</InlineCode></div>
+              <div>Runtime chart points use observed published dates inside the selected window.</div>
+            </div>
+          </details>
+        </section>
+
+        {/* ── CTA ── */}
+        <div className="border-y border-[var(--line)] py-6 flex flex-wrap items-center justify-between gap-6">
+          <div>
+            <div className="eyebrow mb-2">Want the JSON behind these charts?</div>
+            <p className="text-sm text-[var(--ink2)] max-w-lg">Every label here is backed by a determinism hash and a full confidence score. A subscription gives you API access to the complete Meta JSON.</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/sign-up" className="btn-ghost">Sign up free</Link>
+            <Link href="/#pricing" className="btn-primary">See plans</Link>
+          </div>
         </div>
-      </details>
 
-      <ExplainModal
-        id={`profile-${chainId}`}
-        title={`${displayName} chain profile`}
-        subtitle={<>Why this chain is interpreted the way it is on this page.</>}
-        pair={chainProfilePair}
-        traceability={
-          <ul className="list-disc pl-5">
-            <li>Chain id: <InlineCode>{chainId}</InlineCode></li>
-            <li>Published profile label: <InlineCode>{meta.profile?.label ?? displayName}</InlineCode></li>
-            {meta.profile?.note ? (
-              <li>Published profile note: <InlineCode>{meta.profile.note}</InlineCode></li>
-            ) : null}
-          </ul>
-        }
-      />
+        </div>
+      </div>
 
-      <ExplainModal
-        id={`read-order-${chainId}`}
-        title="Why this reading order is recommended"
-        pair={readOrderExplanation()}
-        traceability={
-          <ul className="list-disc pl-5">
-            <li>Freshness source: <InlineCode>confidence.lag_days_vs_utc_today</InlineCode></li>
-            <li>Confidence source: <InlineCode>confidence.confidence_score</InlineCode></li>
-            <li>Regime source: <InlineCode>status.label</InlineCode></li>
-            <li>Scorecard source: <InlineCode>scorecard.dimensions.*</InlineCode></li>
-            <li>Drivers source: <InlineCode>regime.drivers[]</InlineCode></li>
-          </ul>
-        }
-      />
-
-      <ExplainModal
-        id={`regime-${chainId}`}
-        title="What regime means"
-        subtitle={<>Current visible label: <InlineCode>{regimeLabel}</InlineCode></>}
-        pair={regimeExplanation(regimeLabel)}
-        traceability={
-          <ul className="list-disc pl-5">
-            <li>Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode></li>
-            <li>Field: <InlineCode>status.label</InlineCode></li>
-            <li>Published one-liner: <InlineCode>{oneLiner ?? "—"}</InlineCode></li>
-          </ul>
-        }
-      />
-
-      <ExplainModal
-        id={`confidence-${chainId}`}
-        title="What confidence means"
-        subtitle={<>Current visible band: <InlineCode>{confBand}</InlineCode></>}
-        pair={confidenceExplanation(conf, meta.confidence?.data_quality_score, meta.confidence?.label_confidence_score)}
-        traceability={
-          <ul className="list-disc pl-5">
-            <li>Source: <InlineCode>{`meta/${chainId}/latest.json`}</InlineCode></li>
-            <li>Field: <InlineCode>confidence.confidence_score</InlineCode></li>
-            <li>Data quality: <InlineCode>{fmtNum(meta.confidence?.data_quality_score, 3)}</InlineCode></li>
-            <li>Label support: <InlineCode>{fmtNum(meta.confidence?.label_confidence_score, 3)}</InlineCode></li>
-          </ul>
-        }
-      />
-
-      <ExplainModal
-        id={`asof-${chainId}`}
-        title="What data as-of means"
-        pair={asOfExplanation(asOf)}
-        traceability={
-          <ul className="list-disc pl-5">
-            <li>Visible date: <InlineCode>{fmtDate(asOf)}</InlineCode></li>
-            <li>Regime date: <InlineCode>{fmtDate(regimeAsOf)}</InlineCode></li>
-            <li>Hero path: <InlineCode>{heroPath}</InlineCode></li>
-            <li>Meta path: <InlineCode>{metaPath}</InlineCode></li>
-          </ul>
-        }
-      />
-
-      <ExplainModal
-        id={`lag-${chainId}`}
-        title="What observed lag means"
-        pair={lagExplanation(meta.confidence?.lag_days_vs_utc_today)}
-        traceability={
-          <ul className="list-disc pl-5">
-            <li>Field: <InlineCode>confidence.lag_days_vs_utc_today</InlineCode></li>
-            <li>Current value: <InlineCode>{typeof meta.confidence?.lag_days_vs_utc_today === "number" ? `${meta.confidence.lag_days_vs_utc_today}d` : "—"}</InlineCode></li>
-          </ul>
-        }
-      />
-
-      <ExplainModal
-        id={`determinism-${chainId}`}
-        title="What determinism means"
-        pair={determinismExplanation(meta.regime?.determinism_hash, meta.regime?.window_days ?? meta.scorecard?.window_days)}
-        traceability={
-          <ul className="list-disc pl-5">
-            <li>Field: <InlineCode>regime.determinism_hash</InlineCode></li>
-            <li>Hash: <InlineCode>{meta.regime?.determinism_hash ?? "—"}</InlineCode></li>
-            <li>Window days: <InlineCode>{String(meta.regime?.window_days ?? meta.scorecard?.window_days ?? "—")}</InlineCode></li>
-          </ul>
-        }
-      />
-      </UrdContainer>
-    </UrdPage>
+      {/* ── Global modals ── */}
+      <ExplainModal id={`profile-${chainId}`} title={`${displayName} chain profile`} subtitle={<>Why this chain is interpreted the way it is on this page.</>} pair={chainProfilePair} traceability={<ul className="list-disc pl-5"><li>Chain: <InlineCode>{chainId}</InlineCode></li><li>Profile label: <InlineCode>{meta.profile?.label ?? displayName}</InlineCode></li></ul>} />
+      <ExplainModal id={`read-order-${chainId}`} title="Why this reading order is recommended" pair={readOrderExplanation()} traceability={<ul className="list-disc pl-5"><li>Freshness: <InlineCode>confidence.lag_days_vs_utc_today</InlineCode></li><li>Confidence: <InlineCode>confidence.confidence_score</InlineCode></li><li>Regime: <InlineCode>status.label</InlineCode></li></ul>} />
+      <ExplainModal id={`regime-${chainId}`} title="What regime means" subtitle={<>Current label: <InlineCode>{regimeLabel}</InlineCode></>} pair={regimeExplanation(regimeLabel)} traceability={<ul className="list-disc pl-5"><li>Source: <InlineCode>{metaPath}</InlineCode></li><li>Field: <InlineCode>status.label</InlineCode></li></ul>} />
+      <ExplainModal id={`confidence-${chainId}`} title="What confidence means" subtitle={<>Band: <InlineCode>{confBand}</InlineCode></>} pair={confidenceExplanation(conf, meta.confidence?.data_quality_score, meta.confidence?.label_confidence_score)} traceability={<ul className="list-disc pl-5"><li>Source: <InlineCode>{metaPath}</InlineCode></li><li>Score: <InlineCode>{fmtNum(conf, 3)}</InlineCode></li></ul>} />
+      <ExplainModal id={`asof-${chainId}`} title="What data as-of means" pair={asOfExplanation(asOf)} traceability={<ul className="list-disc pl-5"><li>Visible date: <InlineCode>{fmtDate(asOf)}</InlineCode></li><li>Hero path: <InlineCode>{heroPath}</InlineCode></li></ul>} />
+      <ExplainModal id={`lag-${chainId}`} title="What observed lag means" pair={lagExplanation(meta.confidence?.lag_days_vs_utc_today)} traceability={<ul className="list-disc pl-5"><li>Field: <InlineCode>confidence.lag_days_vs_utc_today</InlineCode></li><li>Value: <InlineCode>{typeof meta.confidence?.lag_days_vs_utc_today === "number" ? `${meta.confidence.lag_days_vs_utc_today}d` : "—"}</InlineCode></li></ul>} />
+      <ExplainModal id={`determinism-${chainId}`} title="What determinism means" pair={determinismExplanation(meta.regime?.determinism_hash, meta.regime?.window_days ?? meta.scorecard?.window_days)} traceability={<ul className="list-disc pl-5"><li>Hash: <InlineCode>{meta.regime?.determinism_hash ?? "—"}</InlineCode></li><li>Window: <InlineCode>{String(meta.regime?.window_days ?? meta.scorecard?.window_days ?? "—")}</InlineCode></li></ul>} />
+    </main>
   );
 }

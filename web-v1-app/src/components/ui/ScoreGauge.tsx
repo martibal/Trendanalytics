@@ -106,11 +106,11 @@ export default function ScoreGauge({
   const lowColor = getRegimeColorByLabel("CONGESTED");
   const midColor = getRegimeColorByLabel("HEATING");
   const highColor = getRegimeColorByLabel("STABLE");
-  const valueColor = "#0a1d3a";
-  const labelColor = "#1d3f67";
-  const mutedColor = "#27476f";
+  const valueColor = "#E8E0D0";
+  const labelColor = "#7A8A96";
+  const mutedColor = "#3A4A57";
   const glowColor = hexToRgba(getDesignTokenHex("--color-accent"), 0.18);
-  const dotFill = getDesignTokenHex("--color-bg-card");
+  const dotFill = "#111E30";
   const dotStroke = getDesignTokenHex("--color-accent");
 
   const valueText = `${Math.round(normalized)}`;
