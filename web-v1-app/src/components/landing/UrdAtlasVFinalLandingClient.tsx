@@ -25,6 +25,12 @@ export type LandingChainData = {
   path: number[];
 };
 
+export type LandingBriefPathPoint = {
+  date: string;
+  label: Label;
+  isLatest?: boolean;
+};
+
 export type LandingBriefData = {
   title: string;
   headline: string;
@@ -32,7 +38,7 @@ export type LandingBriefData = {
   confidence: string;
   changes: string;
   run: string;
-  path: Label[];
+  path: Array<Label | LandingBriefPathPoint>;
   plain: string;
 };
 
@@ -225,6 +231,34 @@ function labelClass(label: Label): string {
 function compactLabel(label: Label): string {
   if (label === "UNKNOWN/DEGRADED") return "UNKNOWN";
   return label;
+}
+
+function isBriefPathPoint(
+  value: Label | LandingBriefPathPoint,
+): value is LandingBriefPathPoint {
+  return typeof value === "object" && value !== null && "label" in value;
+}
+
+function briefPathLabel(value: Label | LandingBriefPathPoint): Label {
+  return isBriefPathPoint(value) ? value.label : value;
+}
+
+function briefPathDate(value: Label | LandingBriefPathPoint): string | null {
+  if (!isBriefPathPoint(value)) return null;
+  if (!value.date) return null;
+  return value.date;
+}
+
+function briefPathIsLatest(
+  value: Label | LandingBriefPathPoint,
+  index: number,
+  pathLength: number,
+): boolean {
+  if (isBriefPathPoint(value) && typeof value.isLatest === "boolean") {
+    return value.isLatest;
+  }
+
+  return index === pathLength - 1;
 }
 
 function highlightJson(raw: string): string {
@@ -531,6 +565,10 @@ export default function UrdAtlasVFinalLandingClient({
         .ua-chain-logo-svg { width: 34px; height: 34px; display: block; filter: saturate(1.08) contrast(1.06); }
         .ua-chain-logo-name { font-family: var(--mono); font-size: 9.5px; font-weight: 500; letter-spacing: .06em; color: var(--ink); line-height: 1.15; text-align: center; }
         .ua-chain-logo-fallback { color: var(--ink); font-family: var(--mono); font-size: 20px; }
+        .ua-vf-regime-path .ua-vf-path-token { display: inline-grid; grid-template-columns: 1fr; gap: 4px; align-items: start; min-width: 96px; padding-bottom: 7px; color: var(--ink); }
+        .ua-vf-path-token b { color: var(--ink); font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: .04em; line-height: 1.1; text-transform: none; }
+        .ua-vf-path-token i { color: var(--gold); font-family: var(--mono); font-size: 8px; font-style: normal; font-weight: 500; letter-spacing: .14em; line-height: 1; text-transform: uppercase; }
+        .ua-vf-path-token strong { color: currentColor; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; line-height: 1.1; text-transform: uppercase; }
         @media (max-width: 560px) {
           .ua-chain-hero-row { grid-template-columns: 64px minmax(0, 1fr) auto !important; gap: 0 12px !important; padding: 15px 16px !important; }
           .ua-chain-logo-mark { width: 38px; height: 38px; }
@@ -952,11 +990,26 @@ export default function UrdAtlasVFinalLandingClient({
                   <h3 className="ua-vf-brief-headline">{currentBrief.headline}</h3>
 
                   <div className="ua-vf-regime-path">
-                    {currentBrief.path.map((label, index) => (
-                      <span key={`${label}-${index}`} className={labelClass(label)}>
-                        D{index + 1} {compactLabel(label)}
-                      </span>
-                    ))}
+                    {currentBrief.path.map((point, index) => {
+                      const label = briefPathLabel(point);
+                      const dateLabel = briefPathDate(point) ?? `D${index + 1}`;
+                      const isLatest = briefPathIsLatest(
+                        point,
+                        index,
+                        currentBrief.path.length,
+                      );
+
+                      return (
+                        <span
+                          key={`${dateLabel}-${label}-${index}`}
+                          className={`ua-vf-path-token ${labelClass(label)}`}
+                        >
+                          <b>{dateLabel}</b>
+                          {isLatest ? <i>Latest</i> : null}
+                          <strong>{compactLabel(label)}</strong>
+                        </span>
+                      );
+                    })}
                   </div>
 
                   <p className="ua-vf-muted">{currentBrief.plain}</p>

@@ -1,6 +1,8 @@
 param(
   [ValidateSet('incremental','rebuild')]
-  [string]$Mode = 'incremental'
+  [string]$Mode = 'incremental',
+
+  [switch]$SkipRawDownload
 )
 
 Set-StrictMode -Version Latest
@@ -155,6 +157,7 @@ function Read-DownloadReport([string]$path) {
 try {
   Write-Log '=== PIPELINE START ==='
   Write-Log "Mode: $Mode"
+  Write-Log ("SkipRawDownload: " + [bool]$SkipRawDownload)
 
   $TOOLS_ROOT = Split-Path -Parent $MyInvocation.MyCommand.Path
   $PIPELINE_ROOT = Resolve-Path (Join-Path $TOOLS_ROOT '..') | Select-Object -ExpandProperty Path
@@ -222,7 +225,11 @@ try {
 
   Push-Location $MAIN_ROOT
   try {
-    if (Test-Path $PY_DOWNLOAD_RAW) {
+    $downloadReport = $null
+
+    if ($SkipRawDownload) {
+      Write-Log 'STEP -1: Skipping RAW download because -SkipRawDownload was provided'
+    } elseif (Test-Path $PY_DOWNLOAD_RAW) {
       Write-Log 'STEP -1: Download/sync RAW from AWS (JSON-aware minimal catch-up)'
       $rawLookbackDays = Get-EnvIntOrDefault -Name 'CSS_RAW_LOOKBACK_DAYS' -DefaultValue 60
       $startRaw = (Get-Date).ToUniversalTime().AddDays(-1 * $rawLookbackDays)
@@ -239,7 +246,6 @@ try {
       $downloadReport = Read-DownloadReport -path $downloadReportPath
     } else {
       Write-Log "STEP -1: Skipping RAW download (missing tool): $PY_DOWNLOAD_RAW"
-      $downloadReport = $null
     }
 
     Write-Log 'STEP 0: Probe latest raw day'
@@ -302,58 +308,56 @@ try {
       }
     }
 
-    $activeChains = New-Object System.Collections.Generic.List[string]
-    foreach ($c in $chains) {
-      $chainFeaturesDir = Join-Path $FEATURES_ROOT $c
-      $chainFeatureFiles = @(
-        Get-ChildItem -Path $chainFeaturesDir -File -Filter '*.parquet' -ErrorAction SilentlyContinue
-      )
-
-      if ($chainFeatureFiles.Length -gt 0) {
-        [void]$activeChains.Add($c)
-      }
-    }
-
-    if ($activeChains.Count -eq 0) {
-      if ($Mode -eq 'incremental') {
-        Write-Log 'No feature parquet available for any chain in incremental mode.'
-        Write-Log 'Pipeline exits successfully as a no-op.'
-        Write-Log '=== PIPELINE OK (NO-OP) ==='
-        return
-      }
-
-      throw 'No feature parquet available for any chain after feature build step.'
-    }
-
-    $activeChainsArr = @($activeChains.ToArray())
-    $activeChainsCsv = [string]::Join(',', $activeChainsArr)
-    Write-Log ('Active chains for downstream build: ' + ([string]::Join(', ', $activeChainsArr)))
-
     Write-Log 'STEP 2: Build GOLD timeseries'
-    foreach ($c in $activeChainsArr) {
+    foreach ($c in $chains) {
       Write-Log ("  build gold timeseries: " + $c)
       & $PY -u $PY_BUILD_GOLD_TS --chain $c --features_root $FEATURES_ROOT --gold_root $GOLD_PARQUET_ROOT --status_root $STATUS_ROOT --reports_dir $REPORTS_DIR
       if ($LASTEXITCODE -ne 0) { throw "build_gold_timeseries.py failed chain=$c rc=$LASTEXITCODE" }
     }
 
     Write-Log 'STEP 3: Build GOLD weekly'
-    foreach ($c in $activeChainsArr) {
+    foreach ($c in $chains) {
       Write-Log ("  build gold weekly: " + $c)
       & $PY -u $PY_BUILD_GOLD_WEEKLY --chain $c --gold_root $GOLD_PARQUET_ROOT --gold_weekly_root $GOLD_WEEKLY_ROOT
       if ($LASTEXITCODE -ne 0) { throw "build_gold_weekly.py failed chain=$c rc=$LASTEXITCODE" }
     }
 
     Write-Log 'STEP 4: Sync GOLD json history + windows'
-    & $PY -u $PY_SYNC_GOLD --repo-root $MAIN_ROOT --gold-root $GOLD_PARQUET_ROOT --out-root $GOLD_JSON_ROOT --chains $activeChainsCsv --mode $syncModeGold --windows $windowsCsv
+    & $PY -u $PY_SYNC_GOLD --repo-root $MAIN_ROOT --gold-root $GOLD_PARQUET_ROOT --out-root $GOLD_JSON_ROOT --chains $chainsCsv --mode $syncModeGold --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) { throw "sync_gold_json_history.py failed rc=$LASTEXITCODE" }
 
     Write-Log 'STEP 5: Export DERIVED json history + windows'
-    & $PY -u $PY_EXPORT_DERIVED --root $MAIN_ROOT --gold-json-root $GOLD_JSON_ROOT --meta-json-root $META_JSON_ROOT --out-root $DERIVED_OUT_ROOT --chains $activeChainsCsv --mode $modeIncRebuild --windows $windowsCsv
+    & $PY -u $PY_EXPORT_DERIVED --root $MAIN_ROOT --gold-json-root $GOLD_JSON_ROOT --meta-json-root $META_JSON_ROOT --out-root $DERIVED_OUT_ROOT --chains $chainsCsv --mode $modeIncRebuild --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) { throw "export_derived_json_history.py failed rc=$LASTEXITCODE" }
 
     Write-Log 'STEP 6: Export META json history + windows'
-    & $PY -u $PY_EXPORT_META --root $MAIN_ROOT --out-root $META_JSON_ROOT --start $startIso --mode $modeIncRebuild --windows $windowsCsv
-    if ($LASTEXITCODE -ne 0) { throw "export_meta_json_history.py failed rc=$LASTEXITCODE" }
+    Write-Log '  forcing api.main paths for META export to the freshly calculated run outputs'
+    Write-Log ("  GOLD_DIR        = " + $GOLD_JSON_ROOT)
+    Write-Log ("  GOLD_STATUS_DIR = " + $STATUS_ROOT)
+    Write-Log ("  GOLD_WEEKLY_DIR = " + $GOLD_WEEKLY_ROOT)
+    Write-Log ("  META_DIR        = " + $META_JSON_ROOT)
+
+    $previousApiMainEnv = @{
+      GOLD_DIR = [Environment]::GetEnvironmentVariable('GOLD_DIR', [EnvironmentVariableTarget]::Process)
+      GOLD_STATUS_DIR = [Environment]::GetEnvironmentVariable('GOLD_STATUS_DIR', [EnvironmentVariableTarget]::Process)
+      GOLD_WEEKLY_DIR = [Environment]::GetEnvironmentVariable('GOLD_WEEKLY_DIR', [EnvironmentVariableTarget]::Process)
+      META_DIR = [Environment]::GetEnvironmentVariable('META_DIR', [EnvironmentVariableTarget]::Process)
+    }
+
+    try {
+      [Environment]::SetEnvironmentVariable('GOLD_DIR', $GOLD_JSON_ROOT, [EnvironmentVariableTarget]::Process)
+      [Environment]::SetEnvironmentVariable('GOLD_STATUS_DIR', $STATUS_ROOT, [EnvironmentVariableTarget]::Process)
+      [Environment]::SetEnvironmentVariable('GOLD_WEEKLY_DIR', $GOLD_WEEKLY_ROOT, [EnvironmentVariableTarget]::Process)
+      [Environment]::SetEnvironmentVariable('META_DIR', $META_JSON_ROOT, [EnvironmentVariableTarget]::Process)
+
+      & $PY -u $PY_EXPORT_META --root $MAIN_ROOT --out-root $META_JSON_ROOT --start $startIso --mode $modeIncRebuild --windows $windowsCsv
+      if ($LASTEXITCODE -ne 0) { throw "export_meta_json_history.py failed rc=$LASTEXITCODE" }
+    }
+    finally {
+      foreach ($name in $previousApiMainEnv.Keys) {
+        [Environment]::SetEnvironmentVariable($name, $previousApiMainEnv[$name], [EnvironmentVariableTarget]::Process)
+      }
+    }
 
     Write-Log 'STEP 7: Publish artifacts -> data/published/v1'
     & $PY -u $PY_PUBLISH --root $MAIN_ROOT --calculated-root $CALC_ROOT --published-root $PUBLISHED_ROOT --chains $chainsCsv --genres 'gold,meta,derived' --windows $windowsCsv
