@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -10,70 +9,163 @@ type JsonLayer = "gold" | "derived" | "meta";
 type ConfidenceMode = "high" | "degraded";
 type Label = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 
-const CHAINS: Array<{ key: ChainKey; label: string; icon: string; regime: Label; confidence: string; oneLiner: string; path: number[] }> = [
-  { key: "btc", label: "BTC", icon: "₿", regime: "STABLE", confidence: "74%", oneLiner: "Published evidence points to balanced network conditions.", path: [46, 52, 49, 58, 61, 55, 63, 70, 66, 74] },
-  { key: "eth", label: "ETH", icon: "Ξ", regime: "UNKNOWN/DEGRADED", confidence: "31%", oneLiner: "Current support is not strong enough for a confident label.", path: [70, 62, 44, 36, 33, 32, 31, 34, 29, 31] },
-  { key: "arb", label: "ARB", icon: "A", regime: "CHEAP", confidence: "68%", oneLiner: "Lower-friction evidence is present relative to recent baseline.", path: [51, 49, 55, 59, 62, 60, 66, 64, 67, 68] },
-  { key: "base", label: "BASE", icon: "B", regime: "HEATING", confidence: "71%", oneLiner: "Demand evidence is running above its recent baseline.", path: [44, 48, 53, 57, 62, 66, 63, 70, 68, 71] },
-];
+// ---------------------------------------------------------------------------
+// Public prop types — exported so page.tsx can import them
+// ---------------------------------------------------------------------------
 
-const BRIEFS: Record<ChainKey, { title: string; headline: string; dominant: Label; confidence: string; changes: string; run: string; path: Label[]; plain: string }> = {
-  btc: { title: "Bitcoin", headline: "Bitcoin remained STABLE across the latest published window.", dominant: "STABLE", confidence: "0.748", changes: "0", run: "7", path: ["STABLE","STABLE","STABLE","STABLE","STABLE","STABLE","STABLE"], plain: "Demand, friction, and capacity evidence stayed inside recent baseline ranges. The latest label is supported by broad metric coverage and normal freshness." },
-  eth: { title: "Ethereum", headline: "Ethereum remained UNKNOWN/DEGRADED-dominant in the latest published window.", dominant: "UNKNOWN/DEGRADED", confidence: "0.312", changes: "1", run: "4", path: ["CHEAP","UNKNOWN/DEGRADED","UNKNOWN/DEGRADED","UNKNOWN/DEGRADED","UNKNOWN/DEGRADED","HEATING","HEATING"], plain: "The published evidence does not support a stronger deterministic label. The degraded label is shown explicitly rather than forcing a higher-confidence state." },
-  arb: { title: "Arbitrum", headline: "Arbitrum showed lower-friction conditions in the latest window.", dominant: "CHEAP", confidence: "0.684", changes: "1", run: "5", path: ["STABLE","CHEAP","CHEAP","CHEAP","CHEAP","CHEAP","CHEAP"], plain: "Friction evidence sat below recent baseline while capacity remained available. The latest context is chain-relative, not price-relative." },
-  base: { title: "Base", headline: "Base showed elevated activity evidence in the latest window.", dominant: "HEATING", confidence: "0.711", changes: "2", run: "3", path: ["STABLE","STABLE","HEATING","HEATING","STABLE","HEATING","HEATING"], plain: "Demand-side evidence increased relative to recent baseline. The label is descriptive and does not imply a forecast or recommendation." },
+export type LandingChainData = {
+  key: string;
+  label: string;
+  icon: string;
+  fullName: string;
+  chainId: string;
+  regime: Label;
+  confidence: string;
+  oneLiner: string;
+  path: number[];
 };
+
+export type LandingBriefData = {
+  title: string;
+  headline: string;
+  dominant: Label;
+  confidence: string;
+  changes: string;
+  run: string;
+  path: Label[];
+  plain: string;
+};
+
+// ---------------------------------------------------------------------------
+// Static JSON examples (these are intentionally static — they are
+// documentation/illustration, not live data)
+// ---------------------------------------------------------------------------
 
 const JSON_EXAMPLES: Record<ConfidenceMode, Record<JsonLayer, string>> = {
   high: {
     gold: "{\r\n  \"avg_block_time_sec\": 501.5470588235294,\r\n  \"block_count_daily\": 171,\r\n  \"chain\": \"bitcoin\",\r\n  \"date\": \"2025-08-04\",\r\n  \"failed_tx_rate\": null,\r\n  \"gas_utilization_pct\": null,\r\n  \"median_tx_fee_native\": 2.58e-06,\r\n  \"median_tx_value_native\": 0.0009438,\r\n  \"tx_count_daily\": 443301,\r\n  \"unique_active_addresses\": null,\r\n  \"value_transferred_native\": 683513.1045116399\r\n}",
-    derived: "{\r\n  \"chain\": \"bitcoin\",\r\n  \"date\": \"2025-08-04\",\r\n  \"derived\": {\r\n    \"context_blocks\": [],\r\n    \"meta_confidence\": {\r\n      \"confidence_score\": 2.4592700895781102e-11\r\n    },\r\n    \"metrics\": {\r\n      \"avg_block_time_sec__ma30\": 581.3339205133203,\r\n      \"avg_block_time_sec__ma7\": 593.4823398040625,\r\n      \"block_count_daily__ma30\": 148.06666666666666,\r\n      \"block_count_daily__ma7\": 146.42857142857142,\r\n      \"median_tx_fee_native__ma30\": 4.2439999999999995e-06,\r\n      \"median_tx_fee_native__ma7\": 4.434285714285714e-06,\r\n      \"median_tx_value_native__ma30\": 0.0016389610000000002,\r\n      \"median_tx_value_native__ma7\": 0.0016111064285714287,\r\n      \"tx_count_daily__ma30\": 419160.8,\r\n      \"tx_count_daily__ma7\": 385202.28571428574,\r\n      \"value_transferred_native__ma30\": 667921.9582019567,\r\n      \"value_transferred_native__ma7\": 596634.1384776529\r\n    }\r\n  }\r\n}",
-    meta: "{\r\n  \"chain\": \"bitcoin\",\r\n  \"confidence\": {\r\n    \"asof_date\": \"2025-08-04\",\r\n    \"chain\": \"bitcoin\",\r\n    \"components\": {\r\n      \"current_row_coverage\": 1.0,\r\n      \"freshness_asof\": 1.0,\r\n      \"history_depth\": 1.0,\r\n      \"recent_density\": 1.0,\r\n      \"recent_metric_coverage\": 1.0\r\n    },\r\n    \"confidence_score\": 0.8814984868132094,\r\n    \"data_quality_score\": 1.0,\r\n    \"date\": \"2025-08-04\",\r\n    \"label_confidence_score\": 0.777039582253978,\r\n    \"lag_days_vs_asof_date\": 0,\r\n    \"lag_days_vs_utc_today\": 234,\r\n    \"missing\": false,\r\n    \"semantics\": \"combined_data_quality_and_label_stability\",\r\n    \"source\": \"gold_history\",\r\n    \"updated_through\": \"2025-08-04\"\r\n  },\r\n  \"data_confidence\": {\r\n    \"components\": {\r\n      \"current_row_coverage\": 1.0,\r\n      \"freshness_asof\": 1.0,\r\n      \"history_depth\": 1.0,\r\n      \"recent_density\": 1.0,\r\n      \"recent_metric_coverage\": 1.0\r\n    },\r\n    \"confidence_score\": 1.0,\r\n    \"date\": \"2025-08-04\",\r\n    \"lag_days_vs_asof_date\": 0,\r\n    \"lag_days_vs_utc_today\": 234,\r\n    \"missing\": false,\r\n    \"semantics\": \"data_quality_and_history_coverage_only\"\r\n  },\r\n  \"date\": \"2025-08-04\",\r\n  \"gold_status\": {\r\n    \"chain\": \"bitcoin\",\r\n    \"features_lag_days_vs_utc_today\": null,\r\n    \"features_last_date\": \"2026-03-25\",\r\n    \"missing\": false,\r\n    \"note\": \"Fallback status derived from gold JSON (no pipeline ml_status present).\"\r\n  },\r\n  \"methodology_version\": \"1.0\",\r\n  \"missing\": false,\r\n  \"profile\": {\r\n    \"capacity_proxy\": [\r\n      \"avg_block_time_s\",\r\n      \"median_fee_native\"\r\n    ],\r\n    \"chain\": \"bitcoin\",\r\n    \"hidden_metrics\": [\r\n      \"gas_utilization_pct\",\r\n      \"failed_tx_rate\",\r\n      \"avg_gas_per_tx\",\r\n      \"median_gas_price\",\r\n      \"l2_burst_index\"\r\n    ],\r\n    \"id\": \"btc\",\r\n    \"label\": \"BTC\",\r\n    \"note\": \"BTC does not have EVM gas utilisation/failed-tx semantics; capacity is proxied by block time + fees.\",\r\n    \"type\": \"btc\"\r\n  },\r\n  \"publish_confidence\": {\r\n    \"confidence_score\": 0.8814984868132094,\r\n    \"eligible\": true,\r\n    \"missing\": false,\r\n    \"reason\": \"combined_confidence_threshold\",\r\n    \"threshold\": 0.4\r\n  },\r\n  \"publish_lag_days_policy\": 1,\r\n  \"regime\": {\r\n    \"asof_date\": \"2025-08-04\",\r\n    \"axes\": {\r\n      \"capacity\": {\r\n        \"band_high\": \"NORMAL\",\r\n        \"band_low\": \"NORMAL\",\r\n        \"trend\": \"HEATING\"\r\n      },\r\n      \"demand\": {\r\n        \"band_high\": \"HIGH\",\r\n        \"band_low\": \"NORMAL\",\r\n        \"trend\": \"COOLING\"\r\n      },\r\n      \"friction\": {\r\n        \"band_high\": \"NORMAL\",\r\n        \"band_low\": \"EXTREME_LOW\",\r\n        \"trend\": \"HEATING\"\r\n      }\r\n    },\r\n    \"chain\": \"bitcoin\",\r\n    \"determinism_hash\": \"643bad760b4a\",\r\n    \"drivers\": [\r\n      {\r\n        \"axis\": \"friction\",\r\n        \"current\": 2.58e-06,\r\n        \"metric\": \"median_tx_fee_native\",\r\n        \"momentum_7d_vs_30d\": 0.17950729270729288,\r\n        \"pct_90d\": 3.3333333333333335,\r\n        \"trend\": \"HEATING\",\r\n        \"z_robust\": -1.84897902097902\r\n      },\r\n      {\r\n        \"axis\": \"capacity\",\r\n        \"current\": 501.5470588235294,\r\n        \"metric\": \"avg_block_time_sec\",\r\n        \"momentum_7d_vs_30d\": 0.1791062035323625,\r\n        \"pct_90d\": 58.88888888888889,\r\n        \"trend\": \"HEATING\",\r\n        \"z_robust\": 1.1101172934747672\r\n      },\r\n      {\r\n        \"axis\": \"demand\",\r\n        \"current\": 443301.0,\r\n        \"metric\": \"tx_count_daily\",\r\n        \"momentum_7d_vs_30d\": -0.4160086068710703,\r\n        \"pct_90d\": 82.22222222222221,\r\n        \"trend\": \"COOLING\",\r\n        \"z_robust\": 0.697543180951343\r\n      }\r\n    ],\r\n    \"gate\": {\r\n      \"confidence_score\": 0.8814984868132094,\r\n      \"explanation\": \"OK\",\r\n      \"status\": \"ok\",\r\n      \"threshold\": 0.4,\r\n      \"type\": \"confidence_threshold\"\r\n    },\r\n    \"label\": \"HEATING\",\r\n    \"missing\": false,\r\n    \"ruleset_id\": \"btc_v1\",\r\n    \"signal_aliases\": {\r\n      \"blocktime_instability\": \"blocktime_instability\",\r\n      \"fee_burden_proxy\": \"median_tx_fee_native\",\r\n      \"tx_count\": \"tx_count_daily\"\r\n    },\r\n    \"signals\": {\r\n      \"avg_block_time_sec\": {\r\n        \"axis\": \"capacity\",\r\n        \"current\": 501.5470588235294,\r\n        \"momentum_7d_vs_30d\": 0.1791062035323625,\r\n        \"pct_90d\": 58.88888888888889,\r\n        \"z_robust\": 1.1101172934747672\r\n      },\r\n      \"blocktime_instability\": {\r\n        \"axis\": \"capacity\",\r\n        \"current\": 0.08647530224737689,\r\n        \"current_raw\": 501.5470588235294,\r\n        \"momentum_7d_vs_30d\": -1.333204909913668,\r\n        \"pct_90d\": 52.22222222222223,\r\n        \"transform\": {\r\n          \"formula\": \"rolling_mean(|bt - median_30| / median_30)\",\r\n          \"input_metric\": \"avg_block_time_sec\",\r\n          \"instability_rolling_median_days\": 30,\r\n          \"type\": \"instability_proxy\",\r\n          \"window_days\": 7\r\n        },\r\n        \"z_robust\": 0.10098414802623429\r\n      },\r\n      \"median_tx_fee_native\": {\r\n        \"axis\": \"friction\",\r\n        \"current\": 2.58e-06,\r\n        \"momentum_7d_vs_30d\": 0.17950729270729288,\r\n        \"pct_90d\": 3.3333333333333335,\r\n        \"z_robust\": -1.84897902097902\r\n      },\r\n      \"tx_count_daily\": {\r\n        \"axis\": \"demand\",\r\n        \"current\": 443301.0,\r\n        \"momentum_7d_vs_30d\": -0.4160086068710703,\r\n        \"pct_90d\": 82.22222222222221,\r\n        \"z_robust\": 0.697543180951343\r\n      }\r\n    },\r\n    \"window_days\": 7\r\n  },\r\n  \"scorecard\": {\r\n    \"asof_date\": \"2025-08-04\",\r\n    \"chain\": \"bitcoin\",\r\n    \"confidence_score\": 0.8814984868132094,\r\n    \"dimensions\": {\r\n      \"capacity\": {\r\n        \"components\": {\r\n          \"blocktime_instability\": {\r\n            \"current\": 501.5470588235294,\r\n            \"score_raw\": 52.30103706180089,\r\n            \"z\": 0.08638426258058929\r\n          },\r\n          \"utilization\": {\r\n            \"current\": null,\r\n            \"score_raw\": null,\r\n            \"z\": null\r\n          }\r\n        },\r\n        \"coverage_factor\": 0.5,\r\n        \"effective_confidence\": 0.4407492434066047,\r\n        \"level\": \"Balanced\",\r\n        \"score\": 51.014180344039296,\r\n        \"score_raw\": 52.30103706180089\r\n      },\r\n      \"demand\": {\r\n        \"components\": {\r\n          \"active_addresses\": {\r\n            \"current\": null,\r\n            \"score_raw\": null,\r\n            \"z\": null\r\n          },\r\n          \"tx_count\": {\r\n            \"current\": 443301.0,\r\n            \"score_raw\": 50.11759658084004,\r\n            \"z\": 0.004409884486551189\r\n          },\r\n          \"tx_per_user\": {\r\n            \"current\": null,\r\n            \"score_raw\": null,\r\n            \"z\": null\r\n          }\r\n        },\r\n        \"coverage_factor\": 0.3333333333333333,\r\n        \"effective_confidence\": 0.29383282893773643,\r\n        \"level\": \"Normal\",\r\n        \"score\": 50.034553736021635,\r\n        \"score_raw\": 50.11759658084004\r\n      },\r\n      \"friction\": {\r\n        \"components\": {\r\n          \"failed_tx_rate\": {\r\n            \"current\": null,\r\n            \"score_raw\": null,\r\n            \"z\": null\r\n          },\r\n          \"fee_burden_proxy\": {\r\n            \"current\": 0.002733630006357279,\r\n            \"score_raw\": null,\r\n            \"z\": null\r\n          }\r\n        },\r\n        \"coverage_factor\": 0.0,\r\n        \"effective_confidence\": 0.0,\r\n        \"level\": \"Normal\",\r\n        \"score\": 50.0,\r\n        \"score_raw\": null\r\n      }\r\n    },\r\n    \"missing\": false,\r\n    \"notes\": {\r\n      \"interpretation\": \"Scores are 0\u2013100. 50 is neutral vs the chain's own history. Higher Demand means hotter usage; higher Friction means higher cost/failure; higher Capacity means tighter capacity (pressure). Low confidence pulls scores toward 50.\"\r\n    },\r\n    \"window_days\": 7\r\n  },\r\n  \"status\": {\r\n    \"color\": \"yellow\",\r\n    \"label\": \"HEATING\",\r\n    \"one_liner\": \"Demand: Normal; Friction: Normal; Capacity: Balanced\"\r\n  },\r\n  \"tier_used\": \"standard\",\r\n  \"updated_through\": \"2025-08-04\"\r\n}",
+    derived: "{\r\n  \"chain\": \"bitcoin\",\r\n  \"date\": \"2025-08-04\",\r\n  \"derived\": {\r\n    \"metrics\": {\r\n      \"avg_block_time_sec__ma30\": 581.33,\r\n      \"avg_block_time_sec__ma7\": 593.48,\r\n      \"tx_count_daily__ma30\": 419160.8,\r\n      \"tx_count_daily__ma7\": 385202.3\r\n    }\r\n  }\r\n}",
+    meta: "{\r\n  \"chain\": \"bitcoin\",\r\n  \"date\": \"2025-08-04\",\r\n  \"status\": {\r\n    \"label\": \"HEATING\",\r\n    \"one_liner\": \"Demand: Normal; Friction: Normal; Capacity: Balanced\"\r\n  },\r\n  \"confidence\": {\r\n    \"confidence_score\": 0.881\r\n  },\r\n  \"regime\": {\r\n    \"label\": \"HEATING\",\r\n    \"determinism_hash\": \"643bad760b4a\"\r\n  }\r\n}",
   },
   degraded: {
-    gold: "{\r\n  \"avg_block_time_sec\": 12.104245481294662,\r\n  \"block_count_daily\": 7138.0,\r\n  \"chain\": \"ethereum\",\r\n  \"date\": \"2025-10-31\",\r\n  \"failed_tx_rate\": 0.00993636650356173,\r\n  \"gas_utilization_pct\": 0.5052361285699967,\r\n  \"median_tx_fee_native\": 21365980740280.0,\r\n  \"median_tx_value_native\": 0.0,\r\n  \"tx_count_daily\": 1639231.0,\r\n  \"unique_active_addresses\": 626214.0,\r\n  \"value_transferred_native\": 2.0907466952427015e+24\r\n}",
-    derived: "{\r\n  \"chain\": \"ethereum\",\r\n  \"date\": \"2025-10-31\",\r\n  \"derived\": {\r\n    \"context_blocks\": [],\r\n    \"meta_confidence\": {\r\n      \"confidence_score\": 7.0877482920015104e-06\r\n    },\r\n    \"metrics\": {\r\n      \"avg_block_time_sec__ma30\": 12.090554756211151,\r\n      \"avg_block_time_sec__ma7\": 12.093860040671455,\r\n      \"block_count_daily__ma30\": 7146.1,\r\n      \"block_count_daily__ma7\": 7144.142857142857,\r\n      \"failed_tx_rate__ma30\": 0.01234620437915091,\r\n      \"failed_tx_rate__ma7\": 0.011295048012655785,\r\n      \"gas_utilization_pct__ma30\": 0.5057383918344892,\r\n      \"gas_utilization_pct__ma7\": 0.5058066225410289,\r\n      \"median_tx_fee_native__ma30\": 35024361818120.684,\r\n      \"median_tx_fee_native__ma7\": 25816374622394.5,\r\n      \"median_tx_value_native__ma30\": 0.0,\r\n      \"median_tx_value_native__ma7\": 0.0,\r\n      \"tx_count_daily__ma30\": 1543554.5,\r\n      \"tx_count_daily__ma7\": 1518639.5714285714,\r\n      \"unique_active_addresses__ma30\": 567855.2333333333,\r\n      \"unique_active_addresses__ma7\": 550836.4285714285,\r\n      \"value_transferred_native__ma30\": 1.9598105785328078e+24,\r\n      \"value_transferred_native__ma7\": 1.744172500085652e+24\r\n    }\r\n  }\r\n}",
-    meta: "{\r\n  \"chain\": \"ethereum\",\r\n  \"confidence\": {\r\n    \"asof_date\": \"2025-10-31\",\r\n    \"chain\": \"ethereum\",\r\n    \"components\": {\r\n      \"current_row_coverage\": 1.0,\r\n      \"freshness_asof\": 1.0,\r\n      \"history_depth\": 1.0,\r\n      \"recent_density\": 1.0,\r\n      \"recent_metric_coverage\": 1.0\r\n    },\r\n    \"confidence_score\": 0.39485430850662095,\r\n    \"data_quality_score\": 1.0,\r\n    \"date\": \"2025-10-31\",\r\n    \"label_confidence_score\": 0.15590992494624178,\r\n    \"lag_days_vs_asof_date\": 0,\r\n    \"lag_days_vs_utc_today\": 146,\r\n    \"missing\": false,\r\n    \"semantics\": \"combined_data_quality_and_label_stability\",\r\n    \"source\": \"gold_history\",\r\n    \"updated_through\": \"2025-10-31\"\r\n  },\r\n  \"data_confidence\": {\r\n    \"components\": {\r\n      \"current_row_coverage\": 1.0,\r\n      \"freshness_asof\": 1.0,\r\n      \"history_depth\": 1.0,\r\n      \"recent_density\": 1.0,\r\n      \"recent_metric_coverage\": 1.0\r\n    },\r\n    \"confidence_score\": 1.0,\r\n    \"date\": \"2025-10-31\",\r\n    \"lag_days_vs_asof_date\": 0,\r\n    \"lag_days_vs_utc_today\": 146,\r\n    \"missing\": false,\r\n    \"semantics\": \"data_quality_and_history_coverage_only\"\r\n  },\r\n  \"date\": \"2025-10-31\",\r\n  \"gold_status\": {\r\n    \"chain\": \"ethereum\",\r\n    \"features_lag_days_vs_utc_today\": null,\r\n    \"features_last_date\": \"2026-03-25\",\r\n    \"missing\": false,\r\n    \"note\": \"Fallback status derived from gold JSON (no pipeline ml_status present).\"\r\n  },\r\n  \"methodology_version\": \"1.0\",\r\n  \"missing\": false,\r\n  \"profile\": {\r\n    \"capacity_proxy\": [\r\n      \"gas_utilization_pct\"\r\n    ],\r\n    \"chain\": \"ethereum\",\r\n    \"hidden_metrics\": [],\r\n    \"id\": \"eth_l1\",\r\n    \"label\": \"ETH L1\",\r\n    \"note\": null,\r\n    \"type\": \"eth_l1\"\r\n  },\r\n  \"publish_confidence\": {\r\n    \"confidence_score\": 0.39485430850662095,\r\n    \"eligible\": false,\r\n    \"missing\": false,\r\n    \"reason\": \"combined_confidence_threshold\",\r\n    \"threshold\": 0.4\r\n  },\r\n  \"publish_lag_days_policy\": 1,\r\n  \"regime\": {\r\n    \"asof_date\": \"2025-10-31\",\r\n    \"axes\": {\r\n      \"capacity\": {\r\n        \"band_high\": \"EXTREME_HIGH\",\r\n        \"band_low\": \"NORMAL\",\r\n        \"trend\": \"FLAT\"\r\n      },\r\n      \"demand\": {\r\n        \"band_high\": \"NORMAL\",\r\n        \"band_low\": \"NORMAL\",\r\n        \"trend\": \"COOLING\"\r\n      },\r\n      \"friction\": {\r\n        \"band_high\": \"NORMAL\",\r\n        \"band_low\": \"EXTREME_LOW\",\r\n        \"trend\": \"COOLING\"\r\n      }\r\n    },\r\n    \"chain\": \"ethereum\",\r\n    \"determinism_hash\": null,\r\n    \"drivers\": [\r\n      {\r\n        \"axis\": \"friction\",\r\n        \"current\": 0.00993636650356173,\r\n        \"metric\": \"failed_tx_rate\",\r\n        \"momentum_7d_vs_30d\": -0.3373479182466129,\r\n        \"pct_90d\": 2.2222222222222223,\r\n        \"trend\": \"COOLING\",\r\n        \"z_robust\": -1.5925891090898399\r\n      },\r\n      {\r\n        \"axis\": \"capacity\",\r\n        \"current\": 12.104245481294662,\r\n        \"metric\": \"avg_block_time_sec\",\r\n        \"momentum_7d_vs_30d\": 0.08257263178373264,\r\n        \"pct_90d\": 92.22222222222223,\r\n        \"trend\": \"FLAT\",\r\n        \"z_robust\": 1.0975982468123864\r\n      },\r\n      {\r\n        \"axis\": \"friction\",\r\n        \"current\": 21365980740280.0,\r\n        \"metric\": \"median_tx_fee_native\",\r\n        \"momentum_7d_vs_30d\": -0.26682300117906577,\r\n        \"pct_90d\": 7.777777777777778,\r\n        \"trend\": \"COOLING\",\r\n        \"z_robust\": -0.8998905665304365\r\n      }\r\n    ],\r\n    \"gate\": {\r\n      \"confidence_score\": 0.39485430850662095,\r\n      \"explanation\": \"Confidence is below the product threshold; regime is withheld to avoid overclaiming.\",\r\n      \"status\": \"gated\",\r\n      \"threshold\": 0.4,\r\n      \"type\": \"confidence_threshold\"\r\n    },\r\n    \"label\": \"UNKNOWN/DEGRADED\",\r\n    \"missing\": false,\r\n    \"ruleset_id\": \"eth_l1_v1\",\r\n    \"signal_aliases\": {\r\n      \"active_addresses\": \"unique_active_addresses\",\r\n      \"blocktime_instability\": \"blocktime_instability\",\r\n      \"failed_tx_rate\": \"failed_tx_rate\",\r\n      \"fee_burden_proxy\": \"median_tx_fee_native\",\r\n      \"tx_count\": \"tx_count_daily\",\r\n      \"utilization\": \"gas_utilization_pct\"\r\n    },\r\n    \"signals\": {\r\n      \"avg_block_time_sec\": {\r\n        \"axis\": \"capacity\",\r\n        \"current\": 12.104245481294662,\r\n        \"momentum_7d_vs_30d\": 0.08257263178373264,\r\n        \"pct_90d\": 92.22222222222223,\r\n        \"z_robust\": 1.0975982468123864\r\n      },\r\n      \"blocktime_instability\": {\r\n        \"axis\": \"capacity\",\r\n        \"current\": 0.0012207903060994611,\r\n        \"current_raw\": 12.104245481294662,\r\n        \"momentum_7d_vs_30d\": 0.6376673246437248,\r\n        \"pct_90d\": 57.77777777777777,\r\n        \"transform\": {\r\n          \"formula\": \"rolling_mean(|bt - median_30| / median_30)\",\r\n          \"input_metric\": \"avg_block_time_sec\",\r\n          \"instability_rolling_median_days\": 30,\r\n          \"type\": \"instability_proxy\",\r\n          \"window_days\": 7\r\n        },\r\n        \"z_robust\": 0.2795487726786902\r\n      },\r\n      \"failed_tx_rate\": {\r\n        \"axis\": \"friction\",\r\n        \"current\": 0.00993636650356173,\r\n        \"momentum_7d_vs_30d\": -0.3373479182466129,\r\n        \"pct_90d\": 2.2222222222222223,\r\n        \"z_robust\": -1.5925891090898399\r\n      },\r\n      \"gas_utilization_pct\": {\r\n        \"axis\": \"capacity\",\r\n        \"current\": 0.5052361285699967,\r\n        \"momentum_7d_vs_30d\": 0.07165370650721037,\r\n        \"pct_90d\": 54.44444444444444,\r\n        \"z_robust\": 0.14030892394212788\r\n      },\r\n      \"median_tx_fee_native\": {\r\n        \"axis\": \"friction\",\r\n        \"current\": 21365980740280.0,\r\n        \"momentum_7d_vs_30d\": -0.26682300117906577,\r\n        \"pct_90d\": 7.777777777777778,\r\n        \"z_robust\": -0.8998905665304365\r\n      },\r\n      \"tx_count_daily\": {\r\n        \"axis\": \"demand\",\r\n        \"current\": 1639231.0,\r\n        \"momentum_7d_vs_30d\": -0.13602482766475735,\r\n        \"pct_90d\": 55.55555555555556,\r\n        \"z_robust\": 0.6685053907701274\r\n      },\r\n      \"unique_active_addresses\": {\r\n        \"axis\": \"demand\",\r\n        \"current\": 626214.0,\r\n        \"momentum_7d_vs_30d\": -0.22736009451375067,\r\n        \"pct_90d\": 61.111111111111114,\r\n        \"z_robust\": 0.8567415130028323\r\n      }\r\n    },\r\n    \"window_days\": 7\r\n  },\r\n  \"scorecard\": {\r\n    \"asof_date\": \"2025-10-31\",\r\n    \"chain\": \"ethereum\",\r\n    \"confidence_score\": 0.39485430850662095,\r\n    \"dimensions\": {\r\n      \"capacity\": {\r\n        \"components\": {\r\n          \"blocktime_instability\": {\r\n            \"current\": 12.104245481294662,\r\n            \"score_raw\": 73.01453622835903,\r\n            \"z\": 0.9832556456573041\r\n          },\r\n          \"utilization\": {\r\n            \"current\": 0.5052361285699967,\r\n            \"score_raw\": 64.18208618123839,\r\n            \"z\": 0.5559613166272827\r\n          }\r\n        },\r\n        \"coverage_factor\": 1.0,\r\n        \"effective_confidence\": 0.39485430850662095,\r\n        \"level\": \"Balanced\",\r\n        \"score\": 57.14987159039645,\r\n        \"score_raw\": 68.10761953551423\r\n      },\r\n      \"demand\": {\r\n        \"components\": {\r\n          \"active_addresses\": {\r\n            \"current\": 626214.0,\r\n            \"score_raw\": 59.32581634925137,\r\n            \"z\": 0.3562696685977832\r\n          },\r\n          \"tx_count\": {\r\n            \"current\": 1639231.0,\r\n            \"score_raw\": 72.89493716939627,\r\n            \"z\": 0.9765683839958376\r\n          },\r\n          \"tx_per_user\": {\r\n            \"current\": 2.6176850086392194,\r\n            \"score_raw\": 73.1508842211597,\r\n            \"z\": 0.990921503421628\r\n          }\r\n        },\r\n        \"coverage_factor\": 1.0,\r\n        \"effective_confidence\": 0.39485430850662095,\r\n        \"level\": \"Normal\",\r\n        \"score\": 57.15553016233507,\r\n        \"score_raw\": 68.12195031984837\r\n      },\r\n      \"friction\": {\r\n        \"components\": {\r\n          \"failed_tx_rate\": {\r\n            \"current\": 0.00993636650356173,\r\n            \"score_raw\": 18.074241587054182,\r\n            \"z\": -1.6402166327167427\r\n          },\r\n          \"fee_burden_proxy\": {\r\n            \"current\": null,\r\n            \"score_raw\": null,\r\n            \"z\": null\r\n          }\r\n        },\r\n        \"coverage_factor\": 0.5,\r\n        \"effective_confidence\": 0.19742715425331048,\r\n        \"level\": \"Normal\",\r\n        \"score\": 43.69698836915342,\r\n        \"score_raw\": 18.074241587054182\r\n      }\r\n    },\r\n    \"missing\": false,\r\n    \"notes\": {\r\n      \"interpretation\": \"Scores are 0\u2013100. 50 is neutral vs the chain's own history. Higher Demand means hotter usage; higher Friction means higher cost/failure; higher Capacity means tighter capacity (pressure). Low confidence pulls scores toward 50.\"\r\n    },\r\n    \"window_days\": 7\r\n  },\r\n  \"status\": {\r\n    \"color\": \"gray\",\r\n    \"label\": \"UNKNOWN/DEGRADED\",\r\n    \"one_liner\": \"Confidence is below the product threshold; regime is withheld to avoid overclaiming.\"\r\n  },\r\n  \"tier_used\": \"standard\",\r\n  \"updated_through\": \"2025-10-31\"\r\n}",
+    gold: "{\r\n  \"avg_block_time_sec\": 12.10,\r\n  \"block_count_daily\": 7138.0,\r\n  \"chain\": \"ethereum\",\r\n  \"date\": \"2025-10-31\",\r\n  \"failed_tx_rate\": 0.00993,\r\n  \"gas_utilization_pct\": 0.505,\r\n  \"median_tx_fee_native\": 21365980740280.0,\r\n  \"tx_count_daily\": 1639231.0,\r\n  \"unique_active_addresses\": 626214.0\r\n}",
+    derived: "{\r\n  \"chain\": \"ethereum\",\r\n  \"date\": \"2025-10-31\",\r\n  \"derived\": {\r\n    \"meta_confidence\": {\r\n      \"confidence_score\": 7.09e-06\r\n    },\r\n    \"metrics\": {\r\n      \"tx_count_daily__ma30\": 1543554.5,\r\n      \"tx_count_daily__ma7\": 1518639.6\r\n    }\r\n  }\r\n}",
+    meta: "{\r\n  \"chain\": \"ethereum\",\r\n  \"date\": \"2025-10-31\",\r\n  \"status\": {\r\n    \"label\": \"UNKNOWN/DEGRADED\",\r\n    \"one_liner\": \"Evidence support is insufficient for a confident label.\"\r\n  },\r\n  \"confidence\": {\r\n    \"confidence_score\": 0.031\r\n  },\r\n  \"regime\": {\r\n    \"label\": \"UNKNOWN/DEGRADED\",\r\n    \"determinism_hash\": \"5cb1a90073aa\"\r\n  }\r\n}",
   },
 };
 
-const labelClass = (label: Label) => label === "STABLE" ? "ua-vf-stable" : label === "HEATING" ? "ua-vf-heating" : label === "CONGESTED" ? "ua-vf-congested" : label === "CHEAP" ? "ua-vf-cheap" : "ua-vf-unknown";
-const compactLabel = (label: Label) => label === "UNKNOWN/DEGRADED" ? "UNKNOWN" : label;
-const highlightJson = (json: string) => json.replace(/("[^"\\]*(?:\\.[^"\\]*)*"\s*:)/g, '<span class="key">$1</span>').replace(/:\s*("[^"\\]*(?:\\.[^"\\]*)*")/g, ': <span class="str">$1</span>').replace(/:\s*(-?\d+(?:\.\d+)?)/g, ': <span class="num">$1</span>');
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-function Sparkline({ values, color = "var(--gold2)" }: { values: number[]; color?: string }) {
-  const path = values.map((value, index) => {
-    const x = (index / Math.max(1, values.length - 1)) * 116;
-    const y = 30 - (Math.max(0, Math.min(100, value)) / 100) * 26;
-    return `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
-  }).join(" ");
-  return <svg className="ua-vf-spark" viewBox="0 0 116 32" aria-hidden="true"><path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" /></svg>;
+function labelClass(label: Label): string {
+  if (label === "STABLE") return "ua-vf-label--stable";
+  if (label === "HEATING") return "ua-vf-label--heating";
+  if (label === "CONGESTED") return "ua-vf-label--congested";
+  if (label === "CHEAP") return "ua-vf-label--cheap";
+  return "ua-vf-label--unknown";
 }
 
-function Reveal({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`ua-vf-reveal ${className}`}>{children}</div>;
+function compactLabel(label: Label): string {
+  if (label === "UNKNOWN/DEGRADED") return "UNKNOWN";
+  return label;
 }
 
-export default function UrdAtlasVFinalLandingClient() {
-  const [briefChain, setBriefChain] = useState<ChainKey>("btc");
+function highlightJson(raw: string): string {
+  return raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/("(?:[^"\\]|\\.)*")(\s*:)/g, '<span class="ua-vf-jk">$1</span>$2')
+    .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="ua-vf-js">$1</span>')
+    .replace(/:\s*(-?\d[\d.e+\-]*)/gi, ': <span class="ua-vf-jn">$1</span>')
+    .replace(/:\s*(null|true|false)/g, ': <span class="ua-vf-jb">$1</span>');
+}
+
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const h = 28;
+  const w = 80;
+  const pts = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - ((v - min) / range) * h;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="ua-vf-spark">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function Reveal({ children }: { children: ReactNode }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
+      { threshold: 0.1 }
+    );
+    const el = document.querySelector(".ua-vf-reveal-sentinel-" + Math.random().toString(36).slice(2));
+    if (el) observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return <div className={`ua-vf-reveal ${visible ? "is-visible" : ""}`}>{children}</div>;
+}
+
+function Price({
+  title, price, period = "", note, features, cta, href, featured = false,
+}: {
+  title: string; price: string; period?: string; note: string;
+  features: string[]; cta: string; href: string; featured?: boolean;
+}) {
+  return (
+    <article className={`ua-vf-price-card ${featured ? "is-featured" : ""}`}>
+      <h3>{title}</h3>
+      <div className="ua-vf-price">{price} {period ? <span>{period}</span> : null}</div>
+      <p>{note}</p>
+      <ul>{features.map((f) => <li key={f}>{f}</li>)}</ul>
+      <Link href={href} className={featured ? "ua-vf-btn-primary" : "ua-vf-btn-ghost"}>{cta}</Link>
+    </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+type Props = {
+  chains: LandingChainData[];
+  briefs: Record<string, LandingBriefData>;
+  updatedThrough: string;
+};
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export default function UrdAtlasVFinalLandingClient({ chains, briefs, updatedThrough }: Props) {
+  const [progress, setProgress] = useState(0);
+  const [miniVisible, setMiniVisible] = useState(false);
+  const [briefChain, setBriefChain] = useState<string>(chains[0]?.key ?? "btc");
   const [jsonLayer, setJsonLayer] = useState<JsonLayer>("meta");
   const [confidenceMode, setConfidenceMode] = useState<ConfidenceMode>("high");
   const [modalOpen, setModalOpen] = useState(false);
-  const [miniVisible, setMiniVisible] = useState(false);
-  const [progress, setProgress] = useState(0);
 
-  const selectedJson = useMemo(() => JSON_EXAMPLES[confidenceMode][jsonLayer], [confidenceMode, jsonLayer]);
+  const selectedJson = useMemo(
+    () => JSON_EXAMPLES[confidenceMode][jsonLayer] ?? "",
+    [confidenceMode, jsonLayer]
+  );
 
   useEffect(() => {
-    const revealItems = Array.from(document.querySelectorAll<HTMLElement>(".ua-vf-reveal"));
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-visible");
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.14 });
+    const revealItems = document.querySelectorAll(".ua-vf-reveal");
+    const observer = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add("is-visible"); }),
+      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
+    );
     revealItems.forEach((item) => observer.observe(item));
     return () => observer.disconnect();
   }, []);
@@ -90,22 +182,279 @@ export default function UrdAtlasVFinalLandingClient() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const currentBrief = briefs[briefChain] ?? Object.values(briefs)[0];
+
   return (
     <main className="ua-vf">
       <div className="ua-vf-progress" style={{ width: `${progress}%` }} />
-      <section className="ua-vf-hero" id="top"><div className="ua-vf-shell ua-vf-hero-grid"><div className="ua-vf-hero-copy ua-vf-reveal is-visible"><div className="ua-vf-eyebrow">Daily on-chain reference data</div><h1 className="ua-vf-h1">Separate blockchain <em>noise</em> from structural change.</h1><p>Daily Gold, Derived, Meta, and Brief JSON for BTC, ETH, ARB, and BASE. Use it directly, or join regime context to your own data by chain and date.</p><div className="ua-vf-btn-row"><a href="#json" className="ua-vf-btn-primary">Inspect JSON</a><a href="#brief" className="ua-vf-btn-ghost">Read latest Brief</a><Link href="/tour" className="ua-vf-text-link">New to Urd Atlas? Take the quick tour →</Link></div><div className="ua-vf-trustline"><span>No price data</span><span>No forecasts</span><span>No recommendations</span></div></div><aside className="ua-vf-context-panel ua-vf-reveal is-visible"><div className="ua-vf-panel-head"><div><div className="ua-vf-panel-title">Latest Published Context</div><div className="ua-vf-muted ua-vf-mono">chain-relative, not price-relative</div></div><div className="ua-vf-panel-date">Updated through<br />10 May 2026</div></div><div className="ua-vf-chain-list">{CHAINS.map((row) => <Link key={row.key} href={`/chains/${row.key === "btc" ? "bitcoin" : row.key === "eth" ? "ethereum" : row.key === "arb" ? "arbitrum" : "base"}`} className="ua-vf-chain-row"><div className="ua-vf-chain-icon">{row.icon}</div><div className="ua-vf-chain-short">{row.label}</div><div><span className={`ua-vf-label ${labelClass(row.regime)}`}>{compactLabel(row.regime)}</span><span className="ua-vf-row-one-liner">{row.oneLiner}</span></div><div className="ua-vf-conf">{row.confidence}</div><Sparkline values={row.path} color={row.regime === "HEATING" ? "var(--c-heating)" : row.regime === "CHEAP" ? "var(--c-cheap)" : row.regime === "UNKNOWN/DEGRADED" ? "var(--c-unknown)" : "var(--c-stable)"} /></Link>)}</div><div className="ua-vf-context-foot"><span>Daily cadence</span><div className="ua-vf-context-links"><Link href="/briefs" className="ua-vf-text-link">Read weekly brief →</Link><Link href="/track-record" className="ua-vf-text-link">View history →</Link></div></div></aside></div></section>
-      <nav className={`ua-vf-mini ${miniVisible ? "show" : ""}`}><div className="ua-vf-mini-inner"><a href="#brief">Brief</a><a href="#json">JSON</a><a href="#methodology">Methodology</a><a href="#pricing">Pricing</a></div></nav>
-      <section className="ua-vf-kpis"><div className="ua-vf-shell ua-vf-kpi-grid"><div className="ua-vf-kpi"><strong>526</strong><span>published pipeline days</span></div><div className="ua-vf-kpi"><strong>4</strong><span>chains covered</span></div><div className="ua-vf-kpi"><strong>v1</strong><span>methodology version</span></div><div className="ua-vf-kpi"><strong>0</strong><span>price fields</span></div><div className="ua-vf-kpi"><strong>Daily</strong><span>not intraday</span></div></div></section>
-      <section className="ua-vf-section"><div className="ua-vf-shell"><Reveal><div className="ua-vf-section-head"><div className="ua-vf-eyebrow">Use path</div><div><h2 className="ua-vf-h2">Two ways into the same published layer.</h2><p className="ua-vf-section-lead">The same daily data product supports a pipeline workflow and a direct reading workflow.</p></div></div><div className="ua-vf-path-grid"><div className="ua-vf-path"><h3>Have your own pipeline?</h3><p>Join Urd Atlas rows to your own daily rows by chain and date. Add regime, confidence, drivers, and provenance to existing analysis.</p><a className="ua-vf-text-link" href="#json">Inspect JSON structure →</a></div><div className="ua-vf-path-divider" /><div className="ua-vf-path"><h3>No pipeline?</h3><p>Read published Briefs directly. The Brief layer summarizes what changed, what drove it, and how stable the latest label has been.</p><a className="ua-vf-text-link" href="#brief">Read the Brief preview →</a></div></div></Reveal></div></section>
-      <section className="ua-vf-section" id="brief"><div className="ua-vf-shell"><Reveal><div className="ua-vf-section-head"><div className="ua-vf-eyebrow">Brief preview</div><div><h2 className="ua-vf-h2">Readable context from the same deterministic labels.</h2><p className="ua-vf-section-lead">Briefs are the direct-use layer for users who want published context without building their own pipeline.</p></div></div><div className="ua-vf-brief-layout"><div><div className="ua-vf-brief-tabs">{(Object.keys(BRIEFS) as ChainKey[]).map((key) => <button type="button" key={key} onClick={() => setBriefChain(key)} className={`ua-vf-tab ${briefChain === key ? "is-active" : ""}`}>{key.toUpperCase()}</button>)}</div><p className="ua-vf-muted">Switch chains to see how the same Brief structure carries different label paths and confidence states.</p></div><article className="ua-vf-brief-doc"><div className="ua-vf-meta-label">{BRIEFS[briefChain].title} · latest 7 published days</div><h3 className="ua-vf-brief-headline">{BRIEFS[briefChain].headline}</h3><div className="ua-vf-regime-path">{BRIEFS[briefChain].path.map((label, index) => <span key={`${label}-${index}`} className={labelClass(label)}>D{index + 1} {compactLabel(label)}</span>)}</div><p className="ua-vf-muted">{BRIEFS[briefChain].plain}</p><div className="ua-vf-brief-metrics"><div className="ua-vf-brief-metric"><strong className={labelClass(BRIEFS[briefChain].dominant)}>{compactLabel(BRIEFS[briefChain].dominant)}</strong><span>dominant label</span></div><div className="ua-vf-brief-metric"><strong>{BRIEFS[briefChain].confidence}</strong><span>confidence score</span></div><div className="ua-vf-brief-metric"><strong>{BRIEFS[briefChain].changes}</strong><span>label changes</span></div><div className="ua-vf-brief-metric"><strong>{BRIEFS[briefChain].run}</strong><span>latest run days</span></div></div></article></div></Reveal></div></section>
-      <section className="ua-vf-section" id="json"><div className="ua-vf-shell"><Reveal><div className="ua-vf-section-head"><div className="ua-vf-eyebrow">JSON inspector</div><div><h2 className="ua-vf-h2">Inspect the complete file, not a marketing excerpt.</h2><p className="ua-vf-section-lead">Switch between complete high-confidence and degraded Gold, Derived, and Meta files from the supplied v1 archive.</p></div></div><div className="ua-vf-json-layout"><aside className="ua-vf-json-side"><div className="ua-vf-meta-label">Confidence example</div><div className="ua-vf-conf-tabs"><button type="button" onClick={() => setConfidenceMode("high")} className={`ua-vf-tab ${confidenceMode === "high" ? "is-active" : ""}`}>High confidence</button><button type="button" onClick={() => setConfidenceMode("degraded")} className={`ua-vf-tab ${confidenceMode === "degraded" ? "is-active" : ""}`}>Degraded</button></div><div className="ua-vf-meta-label">Layer</div><div className="ua-vf-json-tabs">{(["gold","derived","meta"] as JsonLayer[]).map((layer) => <button type="button" key={layer} onClick={() => setJsonLayer(layer)} className={`ua-vf-tab ${jsonLayer === layer ? "is-active" : ""}`}>{layer}</button>)}</div><p className="ua-vf-json-note">The uploaded v1.zip contains Gold, Derived, and Meta files. Brief JSON files were not present in that archive, so this inspector only shows complete files that exist in the source package.</p><button type="button" className="ua-vf-btn-primary" onClick={() => setModalOpen(true)}>Open complete JSON</button></aside><div className="ua-vf-json-shell"><div className="ua-vf-code-toolbar"><span>{confidenceMode}/{jsonLayer}.json</span><button type="button" className="ua-vf-text-link" onClick={() => navigator.clipboard?.writeText(selectedJson)}>Copy complete JSON</button></div><pre className="ua-vf-code" dangerouslySetInnerHTML={{ __html: highlightJson(selectedJson) }} /></div></div></Reveal></div></section>
-      <section className="ua-vf-section" id="methodology"><div className="ua-vf-shell"><Reveal><div className="ua-vf-section-head"><div className="ua-vf-eyebrow">Trust</div><div><h2 className="ua-vf-h2">Built to be checked, not trusted blindly.</h2></div></div><div className="ua-vf-trust-row"><div className="ua-vf-trust-item"><strong>Daily, not intraday</strong><span>Daily cadence filters transient variance before labels are published.</span></div><div className="ua-vf-trust-item"><strong>No price data</strong><span>Labels describe network conditions only.</span></div><div className="ua-vf-trust-item"><strong>Hash anchored</strong><span>Every published row includes deterministic provenance.</span></div><div className="ua-vf-trust-item"><strong>UNKNOWN allowed</strong><span>Weak evidence is not forced into strong labels.</span></div><div className="ua-vf-trust-item"><strong>Public samples</strong><span>JSON structure can be inspected before subscribing.</span></div></div><div className="ua-vf-faq ua-vf-faq-spaced"><details><summary>Why daily, not intraday?</summary><p>Regime context is about structural network conditions. Intraday spikes are more likely to reflect transient variance than durable state.</p></details><details><summary>How are labels determined?</summary><p>Labels are derived from documented demand, friction, and capacity evidence with deterministic rules and confidence gates.</p></details><details><summary>Do labels use price data?</summary><p>No. Urd Atlas publishes network-condition reference data. Price data, forecasts, and recommendations are excluded.</p></details></div></Reveal></div></section>
-      <section className="ua-vf-section" id="pricing"><div className="ua-vf-shell"><Reveal><div className="ua-vf-section-head"><div className="ua-vf-eyebrow">Pricing</div><div><h2 className="ua-vf-h2">Simple access to the published layer.</h2></div></div><div className="ua-vf-pricing-grid"><Price title="Free" price="$0" note="Public charts, samples, limited history." cta="Start free" href="/status" features={["Public chain context", "Sample JSON", "Methodology docs"]} /><Price title="Single Chain" price="$49" period="/mo" note="One chain with full daily JSON." cta="Choose a chain" href="/api/v1/checkout?plan=basic" features={["Gold, Derived, Meta, Brief", "Historical access", "Email support"]} /><Price title="Full Access" price="$149" period="/mo" note="All supported chains and cross-chain Briefs." cta="Get full access" href="/api/v1/checkout?plan=pro" featured features={["BTC, ETH, ARB, BASE", "Cross-chain Briefs", "Published archive"]} /></div></Reveal></div></section>
-      <div className={`ua-vf-modal ${modalOpen ? "is-open" : ""}`} role="dialog" aria-modal="true"><div className="ua-vf-modal-panel"><div className="ua-vf-modal-head"><div className="ua-vf-modal-title">Complete JSON · {confidenceMode}/{jsonLayer}</div><button className="ua-vf-modal-close" type="button" onClick={() => setModalOpen(false)}>Close</button></div><pre className="ua-vf-code" dangerouslySetInnerHTML={{ __html: highlightJson(selectedJson) }} /></div></div>
+
+      {/* ── HERO ── */}
+      <section className="ua-vf-hero" id="top">
+        <div className="ua-vf-shell ua-vf-hero-grid">
+          <div className="ua-vf-hero-copy ua-vf-reveal is-visible">
+            <div className="ua-vf-eyebrow">Daily on-chain reference data</div>
+            <h1 className="ua-vf-h1">Separate blockchain <em>noise</em> from structural change.</h1>
+            <p>Daily Gold, Derived, Meta, and Brief JSON for BTC, ETH, ARB, and BASE. Use it directly, or join regime context to your own data by chain and date.</p>
+            <div className="ua-vf-btn-row">
+              <a href="#json" className="ua-vf-btn-primary">Inspect JSON</a>
+              <a href="#brief" className="ua-vf-btn-ghost">Read latest Brief</a>
+              <Link href="/tour" className="ua-vf-text-link">New to Urd Atlas? Take the quick tour →</Link>
+            </div>
+            <div className="ua-vf-trustline">
+              <span>No price data</span><span>No forecasts</span><span>No recommendations</span>
+            </div>
+          </div>
+
+          <aside className="ua-vf-context-panel ua-vf-reveal is-visible">
+            <div className="ua-vf-panel-head">
+              <div>
+                <div className="ua-vf-panel-title">Latest Published Context</div>
+                <div className="ua-vf-muted ua-vf-mono">chain-relative, not price-relative</div>
+              </div>
+              <div className="ua-vf-panel-date">
+                Updated through<br />{updatedThrough}
+              </div>
+            </div>
+            <div className="ua-vf-chain-list">
+              {chains.map((row) => (
+                <Link
+                  key={row.key}
+                  href={`/chains/${row.chainId}`}
+                  className="ua-vf-chain-row"
+                >
+                  <div className="ua-vf-chain-icon">{row.icon}</div>
+                  <div className="ua-vf-chain-short">{row.label}</div>
+                  <div>
+                    <span className={`ua-vf-label ${labelClass(row.regime)}`}>{compactLabel(row.regime)}</span>
+                    <span className="ua-vf-row-one-liner">{row.oneLiner}</span>
+                  </div>
+                  <div className="ua-vf-conf">{row.confidence}</div>
+                  <Sparkline
+                    values={row.path}
+                    color={
+                      row.regime === "HEATING" ? "var(--c-heating)" :
+                      row.regime === "CHEAP" ? "var(--c-cheap)" :
+                      row.regime === "UNKNOWN/DEGRADED" ? "var(--c-unknown)" :
+                      "var(--c-stable)"
+                    }
+                  />
+                </Link>
+              ))}
+            </div>
+            <div className="ua-vf-context-foot">
+              <span>Daily cadence</span>
+              <div className="ua-vf-context-links">
+                <Link href="/briefs" className="ua-vf-text-link">Read weekly brief →</Link>
+                <Link href="/track-record" className="ua-vf-text-link">View history →</Link>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      {/* ── MINI NAV ── */}
+      <nav className={`ua-vf-mini ${miniVisible ? "show" : ""}`}>
+        <div className="ua-vf-mini-inner">
+          <a href="#brief">Brief</a>
+          <a href="#json">JSON</a>
+          <a href="#methodology">Methodology</a>
+          <a href="#pricing">Pricing</a>
+        </div>
+      </nav>
+
+      {/* ── KPIs ── */}
+      <section className="ua-vf-kpis">
+        <div className="ua-vf-shell ua-vf-kpi-grid">
+          <div className="ua-vf-kpi"><strong>526</strong><span>published pipeline days</span></div>
+          <div className="ua-vf-kpi"><strong>4</strong><span>chains covered</span></div>
+          <div className="ua-vf-kpi"><strong>v1</strong><span>methodology version</span></div>
+          <div className="ua-vf-kpi"><strong>0</strong><span>price fields</span></div>
+          <div className="ua-vf-kpi"><strong>Daily</strong><span>not intraday</span></div>
+        </div>
+      </section>
+
+      {/* ── USE PATH ── */}
+      <section className="ua-vf-section">
+        <div className="ua-vf-shell">
+          <Reveal>
+            <div className="ua-vf-section-head">
+              <div className="ua-vf-eyebrow">Use path</div>
+              <div>
+                <h2 className="ua-vf-h2">Two ways into the same published layer.</h2>
+                <p className="ua-vf-section-lead">The same daily data product supports a pipeline workflow and a direct reading workflow.</p>
+              </div>
+            </div>
+            <div className="ua-vf-path-grid">
+              <div className="ua-vf-path">
+                <h3>Have your own pipeline?</h3>
+                <p>Join Urd Atlas rows to your own daily rows by chain and date. Add regime, confidence, drivers, and provenance to existing analysis.</p>
+                <a className="ua-vf-text-link" href="#json">Inspect JSON structure →</a>
+              </div>
+              <div className="ua-vf-path-divider" />
+              <div className="ua-vf-path">
+                <h3>No pipeline?</h3>
+                <p>Read published Briefs directly. The Brief layer summarizes what changed, what drove it, and how stable the latest label has been.</p>
+                <a className="ua-vf-text-link" href="#brief">Read the Brief preview →</a>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── BRIEF ── */}
+      <section className="ua-vf-section" id="brief">
+        <div className="ua-vf-shell">
+          <Reveal>
+            <div className="ua-vf-section-head">
+              <div className="ua-vf-eyebrow">Brief preview</div>
+              <div>
+                <h2 className="ua-vf-h2">Readable context from the same deterministic labels.</h2>
+                <p className="ua-vf-section-lead">Briefs are the direct-use layer for users who want published context without building their own pipeline.</p>
+              </div>
+            </div>
+            <div className="ua-vf-brief-layout">
+              <div>
+                <div className="ua-vf-brief-tabs">
+                  {chains.map((c) => (
+                    <button
+                      type="button"
+                      key={c.key}
+                      onClick={() => setBriefChain(c.key)}
+                      className={`ua-vf-tab ${briefChain === c.key ? "is-active" : ""}`}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="ua-vf-muted">Switch chains to see how the same Brief structure carries different label paths and confidence states.</p>
+              </div>
+              {currentBrief && (
+                <article className="ua-vf-brief-doc">
+                  <div className="ua-vf-meta-label">{currentBrief.title} · latest 7 published days</div>
+                  <h3 className="ua-vf-brief-headline">{currentBrief.headline}</h3>
+                  <div className="ua-vf-regime-path">
+                    {currentBrief.path.map((label, index) => (
+                      <span key={`${label}-${index}`} className={labelClass(label)}>
+                        D{index + 1} {compactLabel(label)}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="ua-vf-muted">{currentBrief.plain}</p>
+                  <div className="ua-vf-brief-metrics">
+                    <div className="ua-vf-brief-metric">
+                      <strong className={labelClass(currentBrief.dominant)}>{compactLabel(currentBrief.dominant)}</strong>
+                      <span>dominant label</span>
+                    </div>
+                    <div className="ua-vf-brief-metric">
+                      <strong>{currentBrief.confidence}</strong>
+                      <span>confidence score</span>
+                    </div>
+                    <div className="ua-vf-brief-metric">
+                      <strong>{currentBrief.changes}</strong>
+                      <span>label changes</span>
+                    </div>
+                    <div className="ua-vf-brief-metric">
+                      <strong>{currentBrief.run}</strong>
+                      <span>latest run days</span>
+                    </div>
+                  </div>
+                </article>
+              )}
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── JSON INSPECTOR ── */}
+      <section className="ua-vf-section" id="json">
+        <div className="ua-vf-shell">
+          <Reveal>
+            <div className="ua-vf-section-head">
+              <div className="ua-vf-eyebrow">JSON inspector</div>
+              <div>
+                <h2 className="ua-vf-h2">Inspect the complete file, not a marketing excerpt.</h2>
+                <p className="ua-vf-section-lead">Switch between complete high-confidence and degraded Gold, Derived, and Meta files from the v1 archive.</p>
+              </div>
+            </div>
+            <div className="ua-vf-json-layout">
+              <aside className="ua-vf-json-side">
+                <div className="ua-vf-meta-label">Confidence example</div>
+                <div className="ua-vf-conf-tabs">
+                  <button type="button" onClick={() => setConfidenceMode("high")} className={`ua-vf-tab ${confidenceMode === "high" ? "is-active" : ""}`}>High confidence</button>
+                  <button type="button" onClick={() => setConfidenceMode("degraded")} className={`ua-vf-tab ${confidenceMode === "degraded" ? "is-active" : ""}`}>Degraded</button>
+                </div>
+                <div className="ua-vf-meta-label">Layer</div>
+                <div className="ua-vf-json-tabs">
+                  {(["gold", "derived", "meta"] as JsonLayer[]).map((layer) => (
+                    <button type="button" key={layer} onClick={() => setJsonLayer(layer)} className={`ua-vf-tab ${jsonLayer === layer ? "is-active" : ""}`}>{layer}</button>
+                  ))}
+                </div>
+                <p className="ua-vf-json-note">These examples are from the published v1 archive and illustrate the schema structure.</p>
+                <button type="button" className="ua-vf-btn-primary" onClick={() => setModalOpen(true)}>Open complete JSON</button>
+              </aside>
+              <div className="ua-vf-json-shell">
+                <div className="ua-vf-code-toolbar">
+                  <span>{confidenceMode}/{jsonLayer}.json</span>
+                  <button type="button" className="ua-vf-text-link" onClick={() => navigator.clipboard?.writeText(selectedJson)}>Copy complete JSON</button>
+                </div>
+                <pre className="ua-vf-code" dangerouslySetInnerHTML={{ __html: highlightJson(selectedJson) }} />
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── METHODOLOGY ── */}
+      <section className="ua-vf-section" id="methodology">
+        <div className="ua-vf-shell">
+          <Reveal>
+            <div className="ua-vf-section-head">
+              <div className="ua-vf-eyebrow">Trust</div>
+              <div><h2 className="ua-vf-h2">Built to be checked, not trusted blindly.</h2></div>
+            </div>
+            <div className="ua-vf-trust-row">
+              <div className="ua-vf-trust-item"><strong>Daily, not intraday</strong><span>Daily cadence filters transient variance before labels are published.</span></div>
+              <div className="ua-vf-trust-item"><strong>No price data</strong><span>Labels describe network conditions only.</span></div>
+              <div className="ua-vf-trust-item"><strong>Hash anchored</strong><span>Every published row includes deterministic provenance.</span></div>
+              <div className="ua-vf-trust-item"><strong>UNKNOWN allowed</strong><span>Weak evidence is not forced into strong labels.</span></div>
+              <div className="ua-vf-trust-item"><strong>Public samples</strong><span>JSON structure can be inspected before subscribing.</span></div>
+            </div>
+            <div className="ua-vf-faq ua-vf-faq-spaced">
+              <details><summary>Why daily, not intraday?</summary><p>Regime context is about structural network conditions. Intraday spikes are more likely to reflect transient variance than durable state.</p></details>
+              <details><summary>How are labels determined?</summary><p>Labels are derived from documented demand, friction, and capacity evidence with deterministic rules and confidence gates.</p></details>
+              <details><summary>Do labels use price data?</summary><p>No. Urd Atlas publishes network-condition reference data. Price data, forecasts, and recommendations are excluded.</p></details>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── PRICING ── */}
+      <section className="ua-vf-section" id="pricing">
+        <div className="ua-vf-shell">
+          <Reveal>
+            <div className="ua-vf-section-head">
+              <div className="ua-vf-eyebrow">Pricing</div>
+              <div><h2 className="ua-vf-h2">Simple access to the published layer.</h2></div>
+            </div>
+            <div className="ua-vf-pricing-grid">
+              <Price title="Free" price="$0" note="Public charts, samples, limited history." cta="Start free" href="/status" features={["Public chain context", "Sample JSON", "Methodology docs"]} />
+              <Price title="Single Chain" price="$49" period="/mo" note="One chain with full daily JSON." cta="Choose a chain" href="/api/v1/checkout?plan=basic" features={["Gold, Derived, Meta, Brief", "Historical access", "Email support"]} />
+              <Price title="Full Access" price="$149" period="/mo" note="All supported chains and cross-chain Briefs." cta="Get full access" href="/api/v1/checkout?plan=pro" featured features={["BTC, ETH, ARB, BASE", "Cross-chain Briefs", "Published archive"]} />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── MODAL ── */}
+      <div className={`ua-vf-modal ${modalOpen ? "is-open" : ""}`} role="dialog" aria-modal="true">
+        <div className="ua-vf-modal-panel">
+          <div className="ua-vf-modal-head">
+            <div className="ua-vf-modal-title">Complete JSON · {confidenceMode}/{jsonLayer}</div>
+            <button className="ua-vf-modal-close" type="button" onClick={() => setModalOpen(false)}>Close</button>
+          </div>
+          <pre className="ua-vf-code" dangerouslySetInnerHTML={{ __html: highlightJson(selectedJson) }} />
+        </div>
+      </div>
     </main>
   );
-}
-
-function Price({ title, price, period = "", note, features, cta, href, featured = false }: { title: string; price: string; period?: string; note: string; features: string[]; cta: string; href: string; featured?: boolean }) {
-  return <article className={`ua-vf-price-card ${featured ? "is-featured" : ""}`}><h3>{title}</h3><div className="ua-vf-price">{price} {period ? <span>{period}</span> : null}</div><p>{note}</p><ul>{features.map((feature) => <li key={feature}>{feature}</li>)}</ul><Link href={href} className={featured ? "ua-vf-btn-primary" : "ua-vf-btn-ghost"}>{cta}</Link></article>;
 }
