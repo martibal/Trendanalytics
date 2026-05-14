@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+export const revalidate = 0;
 
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
