@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -82,15 +83,26 @@ def _materialize_windows_from_disk(chain_out: Path, windows: list[int]) -> None:
     records = _load_records_from_day_files(chain_out)
     if not records:
         return
-
     _write_json(chain_out / "latest.json", records[-1])
+    
+    # Use the latest date as anchor, filter by calendar days
+    latest_date_str = records[-1].get("date", "")
+    try:
+        latest_date = date.fromisoformat(latest_date_str)
+    except ValueError:
+        # Fallback to row-count if date is unparseable
+        for w in windows:
+            tail = records[-w:] if len(records) >= w else records
+            _write_json(chain_out / f"last{w}d.json", tail)
+        return
 
     for w in windows:
         if w <= 0:
             continue
-        tail = records[-w:] if len(records) >= w else records
+        cutoff = latest_date - timedelta(days=w - 1)
+        cutoff_str = cutoff.isoformat()
+        tail = [r for r in records if r.get("date", "") >= cutoff_str]
         _write_json(chain_out / f"last{w}d.json", tail)
-
 
 def _sync_chain(cfg: SyncConfig, chain: str) -> int:
     gold_parquet = cfg.gold_root / f"{chain}.parquet"
