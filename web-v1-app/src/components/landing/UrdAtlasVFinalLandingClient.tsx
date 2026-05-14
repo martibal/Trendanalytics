@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ChainKey = "btc" | "eth" | "arb" | "base";
 type JsonLayer = "gold" | "derived" | "meta";
-type ConfidenceMode = "high" | "degraded";
 type Label = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 
 // ---------------------------------------------------------------------------
@@ -67,22 +66,21 @@ function getPublishedAtDisplay(manifest: DatasetManifest | null): string {
 }
 
 // ---------------------------------------------------------------------------
-// Static JSON examples (these are intentionally static — they are
-// documentation/illustration, not live data)
+// JSON inspector options — reads the actual published latest.json files from
+// /public/data/published/v1, not simplified marketing examples.
 // ---------------------------------------------------------------------------
 
-const JSON_EXAMPLES: Record<ConfidenceMode, Record<JsonLayer, string>> = {
-  high: {
-    gold: "{\r\n  \"avg_block_time_sec\": 501.5470588235294,\r\n  \"block_count_daily\": 171,\r\n  \"chain\": \"bitcoin\",\r\n  \"date\": \"2025-08-04\",\r\n  \"failed_tx_rate\": null,\r\n  \"gas_utilization_pct\": null,\r\n  \"median_tx_fee_native\": 2.58e-06,\r\n  \"median_tx_value_native\": 0.0009438,\r\n  \"tx_count_daily\": 443301,\r\n  \"unique_active_addresses\": null,\r\n  \"value_transferred_native\": 683513.1045116399\r\n}",
-    derived: "{\r\n  \"chain\": \"bitcoin\",\r\n  \"date\": \"2025-08-04\",\r\n  \"derived\": {\r\n    \"metrics\": {\r\n      \"avg_block_time_sec__ma30\": 581.33,\r\n      \"avg_block_time_sec__ma7\": 593.48,\r\n      \"tx_count_daily__ma30\": 419160.8,\r\n      \"tx_count_daily__ma7\": 385202.3\r\n    }\r\n  }\r\n}",
-    meta: "{\r\n  \"chain\": \"bitcoin\",\r\n  \"date\": \"2025-08-04\",\r\n  \"status\": {\r\n    \"label\": \"HEATING\",\r\n    \"one_liner\": \"Demand: Normal; Friction: Normal; Capacity: Balanced\"\r\n  },\r\n  \"confidence\": {\r\n    \"confidence_score\": 0.881\r\n  },\r\n  \"regime\": {\r\n    \"label\": \"HEATING\",\r\n    \"determinism_hash\": \"643bad760b4a\"\r\n  }\r\n}",
-  },
-  degraded: {
-    gold: "{\r\n  \"avg_block_time_sec\": 12.10,\r\n  \"block_count_daily\": 7138.0,\r\n  \"chain\": \"ethereum\",\r\n  \"date\": \"2025-10-31\",\r\n  \"failed_tx_rate\": 0.00993,\r\n  \"gas_utilization_pct\": 0.505,\r\n  \"median_tx_fee_native\": 21365980740280.0,\r\n  \"tx_count_daily\": 1639231.0,\r\n  \"unique_active_addresses\": 626214.0\r\n}",
-    derived: "{\r\n  \"chain\": \"ethereum\",\r\n  \"date\": \"2025-10-31\",\r\n  \"derived\": {\r\n    \"meta_confidence\": {\r\n      \"confidence_score\": 7.09e-06\r\n    },\r\n    \"metrics\": {\r\n      \"tx_count_daily__ma30\": 1543554.5,\r\n      \"tx_count_daily__ma7\": 1518639.6\r\n    }\r\n  }\r\n}",
-    meta: "{\r\n  \"chain\": \"ethereum\",\r\n  \"date\": \"2025-10-31\",\r\n  \"status\": {\r\n    \"label\": \"UNKNOWN/DEGRADED\",\r\n    \"one_liner\": \"Evidence support is insufficient for a confident label.\"\r\n  },\r\n  \"confidence\": {\r\n    \"confidence_score\": 0.031\r\n  },\r\n  \"regime\": {\r\n    \"label\": \"UNKNOWN/DEGRADED\",\r\n    \"determinism_hash\": \"5cb1a90073aa\"\r\n  }\r\n}",
-  },
-};
+type JsonChain = "bitcoin" | "ethereum" | "arbitrum" | "base";
+type JsonLoadState = "loading" | "ready" | "error";
+
+const JSON_CHAIN_OPTIONS: Array<{ label: string; value: JsonChain }> = [
+  { label: "BTC", value: "bitcoin" },
+  { label: "ETH", value: "ethereum" },
+  { label: "ARB", value: "arbitrum" },
+  { label: "BASE", value: "base" },
+];
+
+const JSON_LAYER_OPTIONS: JsonLayer[] = ["gold", "derived", "meta"];
 
 const PRICE_STRIP_CSS = `
 .ua-vf-section[id] {
@@ -497,17 +495,62 @@ export default function UrdAtlasVFinalLandingClient({
   const [progress, setProgress] = useState(0);
   const [miniVisible, setMiniVisible] = useState(false);
   const [briefChain, setBriefChain] = useState<string>(chains[0]?.key ?? "btc");
+  const [jsonChain, setJsonChain] = useState<JsonChain>("bitcoin");
   const [jsonLayer, setJsonLayer] = useState<JsonLayer>("meta");
-  const [confidenceMode, setConfidenceMode] = useState<ConfidenceMode>("high");
+  const [selectedJson, setSelectedJson] = useState("{\n  \"loading\": true\n}");
+  const [jsonLoadState, setJsonLoadState] = useState<JsonLoadState>("loading");
   const [modalOpen, setModalOpen] = useState(false);
   const [forcePricingReveal, setForcePricingReveal] = useState(false);
   const [lastRunDisplay, setLastRunDisplay] = useState("—");
 
 
-  const selectedJson = useMemo(
-    () => JSON_EXAMPLES[confidenceMode][jsonLayer] ?? "",
-    [confidenceMode, jsonLayer],
-  );
+  const selectedJsonPath = `${jsonLayer}/${jsonChain}/latest.json`;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPublishedJson() {
+      const path = `/data/published/v1/${selectedJsonPath}`;
+
+      setJsonLoadState("loading");
+
+      try {
+        const response = await fetch(path, { cache: "no-store" });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} while reading ${path}`);
+        }
+
+        const value = (await response.json()) as unknown;
+
+        if (!cancelled) {
+          setSelectedJson(JSON.stringify(value, null, 2));
+          setJsonLoadState("ready");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSelectedJson(
+            JSON.stringify(
+              {
+                error: "Could not load published JSON",
+                path,
+                detail: error instanceof Error ? error.message : String(error),
+              },
+              null,
+              2,
+            ),
+          );
+          setJsonLoadState("error");
+        }
+      }
+    }
+
+    void loadPublishedJson();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedJsonPath]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -1050,35 +1093,31 @@ export default function UrdAtlasVFinalLandingClient({
               <div>
                 <h2 className="ua-vf-h2">Inspect the complete file, not a marketing excerpt.</h2>
                 <p className="ua-vf-section-lead">
-                  Switch between complete high-confidence and degraded Gold, Derived, and Meta
-                  files from the v1 archive.
+                  Switch between the actual published latest Gold, Derived, and Meta JSON files
+                  for each supported chain.
                 </p>
               </div>
             </div>
 
             <div className="ua-vf-json-layout">
               <aside className="ua-vf-json-side">
-                <div className="ua-vf-meta-label">Confidence example</div>
+                <div className="ua-vf-meta-label">Chain</div>
                 <div className="ua-vf-conf-tabs">
-                  <button
-                    type="button"
-                    onClick={() => setConfidenceMode("high")}
-                    className={`ua-vf-tab ${confidenceMode === "high" ? "is-active" : ""}`}
-                  >
-                    High confidence
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfidenceMode("degraded")}
-                    className={`ua-vf-tab ${confidenceMode === "degraded" ? "is-active" : ""}`}
-                  >
-                    Degraded
-                  </button>
+                  {JSON_CHAIN_OPTIONS.map((chain) => (
+                    <button
+                      type="button"
+                      key={chain.value}
+                      onClick={() => setJsonChain(chain.value)}
+                      className={`ua-vf-tab ${jsonChain === chain.value ? "is-active" : ""}`}
+                    >
+                      {chain.label}
+                    </button>
+                  ))}
                 </div>
 
                 <div className="ua-vf-meta-label">Layer</div>
                 <div className="ua-vf-json-tabs">
-                  {(["gold", "derived", "meta"] as JsonLayer[]).map((layer) => (
+                  {JSON_LAYER_OPTIONS.map((layer) => (
                     <button
                       type="button"
                       key={layer}
@@ -1091,8 +1130,8 @@ export default function UrdAtlasVFinalLandingClient({
                 </div>
 
                 <p className="ua-vf-json-note">
-                  These examples are from the published v1 archive and illustrate the schema
-                  structure.
+                  This inspector reads the actual published latest.json files from the same public
+                  dataset path used by the application: {selectedJsonPath}.
                 </p>
 
                 <button
@@ -1106,13 +1145,14 @@ export default function UrdAtlasVFinalLandingClient({
 
               <div className="ua-vf-json-shell">
                 <div className="ua-vf-code-toolbar">
-                  <span>{confidenceMode}/{jsonLayer}.json</span>
+                  <span>{selectedJsonPath}{jsonLoadState === "error" ? " · load error" : ""}</span>
                   <button
                     type="button"
                     className="ua-vf-text-link"
                     onClick={() => navigator.clipboard?.writeText(selectedJson)}
+                    disabled={jsonLoadState === "loading"}
                   >
-                    Copy complete JSON
+                    {jsonLoadState === "loading" ? "Loading…" : "Copy complete JSON"}
                   </button>
                 </div>
                 <pre
@@ -1237,7 +1277,7 @@ export default function UrdAtlasVFinalLandingClient({
         <div className="ua-vf-modal-panel">
           <div className="ua-vf-modal-head">
             <div className="ua-vf-modal-title">
-              Complete JSON · {confidenceMode}/{jsonLayer}
+              Complete JSON · {selectedJsonPath}
             </div>
             <button className="ua-vf-modal-close" type="button" onClick={() => setModalOpen(false)}>
               Close
