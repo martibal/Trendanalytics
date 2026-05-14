@@ -7,6 +7,7 @@ import type { ChainId } from "@/config/chains";
 import { db } from "@/lib/db";
 
 type CheckoutPlan = "basic" | "pro";
+type StripeKeyMode = "missing" | "test" | "live" | "restricted_test" | "restricted_live" | "unknown";
 
 const TERMS_VERSION = "2026-04-13";
 
@@ -17,14 +18,33 @@ const CHAIN_OPTIONS: Array<{ label: string; value: ChainId }> = [
   { label: "Base", value: "base" },
 ];
 
-function getStripeClient(): Stripe | null {
+function detectStripeKeyMode(value: string | null | undefined): StripeKeyMode {
+  const key = value?.trim();
+
+  if (!key) return "missing";
+  if (key.startsWith("sk_test_")) return "test";
+  if (key.startsWith("sk_live_")) return "live";
+  if (key.startsWith("rk_test_")) return "restricted_test";
+  if (key.startsWith("rk_live_")) return "restricted_live";
+
+  return "unknown";
+}
+
+function getStripeClient(): { stripe: Stripe | null; keyMode: StripeKeyMode } {
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+  const keyMode = detectStripeKeyMode(secretKey);
 
   if (!secretKey) {
-    return null;
+    return {
+      stripe: null,
+      keyMode,
+    };
   }
 
-  return new Stripe(secretKey);
+  return {
+    stripe: new Stripe(secretKey),
+    keyMode,
+  };
 }
 
 function getAppUrl(request: Request): string {
@@ -42,6 +62,17 @@ function getAppUrl(request: Request): string {
 
   const url = new URL(request.url);
   return url.origin.replace(/\/+$/, "");
+}
+
+function isProductionCheckoutRequest(request: Request): boolean {
+  const url = new URL(request.url);
+  const host = url.hostname.toLowerCase();
+
+  return (
+    process.env.VERCEL_ENV === "production" ||
+    host === "urdatlas.com" ||
+    host === "www.urdatlas.com"
+  );
 }
 
 function jsonError(
@@ -200,7 +231,7 @@ async function resolveAccount(params: {
 }
 
 async function handleCheckout(request: Request) {
-  const stripe = getStripeClient();
+  const { stripe, keyMode } = getStripeClient();
 
   if (!stripe) {
     return jsonError(
@@ -223,6 +254,25 @@ async function handleCheckout(request: Request) {
   }
 
   const priceId = priceIdForPlan(plan);
+
+  console.info("[checkout] runtime Stripe configuration", {
+    vercelEnv: process.env.VERCEL_ENV ?? null,
+    requestHost: new URL(request.url).hostname,
+    stripeSecretMode: keyMode,
+    plan,
+    priceId,
+    hasBasicPrice: Boolean(process.env.STRIPE_PRICE_BASIC?.trim()),
+    hasProPrice: Boolean(process.env.STRIPE_PRICE_PRO?.trim()),
+  });
+
+  if (isProductionCheckoutRequest(request) && keyMode !== "live") {
+    return jsonError(
+      503,
+      "checkout_not_configured",
+      "Production checkout is not configured correctly.",
+      `Production checkout is using a ${keyMode} Stripe key at runtime. Expected STRIPE_SECRET_KEY to start with sk_live_.`
+    );
+  }
 
   if (!priceId) {
     return jsonError(
@@ -341,6 +391,7 @@ async function handleCheckout(request: Request) {
     console.error("[checkout] Stripe session creation failed", {
       plan,
       priceId,
+      stripeSecretMode: keyMode,
       error:
         error instanceof Error
           ? { name: error.name, message: error.message, stack: error.stack }
