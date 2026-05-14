@@ -36,6 +36,30 @@ export type LandingBriefData = {
   plain: string;
 };
 
+
+type DatasetManifest = {
+  published_at?: string;
+  computed_at_utc?: string;
+};
+
+function formatUtcDate(value: string | undefined): string {
+  if (!value) return "—";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return parsed.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function getPublishedAtDisplay(manifest: DatasetManifest | null): string {
+  return formatUtcDate(manifest?.published_at ?? manifest?.computed_at_utc);
+}
+
 // ---------------------------------------------------------------------------
 // Static JSON examples (these are intentionally static — they are
 // documentation/illustration, not live data)
@@ -243,6 +267,70 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   );
 }
 
+function ChainLogo({ chainId }: { chainId: string }) {
+  if (chainId === "bitcoin") {
+    return (
+      <svg className="ua-chain-logo-svg" viewBox="0 0 48 48" role="img" aria-label="Bitcoin logo">
+        <circle cx="24" cy="24" r="22" fill="#F7931A" />
+        <text
+          x="24"
+          y="31"
+          textAnchor="middle"
+          fontSize="22"
+          fontWeight="700"
+          fontFamily="Arial, Helvetica, sans-serif"
+          fill="#FFFFFF"
+        >
+          ₿
+        </text>
+      </svg>
+    );
+  }
+
+  if (chainId === "ethereum") {
+    return (
+      <svg className="ua-chain-logo-svg" viewBox="0 0 48 48" role="img" aria-label="Ethereum logo">
+        <path d="M24 4 11 25 24 19.2 37 25 24 4Z" fill="#E7EDF3" />
+        <path d="M24 4v15.2L37 25 24 4Z" fill="#9CAFC3" />
+        <path d="M24 21.8 11 27.6 24 44 37 27.6 24 21.8Z" fill="#AAB8C8" />
+        <path d="M24 21.8V44l13-16.4-13-5.8Z" fill="#6E8196" />
+      </svg>
+    );
+  }
+
+  if (chainId === "arbitrum") {
+    return (
+      <svg className="ua-chain-logo-svg" viewBox="0 0 48 48" role="img" aria-label="Arbitrum logo">
+        <path
+          d="M24 3.8 40.8 13.4v21.2L24 44.2 7.2 34.6V13.4L24 3.8Z"
+          fill="#111E30"
+          stroke="#69A7FF"
+          strokeWidth="2.2"
+          strokeLinejoin="round"
+        />
+        <path d="M18 33.4 29.6 10.8h5L23.2 33.4H18Z" fill="#28A0F0" />
+        <path d="M25.5 33.4 34.4 16.1h5L30.4 33.4h-4.9Z" fill="#FFFFFF" opacity="0.92" />
+        <path d="M11.8 33.4 22.2 13.1h5L16.8 33.4h-5Z" fill="#1B4ADD" />
+      </svg>
+    );
+  }
+
+  if (chainId === "base") {
+    return (
+      <svg className="ua-chain-logo-svg" viewBox="0 0 48 48" role="img" aria-label="Base logo">
+        <circle cx="24" cy="24" r="22" fill="#0052FF" />
+        <circle cx="24" cy="24" r="10.5" fill="#FFFFFF" />
+      </svg>
+    );
+  }
+
+  return (
+    <span className="ua-chain-logo-fallback" aria-hidden="true">
+      •
+    </span>
+  );
+}
+
 function Reveal({
   children,
   forceVisible = false,
@@ -379,6 +467,8 @@ export default function UrdAtlasVFinalLandingClient({
   const [confidenceMode, setConfidenceMode] = useState<ConfidenceMode>("high");
   const [modalOpen, setModalOpen] = useState(false);
   const [forcePricingReveal, setForcePricingReveal] = useState(false);
+  const [lastRunDisplay, setLastRunDisplay] = useState("—");
+
 
   const selectedJson = useMemo(
     () => JSON_EXAMPLES[confidenceMode][jsonLayer] ?? "",
@@ -399,6 +489,36 @@ export default function UrdAtlasVFinalLandingClient({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDatasetManifest() {
+      try {
+        const response = await fetch("/data/published/v1/dataset.json", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) return;
+
+        const manifest = (await response.json()) as DatasetManifest;
+        const nextLastRun = getPublishedAtDisplay(manifest);
+
+        if (!cancelled && nextLastRun !== "—") {
+          setLastRunDisplay(nextLastRun);
+        }
+      } catch {
+        // Keep the dashboard honest: if the manifest cannot be read, do not
+        // synthesize a fake run date from the browser clock.
+      }
+    }
+
+    void loadDatasetManifest();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const currentBrief = briefs[briefChain] ?? Object.values(briefs)[0];
 
   return (
@@ -407,6 +527,17 @@ export default function UrdAtlasVFinalLandingClient({
         .ua-chain-hero-row:hover { background: var(--surface3) !important; padding-left: 26px !important; }
         .ua-chain-hero-row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: transparent; transition: background .2s; }
         .ua-chain-hero-row:hover::before { background: var(--gold); }
+        .ua-chain-logo-mark { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line2); border-radius: 999px; background: rgba(232,224,208,.035); box-shadow: 0 0 0 1px rgba(232,224,208,.025), 0 10px 24px rgba(0,0,0,.18); }
+        .ua-chain-logo-svg { width: 34px; height: 34px; display: block; filter: saturate(1.08) contrast(1.06); }
+        .ua-chain-logo-name { font-family: var(--mono); font-size: 9.5px; font-weight: 500; letter-spacing: .06em; color: var(--ink); line-height: 1.15; text-align: center; }
+        .ua-chain-logo-fallback { color: var(--ink); font-family: var(--mono); font-size: 20px; }
+        @media (max-width: 560px) {
+          .ua-chain-hero-row { grid-template-columns: 64px minmax(0, 1fr) auto !important; gap: 0 12px !important; padding: 15px 16px !important; }
+          .ua-chain-logo-mark { width: 38px; height: 38px; }
+          .ua-chain-logo-svg { width: 30px; height: 30px; }
+          .ua-chain-logo-name { font-size: 8.5px; letter-spacing: .04em; }
+          .ua-chain-hero-row .ua-vf-spark { display: none; }
+        }
       ` }} />
       <style dangerouslySetInnerHTML={{ __html: PRICE_STRIP_CSS }} />
       <div className="ua-vf-progress" style={{ width: `${progress}%` }} />
@@ -516,25 +647,48 @@ export default function UrdAtlasVFinalLandingClient({
                 <div style={{
                   fontFamily: "var(--mono)",
                   fontSize: "11px",
-                  color: "var(--ink3)",
+                  color: "var(--ink2)",
                   marginTop: "4px",
                 }}>Click any chain to see full data →</div>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: "9px",
-                  letterSpacing: ".12em",
-                  textTransform: "uppercase",
-                  color: "var(--ink3)",
-                  marginBottom: "3px",
-                }}>Last run</div>
-                <div style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  color: "var(--ink)",
-                }}>{updatedThrough}</div>
+              <div style={{
+                textAlign: "right",
+                display: "grid",
+                gap: "10px",
+              }}>
+                <div>
+                  <div style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: "9px",
+                    letterSpacing: ".12em",
+                    textTransform: "uppercase",
+                    color: "var(--ink3)",
+                    marginBottom: "3px",
+                  }}>Last run</div>
+                  <div style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "var(--ink)",
+                  }}>{lastRunDisplay}</div>
+                </div>
+
+                <div>
+                  <div style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: "9px",
+                    letterSpacing: ".12em",
+                    textTransform: "uppercase",
+                    color: "var(--ink3)",
+                    marginBottom: "3px",
+                  }}>Data through</div>
+                  <div style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "var(--ink)",
+                  }}>{updatedThrough}</div>
+                </div>
               </div>
             </div>
 
@@ -562,10 +716,10 @@ export default function UrdAtlasVFinalLandingClient({
                     href={`/chains/${row.chainId}`}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "56px 1fr auto",
-                      gap: "0 14px",
+                      gridTemplateColumns: "76px minmax(0, 1fr) auto",
+                      gap: "0 16px",
                       alignItems: "center",
-                      padding: "14px 20px",
+                      padding: "16px 20px",
                       borderBottom: "1px solid var(--line)",
                       textDecoration: "none",
                       transition: "background .18s, padding-left .18s",
@@ -573,25 +727,21 @@ export default function UrdAtlasVFinalLandingClient({
                     }}
                     className="ua-chain-hero-row"
                   >
-                    {/* Left: icon + name */}
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-                      <div style={{
-                        width: "32px", height: "32px",
-                        display: "grid", placeItems: "center",
-                        border: "1px solid var(--line2)",
-                        borderRadius: "3px",
-                        fontFamily: "var(--mono)",
-                        fontSize: "14px",
-                        color: "var(--ink)",
-                        background: "var(--surface3)",
-                      }}>{row.icon}</div>
-                      <span style={{
-                        fontFamily: "var(--mono)",
-                        fontSize: "9px",
-                        letterSpacing: ".1em",
-                        textTransform: "uppercase",
-                        color: "var(--ink3)",
-                      }}>{row.label}</span>
+                    {/* Left: real chain logo + full name */}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        minWidth: 0,
+                      }}
+                    >
+                      <div className="ua-chain-logo-mark">
+                        <ChainLogo chainId={row.chainId} />
+                      </div>
+                      <span className="ua-chain-logo-name">{row.fullName}</span>
                     </div>
 
                     {/* Middle: regime label + plain-English meaning */}
@@ -619,9 +769,9 @@ export default function UrdAtlasVFinalLandingClient({
                       </div>
                       <div style={{
                         fontFamily: "var(--sans)",
-                        fontSize: "11px",
-                        color: "var(--ink2)",
-                        lineHeight: 1.4,
+                        fontSize: "12px",
+                        color: "var(--ink)",
+                        lineHeight: 1.45,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -643,7 +793,7 @@ export default function UrdAtlasVFinalLandingClient({
                           fontSize: "8px",
                           letterSpacing: ".1em",
                           textTransform: "uppercase",
-                          color: "var(--ink3)",
+                          color: "var(--ink2)",
                         }}>confidence</span>
                       </div>
                       <Sparkline values={row.path} color={regimeColor} />
@@ -664,7 +814,7 @@ export default function UrdAtlasVFinalLandingClient({
               <span style={{
                 fontFamily: "var(--mono)",
                 fontSize: "10px",
-                color: "var(--ink3)",
+                color: "var(--ink2)",
                 letterSpacing: ".1em",
                 textTransform: "uppercase",
               }}>Daily · chain-relative</span>
