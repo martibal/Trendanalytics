@@ -98,16 +98,24 @@ function Get-MissingFeatureDays([string]$featuresRoot, [string]$chain, [string[]
   $files = @(
     Get-ChildItem -Path (Join-Path $featuresRoot $chain) -File -Filter '*.parquet' -ErrorAction SilentlyContinue
   )
+
   foreach ($f in $files) {
-    if ($f.BaseName -match '^\d{4}-\d{2}-\d{2}$') { $existing[$f.BaseName] = $true }
+    if ($f.BaseName -match '^\d{4}-\d{2}-\d{2}$') {
+      $existing[$f.BaseName] = $true
+    }
   }
 
   $missing = New-Object System.Collections.Generic.List[string]
+
   foreach ($d in $rawDays) {
     if (-not $d) { continue }
+
     $dt = Parse-IsoDate([string]$d)
     if ($dt -lt $startDate) { continue }
-    if (-not $existing.ContainsKey([string]$d)) { [void]$missing.Add([string]$d) }
+
+    if (-not $existing.ContainsKey([string]$d)) {
+      [void]$missing.Add([string]$d)
+    }
   }
 
   return @($missing.ToArray())
@@ -118,7 +126,7 @@ function Get-LatestPublishedDay([string]$publishedRoot, [string[]]$chains) {
 
   $candidates = New-Object System.Collections.Generic.List[string]
 
-  foreach ($genre in @('gold', 'derived')) {
+  foreach ($genre in @('gold', 'derived', 'meta')) {
     foreach ($chain in $chains) {
       $dir = Join-Path $publishedRoot (Join-Path $genre $chain)
       if (-not (Test-Path $dir)) { continue }
@@ -152,6 +160,20 @@ function Read-DownloadReport([string]$path) {
     Write-Log "WARN: $($_.Exception.Message)"
     return $null
   }
+}
+
+function Get-PlannedDownloadCount($downloadReport) {
+  if (-not $downloadReport) { return 0 }
+
+  if ($downloadReport.planned_downloads) {
+    return @($downloadReport.planned_downloads).Count
+  }
+
+  if ($downloadReport.summary -and $null -ne $downloadReport.summary.planned_downloads) {
+    return [int]$downloadReport.summary.planned_downloads
+  }
+
+  return 0
 }
 
 try {
@@ -229,8 +251,10 @@ try {
 
     if ($SkipRawDownload) {
       Write-Log 'STEP -1: Skipping RAW download because -SkipRawDownload was provided'
-    } elseif (Test-Path $PY_DOWNLOAD_RAW) {
+    }
+    elseif (Test-Path $PY_DOWNLOAD_RAW) {
       Write-Log 'STEP -1: Download/sync RAW from AWS (JSON-aware minimal catch-up)'
+
       $rawLookbackDays = Get-EnvIntOrDefault -Name 'CSS_RAW_LOOKBACK_DAYS' -DefaultValue 60
       $startRaw = (Get-Date).ToUniversalTime().AddDays(-1 * $rawLookbackDays)
       $startRawIso = Format-IsoDate $startRaw
@@ -238,30 +262,51 @@ try {
 
       Write-Log ("  raw sync start: " + $startRawIso + " (lookback " + $rawLookbackDays + "d)")
       Write-Log ("  published state root: " + $PUBLISHED_ROOT)
+
       & $PY -u $PY_DOWNLOAD_RAW --root $MAIN_ROOT --raw-root $RAW_ROOT --published-root $PUBLISHED_ROOT --start $startRawIso --chains $chainsCsv --lag-l1-days 1 --lag-l2-days 7
       if ($LASTEXITCODE -ne 0) {
         throw "download_up_to_date_minimal.py failed rc=$LASTEXITCODE"
       }
 
       $downloadReport = Read-DownloadReport -path $downloadReportPath
-    } else {
+    }
+    else {
       Write-Log "STEP -1: Skipping RAW download (missing tool): $PY_DOWNLOAD_RAW"
     }
 
     Write-Log 'STEP 0: Probe latest raw day'
+
     $latestRaw = Get-LatestRawDay $RAW_ROOT
     $latestPublished = Get-LatestPublishedDay $PUBLISHED_ROOT $chains
-    $plannedDownloadCount = 0
+    $plannedDownloadCount = Get-PlannedDownloadCount $downloadReport
 
-    if ($downloadReport -and $downloadReport.planned_downloads) {
-      $plannedDownloadCount = @($downloadReport.planned_downloads).Count
+    if ($latestRaw) {
+      Write-Log ("Latest raw day: " + (Format-IsoDate $latestRaw))
+    }
+    else {
+      Write-Log "Latest raw day: none found"
+    }
+
+    if ($latestPublished) {
+      Write-Log ("Latest published day: " + (Format-IsoDate $latestPublished))
+    }
+    else {
+      Write-Log "Latest published day: none found"
+    }
+
+    Write-Log ("Planned raw downloads from report: " + $plannedDownloadCount)
+
+    if ($Mode -eq 'incremental' -and -not $SkipRawDownload -and $latestPublished -and $plannedDownloadCount -eq 0) {
+      Write-Log "No new unpublished raw days were detected for incremental mode."
+      Write-Log "Pipeline exits successfully as a no-op before feature/gold rebuild."
+      Write-Log '=== PIPELINE OK (NO-OP) ==='
+      return
     }
 
     if (-not $latestRaw) {
       if ($Mode -eq 'incremental' -and $latestPublished -and $plannedDownloadCount -eq 0) {
-        Write-Log ("Latest published day: " + (Format-IsoDate $latestPublished))
-        Write-Log "No unpublished missing days were detected for incremental mode."
-        Write-Log "No raw parquet was downloaded, so pipeline exits successfully as a no-op."
+        Write-Log "No local raw day folders are available, and no unpublished missing raw days were detected."
+        Write-Log "Pipeline exits successfully as a no-op."
         Write-Log '=== PIPELINE OK (NO-OP) ==='
         return
       }
@@ -269,19 +314,15 @@ try {
       throw "No raw day folders found under $RAW_ROOT"
     }
 
-    Write-Log ("Latest raw day: " + (Format-IsoDate $latestRaw))
-    if ($latestPublished) {
-      Write-Log ("Latest published day: " + (Format-IsoDate $latestPublished))
-    }
-    Write-Log ("Planned raw downloads from report: " + $plannedDownloadCount)
-
     $startDate = $latestRaw.AddDays(-30)
     if ($Mode -eq 'rebuild') { $startDate = $latestRaw.AddDays(-365) }
+
     Write-Log ("Start date: " + (Format-IsoDate $startDate))
 
     $startIso = Format-IsoDate $startDate
 
     Write-Log 'STEP 1: Build daily features (feature_daily_agg.py)'
+
     foreach ($c in $chains) {
       $rawDays = @(Get-RawDaysForChain $RAW_ROOT $c)
 
@@ -301,6 +342,7 @@ try {
 
       foreach ($d in $missing) {
         Write-Log ("  build features: " + $c + " " + $d)
+
         & $PY -u $PY_DAILY_AGG --chain $c --date $d --raw_root $RAW_ROOT --out_root $FEATURES_ROOT
         if ($LASTEXITCODE -ne 0) {
           throw "feature_daily_agg.py failed chain=$c day=$d rc=$LASTEXITCODE"
@@ -309,26 +351,40 @@ try {
     }
 
     Write-Log 'STEP 2: Build GOLD timeseries'
+
     foreach ($c in $chains) {
       Write-Log ("  build gold timeseries: " + $c)
+
       & $PY -u $PY_BUILD_GOLD_TS --chain $c --features_root $FEATURES_ROOT --gold_root $GOLD_PARQUET_ROOT --status_root $STATUS_ROOT --reports_dir $REPORTS_DIR
-      if ($LASTEXITCODE -ne 0) { throw "build_gold_timeseries.py failed chain=$c rc=$LASTEXITCODE" }
+      if ($LASTEXITCODE -ne 0) {
+        throw "build_gold_timeseries.py failed chain=$c rc=$LASTEXITCODE"
+      }
     }
 
     Write-Log 'STEP 3: Build GOLD weekly'
+
     foreach ($c in $chains) {
       Write-Log ("  build gold weekly: " + $c)
+
       & $PY -u $PY_BUILD_GOLD_WEEKLY --chain $c --gold_root $GOLD_PARQUET_ROOT --gold_weekly_root $GOLD_WEEKLY_ROOT
-      if ($LASTEXITCODE -ne 0) { throw "build_gold_weekly.py failed chain=$c rc=$LASTEXITCODE" }
+      if ($LASTEXITCODE -ne 0) {
+        throw "build_gold_weekly.py failed chain=$c rc=$LASTEXITCODE"
+      }
     }
 
     Write-Log 'STEP 4: Sync GOLD json history + windows'
+
     & $PY -u $PY_SYNC_GOLD --repo-root $MAIN_ROOT --gold-root $GOLD_PARQUET_ROOT --out-root $GOLD_JSON_ROOT --chains $chainsCsv --mode $syncModeGold --windows $windowsCsv
-    if ($LASTEXITCODE -ne 0) { throw "sync_gold_json_history.py failed rc=$LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) {
+      throw "sync_gold_json_history.py failed rc=$LASTEXITCODE"
+    }
 
     Write-Log 'STEP 5: Export DERIVED json history + windows'
+
     & $PY -u $PY_EXPORT_DERIVED --root $MAIN_ROOT --gold-json-root $GOLD_JSON_ROOT --meta-json-root $META_JSON_ROOT --out-root $DERIVED_OUT_ROOT --chains $chainsCsv --mode $modeIncRebuild --windows $windowsCsv
-    if ($LASTEXITCODE -ne 0) { throw "export_derived_json_history.py failed rc=$LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) {
+      throw "export_derived_json_history.py failed rc=$LASTEXITCODE"
+    }
 
     Write-Log 'STEP 6: Export META json history + windows'
     Write-Log '  forcing api.main paths for META export to the freshly calculated run outputs'
@@ -351,7 +407,9 @@ try {
       [Environment]::SetEnvironmentVariable('META_DIR', $META_JSON_ROOT, [EnvironmentVariableTarget]::Process)
 
       & $PY -u $PY_EXPORT_META --root $MAIN_ROOT --out-root $META_JSON_ROOT --start $startIso --mode $modeIncRebuild --windows $windowsCsv
-      if ($LASTEXITCODE -ne 0) { throw "export_meta_json_history.py failed rc=$LASTEXITCODE" }
+      if ($LASTEXITCODE -ne 0) {
+        throw "export_meta_json_history.py failed rc=$LASTEXITCODE"
+      }
     }
     finally {
       foreach ($name in $previousApiMainEnv.Keys) {
@@ -360,23 +418,33 @@ try {
     }
 
     Write-Log 'STEP 7: Publish artifacts -> data/published/v1'
+
     & $PY -u $PY_PUBLISH --root $MAIN_ROOT --calculated-root $CALC_ROOT --published-root $PUBLISHED_ROOT --chains $chainsCsv --genres 'gold,meta,derived' --windows $windowsCsv
-    if ($LASTEXITCODE -ne 0) { throw "publish_artifacts.py failed rc=$LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) {
+      throw "publish_artifacts.py failed rc=$LASTEXITCODE"
+    }
 
     Write-Log 'STEP 8: Validate published dataset contract'
+
     & $PY -u $PY_VALIDATE_PUBLISHED --published-root $PUBLISHED_ROOT --chains $chainsCsv --genres 'gold,meta,derived' --windows $windowsCsv
-    if ($LASTEXITCODE -ne 0) { throw "validate_published_dataset.py failed rc=$LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) {
+      throw "validate_published_dataset.py failed rc=$LASTEXITCODE"
+    }
 
     if ($SYNC_WEB_ENABLED -and (Test-Path $SYNC_WEB)) {
       Write-Log 'STEP 9: Sync published dataset -> web public'
+
       try {
         & $SYNC_WEB -Root $MAIN_ROOT
-        if ($LASTEXITCODE -ne 0) { throw "sync_web_data.ps1 failed rc=$LASTEXITCODE" }
+        if ($LASTEXITCODE -ne 0) {
+          throw "sync_web_data.ps1 failed rc=$LASTEXITCODE"
+        }
       }
       catch {
         Write-Log "NOTE: sync_web_data.ps1 failed (non-fatal): $($_.Exception.Message)"
       }
-    } elseif (-not $SYNC_WEB_ENABLED) {
+    }
+    elseif (-not $SYNC_WEB_ENABLED) {
       Write-Log 'STEP 9: Skipping web sync because CSS_SYNC_WEB disables it'
     }
 
@@ -385,8 +453,8 @@ try {
   finally {
     Pop-Location
   }
-
-} catch {
+}
+catch {
   Write-Log ("FATAL: " + $_.Exception.Message)
   throw
 }
