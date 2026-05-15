@@ -162,20 +162,38 @@ function Read-DownloadReport([string]$path) {
   }
 }
 
+function Get-ObjectPropertyValue($Object, [string]$PropertyName) {
+  if (-not $Object) { return $null }
+
+  $property = $Object.PSObject.Properties[$PropertyName]
+  if (-not $property) { return $null }
+
+  return $property.Value
+}
+
 function Get-PlannedDownloadCount($downloadReport) {
   if (-not $downloadReport) { return 0 }
 
-  if ($downloadReport.planned_downloads) {
-    return @($downloadReport.planned_downloads).Count
+  $plannedDownloads = Get-ObjectPropertyValue $downloadReport 'planned_downloads'
+  if ($plannedDownloads) {
+    return @($plannedDownloads).Count
   }
 
-  if ($downloadReport.summary -and $null -ne $downloadReport.summary.planned_downloads) {
-    return [int]$downloadReport.summary.planned_downloads
+  $summary = Get-ObjectPropertyValue $downloadReport 'summary'
+  if ($summary) {
+    $summaryPlannedDownloads = Get-ObjectPropertyValue $summary 'planned_downloads'
+    if ($null -ne $summaryPlannedDownloads) {
+      return [int]$summaryPlannedDownloads
+    }
+
+    $summaryMissingUnpublished = Get-ObjectPropertyValue $summary 'missing_unpublished'
+    if ($null -ne $summaryMissingUnpublished) {
+      return [int]$summaryMissingUnpublished
+    }
   }
 
   return 0
 }
-
 try {
   Write-Log '=== PIPELINE START ==='
   Write-Log "Mode: $Mode"
