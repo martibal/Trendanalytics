@@ -77,7 +77,7 @@ export default async function ChainHistoryPage({
 
   const canonicalPath = `data/published/v1/meta/${chainId}/last90d.json`;
   const bundle = await readPublishedJson<HistoryBundle>(canonicalPath);
-  const rows = extractRows(bundle);
+  const rows = extractRows(bundle).reverse();
 
   const latestRow = rows[0] ?? null;
   const latestConfidence = typeof latestRow?.confidence?.confidence_score === "number"
