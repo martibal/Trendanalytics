@@ -5,17 +5,14 @@ import Link from "next/link";
 import { readDatasetManifest, type DatasetManifest } from "@/lib/dataset";
 import { type ThresholdControlValues } from "@/components/thresholds/ThresholdControls";
 import ThresholdControlsClient from "@/components/thresholds/ThresholdControlsClient";
-
-import ShortFullContent from "@/components/site/ShortFullContent";
-
-import PageHero from "@/components/site/PageHero";
-import { UrdContainer, UrdPage, urd, cx } from "@/components/site/UrdDesignSystem";
 import { UrdHashModal, UrdHashModalClose, UrdHashModalTrigger } from "@/components/site/UrdHashModal";
 
 import "server-only";
 
+export const revalidate = 0;
+
 // ---------------------------------------------------------------------------
-// Canonical default values — single source of truth for this page
+// Canonical default values
 // ---------------------------------------------------------------------------
 
 const CANONICAL_DEFAULTS: ThresholdControlValues = {
@@ -32,62 +29,51 @@ const CANONICAL_DEFAULTS: ThresholdControlValues = {
 };
 
 // ---------------------------------------------------------------------------
-// Shared UI primitives — identical across all pages
+// UI primitives
 // ---------------------------------------------------------------------------
 
 function InlineCode({ children }: { children: ReactNode }) {
-  return <code className="rounded border border-[var(--urd-border)] bg-[var(--urd-raised)] px-1 py-0.5 text-[var(--urd-text-strong)] text-xs font-mono">{children}</code>;
+  return <code className="code-block inline-block px-2 py-0.5 text-[12px]">{children}</code>;
 }
 
 function MoreLink({ id, label = "More" }: { id: string; label?: string }) {
-  return <UrdHashModalTrigger id={id}>{label}</UrdHashModalTrigger>;
+  return <UrdHashModalTrigger id={id} className="text-link">{label} →</UrdHashModalTrigger>;
 }
 
 type ExplainPair = { basic: ReactNode; advanced: ReactNode; traceability?: ReactNode };
 
-function ExplainModal({
-  id,
-  title,
-  subtitle,
-  pair,
-  traceability,
-}: {
-  id: string;
-  title: string;
-  subtitle?: ReactNode;
-  pair: ExplainPair;
-  traceability?: ReactNode;
+function ExplainModal({ id, title, subtitle, pair, traceability }: {
+  id: string; title: string; subtitle?: ReactNode;
+  pair: ExplainPair; traceability?: ReactNode;
 }) {
   return (
     <UrdHashModal id={id}>
-      <UrdHashModalClose className={urd.modalBackdrop} ariaLabel="Close dialog">
+      <UrdHashModalClose className="absolute inset-0 bg-[rgba(8,15,26,.84)]" ariaLabel="Close dialog">
         <span className="sr-only">Close dialog</span>
       </UrdHashModalClose>
-      <div className={urd.modalPanel}>
-        <div className={urd.modalHeader}>
+      <div className="modal-panel relative z-10 flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden">
+        <div className="modal-head shrink-0">
           <div>
-            <h3 className="text-2xl font-black text-[var(--urd-text-strong)]">{title}</h3>
-            {subtitle ? (
-              <div className="mt-2 text-sm font-semibold leading-6 text-[var(--urd-text-body)]">{subtitle}</div>
-            ) : null}
+            <h3 className="ua-h3 text-[var(--ink)]">{title}</h3>
+            {subtitle ? <div className="mt-2 text-sm leading-6 text-[var(--ink2)]">{subtitle}</div> : null}
           </div>
-          <UrdHashModalClose className={urd.modalClose}>×</UrdHashModalClose>
+          <UrdHashModalClose className="btn-ghost h-10 px-3 shrink-0">×</UrdHashModalClose>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-5">
-          <div className={urd.modalGrid}>
-            <section className={urd.modalBasicPanel}>
-              <div className={cx(urd.modalKicker, "text-emerald-800")}>Basic</div>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.basic}</div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <section className="border-t-2 border-[var(--c-stable)] pt-4">
+              <div className="eyebrow mb-3">Basic</div>
+              <div className="text-sm leading-7 text-[var(--ink2)]">{pair.basic}</div>
             </section>
-            <details className={urd.modalAdvancedPanel} open>
-              <summary className={cx(urd.modalKicker, "cursor-pointer list-none")}>Advanced</summary>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{pair.advanced}</div>
+            <details className="border-t-2 border-[var(--gold)] pt-4">
+              <summary className="eyebrow cursor-pointer mb-3">Advanced</summary>
+              <div className="text-sm leading-7 text-[var(--ink2)]">{pair.advanced}</div>
             </details>
           </div>
           {traceability ? (
-            <div className="mt-4 rounded-2xl border border-[var(--urd-border)] bg-[var(--urd-raised)] p-5">
-              <div className={urd.modalKicker}>Traceability</div>
-              <div className="mt-3 text-sm font-semibold leading-7 text-[var(--urd-text-strong)]">{traceability}</div>
+            <div className="mt-6 border-t border-[var(--line)] pt-5">
+              <div className="eyebrow mb-3">Traceability</div>
+              <div className="text-sm leading-7 text-[var(--ink2)]">{traceability}</div>
             </div>
           ) : null}
         </div>
@@ -97,7 +83,7 @@ function ExplainModal({
 }
 
 // ---------------------------------------------------------------------------
-// Explanations
+// Explanations — unchanged from original
 // ---------------------------------------------------------------------------
 
 const whatAreThresholdsExplain: ExplainPair = {
@@ -121,7 +107,7 @@ const whatAreThresholdsExplain: ExplainPair = {
         exactly which thresholds were crossed to produce that label.
       </p>
       <p className="mt-3">
-        The thresholds on this page are the <span className="font-medium text-[var(--urd-text-strong)]">
+        The thresholds on this page are the <span className="font-medium text-[var(--ink)]">
         canonical defaults</span> — the values the model actually uses every day. You can
         also use the simulator below to explore what would happen if you moved them, but
         that simulation stays in your browser and never changes what the product publishes.
@@ -166,7 +152,7 @@ const confidenceThresholdExplain: ExplainPair = {
     <>
       <p>
         The confidence threshold is the most important single number on this page. It is set
-        to <span className="font-medium text-[var(--urd-text-strong)]">0.40</span>.
+        to <span className="font-medium text-[var(--ink)]">0.40</span>.
       </p>
       <p className="mt-3">
         If a chain&apos;s confidence score falls below 0.40, the model will not publish a
@@ -177,7 +163,7 @@ const confidenceThresholdExplain: ExplainPair = {
       <p className="mt-3">
         There is also a middle zone between 0.40 and 0.70 called the Caution band. Labels in
         this range are published, but the scorecard scores are pulled toward neutral (50) to
-        avoid over-interpreting weak evidence. You will see a yellow warning on chain pages
+        avoid over-interpreting weak evidence. You will see a warning on chain pages
         when confidence is in this range.
       </p>
       <p className="mt-3">
@@ -211,19 +197,11 @@ const confidenceThresholdExplain: ExplainPair = {
     </>
   ),
   traceability: (
-    <ul className="list-disc pl-5">
-      <li>
-        Gate field: <InlineCode>confidence.confidence_score</InlineCode>
-      </li>
-      <li>
-        Hard floor: <InlineCode>0.40</InlineCode> → UNKNOWN/DEGRADED
-      </li>
-      <li>
-        Caution band: <InlineCode>0.40–0.69</InlineCode> → scores degraded toward 50
-      </li>
-      <li>
-        Good band: <InlineCode>≥ 0.70</InlineCode> → full scorecard expression
-      </li>
+    <ul className="list-disc pl-5 text-sm text-[var(--ink2)] space-y-1">
+      <li>Gate field: <InlineCode>confidence.confidence_score</InlineCode></li>
+      <li>Hard floor: <InlineCode>0.40</InlineCode> → UNKNOWN/DEGRADED</li>
+      <li>Caution band: <InlineCode>0.40–0.69</InlineCode> → scores degraded toward 50</li>
+      <li>Good band: <InlineCode>≥ 0.70</InlineCode> → full scorecard expression</li>
     </ul>
   ),
 };
@@ -236,31 +214,13 @@ const bandThresholdsExplain: ExplainPair = {
         on any given day. The model uses two separate tests — percentile rank and z-score —
         and flags a metric as high if either one crosses the threshold.
       </p>
-      <p className="mt-3">
-        Here is what the default thresholds mean in plain language:
-      </p>
+      <p className="mt-3">Here is what the default thresholds mean in plain language:</p>
       <ul className="mt-2 list-disc space-y-2 pl-5">
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">High</span> — the metric is above the
-          80th percentile of the last 90 days, or its z-score is above +1.5. Either
-          condition is enough.
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Extreme high</span> — above the 95th
-          percentile, or z-score above +2.5. A stronger signal than merely high.
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Low</span> — below the 20th percentile,
-          or z-score below −1.5.
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Extreme low</span> — below the 5th
-          percentile, or z-score below −2.5.
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">Normal</span> — everything in between.
-          No band condition fires.
-        </li>
+        <li><span className="font-medium text-[var(--ink)]">High</span> — the metric is above the 80th percentile of the last 90 days, or its z-score is above +1.5. Either condition is enough.</li>
+        <li><span className="font-medium text-[var(--ink)]">Extreme high</span> — above the 95th percentile, or z-score above +2.5. A stronger signal than merely high.</li>
+        <li><span className="font-medium text-[var(--ink)]">Low</span> — below the 20th percentile, or z-score below −1.5.</li>
+        <li><span className="font-medium text-[var(--ink)]">Extreme low</span> — below the 5th percentile, or z-score below −2.5.</li>
+        <li><span className="font-medium text-[var(--ink)]">Normal</span> — everything in between. No band condition fires.</li>
       </ul>
     </>
   ),
@@ -271,28 +231,24 @@ const bandThresholdsExplain: ExplainPair = {
         <InlineCode>band = HIGH if pct_90d ≥ high_pct OR z_robust ≥ high_z</InlineCode>.
         This OR structure is intentional — it ensures that a metric can be classified as
         high via either a rank argument (positional in the empirical distribution) or a
-        distance argument (standardised deviation from the robust centre). In
-        well-behaved distributions these will co-fire; in pathological or sparse
-        distributions one criterion may be uninformative.
+        distance argument (standardised deviation from the robust centre).
       </p>
       <p className="mt-3">
         The z_robust criterion uses MAD-based standardisation:{" "}
         <InlineCode>z = 0.6745 × (x − median) / MAD</InlineCode>. The 0.6745 scaling makes
         the statistic asymptotically equivalent to a standard z-score under Gaussian
-        assumptions while inheriting outlier robustness from the MAD estimator. Fallback:
-        if MAD = 0, standard z-score is used; if std = 0, z = 0.
+        assumptions while inheriting outlier robustness from the MAD estimator.
       </p>
       <p className="mt-3">
         Band outcomes feed directly into axis-level regime rule evaluation. CONGESTED
         requires Capacity = EXTREME_HIGH, or (Capacity = HIGH and Friction = HIGH). HEATING
         requires Demand = HIGH and at least one axis trend = HEATING. CHEAP requires both
-        Friction = LOW and Capacity = LOW. These rules are applied after all band
-        classifications are complete and after confidence gating.
+        Friction = LOW and Capacity = LOW.
       </p>
     </>
   ),
   traceability: (
-    <ul className="list-disc pl-5">
+    <ul className="list-disc pl-5 text-sm text-[var(--ink2)] space-y-1">
       <li>High: <InlineCode>pct_90d ≥ 80</InlineCode> OR <InlineCode>z_robust ≥ 1.5</InlineCode></li>
       <li>Extreme high: <InlineCode>pct_90d ≥ 95</InlineCode> OR <InlineCode>z_robust ≥ 2.5</InlineCode></li>
       <li>Low: <InlineCode>pct_90d ≤ 20</InlineCode> OR <InlineCode>z_robust ≤ −1.5</InlineCode></li>
@@ -311,65 +267,29 @@ const regimeRulesExplain: ExplainPair = {
         evaluated in a fixed order, and the first one that matches wins.
       </p>
       <ol className="mt-3 list-decimal space-y-2 pl-5">
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">UNKNOWN/DEGRADED</span> — checked first.
-          If confidence is below 0.40, this label is assigned and no further rules are
-          evaluated.
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">CONGESTED</span> — capacity is extreme
-          high, or both capacity and friction are high at the same time.
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">CHEAP</span> — both friction and capacity
-          are low.
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">HEATING</span> — demand is high, and at
-          least one axis is trending upward (momentum positive).
-        </li>
-        <li>
-          <span className="font-medium text-[var(--urd-text-strong)]">STABLE</span> — none of the above apply.
-          The chain looks roughly normal.
-        </li>
+        <li><span className="font-medium text-[var(--ink)]">UNKNOWN/DEGRADED</span> — checked first. If confidence is below 0.40, this label is assigned and no further rules are evaluated.</li>
+        <li><span className="font-medium text-[var(--ink)]">CONGESTED</span> — capacity is extreme high, or both capacity and friction are high at the same time.</li>
+        <li><span className="font-medium text-[var(--ink)]">CHEAP</span> — both friction and capacity are low.</li>
+        <li><span className="font-medium text-[var(--ink)]">HEATING</span> — demand is high, and at least one axis is trending upward (momentum positive).</li>
+        <li><span className="font-medium text-[var(--ink)]">STABLE</span> — none of the above apply. The chain looks roughly normal.</li>
       </ol>
     </>
   ),
   advanced: (
     <>
-      <p>
-        The regime classification is a deterministic rule tree evaluated after band
-        classification and confidence gating. The evaluation order is:
-      </p>
+      <p>The regime classification is a deterministic rule tree evaluated after band classification and confidence gating. The evaluation order is:</p>
       <ol className="mt-3 list-decimal space-y-2 pl-5">
-        <li>
-          If <InlineCode>confidence_score &lt; confidence_threshold</InlineCode> →{" "}
-          <InlineCode>UNKNOWN/DEGRADED</InlineCode> (pre-empts all subsequent rules)
-        </li>
-        <li>
-          If <InlineCode>capacity = EXTREME_HIGH</InlineCode> OR{" "}
-          (<InlineCode>capacity = HIGH</InlineCode> AND{" "}
-          <InlineCode>friction = HIGH</InlineCode>) → <InlineCode>CONGESTED</InlineCode>
-        </li>
-        <li>
-          If <InlineCode>friction = LOW</InlineCode> AND{" "}
-          <InlineCode>capacity = LOW</InlineCode> → <InlineCode>CHEAP</InlineCode>
-        </li>
-        <li>
-          If <InlineCode>demand = HIGH</InlineCode> AND any axis trend is{" "}
-          <InlineCode>HEATING</InlineCode> (momentum ≥ 0.15) → <InlineCode>HEATING</InlineCode>
-        </li>
-        <li>
-          Default: <InlineCode>STABLE</InlineCode>
-        </li>
+        <li>If <InlineCode>confidence_score &lt; confidence_threshold</InlineCode> → <InlineCode>UNKNOWN/DEGRADED</InlineCode> (pre-empts all subsequent rules)</li>
+        <li>If <InlineCode>capacity = EXTREME_HIGH</InlineCode> OR (<InlineCode>capacity = HIGH</InlineCode> AND <InlineCode>friction = HIGH</InlineCode>) → <InlineCode>CONGESTED</InlineCode></li>
+        <li>If <InlineCode>friction = LOW</InlineCode> AND <InlineCode>capacity = LOW</InlineCode> → <InlineCode>CHEAP</InlineCode></li>
+        <li>If <InlineCode>demand = HIGH</InlineCode> AND any axis trend is <InlineCode>HEATING</InlineCode> (momentum ≥ 0.15) → <InlineCode>HEATING</InlineCode></li>
+        <li>Default: <InlineCode>STABLE</InlineCode></li>
       </ol>
       <p className="mt-3">
         The priority ordering ensures CONGESTED cannot be masked by CHEAP conditions, and
         HEATING requires both level elevation and directional acceleration. STABLE is the
         residual category — it does not have positive conditions, it is the absence of all
-        other conditions. This design means STABLE is epistemically conservative: the model
-        does not claim STABLE when no positive evidence exists; it simply finds no reason
-        for a stronger label.
+        other conditions.
       </p>
     </>
   ),
@@ -409,11 +329,7 @@ const simulatorExplain: ExplainPair = {
         preview: the API endpoint <InlineCode>POST /api/v1/files/custom</InlineCode> accepts
         a threshold configuration and returns identity-hashed JSON outputs generated by
         applying those thresholds to the canonical published data. Custom outputs are
-        immutable per identity hash, stored per account, and explicitly marked as custom —
-        they cannot overwrite canonical meta artifacts.
-      </p>
-      <p className="mt-3">
-        The identity hash is derived from the canonical custom-threshold parameter vector plus the archived publication context used for the preview. This means two users who submit identical threshold configurations against the same published context will receive the same identity hash and the same output — the custom classification is fully reproducible and auditable.
+        immutable per identity hash, stored per account, and explicitly marked as custom.
       </p>
     </>
   ),
@@ -450,8 +366,7 @@ const interpretationBoundaryExplain: ExplainPair = {
         not constitute a backtested strategy. A user who finds that a stricter confidence
         floor or different band boundaries produce a pattern that correlates with past
         returns has made an observation about a descriptive data series, not validated a
-        trading system. The product does not publish the price data or return series required
-        to make such a validation meaningful.
+        trading system.
       </p>
     </>
   ),
@@ -465,418 +380,257 @@ export default async function ThresholdsPage() {
   const dataset: DatasetManifest | null = await readDatasetManifest();
 
   return (
-    <UrdPage>
-      <PageHero
-        eyebrow="Classification rules"
-        title="Thresholds"
-        summary="The exact values that decide when a metric is high, when confidence is good enough, and which regime label a chain receives."
-      />
+    <main className="ua-page">
 
-      <UrdContainer className="py-10">
-      
-
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="mb-10 rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
-        <div className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%)] p-8 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="max-w-3xl">
-              <div className="text-xs font-medium uppercase tracking-[0.18em] text-blue-700">
-                Classification rules
-              </div>
-              <h1 className="mt-3 text-4xl font-semibold leading-tight text-[var(--urd-text-strong)] sm:text-5xl">
-                Thresholds
-              </h1>
-              <p className="mt-4 text-lg leading-8 text-[var(--urd-text-body)]">
-                The exact values that decide when a metric is "high", when confidence is
-                "good enough", and which regime label a chain receives. Published openly so
-                every classification can be traced and understood.
-              </p>
-              <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[var(--urd-text-strong)]">
-                Most regime-classification products do not publish their thresholds. Urd Atlas
-                does, so every label can be reconstructed and checked.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <MoreLink id="what-are-modal" label="What are thresholds?" />
-                <MoreLink id="regime-rules-modal" label="Regime classification rules" />
-                <MoreLink id="boundary-modal" label="Interpretation boundary" />
-                <Link
-                  href="/methodology"
-                  className="inline-flex items-center rounded-full border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-3 py-1 text-xs font-medium text-[var(--urd-text-strong)] hover:bg-white"
-                >
-                  Methodology
-                </Link>
-              </div>
-            </div>
-
-            {dataset ? (
-              <div className="min-w-[200px] rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-raised)] px-4 py-4 text-xs text-[var(--urd-text-body)]">
-                <div className="font-medium uppercase tracking-[0.12em] text-[var(--urd-text-muted)]">
-                  Dataset
-                </div>
-                {dataset.version ? (
-                  <div className="mt-2">
-                    Revision{" "}
-                    <span className="font-semibold text-[var(--urd-text-strong)]">{dataset.version}</span>
-                  </div>
-                ) : null}
-                {dataset.methodology_version ? (
-                  <div className="mt-1">
-                    Methodology{" "}
-                    <InlineCode>{dataset.methodology_version}</InlineCode>
-                  </div>
-                ) : null}
-                <div className="mt-2 border-t border-[var(--urd-border-soft)] pt-2 text-[var(--urd-text-muted)]">
-                  Published artifact contract
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Reading map */}
-          <div className="mt-6 rounded-2xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-                  How to read this page
-                </div>
-                <div className="mt-2 text-sm text-[var(--urd-text-strong)]">
-                  Canonical values → Confidence gate → Band thresholds → Regime rules → Simulator
-                </div>
-              </div>
-              <MoreLink id="what-are-modal" label="Full explanation" />
-            </div>
+      {/* ── Hero ── */}
+      <header className="hero border-b border-[var(--line)]">
+        <div className="page-shell">
+          <div className="eyebrow mb-4">Classification rules</div>
+          <h1 className="ua-h1">Thresholds</h1>
+          <p className="lead mt-4 max-w-2xl">
+            The exact values that decide when a metric is high, when confidence is good enough,
+            and which regime label a chain receives. Published openly so every classification
+            can be traced and understood.
+          </p>
+          <p className="mt-3 text-sm text-[var(--ink2)] max-w-2xl">
+            Most regime-classification products do not publish their thresholds. Urd Atlas does,
+            so every label can be reconstructed and checked.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <MoreLink id="what-are-modal" label="What are thresholds?" />
+            <MoreLink id="regime-rules-modal" label="Regime classification rules" />
+            <MoreLink id="boundary-modal" label="Interpretation boundary" />
+            <Link href="/methodology" className="text-link">Methodology →</Link>
           </div>
         </div>
-      </section>
+      </header>
 
-      {/* ── Canonical values at a glance ─────────────────────────────────── */}
-      <section className="mb-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-              Canonical defaults
+      <div className="page-shell py-12 space-y-16">
+
+        {/* ── Canonical values ── */}
+        <section>
+          <div className="section-head mb-8">
+            <div>
+              <div className="eyebrow mb-3">Canonical defaults</div>
+              <h2 className="ua-h2">The values the model uses today</h2>
             </div>
-            <h2 className="mt-1 text-3xl font-semibold">The values the model uses today</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-[var(--urd-text-body)]">
+            <p className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
               These are the exact threshold values in the currently published methodology.
               Every regime label on every chain page was produced using these numbers.
             </p>
           </div>
-        </div>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="fact-row mb-8" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
 
-          {/* Confidence gate */}
-          <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-amber-300">
-                Confidence gate
+            {/* Confidence gate */}
+            <div className="fact-item">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="eyebrow">Confidence gate</div>
+                <MoreLink id="confidence-modal" />
               </div>
-              <MoreLink id="confidence-modal" />
+              <div className="font-mono text-[48px] font-medium text-[var(--c-heating)] leading-none mb-4">0.40</div>
+              <p className="text-sm leading-7 text-[var(--ink2)]">
+                Below this value, the regime label becomes UNKNOWN/DEGRADED regardless of
+                axis structure. The most important single threshold on the site.
+              </p>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <div style={{ background: "rgba(158,64,64,.12)", border: "1px solid rgba(158,64,64,.25)", borderRadius: "3px", padding: "8px 4px" }}>
+                  <div className="font-mono text-[11px] font-medium" style={{ color: "var(--c-congested)" }}>&lt; 0.40</div>
+                  <div className="text-[10px] text-[var(--ink3)] mt-1">Degraded</div>
+                </div>
+                <div style={{ background: "rgba(196,132,60,.12)", border: "1px solid rgba(196,132,60,.25)", borderRadius: "3px", padding: "8px 4px" }}>
+                  <div className="font-mono text-[11px] font-medium" style={{ color: "var(--c-heating)" }}>0.40–0.69</div>
+                  <div className="text-[10px] text-[var(--ink3)] mt-1">Caution</div>
+                </div>
+                <div style={{ background: "rgba(16,185,129,.12)", border: "1px solid rgba(16,185,129,.25)", borderRadius: "3px", padding: "8px 4px" }}>
+                  <div className="font-mono text-[11px] font-medium" style={{ color: "var(--c-stable)" }}>≥ 0.70</div>
+                  <div className="text-[10px] text-[var(--ink3)] mt-1">Good</div>
+                </div>
+              </div>
             </div>
-            <div className="mt-4 text-5xl font-semibold text-[var(--urd-text-strong)]">0.40</div>
-            <p className="mt-3 text-sm leading-7 text-[var(--urd-text-body)]">
-              Below this value, the regime label becomes UNKNOWN/DEGRADED regardless of
-              axis structure. The most important single threshold on the site.
-            </p>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-              <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-2 py-2">
-                <div className="font-semibold text-red-300">&lt; 0.40</div>
-                <div className="mt-1 text-[var(--urd-text-body)]">Degraded</div>
-              </div>
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-2 py-2">
-                <div className="font-semibold text-amber-300">0.40–0.69</div>
-                <div className="mt-1 text-[var(--urd-text-body)]">Caution</div>
-              </div>
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2 py-2">
-                <div className="font-semibold text-emerald-300">≥ 0.70</div>
-                <div className="mt-1 text-[var(--urd-text-body)]">Good</div>
-              </div>
-            </div>
-          </div>
 
-          {/* High band */}
-          <div className="rounded-3xl border p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-                High band
+            {/* High band */}
+            <div className="fact-item">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="eyebrow">High band</div>
+                <MoreLink id="bands-modal" />
               </div>
-              <MoreLink id="bands-modal" />
+              <div style={{ display: "flex", alignItems: "end", gap: "16px", marginBottom: "16px" }}>
+                <div>
+                  <div className="text-[11px] text-[var(--ink3)] mb-1">Percentile</div>
+                  <div className="font-mono text-[36px] font-medium text-[var(--ink)] leading-none">≥ 80</div>
+                </div>
+                <div className="text-[var(--ink3)] mb-2 text-sm">or</div>
+                <div>
+                  <div className="text-[11px] text-[var(--ink3)] mb-1">Z-score</div>
+                  <div className="font-mono text-[36px] font-medium text-[var(--ink)] leading-none">≥ 1.5</div>
+                </div>
+              </div>
+              <p className="text-sm leading-7 text-[var(--ink2)]">
+                Either criterion fires the HIGH band. Extreme high: ≥ 95th percentile or
+                z ≥ 2.5. Low mirrors these values on the negative side.
+              </p>
             </div>
-            <div className="mt-4 flex items-end gap-3">
-              <div>
-                <div className="text-xs text-[var(--urd-text-body)]">Percentile</div>
-                <div className="text-4xl font-semibold text-[var(--urd-text-strong)]">≥ 80</div>
-              </div>
-              <div className="mb-1 text-[var(--urd-text-body)]">or</div>
-              <div>
-                <div className="text-xs text-[var(--urd-text-body)]">Z-score</div>
-                <div className="text-4xl font-semibold text-[var(--urd-text-strong)]">≥ 1.5</div>
-              </div>
-            </div>
-            <p className="mt-3 text-sm leading-7 text-[var(--urd-text-body)]">
-              Either criterion fires the HIGH band. Extreme high: ≥ 95th percentile or
-              z ≥ 2.5. Low mirrors these values on the negative side.
-            </p>
-          </div>
 
-          {/* Regime rules summary */}
-          <div className="rounded-3xl border p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-                Regime rules
+            {/* Regime rules */}
+            <div className="fact-item">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="eyebrow">Regime rules</div>
+                <MoreLink id="regime-rules-modal" />
               </div>
-              <MoreLink id="regime-rules-modal" />
-            </div>
-            <ul className="mt-4 space-y-2 text-sm">
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 font-mono text-xs text-red-400">①</span>
-                <span className="text-[var(--urd-text-body)]">
-                  <span className="font-medium text-[var(--urd-text-strong)]">UNKNOWN/DEGRADED</span> — confidence &lt; 0.40
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 font-mono text-xs text-red-400">②</span>
-                <span className="text-[var(--urd-text-body)]">
-                  <span className="font-medium text-[var(--urd-text-strong)]">CONGESTED</span> — capacity extreme high, or capacity+friction both high
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 font-mono text-xs text-blue-400">③</span>
-                <span className="text-[var(--urd-text-body)]">
-                  <span className="font-medium text-[var(--urd-text-strong)]">CHEAP</span> — friction+capacity both low
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 font-mono text-xs text-amber-400">④</span>
-                <span className="text-[var(--urd-text-body)]">
-                  <span className="font-medium text-[var(--urd-text-strong)]">HEATING</span> — demand high + any axis trending up
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 font-mono text-xs text-emerald-400">⑤</span>
-                <span className="text-[var(--urd-text-body)]">
-                  <span className="font-medium text-[var(--urd-text-strong)]">STABLE</span> — none of the above
-                </span>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Full band table */}
-        <div className="mt-4 rounded-3xl border shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-5">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-                All band thresholds
-              </div>
-              <h3 className="mt-1 text-xl font-semibold">Complete canonical values</h3>
-            </div>
-            <MoreLink id="bands-modal" label="How bands work" />
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-[var(--urd-panel-strong)] text-left">
-                <tr>
-                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Band</th>
-                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Percentile criterion</th>
-                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Z-score criterion</th>
-                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Logic</th>
-                  <th className="px-5 py-3 text-xs font-medium uppercase tracking-[0.12em] text-[var(--urd-text-body)]">Role in regime</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
+              <ul className="space-y-2 text-sm">
                 {[
-                  {
-                    band: "EXTREME_HIGH",
-                    pct: "≥ 95th",
-                    z: "≥ +2.5",
-                    logic: "OR",
-                    role: "Triggers CONGESTED alone (capacity axis)",
-                    color: "text-red-300",
-                  },
-                  {
-                    band: "HIGH",
-                    pct: "≥ 80th",
-                    z: "≥ +1.5",
-                    logic: "OR",
-                    role: "CONGESTED (capacity+friction), HEATING (demand)",
-                    color: "text-amber-300",
-                  },
-                  {
-                    band: "NORMAL",
-                    pct: "20th–80th",
-                    z: "−1.5 to +1.5",
-                    logic: "—",
-                    role: "Default — no band condition fires",
-                    color: "text-[var(--urd-text-body)]",
-                  },
-                  {
-                    band: "LOW",
-                    pct: "≤ 20th",
-                    z: "≤ −1.5",
-                    logic: "OR",
-                    role: "CHEAP (friction+capacity both low)",
-                    color: "text-blue-300",
-                  },
-                  {
-                    band: "EXTREME_LOW",
-                    pct: "≤ 5th",
-                    z: "≤ −2.5",
-                    logic: "OR",
-                    role: "Stronger low signal — feeds CHEAP",
-                    color: "text-blue-700",
-                  },
-                ].map((row) => (
-                  <tr key={row.band} className="hover:bg-[var(--urd-raised)]/10">
-                    <td className={`px-5 py-3 font-mono text-xs font-semibold ${row.color}`}>
-                      {row.band}
-                    </td>
-                    <td className="px-5 py-3 font-mono text-xs text-[var(--urd-text-body)]">{row.pct}</td>
-                    <td className="px-5 py-3 font-mono text-xs text-[var(--urd-text-body)]">{row.z}</td>
-                    <td className="px-5 py-3 text-xs text-[var(--urd-text-body)]">{row.logic}</td>
-                    <td className="px-5 py-3 text-xs text-[var(--urd-text-body)]">{row.role}</td>
-                  </tr>
+                  { num: "①", label: "UNKNOWN/DEGRADED", rule: "confidence < 0.40", color: "var(--c-unknown)" },
+                  { num: "②", label: "CONGESTED", rule: "capacity extreme high, or capacity+friction both high", color: "var(--c-congested)" },
+                  { num: "③", label: "CHEAP", rule: "friction+capacity both low", color: "var(--c-cheap)" },
+                  { num: "④", label: "HEATING", rule: "demand high + any axis trending up", color: "var(--c-heating)" },
+                  { num: "⑤", label: "STABLE", rule: "none of the above", color: "var(--c-stable)" },
+                ].map(({ num, label, rule, color }) => (
+                  <li key={label} style={{ display: "flex", alignItems: "start", gap: "8px" }}>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: "11px", color, flexShrink: 0, marginTop: "2px" }}>{num}</span>
+                    <span className="text-[var(--ink2)]">
+                      <span style={{ fontWeight: 500, color }}>{label}</span> — {rule}
+                    </span>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="border-t px-5 py-3 text-xs text-[var(--urd-text-body)]">
-            Source: <InlineCode>regime_engine.py</InlineCode> ·{" "}
-            <InlineCode>market_scorecard.py</InlineCode> · Methodology version{" "}
-            <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Simulator ────────────────────────────────────────────────────── */}
-      <section className="mb-8 rounded-3xl border p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-              Local exploration
+              </ul>
             </div>
-            <h2 className="mt-1 text-3xl font-semibold">Threshold simulator</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-[var(--urd-text-body)]">
+          </div>
+
+          {/* Full band table */}
+          <div className="border-t border-[var(--line)]">
+            <div className="flex flex-wrap items-center justify-between gap-3 py-5 border-b border-[var(--line)]">
+              <div>
+                <div className="eyebrow mb-1">All band thresholds</div>
+                <h3 className="ua-h3">Complete canonical values</h3>
+              </div>
+              <MoreLink id="bands-modal" label="How bands work" />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--line)]">
+                    {["Band", "Percentile criterion", "Z-score criterion", "Logic", "Role in regime"].map((h) => (
+                      <th key={h} className="px-0 py-3 pr-6 text-left font-mono text-[10px] font-medium uppercase tracking-[.16em] text-[var(--gold)]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { band: "EXTREME_HIGH", pct: "≥ 95th", z: "≥ +2.5", logic: "OR", role: "Triggers CONGESTED alone (capacity axis)", color: "var(--c-congested)" },
+                    { band: "HIGH",         pct: "≥ 80th", z: "≥ +1.5", logic: "OR", role: "CONGESTED (capacity+friction), HEATING (demand)", color: "var(--c-heating)" },
+                    { band: "NORMAL",       pct: "20th–80th", z: "−1.5 to +1.5", logic: "—", role: "Default — no band condition fires", color: "var(--ink3)" },
+                    { band: "LOW",          pct: "≤ 20th", z: "≤ −1.5", logic: "OR", role: "CHEAP (friction+capacity both low)", color: "var(--c-cheap)" },
+                    { band: "EXTREME_LOW",  pct: "≤ 5th",  z: "≤ −2.5", logic: "OR", role: "Stronger low signal — feeds CHEAP", color: "var(--c-cheap)" },
+                  ].map((row) => (
+                    <tr key={row.band} className="border-b border-[var(--line)] hover:bg-[var(--surface3)] transition-colors">
+                      <td className="py-3 pr-6"><span className="font-mono text-[11px] font-medium" style={{ color: row.color }}>{row.band}</span></td>
+                      <td className="py-3 pr-6 font-mono text-[12px] text-[var(--ink2)]">{row.pct}</td>
+                      <td className="py-3 pr-6 font-mono text-[12px] text-[var(--ink2)]">{row.z}</td>
+                      <td className="py-3 pr-6 text-[12px] text-[var(--ink2)]">{row.logic}</td>
+                      <td className="py-3 text-[12px] text-[var(--ink2)]">{row.role}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t border-[var(--line)] py-3 font-mono text-[10px] text-[var(--ink3)]">
+              Source: <InlineCode>regime_engine.py</InlineCode> · <InlineCode>market_scorecard.py</InlineCode> · Methodology version <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode>
+            </div>
+          </div>
+
+          {/* Dataset info */}
+          {dataset ? (
+            <div className="fact-row mt-6" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+              {dataset.version ? (
+                <div className="fact-item">
+                  <strong>Dataset revision</strong>
+                  <div className="mt-2 font-mono text-[16px] text-[var(--ink)]">{dataset.version}</div>
+                </div>
+              ) : null}
+              {dataset.methodology_version ? (
+                <div className="fact-item">
+                  <strong>Methodology version</strong>
+                  <div className="mt-2"><InlineCode>{dataset.methodology_version}</InlineCode></div>
+                </div>
+              ) : null}
+              {dataset.published_at ? (
+                <div className="fact-item">
+                  <strong>Published</strong>
+                  <div className="mt-2 font-mono text-[13px] text-[var(--ink)]">{dataset.published_at.slice(0, 10)}</div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+
+        {/* ── Simulator ── */}
+        <section>
+          <div className="section-head mb-8">
+            <div>
+              <div className="eyebrow mb-3">Local exploration</div>
+              <h2 className="ua-h2">Threshold simulator</h2>
+              <MoreLink id="simulator-modal" label="How the simulator works" />
+            </div>
+            <p className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
               Adjust the sliders to explore how different threshold values would change the
               classification rules. Everything here runs in your browser — nothing changes
               what the product actually publishes.
             </p>
           </div>
-          <MoreLink id="simulator-modal" label="How the simulator works" />
-        </div>
 
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm text-amber-200 mb-6">
-          <span className="font-medium">Local simulation only.</span> Adjusting these
-          controls does not overwrite canonical published methodology, public regime labels,
-          or default API outputs. All changes are local to your browser session.
-        </div>
-
-        <ThresholdControlsClient initialValues={CANONICAL_DEFAULTS} />
-      </section>
-
-      {/* ── Navigation strip ─────────────────────────────────────────────── */}
-      <section className="mt-10 rounded-3xl border p-6 shadow-sm">
-        <div className="text-xs font-medium uppercase tracking-[0.14em] text-blue-700">
-          Related
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { href: "/methodology", label: "Methodology", desc: "Full model documentation" },
-            { href: "/glossary", label: "Glossary", desc: "Definitions for every term" },
-            { href: "/chains", label: "Chains", desc: "See thresholds in action — current labels" },
-            { href: "/track-record", label: "Track Record", desc: "Historical label archive" },
-            { href: "/status", label: "Status", desc: "Pipeline and freshness health" },
-            { href: "/api-docs", label: "API Docs", desc: "Custom threshold output contract" },
-          ].map(({ href, label, desc }) => (
-            <Link
-              key={href}
-              href={href}
-              className="group flex items-center justify-between rounded-2xl border bg-background/40 px-4 py-3 transition hover:border-cyan-500/30 hover:bg-[var(--urd-raised)]/30"
-            >
-              <div>
-                <div className="text-sm font-medium text-[var(--urd-text-strong)]">{label}</div>
-                <div className="mt-0.5 text-xs text-[var(--urd-text-body)]">{desc}</div>
-              </div>
-              <span className="text-xs text-[var(--urd-text-body)] transition group-hover:text-blue-700">
-                →
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Data contract ─────────────────────────────────────────────────── */}
-      <details className="mt-8 rounded-2xl border p-5">
-        <summary className="cursor-pointer text-sm font-medium text-[var(--urd-text-body)] hover:text-[var(--urd-text-strong)]">
-          Data contract and traceability
-        </summary>
-        <div className="mt-4 grid gap-2 text-sm text-[var(--urd-text-body)]">
-          <div>Published artifact contract</div>
-          <div>
-            Dataset manifest:{" "}
-            <InlineCode>data/published/v1/dataset.json</InlineCode>
+          <div style={{
+            background: "rgba(196,132,60,.08)", border: "1px solid rgba(196,132,60,.25)",
+            borderRadius: "var(--radius-sm)", padding: "12px 18px",
+            fontFamily: "var(--mono)", fontSize: "11px", color: "var(--c-heating)",
+            marginBottom: "24px",
+          }}>
+            Local simulation only. Adjusting these controls does not overwrite canonical published
+            methodology, public regime labels, or default API outputs. All changes are local to your browser session.
           </div>
-          <div>
-            Threshold values are fixed per methodology version. Changes to thresholds
-            require a methodology version bump and are documented in{" "}
-            <Link href="/methodology/changelog" className="underline hover:text-[var(--urd-text-strong)]">
-              /methodology/changelog
-            </Link>
-            .
+
+          <ThresholdControlsClient initialValues={CANONICAL_DEFAULTS} />
+        </section>
+
+        {/* ── Related ── */}
+        <section className="border-t border-[var(--line)] pt-8">
+          <div className="eyebrow mb-6">Related</div>
+          <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { href: "/methodology", label: "Methodology", desc: "Full model documentation" },
+              { href: "/glossary", label: "Glossary", desc: "Definitions for every term" },
+              { href: "/chains", label: "Chains", desc: "See thresholds in action — current labels" },
+              { href: "/track-record", label: "Track Record", desc: "Historical label archive" },
+              { href: "/status", label: "Status", desc: "Pipeline and freshness health" },
+              { href: "/api-docs", label: "API Docs", desc: "Custom threshold output contract" },
+            ].map(({ href, label, desc }) => (
+              <Link key={href} href={href} className="data-row pr-6" style={{ display: "block", padding: "16px 24px 16px 0" }}>
+                <div className="text-[var(--ink)] text-sm font-medium">{label}</div>
+                <div className="mt-1 text-[11px] text-[var(--ink3)]">{desc}</div>
+              </Link>
+            ))}
           </div>
-          <div>
-            The interactive simulator does not make network requests and does not persist
-            state. It is a client-side presentation layer only.
+        </section>
+
+        {/* ── Data contract ── */}
+        <details className="border-t border-[var(--line)] pt-6">
+          <summary className="eyebrow cursor-pointer">Data contract and traceability</summary>
+          <div className="mt-4 space-y-2 text-sm text-[var(--ink2)]">
+            <div>Dataset manifest: <InlineCode>data/published/v1/dataset.json</InlineCode></div>
+            <div>Threshold values are fixed per methodology version. Changes to thresholds require a methodology version bump.</div>
+            <div>The interactive simulator does not make network requests and does not persist state. It is a client-side presentation layer only.</div>
           </div>
-        </div>
-      </details>
+        </details>
 
-      {/* ── All modals ────────────────────────────────────────────────────── */}
-      <ExplainModal
-        id="what-are-modal"
-        title="What are thresholds?"
-        subtitle="How classification rules work and why they are published openly."
-        pair={whatAreThresholdsExplain}
-      />
+      </div>
 
-      <ExplainModal
-        id="confidence-modal"
-        title="The confidence gate — 0.40"
-        subtitle="The most important threshold on the site and how it works."
-        pair={confidenceThresholdExplain}
-        traceability={confidenceThresholdExplain.traceability}
-      />
-
-      <ExplainModal
-        id="bands-modal"
-        title="Band thresholds"
-        subtitle="How metrics are classified as high, low, extreme, or normal."
-        pair={bandThresholdsExplain}
-        traceability={bandThresholdsExplain.traceability}
-      />
-
-      <ExplainModal
-        id="regime-rules-modal"
-        title="Regime classification rules"
-        subtitle="The exact rules that produce STABLE, HEATING, CONGESTED, CHEAP, and UNKNOWN/DEGRADED."
-        pair={regimeRulesExplain}
-      />
-
-      <ExplainModal
-        id="simulator-modal"
-        title="How the threshold simulator works"
-        subtitle="What the interactive controls do and what they do not do."
-        pair={simulatorExplain}
-      />
-
-      <ExplainModal
-        id="boundary-modal"
-        title="Interpretation boundary"
-        subtitle="What thresholds are and are not for."
-        pair={interpretationBoundaryExplain}
-      />
-      </UrdContainer>
-    </UrdPage>
+      {/* ── Modals ── */}
+      <ExplainModal id="what-are-modal" title="What are thresholds?" subtitle="How classification rules work and why they are published openly." pair={whatAreThresholdsExplain} />
+      <ExplainModal id="confidence-modal" title="The confidence gate — 0.40" subtitle="The most important threshold on the site and how it works." pair={confidenceThresholdExplain} traceability={confidenceThresholdExplain.traceability} />
+      <ExplainModal id="bands-modal" title="Band thresholds" subtitle="How metrics are classified as high, low, extreme, or normal." pair={bandThresholdsExplain} traceability={bandThresholdsExplain.traceability} />
+      <ExplainModal id="regime-rules-modal" title="Regime classification rules" subtitle="The exact rules that produce STABLE, HEATING, CONGESTED, CHEAP, and UNKNOWN/DEGRADED." pair={regimeRulesExplain} />
+      <ExplainModal id="simulator-modal" title="How the threshold simulator works" subtitle="What the interactive controls do and what they do not do." pair={simulatorExplain} />
+      <ExplainModal id="boundary-modal" title="Interpretation boundary" subtitle="What thresholds are and are not for." pair={interpretationBoundaryExplain} />
+    </main>
   );
 }

@@ -1,72 +1,41 @@
 // src/components/track-record/TransitionMatrix.tsx
 "use client";
 
-const REGIMES = [
-  "STABLE",
-  "HEATING",
-  "CONGESTED",
-  "CHEAP",
-  "UNKNOWN/DEGRADED",
-] as const;
-
+const REGIMES = ["STABLE", "HEATING", "CONGESTED", "CHEAP", "UNKNOWN/DEGRADED"] as const;
 type RegimeLabel = (typeof REGIMES)[number];
 
-export type TransitionEntry = {
-  from: string;
-  to: string;
-};
+export type TransitionEntry = { from: string; to: string; };
+export type TransitionMatrixProps = { transitions: TransitionEntry[]; className?: string; };
 
-export type TransitionMatrixProps = {
-  transitions: TransitionEntry[];
-  className?: string;
-};
-
-function getColor(regime: string): string {
+function getHex(regime: string): string {
   switch (regime.toUpperCase()) {
-    case "STABLE":
-      return "var(--color-regime-stable)";
-    case "HEATING":
-      return "var(--color-regime-heating)";
-    case "CONGESTED":
-      return "var(--color-regime-congested)";
-    case "CHEAP":
-      return "var(--color-regime-cheap)";
-    case "UNKNOWN/DEGRADED":
-      return "var(--color-regime-unknown)";
-    default:
-      return "var(--color-regime-unknown)";
+    case "STABLE":           return "#10B981";
+    case "HEATING":          return "#C4843C";
+    case "CONGESTED":        return "#9E4040";
+    case "CHEAP":            return "#3b74d8";
+    case "UNKNOWN/DEGRADED": return "#3A4A57";
+    default:                 return "#3A4A57";
   }
 }
 
 function regimeMeaning(regime: string): string {
   switch (regime.toUpperCase()) {
-    case "STABLE":
-      return "closer to the chain’s usual recent operating range";
-    case "HEATING":
-      return "hotter-than-usual pressure relative to recent history";
-    case "CONGESTED":
-      return "elevated pressure or tighter conditions";
-    case "CHEAP":
-      return "softer-than-usual pressure or looser conditions";
-    case "UNKNOWN/DEGRADED":
-      return "evidence below the canonical publish floor or otherwise degraded";
-    default:
-      return "published descriptive regime";
+    case "STABLE":           return "closer to the chain's usual recent operating range";
+    case "HEATING":          return "hotter-than-usual pressure relative to recent history";
+    case "CONGESTED":        return "elevated pressure or tighter conditions";
+    case "CHEAP":            return "softer-than-usual pressure or looser conditions";
+    case "UNKNOWN/DEGRADED": return "evidence below the canonical publish floor";
+    default:                 return "published descriptive regime";
   }
 }
 
-export default function TransitionMatrix({
-  transitions,
-  className,
-}: TransitionMatrixProps) {
+export default function TransitionMatrix({ transitions, className }: TransitionMatrixProps) {
   const counts: Record<string, Record<string, number>> = {};
   let maxCount = 0;
 
   for (const from of REGIMES) {
     counts[from] = {};
-    for (const to of REGIMES) {
-      counts[from][to] = 0;
-    }
+    for (const to of REGIMES) counts[from][to] = 0;
   }
 
   for (const t of transitions) {
@@ -82,132 +51,95 @@ export default function TransitionMatrix({
 
   if (total === 0) {
     return (
-      <div
-        className={`rounded-xl border p-6 text-sm text-muted-foreground ${
-          className ?? ""
-        }`}
-      >
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: "16px", fontSize: "13px", color: "var(--ink2)" }} className={className ?? ""}>
         No transition data available for the selected filters.
       </div>
     );
   }
 
   return (
-    <div className={`rounded-xl border p-5 ${className ?? ""}`}>
-      <div className="mb-4">
-        <div className="text-sm font-medium text-foreground">
-          Regime Transition Matrix
-        </div>
-        <div className="mt-0.5 text-xs text-muted-foreground">
-          Row = from regime · Column = to regime · Count of day-to-day published
-          label transitions
-        </div>
+    <div className={className}>
+      {/* Header */}
+      <div style={{ marginBottom: "14px" }}>
+        <div style={{ fontFamily: "var(--mono)", fontSize: "10px", fontWeight: 500, letterSpacing: ".16em", textTransform: "uppercase", color: "var(--gold)", marginBottom: "4px" }}>Regime Transition Matrix</div>
+        <div style={{ fontSize: "12px", color: "var(--ink2)" }}>Row = from regime · Column = to regime · Count of day-to-day published label transitions</div>
       </div>
 
-      <div className="mb-4 rounded-xl border bg-muted/10 p-3 text-xs leading-6 text-muted-foreground">
-        <div>
-          Read the matrix as <strong>switching behavior</strong> inside the selected
-          history window.
-        </div>
-        <div className="mt-1">
-          A large diagonal value means the same regime tended to persist from one
-          published day to the next. A larger off-diagonal value means the product
-          more often switched from one regime into another specific regime.
-        </div>
-        <div className="mt-1">
-          This is descriptive only. It does not say which transition is “good” or
-          “bad”; it only shows how the published labels actually changed over time.
-        </div>
+      {/* Explanation */}
+      <div style={{
+        background: "var(--surface2)", border: "1px solid var(--line2)",
+        borderLeft: "3px solid var(--gold)", borderRadius: "0 var(--radius-sm) var(--radius-sm) 0",
+        padding: "12px 16px", marginBottom: "16px", fontSize: "12px", lineHeight: "1.7", color: "var(--ink2)",
+      }}>
+        A large diagonal value means the same regime tended to persist from one published day to the next.
+        A larger off-diagonal value means the product more often switched from one regime into another specific regime.
+        This is descriptive only.
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      {/* Legend */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "16px" }}>
         {REGIMES.map((label) => (
-          <span
-            key={label}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground"
-            title={regimeMeaning(label)}
-          >
-            <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: getColor(label) }}
-              aria-hidden="true"
-            />
+          <span key={label} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "var(--ink2)", fontFamily: "var(--mono)" }} title={regimeMeaning(label)}>
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: getHex(label), flexShrink: 0, display: "inline-block" }} />
             {label}
           </span>
         ))}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-xs">
+      {/* Matrix */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ minWidth: "100%", fontSize: "12px", borderCollapse: "collapse" }}>
           <thead>
             <tr>
-              <th className="pb-2 pr-3 text-left font-medium text-muted-foreground">
+              <th style={{ paddingBottom: "10px", paddingRight: "12px", textAlign: "left", fontFamily: "var(--mono)", fontSize: "9px", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink3)", fontWeight: 500 }}>
                 From ↓ / To →
               </th>
               {REGIMES.map((to) => (
-                <th
-                  key={to}
-                  className="px-2 pb-2 text-center font-medium"
-                  style={{ color: getColor(to) }}
-                  title={regimeMeaning(to)}
-                >
+                <th key={to} style={{ padding: "0 8px 10px", textAlign: "center", fontFamily: "var(--mono)", fontSize: "9px", letterSpacing: ".06em", color: getHex(to), fontWeight: 600 }} title={regimeMeaning(to)}>
                   {to.replace("/", "/\u200B")}
                 </th>
               ))}
-              <th className="pb-2 pl-3 text-right font-medium text-muted-foreground">
+              <th style={{ paddingBottom: "10px", paddingLeft: "12px", textAlign: "right", fontFamily: "var(--mono)", fontSize: "9px", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink3)", fontWeight: 500 }}>
                 Total
               </th>
             </tr>
           </thead>
-
           <tbody>
             {REGIMES.map((from) => {
               const rowTotal = REGIMES.reduce((sum, to) => sum + counts[from][to], 0);
-
               return (
-                <tr key={from} className="border-t border-border/40">
-                  <td
-                    className="py-2 pr-3 font-medium"
-                    style={{ color: getColor(from) }}
-                    title={regimeMeaning(from)}
-                  >
+                <tr key={from} style={{ borderTop: "1px solid var(--line)" }}>
+                  <td style={{ padding: "10px 12px 10px 0", fontFamily: "var(--mono)", fontSize: "10px", fontWeight: 600, color: getHex(from) }} title={regimeMeaning(from)}>
                     {from.replace("/", "/\u200B")}
                   </td>
-
                   {REGIMES.map((to) => {
                     const count = counts[from][to];
                     const intensity = maxCount > 0 ? count / maxCount : 0;
                     const isDiagonal = from === to;
-
+                    const hex = getHex(to);
                     return (
-                      <td key={to} className="px-2 py-2 text-center">
+                      <td key={to} style={{ padding: "8px", textAlign: "center" }}>
                         {count > 0 ? (
                           <span
-                            className="inline-flex h-7 w-10 items-center justify-center rounded font-medium"
-                            title={`${from} → ${to}: ${count} transition${
-                              count !== 1 ? "s" : ""
-                            }`}
+                            title={`${from} → ${to}: ${count} transition${count !== 1 ? "s" : ""}`}
                             style={{
-                              backgroundColor: `color-mix(in srgb, ${getColor(
-                                to
-                              )} ${Math.round(intensity * 60)}%, transparent)`,
-                              color:
-                                intensity > 0.4
-                                  ? getColor(to)
-                                  : "hsl(var(--foreground))",
+                              display: "inline-flex", width: "40px", height: "28px",
+                              alignItems: "center", justifyContent: "center",
+                              borderRadius: "3px", fontFamily: "var(--mono)", fontSize: "11px", fontWeight: 500,
                               fontStyle: isDiagonal ? "italic" : "normal",
+                              background: `color-mix(in srgb, ${hex} ${Math.round(intensity * 50)}%, var(--surface2))`,
+                              color: intensity > 0.3 ? hex : "var(--ink2)",
                             }}
                           >
                             {count}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground/40">—</span>
+                          <span style={{ color: "var(--ink3)", fontFamily: "var(--mono)", fontSize: "11px" }}>—</span>
                         )}
                       </td>
                     );
                   })}
-
-                  <td className="py-2 pl-3 text-right text-muted-foreground">
+                  <td style={{ padding: "10px 0 10px 12px", textAlign: "right", fontFamily: "var(--mono)", fontSize: "11px", color: "var(--ink3)" }}>
                     {rowTotal || "—"}
                   </td>
                 </tr>
@@ -217,19 +149,14 @@ export default function TransitionMatrix({
         </table>
       </div>
 
-      <div className="mt-3 rounded-lg border bg-muted/10 p-3 text-xs leading-6 text-muted-foreground">
-        <div>
-          <strong>How to read the diagonal:</strong> diagonal cells mean the product
-          stayed in the same published regime on consecutive published days.
-        </div>
-        <div className="mt-1">
-          <strong>How to read off-diagonal cells:</strong> these show specific
-          regime switches, for example <em>STABLE → HEATING</em> or{" "}
-          <em>HEATING → CONGESTED</em>.
-        </div>
-        <div className="mt-1">
-          Diagonal (italic) = persisted in same regime. Total transitions: {total}.
-        </div>
+      {/* Footer */}
+      <div style={{
+        background: "var(--surface2)", border: "1px solid var(--line2)", borderRadius: "var(--radius-sm)",
+        padding: "12px 16px", marginTop: "12px", fontSize: "12px", lineHeight: "1.7", color: "var(--ink2)",
+      }}>
+        <div><strong style={{ color: "var(--ink)" }}>Diagonal (italic):</strong> product stayed in the same published regime on consecutive days.</div>
+        <div style={{ marginTop: "4px" }}><strong style={{ color: "var(--ink)" }}>Off-diagonal:</strong> specific regime switches, e.g. STABLE → HEATING or HEATING → CONGESTED.</div>
+        <div style={{ marginTop: "4px", color: "var(--ink3)", fontFamily: "var(--mono)", fontSize: "10px" }}>Total transitions: {total}</div>
       </div>
     </div>
   );
