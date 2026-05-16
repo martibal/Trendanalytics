@@ -459,14 +459,14 @@ function Price({
   featured?: boolean;
 }) {
   return (
-    <article className={`ua-vf-price-card ${featured ? "is-featured" : ""}`}>
+    <article className="ua-vf-price-card is-featured">
       <h3>{title}</h3>
       <div className="ua-vf-price">
         {price} {period ? <span>{period}</span> : null}
       </div>
       <p>{note}</p>
       <ul>{features.map((f) => <li key={f}>{f}</li>)}</ul>
-      <Link href={href} className={featured ? "ua-vf-btn-primary" : "ua-vf-btn-ghost"}>
+      <Link href={href} className="ua-vf-btn-primary">
         {cta}
       </Link>
     </article>
@@ -1252,11 +1252,9 @@ export default function UrdAtlasVFinalLandingClient({
       <section className="ua-vf-section" id="pricing">
         <div className="ua-vf-shell">
           <Reveal forceVisible={forcePricingReveal}>
-            <div className="ua-vf-section-head">
-              <div className="ua-vf-eyebrow">Pricing</div>
-              <div>
-                <h2 className="ua-vf-h2">Simple access to the published layer.</h2>
-              </div>
+            <div style={{ textAlign: "center", marginBottom: "40px" }}>
+              <div className="ua-vf-eyebrow" style={{ marginBottom: "12px" }}>Pricing</div>
+              <h2 className="ua-vf-h2">Simple access to the published layer.</h2>
             </div>
 
             <div className="ua-vf-pricing-grid">
