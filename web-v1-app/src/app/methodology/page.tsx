@@ -16,7 +16,7 @@ export default function MethodologyOverviewPage() {
     <MethodologyPageShell>
       <MethodologyHeader
         title="Methodology"
-        description="How Urd Atlas turns daily blockchain observations into on-chain reference data: Gold observations, Derived transforms, and Meta regime labels, confidence, scorecards, and traceable JSON artifacts."
+        description="How Urd Atlas turns daily blockchain observations into on-chain reference data: Gold observations, Derived transforms, Meta regime labels, and Briefs summaries, confidence, scorecards, and traceable JSON artifacts."
       />
 
       <MethodologyContent>
@@ -35,7 +35,7 @@ export default function MethodologyOverviewPage() {
           pageKey="methodology-overview"
           summary={<>This section documents the Urd Atlas reference data methodology: what gets published, how to read the outputs, what can be checked independently, and where public methodology intentionally stops.</>}
           bullets={[
-            <>Reference layer model: <strong>Gold</strong> for daily observations, <strong>Derived</strong> for deterministic transforms, and <strong>Meta</strong> for regime, confidence, scorecard state, and drivers.</>,
+            <>Reference layer model: <strong>Gold</strong> for daily observations, <strong>Derived</strong> for deterministic transforms, <strong>Meta</strong> for regime, confidence, scorecard state, and drivers, and <strong>Briefs</strong> for readable JSON summaries.</>,
             <>Read order: <MethodologyLink href="/methodology/reference">Reference</MethodologyLink> first, then <MethodologyLink href="/methodology/verification">Verification</MethodologyLink>, then <MethodologyLink href="/methodology/fields">Fields</MethodologyLink> as a lookup layer.</>,
             <>Trust boundary: outputs should be auditable in meaning and behavior, but the private source-data and implementation chain are not publicly reconstructable.</>,
           ]}
@@ -63,10 +63,10 @@ export default function MethodologyOverviewPage() {
 
               <Section title="Reference layer model">
                 <p>
-                  Urd Atlas publishes three reference layers: <InlineCode>Gold</InlineCode>, <InlineCode>Derived</InlineCode>, and <InlineCode>Meta</InlineCode>. Gold is the daily
+                  Urd Atlas publishes four JSON layers: <InlineCode>Gold</InlineCode>, <InlineCode>Derived</InlineCode>, <InlineCode>Meta</InlineCode>, and <InlineCode>Briefs</InlineCode>. Gold is the daily
                   observation layer. Derived is the deterministic trend layer built from Gold. Meta is the
                   analytical layer that publishes regime, confidence, scorecard state, drivers, and
-                  presentation-ready summaries.
+                  presentation-ready summaries. Briefs are the readable JSON layer built from the latest Meta context.
                 </p>
                 <p>
                   The most important page for a technical customer is the public methodology reference. The

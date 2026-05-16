@@ -219,13 +219,14 @@ const whatItDoesNotExplain: ExplainPair = {
 const dataLayersExplain: ExplainPair = {
   basic: (
     <>
-      <p>All published reference data is organised into three layers, each building on the previous.</p>
+      <p>All published reference data is organised into four JSON layers: three technical layers plus a readable Briefs layer.</p>
       <ul className="mt-3 list-disc space-y-2 pl-5">
         <li><span className="font-semibold text-[#031329]">Gold</span> — raw daily observations: transaction counts, fees, block times, gas usage, active addresses.</li>
         <li><span className="font-semibold text-[#031329]">Meta</span> — the regime reference layer: regime label, confidence score, scorecard, and driver set.</li>
         <li><span className="font-semibold text-[#031329]">Derived</span> — the trend layer: 7-day and 30-day moving averages used in charts.</li>
+        <li><span className="font-semibold text-[#031329]">Briefs</span> — the readable JSON layer: short descriptive summaries of the latest regime context.</li>
       </ul>
-      <p className="mt-3">Subscribers can download all three reference layers as JSON files via the API.</p>
+      <p className="mt-3">Subscribers can download Gold, Derived, Meta, and Briefs JSON files via the API.</p>
     </>
   ),
   advanced: (
@@ -236,9 +237,9 @@ const dataLayersExplain: ExplainPair = {
         momentum, axis scoring, confidence gating, and deterministic label classification.
       </p>
       <p className="mt-3">
-        Derived contains rolling means over the Gold series. The separation keeps the data
-        contract auditable: any consumer can independently verify that <InlineCode>metric__ma7</InlineCode> is
-        the 7-day arithmetic mean of the corresponding Gold field.
+        Derived contains rolling means over the Gold series. Briefs then convert the latest
+        Meta context into short readable JSON summaries while preserving the product boundaries:
+        daily, descriptive, not predictive, and not advisory.
       </p>
     </>
   ),
@@ -247,6 +248,7 @@ const dataLayersExplain: ExplainPair = {
       <li>Gold: published daily Gold artifact per chain and date</li>
       <li>Meta: published latest Meta artifact per chain</li>
       <li>Derived: published daily Derived artifact per chain and date</li>
+      <li>Briefs: published latest Briefs artifact per chain plus site-level brief bundles</li>
     </ul>
   ),
 };
@@ -360,6 +362,12 @@ const dataLayers = [
     path: "derived/<chain>/<date>.json",
     desc: "Moving-average series built from Gold data, primarily MA7 and MA30 values used for smoothed trend context.",
   },
+  {
+    name: "Briefs",
+    tag: "readable summaries",
+    path: "briefs/chains/<chain>/latest.json",
+    desc: "Short descriptive JSON summaries of latest regime context, generated from Meta and guarded against predictive or advisory language.",
+  },
 ];
 
 const exploreLinks = [
@@ -457,7 +465,7 @@ export default async function AboutPage() {
               <div>
                 <Eyebrow>Data contract</Eyebrow>
                 <h2 className="mt-3 text-3xl font-black tracking-[-0.03em] text-[#0d2447]">
-                  Three reference layers, one reproducible pipeline.
+                  Four published JSON layers, one reproducible pipeline.
                 </h2>
                 <p className="mt-3 max-w-4xl text-sm font-medium leading-7 text-[#37547b]">
                   The product is not a dashboard first and a data service second. The on-chain
@@ -577,8 +585,8 @@ export default async function AboutPage() {
       />
       <ExplainModal
         id="data-layers-modal"
-        title="The three data layers"
-        subtitle="Gold, Derived, and Meta — the three reference layers and why they are separate."
+        title="The published JSON layers"
+        subtitle="Gold, Derived, Meta, and Briefs — the published JSON layers and why they are separate."
         pair={dataLayersExplain}
       />
       <ExplainModal

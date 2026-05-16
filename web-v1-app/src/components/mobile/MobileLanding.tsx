@@ -80,7 +80,7 @@ const nextLinks = [
   },
   {
     title: "JSON & API",
-    body: "See every Gold, Derived, and Meta reference field before you subscribe.",
+    body: "See every Gold, Derived, Meta, and Briefs reference field before you subscribe.",
     href: "/mobile/api-docs",
   },
 ] as const;
@@ -455,7 +455,7 @@ export default function MobileLanding({
             The three files
           </div>
           <h2 className="mt-1 text-2xl font-semibold text-white">
-            Gold, Derived, Meta
+            Gold, Derived, Meta, Briefs
           </h2>
           <p className="mt-2 text-sm leading-7 text-slate-300">
             Meta is the commercial heart of the product. Gold lets you verify

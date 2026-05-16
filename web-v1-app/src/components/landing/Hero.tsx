@@ -206,7 +206,7 @@ export default function Hero({
               </h1>
 
               <p className="mt-6 max-w-3xl text-[18px] leading-8 text-slate-300">
-                Urd Atlas publishes daily Gold, Derived, and Meta reference layers for BTC, ETH, ARB, and BASE so you can read current
+                Urd Atlas publishes daily Gold, Derived, Meta, and Briefs reference layers for BTC, ETH, ARB, and BASE so you can read current
                 chain state without building your own ingestion, normalization, confidence, and
                 regime-classification stack.
               </p>

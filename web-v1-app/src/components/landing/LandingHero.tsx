@@ -27,7 +27,7 @@ export default function LandingHero(props: LandingHeroProps) {
             Daily reference data for BTC, ETH, ARB, and BASE.
           </h1>
           <p className="mt-4 max-w-3xl text-base leading-8 text-muted-foreground">
-            Urd Atlas publishes Gold, Derived, and Meta reference layers for Bitcoin, Ethereum,
+            Urd Atlas publishes Gold, Derived, Meta, and Briefs reference layers for Bitcoin, Ethereum,
             Arbitrum, and Base. Meta carries the currently published regime, confidence, freshness, and
             supporting drivers without price, forecasts, or advisory language.
           </p>

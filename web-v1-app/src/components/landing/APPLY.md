@@ -61,7 +61,7 @@ import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
                 <span className="block text-[#2f7cff]">from structural change.</span>
               </h1>
               <p className="mt-7 max-w-[800px] text-[24px] font-semibold leading-8 text-white/88 sm:text-[20px]">
-                Daily Gold, Meta, and Derived JSON for BTC, ETH, ARB, and BASE. Regime context without maintaining your own pipeline
+                Daily Gold, Meta, Derived, and Briefs JSON for BTC, ETH, ARB, and BASE. Regime context without maintaining your own pipeline
               </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <a
@@ -92,7 +92,7 @@ import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
                 <span className="block text-[#2f7cff]">from structural change.</span>
               </h1>
               <p className="mt-6 max-w-[800px] text-[19px] font-semibold leading-7 text-white/88 sm:text-[20px]">
-                Daily Gold, Meta, and Derived JSON for BTC, ETH, ARB, and BASE. Regime context without maintaining your own pipeline.
+                Daily Gold, Meta, Derived, and Briefs JSON for BTC, ETH, ARB, and BASE. Regime context without maintaining your own pipeline.
               </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <a
@@ -263,7 +263,7 @@ import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
                   price="$49/mo"
                   pill="1 chain · 90d · JSON"
                   headline="One chain. API access. 90-day history."
-                  body="Gold, Meta, and Derived JSON for one chain of your choice — BTC, ETH, ARB, or BASE. Delivered daily via authenticated API."
+                  body="Gold, Meta, Derived, and Briefs JSON for one chain of your choice — BTC, ETH, ARB, or BASE. Delivered daily via authenticated API."
                   bestFor="Best for: independent analysts validating the dataset against one chain."
                   href="/dashboard"
                   cta="Start Single Chain →"
@@ -274,7 +274,7 @@ import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
                   price="$149/mo"
                   pill="4 chains · 365d · JSON"
                   headline="All four chains. API access. 365-day history."
-                  body="Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
+                  body="Gold, Meta, Derived, and Briefs JSON across BTC, ETH, ARB, and BASE. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
                   bestFor="Best for: multi-chain research, backtesting, and production pipelines."
                   href="/dashboard"
                   cta="Start Research →"
@@ -319,7 +319,7 @@ import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
                   price="$49/mo"
                   pill="1 chain · 90d · JSON"
                   headline="One chain. API access. 90-day history."
-                  body="Gold, Meta, and Derived JSON for one chain of your choice — BTC, ETH, ARB, or BASE. Delivered daily via authenticated API."
+                  body="Gold, Meta, Derived, and Briefs JSON for one chain of your choice — BTC, ETH, ARB, or BASE. Delivered daily via authenticated API."
                   bestFor="Best for: independent analysts validating the dataset against one chain."
                   href="/dashboard"
                   cta="Start Single Chain →"
@@ -330,7 +330,7 @@ import WhoThisIsFor from "@/components/landing/WhoThisIsFor";
                   price="$149/mo"
                   pill="4 chains · 365d · JSON"
                   headline="All four chains. API access. 365-day history."
-                  body="Gold, Meta, and Derived JSON across BTC, ETH, ARB, and BASE. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
+                  body="Gold, Meta, Derived, and Briefs JSON across BTC, ETH, ARB, and BASE. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive."
                   bestFor="Best for: multi-chain research, backtesting, and production pipelines."
                   href="/dashboard"
                   cta="Start Research →"

@@ -1,7 +1,7 @@
 // src/lib/types/json.ts
 
 export type ChainId = "bitcoin" | "ethereum" | "arbitrum" | "base";
-export type DataGenre = "gold" | "meta" | "derived";
+export type DataGenre = "gold" | "meta" | "derived" | "briefs";
 export type WindowToken = "latest" | "7d" | "30d" | "90d" | "180d" | "365d";
 
 export type JsonPrimitive = string | number | boolean | null;
@@ -112,6 +112,21 @@ export type DerivedJson = {
   methodologyVersion?: string | null;
 };
 
+export type BriefJson = {
+  schema?: string;
+  chain?: ChainId | string;
+  date?: string;
+  updated_through?: string | null;
+  brief_status?: string | null;
+  label?: string | null;
+  headline?: string | null;
+  summary?: string | null;
+  confidence?: JsonObject | null;
+  guardrails?: JsonObject | null;
+  methodology_version?: string | null;
+  brief_version?: string | null;
+};
+
 export type LandingIndexRow = {
   chain: ChainId | string;
   label?: string | null;
@@ -152,5 +167,5 @@ export function isChainId(value: unknown): value is ChainId {
 }
 
 export function isDataGenre(value: unknown): value is DataGenre {
-  return value === "gold" || value === "meta" || value === "derived";
+  return value === "gold" || value === "meta" || value === "derived" || value === "briefs";
 }

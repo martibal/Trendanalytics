@@ -11,7 +11,7 @@ export default function Plans({ historyDepthDays }: PlansProps) {
       <div className="max-w-3xl">
         <div className="text-[9px] font-black uppercase tracking-[0.28em] text-cyan-500/70">Subscriber plans</div>
         <h2 className="mt-2 text-3xl font-semibold text-white sm:text-4xl leading-tight">Choose the smallest plan that matches your research workflow.</h2>
-        <p className="mt-4 text-sm leading-7 text-slate-300">The public site explains the reference data surface. Paid plans unlock authenticated JSON delivery for Gold, Derived, and Meta. Until billing is activated, the fastest due-diligence path is the public sample pack, schema reference, verification pack, and service policy.</p>
+        <p className="mt-4 text-sm leading-7 text-slate-300">The public site explains the reference data surface. Paid plans unlock authenticated JSON delivery for Gold, Derived, Meta, and Briefs. Until billing is activated, the fastest due-diligence path is the public sample pack, schema reference, verification pack, and service policy.</p>
       </div>
 
       <div className="mt-6 grid gap-3 lg:grid-cols-3">

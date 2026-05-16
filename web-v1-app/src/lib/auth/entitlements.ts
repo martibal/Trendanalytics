@@ -3,7 +3,7 @@ import type { ChainId } from "@/config/chains";
 
 export type SubscriptionTier = "public" | "basic" | "pro";
 export type SubscriptionStatus = "active" | "inactive";
-export type FileGenre = "gold" | "meta" | "derived";
+export type FileGenre = "gold" | "meta" | "derived" | "briefs";
 export type WindowToken = "latest" | "7d" | "30d" | "90d" | "180d" | "365d";
 
 export type EntitlementInput = {
@@ -52,7 +52,7 @@ export type FileRequestScope = {
 };
 
 const ALL_CHAINS: ChainId[] = ["bitcoin", "ethereum", "arbitrum", "base"];
-const ALL_GENRES: FileGenre[] = ["gold", "meta", "derived"];
+const ALL_GENRES: FileGenre[] = ["gold", "meta", "derived", "briefs"];
 const BASIC_WINDOWS: WindowToken[] = ["latest", "7d", "30d", "90d"];
 const PRO_WINDOWS: WindowToken[] = ["latest", "7d", "30d", "90d", "180d", "365d"];
 

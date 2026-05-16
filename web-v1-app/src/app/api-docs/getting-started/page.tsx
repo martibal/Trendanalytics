@@ -135,7 +135,7 @@ export default function GettingStartedJsonApiPage() {
         </UrdCard>
       <ShortFullContent
         pageKey="getting-started"
-        summary={<>You can think of Urd Atlas onboarding in three steps: inspect a sample JSON, understand Gold / Derived / Meta, and make your first API pull.</>}
+        summary={<>You can think of Urd Atlas onboarding in three steps: inspect a sample JSON, understand Gold / Derived / Meta / Briefs, and make your first API pull.</>}
         bullets={[
           <>If you only do one thing before buying, download one sample Meta file and inspect its label, confidence, and determinism hash.</>,
           <>If you only do one thing after buying, create an API key and fetch one latest.json file successfully.</>,
@@ -241,8 +241,7 @@ export default function GettingStartedJsonApiPage() {
         <Section id="what-you-get" eyebrow="Chapter 3" title="What you actually receive as a subscriber">
           <p className="text-sm leading-7 text-[#27476f]">
             When you subscribe to Urd Atlas, you get API access to structured JSON files.
-            There are three types of files (called genres), and they are published for each
-            chain every day. Here is the complete picture:
+            There are four published JSON genres. Gold, Derived, and Meta are the technical data layers; Briefs are the readable, direct-use JSON layer built from the latest Meta context. Here is the complete picture:
           </p>
 
           <div className="mt-5 overflow-x-auto">
@@ -265,10 +264,15 @@ export default function GettingStartedJsonApiPage() {
                   <td className="py-3 pr-6">The regime label (STABLE/HEATING/CONGESTED/CHEAP), confidence score, scorecard, and ranked driver signals.</td>
                   <td className="py-3 text-[#557099]">Dashboards, alerts, research conditioning</td>
                 </tr>
-                <tr>
+                <tr className="border-b border-[#c0d4e8]">
                   <td className="py-3 pr-6 font-bold text-sky-700">Derived</td>
                   <td className="py-3 pr-6">7-day and 30-day rolling averages for every Gold metric.</td>
                   <td className="py-3 text-[#557099]">Trend charts, smoothed analysis</td>
+                </tr>
+                <tr>
+                  <td className="py-3 pr-6 font-bold text-emerald-700">Briefs</td>
+                  <td className="py-3 pr-6">Short descriptive JSON summaries of the latest regime context, including what changed, what drove it, and the non-advisory guardrails.</td>
+                  <td className="py-3 text-[#557099]">Fast reading, reporting, onboarding, and non-pipeline workflows</td>
                 </tr>
               </tbody>
             </table>
@@ -283,6 +287,7 @@ export default function GettingStartedJsonApiPage() {
                 <CodeBlock>{`/api/v1/files/gold/bitcoin/latest.json
 /api/v1/files/meta/bitcoin/latest.json
 /api/v1/files/derived/bitcoin/latest.json
+/api/v1/files/briefs/chains/bitcoin/latest.json
 
 /api/v1/files/gold/bitcoin/7d/latest.json
 /api/v1/files/meta/bitcoin/7d/latest.json
@@ -295,7 +300,7 @@ export default function GettingStartedJsonApiPage() {
 /api/v1/files/gold/bitcoin/90d/latest.json
 /api/v1/files/meta/bitcoin/90d/latest.json
 /api/v1/files/derived/bitcoin/90d/latest.json`}</CodeBlock>
-                <p className="mt-3 text-xs text-[#557099]">That is 12 files total per day — 3 genres × 4 windows.</p>
+                <p className="mt-3 text-xs text-[#557099]">That is 13 current files in this example: Gold, Meta, and Derived across 4 windows, plus the latest per-chain Briefs JSON.</p>
               </div>
               <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-5">
                 <div className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-3">Research — $149/mo — all 4 chains</div>
@@ -304,11 +309,15 @@ export default function GettingStartedJsonApiPage() {
 /api/v1/files/meta/ethereum/latest.json
 /api/v1/files/meta/arbitrum/latest.json
 /api/v1/files/meta/base/latest.json
+/api/v1/files/briefs/chains/bitcoin/latest.json
+/api/v1/files/briefs/chains/ethereum/latest.json
+/api/v1/files/briefs/chains/arbitrum/latest.json
+/api/v1/files/briefs/chains/base/latest.json
 
 /api/v1/files/meta/bitcoin/365d/latest.json
 /api/v1/files/meta/ethereum/365d/latest.json
-...and so on for gold and derived`}</CodeBlock>
-                <p className="mt-3 text-xs text-[#557099]">That is 72 files total — 3 genres × 4 chains × 6 windows.</p>
+...and so on for gold and derived. Briefs are published as latest per-chain files.`}</CodeBlock>
+                <p className="mt-3 text-xs text-[#557099]">That is 72 technical window files — 3 technical genres × 4 chains × 6 windows — plus 4 latest per-chain Briefs JSON files.</p>
               </div>
             </div>
           </div>
@@ -321,7 +330,8 @@ export default function GettingStartedJsonApiPage() {
           </p>
           <div className="mt-4">
             <CodeBlock label="URL structure">{`/api/v1/files/{genre}/{chain}/{window}/latest.json
-/api/v1/files/{genre}/{chain}/latest.json`}</CodeBlock>
+/api/v1/files/{genre}/{chain}/latest.json
+/api/v1/files/briefs/chains/{chain}/latest.json`}</CodeBlock>
           </div>
 
           <div className="mt-6 grid gap-4">
@@ -421,7 +431,7 @@ export default function GettingStartedJsonApiPage() {
               <h3 className="text-sm font-bold text-[#0d2447] mb-3">What Urd Atlas does automatically</h3>
               <BulletList items={[
                 "Runs the classification pipeline every day",
-                "Publishes new Gold, Derived, and Meta files for each chain",
+                "Publishes new Gold, Derived, Meta, and Briefs files for each chain",
                 "Updates the window bundle files (7d, 30d, 90d, etc.) to include the new day",
                 "Makes all files available on the API immediately after publication",
                 "Updates the public /status endpoint so you can check freshness",
@@ -703,7 +713,7 @@ BASE_URL = "https://urdatlas.com"
 API_KEY = os.environ["URD_ATLAS_API_KEY"]  # set this as environment variable — never hardcode
 
 CHAIN = "bitcoin"   # change to your entitled chain
-GENRE = "meta"      # gold, meta, or derived
+GENRE = "meta"      # gold, meta, derived, or briefs
 
 DATA_DIR = Path("urdatlas_data") / GENRE / CHAIN
 STATE_FILE = Path("urdatlas_state") / f"{CHAIN}_{GENRE}.json"
@@ -728,7 +738,8 @@ def check_status():
     raise RuntimeError(f"Chain {CHAIN} not found in status")
 
 def fetch_file():
-    url = f"{BASE_URL}/api/v1/files/{GENRE}/{CHAIN}/latest.json"
+    path = f"briefs/chains/{CHAIN}/latest.json" if GENRE == "briefs" else f"{GENRE}/{CHAIN}/latest.json"
+    url = f"{BASE_URL}/api/v1/files/{path}"
     r = requests.get(url, headers={"X-API-Key": API_KEY}, timeout=30)
     r.raise_for_status()
     return r.json()

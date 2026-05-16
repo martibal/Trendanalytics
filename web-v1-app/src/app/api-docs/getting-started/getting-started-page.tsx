@@ -230,7 +230,7 @@ export default function GettingStartedJsonApiPage() {
               <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">What Urd Atlas does automatically</h3>
               <BulletList items={[
                 "Runs the classification pipeline every day.",
-                "Publishes new Gold, Derived, and Meta JSON files for each chain.",
+                "Publishes new Gold, Derived, Meta, and Briefs JSON files for each chain.",
                 "Updates the public status endpoint so you can check freshness.",
                 "Makes the new files available on the API immediately after publication.",
               ]} />
@@ -394,7 +394,8 @@ export default function GettingStartedJsonApiPage() {
                 <div className="text-xs uppercase tracking-[0.12em] text-[var(--urd-text-muted)] mb-2">Example — if your chain is bitcoin</div>
                 <CodeBlock>{`/api/v1/files/gold/bitcoin/latest.json
 /api/v1/files/meta/bitcoin/latest.json
-/api/v1/files/derived/bitcoin/latest.json`}</CodeBlock>
+/api/v1/files/derived/bitcoin/latest.json
+/api/v1/files/briefs/chains/bitcoin/latest.json`}</CodeBlock>
               </div>
             </PlanCard>
 
@@ -577,7 +578,7 @@ BASE_URL = "https://urdatlas.com"
 API_KEY = os.environ["URD_ATLAS_API_KEY"]  # set this as an environment variable
 
 CHAIN = "bitcoin"   # change to your entitled chain
-GENRE = "meta"      # gold, meta, or derived
+GENRE = "meta"      # gold, meta, derived, or briefs
 
 STATE_DIR = Path("automation_state")
 DATA_DIR = Path("downloaded_files") / GENRE / CHAIN
@@ -600,7 +601,8 @@ def fetch_status():
     return response.json()
 
 def fetch_latest_file():
-    url = f"{BASE_URL}/api/v1/files/{GENRE}/{CHAIN}/latest.json"
+    path = f"briefs/chains/{CHAIN}/latest.json" if GENRE == "briefs" else f"{GENRE}/{CHAIN}/latest.json"
+    url = f"{BASE_URL}/api/v1/files/{path}"
     response = requests.get(url, headers={"X-API-Key": API_KEY}, timeout=30)
     response.raise_for_status()
     return response.json()

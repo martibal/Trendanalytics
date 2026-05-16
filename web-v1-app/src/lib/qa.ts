@@ -36,7 +36,7 @@ export const qaEntries: QaEntry[] = [
       "The answer is published as on-chain reference data: a regime label, a confidence score, and a short explanation of which metrics are doing the explanatory work. You can read the web surface for free or subscribe to the reference data JSON for direct downstream use.",
     ],
     advanced: [
-      "The product is a deterministic on-chain reference data layer built on top of AWS Public Blockchain Data. It aggregates daily chain data, normalizes it with robust z-score logic, calculates evidence sufficiency, and publishes Gold, Derived, and Meta reference data JSON.",
+      "The product is a deterministic on-chain reference data layer built on top of AWS Public Blockchain Data. It aggregates daily chain data, normalizes it with robust z-score logic, calculates evidence sufficiency, and publishes Gold, Derived, Meta, and Briefs reference data JSON.",
       "Meta contains the main analytical output: status.label, confidence, scorecard dimensions, drivers, and traceability fields. The design goal is reproducible descriptive context, not forecasting or recommendations.",
     ],
   },
@@ -63,7 +63,7 @@ export const qaEntries: QaEntry[] = [
     ],
     advanced: [
       "The free alternative is to pull AWS Public Blockchain Data yourself, write the aggregation logic, normalize it correctly per chain, implement confidence gating, version the artifacts, and keep the whole pipeline maintained.",
-      "Urd Atlas packages that work into documented Gold, Derived, and Meta reference layers so the user consumes stateful, chain-relative reference data instead of rebuilding the full stack from public source data.",
+      "Urd Atlas packages that work into documented Gold, Derived, Meta, and Briefs reference layers so the user consumes stateful, chain-relative reference data instead of rebuilding the full stack from public source data.",
     ],
   },
   {
@@ -310,7 +310,7 @@ export const qaEntries: QaEntry[] = [
   {
     id: "gold-meta-derived-difference",
     category: "JSON and Subscription",
-    question: "What is the difference between Gold, Derived, and Meta?",
+    question: "What is the difference between Gold, Derived, Meta, and Briefs?",
     basic: [
       "Gold is the raw daily observation layer. Meta is the analytical interpretation layer. Derived is the smoothed trend layer built from Gold.",
       "Together they give you raw facts, the model's reading, and trend context in a reusable JSON format.",
@@ -328,7 +328,7 @@ export const qaEntries: QaEntry[] = [
       "Mostly Meta. That is where the actual analytical output lives. Gold and Derived matter because they let you verify, compare, and build around the same state layer.",
     ],
     advanced: [
-      "The subscription gives access to all three layers, but Meta is where the expensive analytical work is compressed into a reusable artifact. Gold and Derived make it possible to audit and extend that output rather than blindly trusting it.",
+      "The subscription gives access to Gold, Derived, Meta, and Briefs. Meta is where the expensive analytical work is compressed into a reusable artifact; Briefs turn that context into a short readable JSON summary. Gold and Derived make it possible to audit and extend the output rather than blindly trusting it.",
     ],
   },
   {
@@ -384,7 +384,7 @@ export const qaEntries: QaEntry[] = [
       "The free surface lets you inspect the published state. Single Chain gives you the actual reference data JSON for one chain so you can use it in your own tools and models.",
     ],
     advanced: [
-      "Single Chain unlocks authenticated API access to Gold, Derived, and Meta for one chain across the supported windows. The public site is the readable inspection layer; Single Chain is the programmatic reference data layer.",
+      "Single Chain unlocks authenticated API access to Gold, Derived, Meta, and Briefs for one chain across the supported windows. The public site is the readable inspection layer; Single Chain is the programmatic reference data layer.",
     ],
   },
   {

@@ -36,7 +36,7 @@ export default function MethodologyReferencePage() {
           bullets={[
             <>
               Gold is the daily observation layer, Derived is the deterministic
-              transform layer, and Meta is the analytical regime layer.
+              transform layer, Meta is the analytical regime layer, and Briefs are the readable JSON summary layer.
             </>,
             <>
               Confidence publishes how strong the current evidence is. Rows below
@@ -116,6 +116,15 @@ export default function MethodologyReferencePage() {
                       <>
                         Publishes regime, confidence, scorecard, drivers,
                         freshness context, and presentation helpers.
+                      </>,
+                    ],
+                    [
+                      <strong key="briefs">Briefs</strong>,
+                      <>Readable JSON summary layer.</>,
+                      <>
+                        Publishes short descriptive summaries of latest Meta
+                        context for fast reading, reporting, and non-pipeline
+                        workflows.
                       </>,
                     ],
                   ]}

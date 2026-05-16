@@ -2,7 +2,7 @@ import ShortFullContent from "@/components/site/ShortFullContent";
 import PageHero from "@/components/site/PageHero";
 import { UrdButtonLink, UrdContainer, UrdInlineCode, UrdPage } from "@/components/site/UrdDesignSystem";
 // src/app/api-docs/schema/page.tsx
-// JSON Schema Reference — complete field-level documentation for Gold, Derived, and Meta
+// JSON Schema Reference — complete field-level documentation for Gold, Derived, Meta, and Briefs
 // artifacts. This page exists to let potential subscribers understand exactly what they
 // receive before subscribing.
 
@@ -149,7 +149,7 @@ export default async function SchemaPage() {
       <PageHero
         eyebrow="What you actually get"
         title="JSON Schema Reference"
-        highlight="Gold, Derived, and Meta"
+        highlight="Gold, Derived, Meta, and Briefs"
         summary="Every field in every published JSON file — defined at two levels. This page exists so you know exactly what a subscription delivers before you subscribe."
       >
         <div className="flex flex-wrap gap-2">
@@ -160,6 +160,7 @@ export default async function SchemaPage() {
             { href: "#gold", label: "Gold" },
             { href: "#meta", label: "Meta" },
             { href: "#derived", label: "Derived" },
+            { href: "#briefs", label: "Briefs" },
           ].map(({ href, label }) => (
             <a
               key={label}
@@ -192,7 +193,7 @@ export default async function SchemaPage() {
         summary={<>This page is the structural contract for the published reference data JSON. Use it when you need exact field names, object structure, and parsing expectations.</>}
         bullets={[
           <>Use <strong>Schema Reference</strong> for contract structure and parsing. Use <Link href="/methodology/fields" className="underline">Field Dictionary</Link> when you need deeper interpretation.</>,
-          <>The three artifact families are <strong>Gold</strong>, <strong>Meta</strong>, and <strong>Derived</strong>. Each one has its own field groups and intended use.</>,
+          <>The published artifact families are <strong>Gold</strong>, <strong>Meta</strong>, <strong>Derived</strong>, and <strong>Briefs</strong>. Gold, Meta, and Derived are the technical pipeline layers; Briefs are the readable JSON summary layer built from Meta context.</>,
           <>If you are evaluating the product, inspect one sample file first, then come here to resolve exact field meaning and structure.</>,
         ]}
         whyItMatters={<>A buyer should be able to confirm exactly what a subscription delivers without scanning hundreds of lines before they find the right field.</>}
@@ -471,6 +472,86 @@ export default async function SchemaPage() {
         </div>
       </section>
 
+
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* BRIEFS                                                            */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      <section id="briefs" className="mb-12 scroll-mt-8">
+        <div className="mb-5 rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-sm">
+          <div className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Layer 4</div>
+          <h2 className="mt-2 text-3xl font-black text-[var(--urd-text-strong)]">Briefs</h2>
+          <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-[var(--urd-text-body)]">
+            Short descriptive JSON summaries built from the latest Meta context. Briefs are designed
+            for fast reading, reporting, and non-pipeline workflows while preserving the same daily,
+            non-predictive, non-advisory boundaries as the rest of Urd Atlas.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--urd-text-muted)]">
+            <IC>briefs/chains/&lt;chain&gt;/latest.json</IC>
+            <IC>briefs/site/latest.json</IC>
+            <IC>briefs/cross-chain/latest.json</IC>
+            <IC>briefs/manifest.json</IC>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <FieldRow
+            field="schema"
+            type="string"
+            basic="Identifies the Briefs schema family so consumers can route the file correctly."
+            advanced={<>Expected values include schema identifiers such as <IC>urd_atlas.chain_brief.v1</IC> or <IC>urd_atlas.site_briefs_bundle.v1</IC>, depending on whether the file is a per-chain brief or a site-level bundle.</>}
+            traceability={<IC>scripts/build_briefs/* → published briefs JSON</IC>}
+          />
+          <FieldRow
+            field="brief_status"
+            type="string enum"
+            basic={<>Publication state for the brief. Typical values are <IC>published</IC>, <IC>degraded</IC>, or <IC>unavailable</IC>.</>}
+            advanced="The status separates the availability of the readable narrative layer from the underlying technical Meta artifact. A degraded brief can still preserve structured facts while replacing unsafe or invalid narrative text with fallback language."
+          />
+          <FieldRow
+            field="chain"
+            type="string"
+            chains="chain briefs"
+            basic={<>Canonical chain identifier: <IC>bitcoin</IC>, <IC>ethereum</IC>, <IC>arbitrum</IC>, or <IC>base</IC>.</>}
+            advanced="Used for entitlement routing and for joining the brief back to the Gold, Derived, and Meta technical artifacts for the same chain."
+          />
+          <FieldRow
+            field="updated_through"
+            type="string (YYYY-MM-DD)"
+            nullable
+            basic="The latest data date represented by the brief. This mirrors the underlying Meta freshness boundary."
+            advanced="Briefs are daily context, not intraday commentary. updated_through should be read as the as-of boundary of the underlying data used to generate the brief."
+          />
+          <FieldRow
+            field="label"
+            type="string enum"
+            nullable
+            basic="Latest regime label summarized by the brief: STABLE, HEATING, CONGESTED, CHEAP, or UNKNOWN/DEGRADED."
+            advanced="Carried from the Meta regime context. Briefs do not create a separate label; they make the existing Meta label readable and easy to consume."
+          />
+          <FieldRow
+            field="headline"
+            type="string"
+            nullable
+            basic="A short readable summary of the latest published chain context."
+            advanced="Generated from deterministic templates and validated against the Briefs language policy. It should remain descriptive and avoid predictive, advisory, or trading-oriented language."
+          />
+          <FieldRow
+            field="confidence"
+            type="object"
+            nullable
+            basic="Compact confidence context for the latest brief, such as latest confidence, 7-day average, or direction when available."
+            advanced="Derived from the latest and recent Meta confidence values. It helps the reader understand whether the brief is based on high-support or low-support context without replacing the full Meta confidence object."
+          />
+          <FieldRow
+            field="guardrails"
+            type="object"
+            nullable
+            basic="Explicit product boundaries: daily cadence, not intraday; descriptive context, not prediction; not investment advice."
+            advanced="The Briefs layer is validated so the narrative stays inside the same methodological boundaries as the technical JSON. Consumers should preserve these guardrails when displaying or redistributing brief text."
+          />
+        </div>
+      </section>
+
           </>
         }
       />
@@ -504,6 +585,7 @@ export default async function SchemaPage() {
           <div>Gold source: <IC>feature_daily_agg.py → build_gold_timeseries.py → published JSON</IC></div>
           <div>Meta source: <IC>main.py (regime_engine + market_scorecard + confidence) → published JSON</IC></div>
           <div>Derived source: <IC>publish_artifacts.py (rolling_mean, windows=[7,30]) → published JSON</IC></div>
+          <div>Briefs source: <IC>scripts/build_briefs/* → published JSON</IC></div>
           <div>Methodology version: <IC>{dataset?.methodology_version ?? "—"}</IC></div>
         </div>
       </details>

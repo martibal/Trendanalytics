@@ -67,7 +67,7 @@ describe("auth/entitlements", () => {
       expect(snapshot.status).toBe("active");
       expect(snapshot.entitledChain).toBe("bitcoin");
       expect(snapshot.allowedChains).toEqual(["bitcoin"]);
-      expect(snapshot.allowedGenres).toEqual(["gold", "meta", "derived"]);
+      expect(snapshot.allowedGenres).toEqual(["gold", "meta", "derived", "briefs"]);
       expect(snapshot.allowedWindows).toEqual(["latest", "7d", "30d", "90d"]);
       expect(snapshot.maxWindowDays).toBe(90);
       expect(snapshot.historyDepthDays).toBe(90);
@@ -87,7 +87,7 @@ describe("auth/entitlements", () => {
         "arbitrum",
         "base",
       ]);
-      expect(snapshot.allowedGenres).toEqual(["gold", "meta", "derived"]);
+      expect(snapshot.allowedGenres).toEqual(["gold", "meta", "derived", "briefs"]);
       expect(snapshot.allowedWindows).toEqual([
         "latest",
         "7d",

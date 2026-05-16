@@ -70,7 +70,7 @@ export default function MobilePlansPage() {
           <Plan
             name="Single Chain"
             price="$49/mo"
-            detail="One blockchain. Gold, Derived and Meta JSON. Built for users who want one chain in their own workflow."
+            detail="One blockchain. Gold, Derived, Meta, and Briefs JSON. Built for users who want one chain in their own workflow."
           >
             <CheckoutButton plan="basic" className={buttonClass}>
               Start Single Chain
@@ -80,7 +80,7 @@ export default function MobilePlansPage() {
           <Plan
             name="Full Access"
             price="$149/mo"
-            detail="All supported chains: BTC, ETH, ARB and BASE. Full daily JSON access across Gold, Derived and Meta."
+            detail="All supported chains: BTC, ETH, ARB and BASE. Full daily JSON access across Gold, Derived, Meta, and Briefs."
           >
             <CheckoutButton plan="pro" className={buttonClass}>
               Start Full Access

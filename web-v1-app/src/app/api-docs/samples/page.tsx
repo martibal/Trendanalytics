@@ -39,8 +39,8 @@ export default function SamplePackPage() {
         <div className="grid gap-6">
           <UrdSection title="What is included">
             <ul className="list-disc pl-5">
-              <li>One representative Gold, Derived, and Meta bundle for Ethereum.</li>
-              <li>One representative Gold, Derived, and Meta bundle for Arbitrum.</li>
+              <li>One representative Gold, Derived, Meta, and Briefs bundle for Ethereum.</li>
+              <li>One representative Gold, Derived, Meta, and Briefs bundle for Arbitrum.</li>
               <li>One real <UrdInlineCode>UNKNOWN/DEGRADED</UrdInlineCode> Meta row.</li>
               <li>Examples showing <UrdInlineCode>methodology_version</UrdInlineCode>, <UrdInlineCode>updated_through</UrdInlineCode>, and <UrdInlineCode>regime.determinism_hash</UrdInlineCode>.</li>
             </ul>

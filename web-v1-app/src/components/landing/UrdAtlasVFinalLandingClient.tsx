@@ -4,8 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
-type ChainKey = "btc" | "eth" | "arb" | "base";
-type JsonLayer = "gold" | "derived" | "meta";
+type JsonLayer = "gold" | "derived" | "meta" | "briefs";
 type Label = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 
 // ---------------------------------------------------------------------------
@@ -80,7 +79,7 @@ const JSON_CHAIN_OPTIONS: Array<{ label: string; value: JsonChain }> = [
   { label: "BASE", value: "base" },
 ];
 
-const JSON_LAYER_OPTIONS: JsonLayer[] = ["gold", "derived", "meta"];
+const JSON_LAYER_OPTIONS: JsonLayer[] = ["gold", "derived", "meta", "briefs"];
 
 const PRICE_STRIP_CSS = `
 .ua-vf-section[id] {
@@ -371,15 +370,12 @@ function Reveal({
   forceVisible?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [visible, setVisible] = useState(forceVisible);
-
-  useEffect(() => {
-    if (forceVisible) setVisible(true);
-  }, [forceVisible]);
+  const [visible, setVisible] = useState(false);
+  const isVisible = forceVisible || visible;
 
   useEffect(() => {
     const node = ref.current;
-    if (!node || visible) return;
+    if (!node || isVisible) return;
 
     const reveal = () => setVisible(true);
 
@@ -430,10 +426,10 @@ function Reveal({
       observer.disconnect();
       window.removeEventListener("hashchange", handleHashChange);
     };
-  }, [visible]);
+  }, [isVisible]);
 
   return (
-    <div ref={ref} className={`ua-vf-reveal ${visible ? "is-visible" : ""}`}>
+    <div ref={ref} className={`ua-vf-reveal ${isVisible ? "is-visible" : ""}`}>
       {children}
     </div>
   );
@@ -447,7 +443,6 @@ function Price({
   features,
   cta,
   href,
-  featured = false,
 }: {
   title: string;
   price: string;
@@ -481,7 +476,7 @@ type Props = {
   chains: LandingChainData[];
   briefs: Record<string, LandingBriefData>;
   updatedThrough: string;
-  pipelineDays: number;
+  pipelineDays?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -492,7 +487,7 @@ export default function UrdAtlasVFinalLandingClient({
   chains,
   briefs,
   updatedThrough,
-  pipelineDays,
+  pipelineDays = 0,
 }: Props) {
   const [progress, setProgress] = useState(0);
   const [miniVisible, setMiniVisible] = useState(false);
@@ -505,8 +500,13 @@ export default function UrdAtlasVFinalLandingClient({
   const [forcePricingReveal, setForcePricingReveal] = useState(false);
   const [lastRunDisplay, setLastRunDisplay] = useState("—");
 
+  const pipelineDaysDisplay = Number.isFinite(pipelineDays) && pipelineDays > 0
+    ? pipelineDays.toLocaleString("en-US")
+    : "—";
 
-  const selectedJsonPath = `${jsonLayer}/${jsonChain}/latest.json`;
+  const selectedJsonPath = jsonLayer === "briefs"
+    ? `briefs/chains/${jsonChain}/latest.json`
+    : `${jsonLayer}/${jsonChain}/latest.json`;
 
   useEffect(() => {
     let cancelled = false;
@@ -661,20 +661,16 @@ export default function UrdAtlasVFinalLandingClient({
 
       {/* ── HERO ── */}
       <section className="ua-vf-hero" id="top">
-        <div className="ua-vf-shell ua-vf-hero-grid" style={{ alignItems: "start" }}>
+        <div className="ua-vf-shell ua-vf-hero-grid">
           <div className="ua-vf-hero-copy ua-vf-reveal is-visible">
-
-            <div className="ua-vf-eyebrow" style={{ paddingTop: "0" }}>Daily network intelligence for Bitcoin, Ethereum, Arbitrum and Base</div>
+            <div className="ua-vf-eyebrow">Daily on-chain reference data</div>
             <h1 className="ua-vf-h1">
-              How busy has the blockchain network been <em>lately?</em>
+              Separate blockchain <em>noise</em> from structural change.
             </h1>
-            <p style={{ marginBottom: "24px" }}>
-              Urd Atlas measures transaction activity, fee pressure and capacity across Bitcoin,
-              Ethereum, Arbitrum and Base every day and publishes one verified, documented answer
-              per chain. Know exactly whether each network has been running at its usual pace,
-              building pressure, or easing off before you make your next move.
+            <p>
+              Daily Gold, Derived, Meta, and Briefs JSON for BTC, ETH, ARB, and BASE. Use it
+              directly, or join regime context to your own data by chain and date.
             </p>
-
             <div className="ua-vf-btn-row">
               <a href="#json" className="ua-vf-btn-primary">
                 Inspect JSON
@@ -692,23 +688,8 @@ export default function UrdAtlasVFinalLandingClient({
               <span>No recommendations</span>
             </div>
 
-          </div>
 
-          <div>
-            <div style={{
-              textAlign: "right",
-              paddingBottom: "8px",
-              paddingTop: "0",
-              fontFamily: "var(--mono)",
-              fontSize: "10px",
-              fontWeight: 500,
-              letterSpacing: ".14em",
-              textTransform: "uppercase",
-              color: "var(--gold)",
-              lineHeight: "1.5",
-            }}>
-              {pipelineDays} days of verified history
-            </div>
+          </div>
 
           <aside style={{
             background: "var(--surface2)",
@@ -926,7 +907,6 @@ export default function UrdAtlasVFinalLandingClient({
               </div>
             </div>
           </aside>
-          </div>
         </div>
       </section>
 
@@ -946,7 +926,7 @@ export default function UrdAtlasVFinalLandingClient({
       <section className="ua-vf-kpis">
         <div className="ua-vf-shell ua-vf-kpi-grid">
           <div className="ua-vf-kpi">
-            <strong>526</strong>
+            <strong>{pipelineDaysDisplay}</strong>
             <span>published pipeline days</span>
           </div>
           <div className="ua-vf-kpi">
@@ -1000,7 +980,7 @@ export default function UrdAtlasVFinalLandingClient({
               <div className="ua-vf-path">
                 <h3>No pipeline?</h3>
                 <p>
-                  Read published Briefs directly. The Brief layer summarizes what changed, what
+                  Read published Briefs directly. The Briefs layer summarizes what changed, what
                   drove it, and how stable the latest label has been.
                 </p>
                 <a className="ua-vf-text-link" href="#brief">
@@ -1115,7 +1095,7 @@ export default function UrdAtlasVFinalLandingClient({
               <div>
                 <h2 className="ua-vf-h2">Inspect the complete file, not a marketing excerpt.</h2>
                 <p className="ua-vf-section-lead">
-                  Switch between the actual published latest Gold, Derived, and Meta JSON files
+                  Switch between the actual published latest Gold, Derived, Meta, and Briefs JSON files
                   for each supported chain.
                 </p>
               </div>
@@ -1252,9 +1232,11 @@ export default function UrdAtlasVFinalLandingClient({
       <section className="ua-vf-section" id="pricing">
         <div className="ua-vf-shell">
           <Reveal forceVisible={forcePricingReveal}>
-            <div style={{ textAlign: "center", marginBottom: "40px" }}>
-              <div className="ua-vf-eyebrow" style={{ marginBottom: "12px" }}>Pricing</div>
-              <h2 className="ua-vf-h2">Simple access to the published layer.</h2>
+            <div className="ua-vf-section-head">
+              <div className="ua-vf-eyebrow">Pricing</div>
+              <div>
+                <h2 className="ua-vf-h2">Simple access to the published layer.</h2>
+              </div>
             </div>
 
             <div className="ua-vf-pricing-grid">
@@ -1274,7 +1256,7 @@ export default function UrdAtlasVFinalLandingClient({
                 note="One chain with full daily JSON."
                 cta="Choose a chain"
                 href="/api/v1/checkout?plan=basic"
-                features={["Gold, Derived, Meta, Brief", "Historical access", "Email support"]}
+                features={["Gold, Derived, Meta, Briefs", "Historical access", "Email support"]}
               />
 
               <Price

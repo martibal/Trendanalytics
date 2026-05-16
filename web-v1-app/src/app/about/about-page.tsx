@@ -195,7 +195,7 @@ const dataLayersExplain: ExplainPair = {
   basic: (
     <>
       <p>
-        All published reference data is organised into three layers, each building on the previous.
+        All published reference data is organised into four JSON layers: three technical layers plus a readable Briefs layer.
       </p>
       <ul className="mt-3 list-disc space-y-2 pl-5">
         <li>
@@ -214,16 +214,21 @@ const dataLayersExplain: ExplainPair = {
           the Gold data and produces smoothed 7-day and 30-day moving averages used in the
           charts. Useful for distinguishing brief spikes from sustained trends.
         </li>
+        <li>
+          <span className="font-medium text-white">Briefs</span> — the readable JSON layer.
+          Turns the latest Meta context into short descriptive summaries for fast reading,
+          reporting, and non-pipeline workflows.
+        </li>
       </ul>
       <p className="mt-3">
-        Subscribers can download all three reference layers as JSON files via the API.
+        Subscribers can download Gold, Derived, Meta, and Briefs JSON files via the API.
       </p>
     </>
   ),
   advanced: (
     <>
       <p>
-        The three-layer architecture reflects a deliberate separation of concerns in the
+        The four-layer architecture reflects a deliberate separation of concerns in the
         published data contract. Gold contains canonical daily aggregates (CANON_COLS) in
         native units, published without transformation. This ensures Gold can be
         independently verified against chain explorers and alternative data vendors.
@@ -236,12 +241,10 @@ const dataLayersExplain: ExplainPair = {
         consume for quantitative research.
       </p>
       <p className="mt-3">
-        Derived contains rolling means (MA7, MA30) over the Gold series. It exists
-        separately from Gold because smoothed series are derivative quantities — combining
-        them in the same file would make the derivation implicit rather than explicit.
-        The separation keeps the data contract auditable: any consumer can independently
-        verify that <InlineCode>metric__ma7</InlineCode> is the 7-day arithmetic mean of
-        the corresponding Gold field.
+        Derived contains rolling means (MA7, MA30) over the Gold series. Briefs then convert
+        the latest Meta context into short readable JSON summaries while preserving the same
+        boundaries as the technical layers: daily cadence, descriptive framing, no forecasts,
+        and no recommendations.
       </p>
     </>
   ),
@@ -250,6 +253,7 @@ const dataLayersExplain: ExplainPair = {
       <li>Gold: <InlineCode>GET /api/v1/files/gold/[chain]/[window]/latest.json</InlineCode></li>
       <li>Meta: <InlineCode>GET /api/v1/files/meta/[chain]/[window]/latest.json</InlineCode></li>
       <li>Derived: <InlineCode>GET /api/v1/files/derived/[chain]/[window]/latest.json</InlineCode></li>
+      <li>Briefs: <InlineCode>GET /api/v1/files/briefs/chains/[chain]/latest.json</InlineCode></li>
     </ul>
   ),
 };
@@ -390,7 +394,7 @@ export default async function AboutPage() {
       </header>
 
       {/* ── Core proposition cards ────────────────────────────────────────── */}
-      <section className="mb-8 grid gap-4 lg:grid-cols-3">
+      <section className="mb-8 grid gap-4 lg:grid-cols-4">
 
         <div className="rounded-3xl border border-emerald-500/15 bg-emerald-500/5 p-6 shadow-sm">
           <div className="flex items-start justify-between gap-3">
@@ -475,16 +479,16 @@ export default async function AboutPage() {
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">
               Architecture
             </div>
-            <h2 className="mt-1 text-3xl font-semibold">Three published data layers</h2>
+            <h2 className="mt-1 text-3xl font-semibold">Four published JSON layers</h2>
             <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
-              Every number on this site comes from one of three layers. Each builds on the
+              Every number on this site comes from the technical layers; Briefs add a readable JSON summary layer. Each builds on the
               previous and can be downloaded independently by subscribers.
             </p>
           </div>
           <MoreLink id="data-layers-modal" label="Technical detail" />
         </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <div className="mt-6 grid gap-4 lg:grid-cols-4">
           {[
             {
               name: "Gold",
@@ -506,6 +510,13 @@ export default async function AboutPage() {
               labelClass: "text-blue-300",
               desc: "Smoothed 7-day and 30-day moving averages of Gold series. Used in charts to distinguish brief spikes from sustained trends.",
               endpoint: "derived / latest JSON",
+            },
+            {
+              name: "Briefs",
+              cardClass: "border-emerald-500/20 bg-emerald-500/5",
+              labelClass: "text-emerald-300",
+              desc: "Readable JSON summaries of latest regime context, built from Meta and guarded against predictive or advisory language.",
+              endpoint: "briefs / chain latest JSON",
             },
           ].map(({ name, cardClass, labelClass, desc, endpoint }) => (
             <div key={name} className={`rounded-2xl border p-5 ${cardClass}`}>
@@ -579,7 +590,7 @@ export default async function AboutPage() {
 
       <section className="mt-10 rounded-3xl border p-6 shadow-sm">
         <div className="text-xs font-medium uppercase tracking-[0.14em] text-cyan-200">Explore</div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { href: "/chains", label: "Chains", desc: "Current regime for all four networks" },
             { href: "/methodology", label: "Methodology", desc: "Full model documentation" },
@@ -654,8 +665,8 @@ export default async function AboutPage() {
       />
       <ExplainModal
         id="data-layers-modal"
-        title="The three data layers"
-        subtitle="Gold, Derived, and Meta — the three reference layers and why they are separate."
+        title="The published JSON layers"
+        subtitle="Gold, Derived, Meta, and Briefs — the published JSON layers and why they are separate."
         pair={dataLayersExplain}
       />
       <ExplainModal

@@ -6,7 +6,7 @@ const STEPS = [
   {
     n: "01",
     title: "Download the sample pack",
-    value: "Real Gold, Derived, and Meta reference data from published days — including one UNKNOWN/DEGRADED row. This is exactly what the API delivers daily.",
+    value: "Real Gold, Derived, Meta, and Briefs reference data from published days — including one UNKNOWN/DEGRADED row. This is exactly what the API delivers daily.",
     actions: [
       { label: "Download zip →", href: "/sample-pack/urd-atlas-public-sample-pack.zip", primary: true },
       { label: "Browse files", href: "/api-docs/samples", primary: false },
@@ -35,7 +35,7 @@ const STEPS = [
   {
     n: "04",
     title: "Read the schema and service policy",
-    value: "Every Gold, Derived, and Meta reference field is documented before you subscribe. The service policy covers publish cadence, AWS upstream dependency, and reply target.",
+    value: "Every Gold, Derived, Meta, and Briefs reference field is documented before you subscribe. The service policy covers publish cadence, AWS upstream dependency, and reply target.",
     actions: [
       { label: "JSON Schema →", href: "/api-docs/schema", primary: false },
       { label: "Service policy →", href: "/service", primary: false },

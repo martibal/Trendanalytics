@@ -326,17 +326,17 @@ export function landingFreshnessExplanation(): ExplainContent {
 }
 
 // ---------------------------------------------------------------------------
-// What the three data layers mean (Gold / Meta / Derived)
+// What the four published JSON layers mean (Gold / Meta / Derived)
 // ---------------------------------------------------------------------------
 
 export function dataLayersExplanation(): ExplainContent {
   return {
-    title: "Gold, Derived, and Meta — what the three layers mean",
+    title: "Gold, Derived, Meta, and Briefs — what the four published JSON layers mean",
     subtitle: "How published data is structured from raw observations to regime intelligence.",
     basic: (
       <>
         <p>
-          All the information on this site comes from one of three data layers, each building on the
+          All the information on this site comes from one of four published JSON layers, each building on the
           previous one. Understanding the layers helps you know where any number comes from.
         </p>
         <p className="mt-3">
@@ -616,7 +616,7 @@ export function subscriberSurfaceExplanation(): ExplainContent {
           A subscription adds one thing: direct access to the underlying JSON data files that power
           the site. If you are an analyst or developer who wants to run your own calculations,
           build your own charts, or feed the data into another tool, a subscription lets you
-          download the raw Gold, Derived, and Meta files for each chain.
+          download the raw Gold, Derived, Meta, and Briefs files for each chain.
         </p>
         <p className="mt-3">
           There are two subscription tiers. <span className="font-medium text-white">Single Chain</span>{" "}
@@ -753,7 +753,7 @@ export function valuePropositionExplanation(): ExplainContent {
           way that narrative commentary cannot be.
         </p>
         <p className="mt-3">
-          The subscriber API delivers authenticated access to the Gold, Derived, and Meta artifact
+          The subscriber API delivers authenticated access to the Gold, Derived, Meta, and Briefs artifact
           layers via a proxy endpoint that enforces chain, genre, window, and date-range
           entitlements server-side. Rate limiting is applied per account using a sliding window
           over Upstash Redis. API keys are stored as argon2id hashes and shown only once at

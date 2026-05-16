@@ -1145,7 +1145,7 @@ export default async function MobileOverviewPage() {
             </h1>
 
             <p className="ua-copy">
-              Urd Atlas publishes daily Gold, Derived, and Meta JSON per chain:
+              Urd Atlas publishes daily Gold, Derived, Meta, and Briefs JSON per chain:
               regime label, confidence, evidence, and provenance fields joined
               by chain and date.
             </p>
@@ -1286,7 +1286,7 @@ export default async function MobileOverviewPage() {
                 name="Single Chain"
                 price="$49"
                 tone="blue"
-                text="One chain. Gold, Derived, and Meta JSON."
+                text="One chain. Gold, Derived, Meta, and Briefs JSON."
               />
 
               <PlanCard

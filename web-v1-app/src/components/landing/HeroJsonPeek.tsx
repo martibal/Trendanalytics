@@ -27,7 +27,7 @@ export default function HeroJsonPeek() {
                 This is what you receive every day
               </div>
               <h2 className="mt-3 text-[26px] font-black leading-[1.12] tracking-[-0.025em] text-[#0d2447] sm:text-[28px]">
-                Gold, Derived, and Meta files per chain per day. Every field documented. Every named label hash-anchored.
+                Gold, Derived, Meta, and Briefs files per chain per day. Every field documented. Every named label hash-anchored.
               </h2>
               <p className="mt-3 text-[14px] font-semibold leading-[1.7] text-[#37547b]">
                 After the workflow example above, this is the concrete artifact surface: daily JSON that can be joined onto

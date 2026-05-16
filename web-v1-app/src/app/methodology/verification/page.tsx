@@ -21,7 +21,7 @@ export default async function MethodologyVerificationPage() {
           <>Class A items are directly reproducible from public artifacts.</>,
           <>Class B items are independently checkable against public chain evidence, but not reconstructable from Urd Atlas files alone.</>,
           <>Class C items remain intentionally black box because they would expose private implementation or source-data reconstruction paths.</>,
-          <>One end-to-end diligence path should be enough to test Gold → Derived → Meta behavior before buying.</>,
+          <>One end-to-end diligence path should be enough to test Gold → Derived → Meta behavior, with Briefs as the readable downstream layer before buying.</>,
         ]}
         whyItMatters={<>Verification is the fastest route from skepticism to trust for a technical evaluator.</>}
         fullContent={
@@ -54,7 +54,7 @@ export default async function MethodologyVerificationPage() {
 
         <Section title="Download these files → run this code → expect these results">
           <Callout title="Files to download first">
-            Put these three files in one local folder: <InlineCode>gold.json</InlineCode>, <InlineCode>derived.json</InlineCode>, and <InlineCode>meta.json</InlineCode> from the Ethereum 2026-03-31 sample-pack row set.
+            Put these three technical files in one local folder: <InlineCode>gold.json</InlineCode>, <InlineCode>derived.json</InlineCode>, and <InlineCode>meta.json</InlineCode> from the Ethereum 2026-03-31 sample-pack row set.
           </Callout>
           <CodeBlock>{`import hashlib
 import json
@@ -133,7 +133,7 @@ print({
             headers={["Layer", "Field or check", "Expected result", "Why it matters"]}
             rows={[
               ["Gold", <InlineCode key="g1">chain</InlineCode>, "ethereum", "Confirms the artifact belongs to the intended chain."],
-              ["Gold", <InlineCode key="g2">date</InlineCode>, "2026-03-31", "Confirms all three files are aligned on the same observation date."],
+              ["Gold", <InlineCode key="g2">date</InlineCode>, "2026-03-31", "Confirms the three technical files are aligned on the same observation date."],
               ["Derived", <><InlineCode key="d1">tx_count_daily__ma7</InlineCode> and <InlineCode key="d2">tx_count_daily__ma30</InlineCode> exist</>, "Present in the same-date Derived row", "Shows that smoothed trend context exists for the same observation row."],
               ["Meta", <InlineCode key="m1">publish_confidence.threshold</InlineCode>, "0.40", "Public gate threshold for whether a named label may be published."],
               ["Meta", <InlineCode key="m2">regime.ruleset_id</InlineCode>, "eth_l1_v1", "Pins the named output to a specific public ruleset identifier."],

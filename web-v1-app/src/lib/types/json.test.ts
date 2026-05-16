@@ -65,6 +65,7 @@ describe("types/json", () => {
       expect(isDataGenre("gold")).toBe(true);
       expect(isDataGenre("meta")).toBe(true);
       expect(isDataGenre("derived")).toBe(true);
+      expect(isDataGenre("briefs")).toBe(true);
     });
 
     it("rejects unsupported data genres", () => {

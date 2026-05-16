@@ -578,7 +578,7 @@ export default async function DashboardPage() {
             </div>
             <div className="ua-dashboard-meta-row">
               <strong>Delivery</strong>
-              <span>Gold, Derived, Meta JSON</span>
+              <span>Gold, Derived, Meta, and Briefs JSON</span>
             </div>
             <div className="ua-dashboard-meta-row">
               <strong>Boundary</strong>
@@ -724,7 +724,7 @@ export default async function DashboardPage() {
                   }
                   detail={
                     entitled
-                      ? "Gold, Derived, and Meta JSON delivery is enabled for this chain."
+                      ? "Gold, Derived, Meta, and Briefs JSON delivery is enabled for this chain."
                       : "This chain is outside the current entitlement scope."
                   }
                   token={<Token tone={entitled ? "ok" : "quiet"}>{entitled ? "enabled" : "not included"}</Token>}

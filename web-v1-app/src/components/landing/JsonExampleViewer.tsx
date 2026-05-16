@@ -4,7 +4,7 @@ import { useState } from "react";
 import { jsonExamples, type JsonExampleKey } from "@/lib/landing";
 
 type ConfidenceLevel = "good" | "degraded";
-type Layer = "gold" | "meta" | "derived";
+type Layer = "gold" | "meta" | "derived" | "briefs";
 
 function confidenceButtonClass(active: boolean, tone: ConfidenceLevel) {
   if (tone === "good") {
@@ -52,7 +52,7 @@ export default function JsonExampleViewer() {
             <div>
               <h3 className="text-xl font-semibold text-white">Actual published JSON examples</h3>
               <p className="mt-1 text-sm text-slate-400">
-                Real historical data from the published artifact store. Not fabricated.
+                Published JSON examples and Briefs-compatible shapes for inspection.
               </p>
             </div>
             <a
@@ -83,7 +83,7 @@ export default function JsonExampleViewer() {
             </div>
 
             <div className="flex gap-1 rounded-xl border border-white/8 bg-white/3 p-1 w-fit">
-              {(["gold", "meta", "derived"] as Layer[]).map((candidate) => (
+              {(["gold", "meta", "derived", "briefs"] as Layer[]).map((candidate) => (
                 <button
                   key={candidate}
                   type="button"

@@ -53,21 +53,37 @@ const LAYERS = [
     hoverBorder: "hover:border-emerald-400/15",
     featured: false as const,
   },
+  {
+    tag: "Briefs",
+    tagClass: "border-lime-400/20 bg-lime-400/6 text-lime-300",
+    title: "Readable summaries",
+    subtitle: "What changed",
+    desc: "Short descriptive JSON summaries of latest Meta context. Built for fast reading, reporting, and non-pipeline workflows.",
+    fields: [
+      { name: "headline", note: "Readable latest-context summary" },
+      { name: "updated_through", note: "As-of data boundary" },
+      { name: "guardrails", note: "Non-predictive, non-advisory framing" },
+    ],
+    dotClass: "bg-lime-400",
+    href: "/api-docs/schema#briefs",
+    hoverBorder: "hover:border-lime-400/15",
+    featured: false as const,
+  },
 ] as const;
 
 export default function JsonLayers() {
   return (
     <section className="mt-16">
       <div className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-500">
-        Three reference layers per chain, per day
+        Four published JSON layers per chain, per day
       </div>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
         <h2 className="text-3xl font-black tracking-[-0.02em] text-white leading-tight">
-          Gold, Derived, Meta.
+          Gold, Derived, Meta, and Briefs.
         </h2>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-4">
         {LAYERS.map((layer) => (
           <Link
             key={layer.tag}

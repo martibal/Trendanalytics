@@ -18,7 +18,7 @@ type RouteContext = {
   params: Promise<{ path: string[] }>;
 };
 
-const ALLOWED_GENRES: FileGenre[] = ["gold", "meta", "derived"];
+const ALLOWED_GENRES: FileGenre[] = ["gold", "meta", "derived", "briefs"];
 const ALLOWED_CHAINS: ChainId[] = ["bitcoin", "ethereum", "arbitrum", "base"];
 
 function isFileGenre(value: string): value is FileGenre {
@@ -27,6 +27,58 @@ function isFileGenre(value: string): value is FileGenre {
 
 function isChainId(value: string): value is ChainId {
   return ALLOWED_CHAINS.includes(value as ChainId);
+}
+
+type ParsedFilePath = {
+  genre: FileGenre;
+  chain: ChainId;
+  windowTail: string[];
+  storageSegments: string[];
+};
+
+function parseFilePathSegments(segments: string[]): ParsedFilePath | null {
+  const [genreRaw] = segments;
+
+  if (!genreRaw || !isFileGenre(genreRaw)) {
+    return null;
+  }
+
+  if (genreRaw === "briefs") {
+    // Briefs are published under briefs/chains/<chain>/latest.json.
+    // Site-level and cross-chain brief bundles remain public data artifacts
+    // and are not routed through the per-chain subscriber entitlement gate.
+    if (segments.length < 4 || segments[1] !== "chains") {
+      return null;
+    }
+
+    const chainRaw = segments[2];
+    if (!isChainId(chainRaw)) {
+      return null;
+    }
+
+    return {
+      genre: genreRaw,
+      chain: chainRaw,
+      windowTail: segments.slice(3),
+      storageSegments: segments,
+    };
+  }
+
+  if (segments.length < 3) {
+    return null;
+  }
+
+  const chainRaw = segments[1];
+  if (!isChainId(chainRaw)) {
+    return null;
+  }
+
+  return {
+    genre: genreRaw,
+    chain: chainRaw,
+    windowTail: segments.slice(2),
+    storageSegments: segments,
+  };
 }
 
 function withRequestId(
@@ -174,22 +226,23 @@ export async function GET(request: Request, context: RouteContext) {
       );
     }
 
-    const [genreRaw, chainRaw, ...tail] = segments;
-    genre = genreRaw;
-    chain = chainRaw;
+    const parsedPath = parseFilePathSegments(segments);
 
-    if (!isFileGenre(genreRaw) || !isChainId(chainRaw)) {
+    if (!parsedPath) {
       return jsonError(
         requestId,
         404,
         "not_found",
         "File path does not exist.",
-        "unknown_genre_or_chain",
+        "unknown_genre_chain_or_brief_scope",
         Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
       );
     }
 
-    const inferredWindow = inferWindowFromTail(tail);
+    genre = parsedPath.genre;
+    chain = parsedPath.chain;
+
+    const inferredWindow = inferWindowFromTail(parsedPath.windowTail);
     window = inferredWindow;
 
     if (!inferredWindow) {
@@ -222,8 +275,8 @@ export async function GET(request: Request, context: RouteContext) {
     const endDate = url.searchParams.get("end");
 
     const decision = evaluateFileEntitlement(authResult.entitlement, {
-      genre: genreRaw,
-      chain: chainRaw,
+      genre: parsedPath.genre,
+      chain: parsedPath.chain,
       window: inferredWindow,
       startDate,
       endDate,
@@ -255,7 +308,7 @@ export async function GET(request: Request, context: RouteContext) {
       );
     }
 
-    const storagePath = buildStoragePath(segments);
+    const storagePath = buildStoragePath(parsedPath.storageSegments);
     const file = await readStorageObject(storagePath);
 
     if (!file) {

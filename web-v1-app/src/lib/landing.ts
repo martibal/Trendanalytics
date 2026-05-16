@@ -4,13 +4,13 @@ export const heroTagline =
   "On-chain reference data for BTC, ETH, ARB, and BASE.";
 
 export const heroSubline =
-  "Every day, the pipeline reads raw transaction data from BTC, ETH, ARB, and BASE and publishes three reference layers: Gold observations, Derived transforms, and Meta regime and confidence context. Not a chart. Not a price feed. Structured, auditable on-chain reference data for downstream analysis.";
+  "Every day, the pipeline reads raw transaction data from BTC, ETH, ARB, and BASE and publishes four published JSON layers: Gold observations, Derived transforms, and Meta regime and confidence context. Not a chart. Not a price feed. Structured, auditable on-chain reference data for downstream analysis.";
 
 export const heroBodyParagraphs = [] as const;
 
 export const heroSalesPunch = [
   "Reference data delivered as JSON — not just charts.",
-  "Subscribers get daily Gold, Derived, and Meta reference data via API — ready to plug into notebooks, models, and dashboards. No pipeline to build or maintain.",
+  "Subscribers get daily Gold, Derived, Meta, and Briefs reference data via API — ready to plug into notebooks, models, and dashboards. No pipeline to build or maintain.",
 ] as const;
 
 export const heroFaqPrompt =
@@ -155,7 +155,7 @@ export const heroActionItems = [
   },
   {
     label: "Structured data without pipeline overhead",
-    detail: "Daily Gold, Derived, and Meta reference data delivered via API. Plug into notebooks or downstream models — no infrastructure to build.",
+    detail: "Daily Gold, Derived, Meta, and Briefs reference data delivered via API. Plug into notebooks or downstream models — no infrastructure to build.",
   },
   {
     label: "Independent verification",
@@ -172,7 +172,7 @@ export const landingUseCases = [
   },
   {
     title: "Structured daily data without pipeline overhead",
-    body: "Daily Gold, Derived, and Meta reference data delivered via authenticated API. Plug directly into notebooks, dashboards, or downstream models — no data pipeline to build or maintain.",
+    body: "Daily Gold, Derived, Meta, and Briefs reference data delivered via authenticated API. Plug directly into notebooks, dashboards, or downstream models — no data pipeline to build or maintain.",
   },
   {
     title: "400+ days of auditable history",
@@ -205,7 +205,7 @@ export const landingPlans = [
     border: "border-cyan-500/25 bg-cyan-500/8",
     body: "One chain. API access. 90-day history.",
     detail:
-      "Daily on-chain reference data for one chain of your choice — BTC, ETH, ARB, or BASE. Gold, Derived, and Meta JSON delivered via authenticated API.",
+      "Daily on-chain reference data for one chain of your choice — BTC, ETH, ARB, or BASE. Gold, Derived, Meta, and Briefs JSON delivered via authenticated API.",
     bestFor: "Best for: independent analysts validating the dataset against one chain.",
     href: "/sign-up",
     cta: "Start Single Chain →",
@@ -219,7 +219,7 @@ export const landingPlans = [
     border: "border-purple-500/25 bg-purple-500/8",
     body: "All four chains. API access. 365-day history.",
     detail:
-      "Daily on-chain reference data across BTC, ETH, ARB, and BASE. Gold, Derived, and Meta JSON delivered via authenticated API. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive.",
+      "Daily on-chain reference data across BTC, ETH, ARB, and BASE. Gold, Derived, Meta, and Briefs JSON delivered via authenticated API. Standard Research includes 365 days of subscriber API history. The public track record may be longer because it reflects the full published archive.",
     bestFor: "Best for: multi-chain research, backtesting, and production pipelines.",
     href: "/sign-up",
     cta: "Start Research →",
@@ -244,7 +244,7 @@ export const trustCards = [
   {
     eyebrow: "Schema",
     title: "What every field contains",
-    body: "See every Gold, Derived, and Meta reference field documented in full.",
+    body: "See every Gold, Derived, Meta, and Briefs reference field documented in full.",
     href: "/api-docs/schema",
   },
 ] as const;
@@ -313,6 +313,25 @@ export const jsonLayers = [
     ],
     moreCount: 0,
   },
+  {
+    eyebrow: "Briefs",
+    title: "Readable summaries",
+    schemaHref: "/api-docs/schema#briefs",
+    accentColor: "text-emerald-300",
+    borderColor: "border-emerald-500/20",
+    bgColor: "bg-emerald-500/5",
+    dotColor: "text-emerald-500/50",
+    description:
+      "Short descriptive JSON summaries of latest Meta context. Built for fast reading, reporting, onboarding, and workflows that do not need to parse every technical field first.",
+    bestFor:
+      "Best for: readable regime context, reports, onboarding, and non-pipeline workflows.",
+    fields: [
+      { key: "headline", note: "Brief readable summary" },
+      { key: "updated_through", note: "As-of data boundary" },
+      { key: "guardrails", note: "Daily, descriptive, non-advisory boundaries" },
+    ],
+    moreCount: 0,
+  },
 ] as const;
 
 // ─── Explore cards ────────────────────────────────────────────────────────────
@@ -330,7 +349,7 @@ export const exploreCards = [
   },
   {
     title: "JSON Schema",
-    body: "See every Gold, Derived, and Meta reference field documented before you subscribe.",
+    body: "See every Gold, Derived, Meta, and Briefs reference field documented before you subscribe.",
     href: "/api-docs/schema",
   },
   {
@@ -346,14 +365,16 @@ export type JsonExampleKey =
   | "meta-good"
   | "meta-degraded"
   | "derived-good"
-  | "derived-degraded";
+  | "derived-degraded"
+  | "briefs-good"
+  | "briefs-degraded";
 
 export type JsonExample = {
   key: JsonExampleKey;
   chain: string;
   date: string;
   confidenceLevel: "good" | "degraded";
-  layer: "gold" | "meta" | "derived";
+  layer: "gold" | "meta" | "derived" | "briefs";
   explanation: string;
   data: string;
 };
@@ -992,6 +1013,46 @@ const derivedDegradedPayload = {
   }
 } as const;
 
+const briefsGoodPayload = {
+  schema: "urd_atlas.chain_brief.v1",
+  brief_version: "briefs_v1.0",
+  chain: "ethereum",
+  updated_through: "2025-08-12",
+  brief_status: "published",
+  label: "CONGESTED",
+  headline: "Ethereum published a high-confidence congested context for the latest daily row.",
+  confidence: {
+    latest: 0.854,
+    average_7d: 0.811,
+    direction: "steady",
+  },
+  guardrails: {
+    not_intraday: true,
+    not_prediction: true,
+    not_investment_advice: true,
+  },
+} as const;
+
+const briefsDegradedPayload = {
+  schema: "urd_atlas.chain_brief.v1",
+  brief_version: "briefs_v1.0",
+  chain: "ethereum",
+  updated_through: "2025-11-04",
+  brief_status: "degraded",
+  label: "UNKNOWN/DEGRADED",
+  headline: "Ethereum published a degraded context because the confidence gate was not cleared.",
+  confidence: {
+    latest: 0.349,
+    average_7d: 0.382,
+    direction: "softening",
+  },
+  guardrails: {
+    not_intraday: true,
+    not_prediction: true,
+    not_investment_advice: true,
+  },
+} as const;
+
 export const jsonExamples: Record<JsonExampleKey, JsonExample> = {
   "gold-good": {
     key: "gold-good",
@@ -1052,5 +1113,25 @@ export const jsonExamples: Record<JsonExampleKey, JsonExample> = {
     explanation:
       "This is a real published Derived artifact for the same degraded Ethereum day. The moving averages are still published, but the paired Meta artifact for this date fell below the confidence threshold and published as UNKNOWN/DEGRADED.",
     data: JSON.stringify(derivedDegradedPayload, null, 2),
+  },
+  "briefs-good": {
+    key: "briefs-good",
+    chain: "ethereum",
+    date: "2025-08-12",
+    confidenceLevel: "good",
+    layer: "briefs",
+    explanation:
+      "This shows the Briefs layer shape for a high-confidence published context. Briefs summarize the latest Meta state in readable JSON while preserving the daily, descriptive, non-advisory guardrails.",
+    data: JSON.stringify(briefsGoodPayload, null, 2),
+  },
+  "briefs-degraded": {
+    key: "briefs-degraded",
+    chain: "ethereum",
+    date: "2025-11-04",
+    confidenceLevel: "degraded",
+    layer: "briefs",
+    explanation:
+      "This shows the Briefs layer shape for a degraded context. The label remains UNKNOWN/DEGRADED and the narrative stays descriptive rather than predictive or advisory.",
+    data: JSON.stringify(briefsDegradedPayload, null, 2),
   },
 };

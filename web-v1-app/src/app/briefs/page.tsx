@@ -284,7 +284,7 @@ export default async function BriefsPage() {
             The latest blockchain week <em>in seconds.</em>
           </h1>
           <p className="lead mt-4 max-w-2xl">
-            Briefs summarize what each chain's published Meta rows showed across
+            Briefs summarize what each chain&apos;s published Meta rows showed across
             the latest 7 days — what regime dominated, how confident the evidence
             was, and whether the label is persistent or recent. Daily cadence.
             Descriptive, not predictive.

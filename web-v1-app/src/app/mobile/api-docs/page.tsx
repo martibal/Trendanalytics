@@ -138,7 +138,7 @@ export default function MobileApiDocsPage() {
             </code>
           </div>
           <div className="mt-2 text-[10px] text-slate-500">
-            genre: gold · meta · derived &nbsp;|&nbsp; chain: bitcoin · ethereum · arbitrum · base
+            genre: gold · meta · derived · briefs · briefs &nbsp;|&nbsp; chain: bitcoin · ethereum · arbitrum · base
           </div>
         </section>
 
@@ -238,8 +238,8 @@ export default function MobileApiDocsPage() {
           </div>
           <div className="space-y-2">
             {[
-              { plan: "Single Chain — $49/mo", access: "1 chain of your choice · Gold, Derived, Meta reference data · 90-day history", color: "#22d3ee" },
-              { plan: "Full Access — $149/mo", access: "All 4 chains · Gold, Derived, Meta reference data", color: "#ff9a4a" },
+              { plan: "Single Chain — $49/mo", access: "1 chain of your choice · Gold, Derived, Meta, and Briefs reference data · 90-day history", color: "#22d3ee" },
+              { plan: "Full Access — $149/mo", access: "All 4 chains · Gold, Derived, Meta, and Briefs reference data", color: "#ff9a4a" },
             ].map((p) => (
               <div key={p.plan} className="rounded-xl border border-white/6 bg-black/10 px-3 py-3">
                 <div className="text-[11px] font-bold mb-0.5" style={{ color: p.color }}>{p.plan}</div>

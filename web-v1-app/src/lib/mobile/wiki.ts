@@ -290,7 +290,7 @@ export const WIKI_ENTRIES: WikiEntry[] = [
     label: "Pipeline",
     category: "pipeline",
     basic: "The automated daily process that reads raw blockchain data, runs the classification, and publishes the JSON files. Runs around 09:00 and 21:00 Europe/Oslo.",
-    advanced: "Deterministic and idempotent per (chain, date) — rerunning with the same inputs produces the same outputs. Reads from AWS Public Blockchain Data, aggregates daily features (CANON_COLS), computes regime engine output, and publishes Gold, Derived, and Meta artifacts. Each run is versioned by revision_id and methodology_version.",
+    advanced: "Deterministic and idempotent per (chain, date) — rerunning with the same inputs produces the same outputs. Reads from AWS Public Blockchain Data, aggregates daily features (CANON_COLS), computes regime engine output, and publishes Gold, Derived, Meta, and Briefs artifacts. Each run is versioned by revision_id and methodology_version.",
     related: ["gold-json", "meta-json", "lag", "aws-data"],
   },
   {
@@ -359,7 +359,7 @@ export const WIKI_CATEGORIES: { key: WikiCategory; label: string; description: s
   { key: "confidence", label: "Confidence & freshness", description: "Evidence quality and data currency" },
   { key: "scorecard", label: "Scorecard & drivers", description: "Demand, Friction, Capacity axes and what drives them" },
   { key: "calculations", label: "Calculations", description: "Formulas, baselines, and statistical methods" },
-  { key: "json", label: "JSON structure", description: "Gold, Derived, and Meta file formats" },
+  { key: "json", label: "JSON structure", description: "Gold, Derived, Meta, and Briefs file formats" },
   { key: "pipeline", label: "Pipeline & data", description: "How and when data is published" },
   { key: "chains", label: "The four chains", description: "BTC, ETH, ARB, and BASE explained" },
 ];

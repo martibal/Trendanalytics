@@ -751,8 +751,8 @@ export default async function TrackRecordPage({
                 <MoreLink id="matrix-modal" />
               </div>
               <p className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
-                How often does each regime transition to each other regime? Rows are the "from" state,
-                columns are the "to" state.
+                How often does each regime transition to each other regime? Rows are the &quot;from&quot; state,
+                columns are the &quot;to&quot; state.
               </p>
             </div>
             <TransitionMatrix transitions={transitions} />
