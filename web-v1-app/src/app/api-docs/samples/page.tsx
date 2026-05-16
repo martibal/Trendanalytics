@@ -212,7 +212,7 @@ export default function SamplePackPage() {
                       <p className="mt-1 text-sm leading-6 text-[var(--ink2)]">{group.description}</p>
                     </div>
                     <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--gold)]">
-                      {group.files.length} file{group.files.length === 1 ? "" : "s"}
+                      {group.files.length} files
                     </div>
                   </div>
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
