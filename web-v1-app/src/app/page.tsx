@@ -376,6 +376,14 @@ async function buildUpdatedThrough(): Promise<string> {
 // Page
 // ---------------------------------------------------------------------------
 
+function buildPipelineDays(): number {
+  // Pipeline started December 2024. Calculate days from then to today.
+  const start = new Date("2024-12-01T00:00:00Z");
+  const now = new Date();
+  const diffMs = now.getTime() - start.getTime();
+  return Math.max(0, Math.floor(diffMs / 86400000));
+}
+
 export default async function HomePage() {
   const [chains, briefs, updatedThrough] = await Promise.all([
     buildChainData(),
@@ -383,11 +391,14 @@ export default async function HomePage() {
     buildUpdatedThrough(),
   ]);
 
+  const pipelineDays = buildPipelineDays();
+
   return (
     <UrdAtlasVFinalLandingClient
       chains={chains}
       briefs={briefs}
       updatedThrough={updatedThrough}
+      pipelineDays={pipelineDays}
     />
   );
 }
