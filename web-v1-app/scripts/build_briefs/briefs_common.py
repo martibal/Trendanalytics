@@ -463,7 +463,13 @@ def classify_chain_pattern(observations: list[MetaObservation]) -> str:
     demand_counts = axis_state_counts(observations, "demand")
     friction_transition = axis_transition(observations, "friction")
 
-    if counts["UNKNOWN/DEGRADED"] >= 2 or (avg_conf is not None and avg_conf < 0.50):
+    conf_direction = confidence_direction([obs.confidence_score for obs in observations])
+    is_degraded = (
+        counts["UNKNOWN/DEGRADED"] >= 2
+        or (avg_conf is not None and avg_conf < 0.40)
+        or (avg_conf is not None and avg_conf < 0.50 and conf_direction != "strengthening")
+    )
+    if is_degraded:
         return "degraded_or_low_confidence"
 
     if (
