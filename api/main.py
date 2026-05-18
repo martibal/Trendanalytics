@@ -1,4 +1,4 @@
-# api/main.py
+﻿# api/main.py
 from __future__ import annotations
 
 import os
@@ -291,14 +291,14 @@ def _slice_confidence_df(df: pd.DataFrame, *, max_rows: Optional[int] = None) ->
 
 
 def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[str, Any]) -> Dict[str, Any]:
-    """Build the public status envelope from the same evidence that supports the label.
+    """Build the public status envelope from regime and scorecard evidence.
 
-    The regime label can be supported by either the profile-aware public scorecard
-    or by regime-axis evidence. If the label is supported by regime axes while the
-    scorecard dimensions remain visually Normal/Balanced, the one_liner must explain
-    the regime-axis basis instead of repeating the neutral scorecard levels. This is
-    required for public explainability: label, one_liner, scorecard and regime.sanity
-    must not contradict each other.
+    The status one-liner must never imply more certainty than the label supports.
+    In particular, a STABLE label can still coexist with elevated adjacent
+    scorecard pressure. When that happens, the one-liner explicitly says that
+    the scorecard is elevated but that the regime-axis rule did not cross the
+    label threshold. This keeps the public explanation aligned with both the
+    label and the scorecard.
     """
     lab = str((regime or {}).get("label") or "UNKNOWN/DEGRADED")
 
@@ -332,6 +332,28 @@ def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[st
     f_lv = f_dim.get("level") or "Normal"
     c_lv = c_dim.get("level") or "Balanced"
 
+    def _num(value: Any) -> Optional[float]:
+        try:
+            v = float(value)
+            if math.isfinite(v):
+                return v
+        except Exception:
+            pass
+        return None
+
+    d_score = _num(d_dim.get("score"))
+    f_score = _num(f_dim.get("score"))
+    c_score = _num(c_dim.get("score"))
+    d_raw = _num(d_dim.get("score_raw"))
+    f_raw = _num(f_dim.get("score_raw"))
+    c_raw = _num(c_dim.get("score_raw"))
+
+    support = (scorecard or {}).get("regime_support") if isinstance(scorecard, dict) else {}
+    support = support if isinstance(support, dict) else {}
+    heating_supported = bool(support.get("heating_supported") is True)
+    congested_supported = bool(support.get("congested_supported") is True)
+    cheap_supported = bool(support.get("cheap_supported") is True)
+
     sanity = ((regime or {}).get("sanity") or {}) if isinstance(regime, dict) else {}
     basis = str(sanity.get("support_basis") or "scorecard")
     reason = str(sanity.get("support_reason") or "")
@@ -340,6 +362,17 @@ def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[st
     def _axis(axis_name: str) -> Dict[str, Any]:
         v = axes.get(axis_name) if isinstance(axes, dict) else None
         return v if isinstance(v, dict) else {}
+
+    def _axis_high(axis_name: str) -> bool:
+        axis = _axis(axis_name)
+        return str(axis.get("band_high") or "NORMAL") in {"HIGH", "EXTREME_HIGH"} and int(axis.get("informative_count") or 0) > 0
+
+    def _axis_low(axis_name: str) -> bool:
+        axis = _axis(axis_name)
+        return str(axis.get("band_low") or "NORMAL") in {"LOW", "EXTREME_LOW"} and int(axis.get("informative_count") or 0) > 0
+
+    def _axis_heating(axis_name: str) -> bool:
+        return str(_axis(axis_name).get("trend") or "FLAT") == "HEATING"
 
     def _axis_band_phrase(axis_name: str) -> str:
         axis = _axis(axis_name)
@@ -369,23 +402,22 @@ def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[st
     }
 
     def _driver_metrics(axis_name: str, *, low_side: bool = False, high_side: bool = False, max_items: int = 2) -> str:
-        axis = _axis(axis_name)
-        signals = axis.get("signals") if isinstance(axis, dict) else []
-        if not isinstance(signals, list):
-            signals = []
+        raw_drivers = (regime or {}).get("drivers") if isinstance(regime, dict) else []
+        drivers = raw_drivers if isinstance(raw_drivers, list) else []
         chosen = []
-        for sig in signals:
-            if not isinstance(sig, dict) or sig.get("informative") is False:
+        for driver in drivers:
+            if not isinstance(driver, dict) or str(driver.get("axis") or "") != axis_name:
                 continue
-            band = str(sig.get("band") or "NORMAL")
-            metric = str(sig.get("metric") or "")
+            metric = str(driver.get("metric") or "")
             if not metric:
                 continue
-            if low_side and band not in {"LOW", "EXTREME_LOW"}:
+            z = abs(float(driver.get("z_robust") or 0.0))
+            pct = float(driver.get("pct_90d") or 50.0)
+            if low_side and pct > 35.0:
                 continue
-            if high_side and band not in {"HIGH", "EXTREME_HIGH"}:
+            if high_side and pct < 65.0:
                 continue
-            chosen.append((abs(float(sig.get("z_robust") or 0.0)), metric))
+            chosen.append((z, metric))
         chosen.sort(reverse=True)
         names = [metric_labels.get(m, m.replace("_", " ")) for _score, m in chosen[:max_items]]
         if not names:
@@ -400,7 +432,7 @@ def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[st
         if lab == "HEATING":
             return f"Demand-led heating: scorecard shows demand {d_lv}."
         if lab == "STABLE":
-            return f"Stable regime: Demand {d_lv}; Friction {f_lv}; Capacity {c_lv}."
+            return _stable_text()
         return f"Demand {d_lv}; Friction {f_lv}; Capacity {c_lv}."
 
     def _axis_text() -> str:
@@ -428,11 +460,50 @@ def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[st
                 + "."
             )
         if lab == "STABLE":
-            return f"Stable regime: Demand {d_lv}; Friction {f_lv}; Capacity {c_lv}."
+            return _stable_text()
         return _scorecard_text()
 
+    def _score_or_raw_high(score: Optional[float], raw: Optional[float], level: Any) -> bool:
+        return str(level) in {"High", "Tight"} or (score is not None and score >= 67.0) or (raw is not None and raw >= 67.0)
+
+    def _score_or_raw_low(score: Optional[float], raw: Optional[float], level: Any) -> bool:
+        return str(level) in {"Low", "Slack"} or (score is not None and score <= 33.0) or (raw is not None and raw <= 33.0)
+
+    def _stable_text() -> str:
+        adjacent: List[str] = []
+
+        demand_adjacent = _score_or_raw_high(d_score, d_raw, d_lv) or heating_supported
+        if demand_adjacent:
+            if _axis_high("demand") and _axis_heating("demand"):
+                adjacent.append("demand is elevated and heating, but the final stable label reflects the full cross-axis rule set")
+            else:
+                adjacent.append("demand is elevated on the scorecard, but regime-axis demand did not cross the HEATING threshold")
+
+        cheap_adjacent = _score_or_raw_low(f_score, f_raw, f_lv) or cheap_supported
+        if cheap_adjacent:
+            if _axis_low("friction") and not _axis_high("capacity"):
+                adjacent.append("friction is low, but the full CHEAP regime rule was not met")
+            else:
+                adjacent.append("friction is low on the scorecard, but regime-axis evidence did not cross the CHEAP threshold")
+
+        congested_adjacent = (
+            congested_supported
+            or (_score_or_raw_high(f_score, f_raw, f_lv) and _score_or_raw_high(c_score, c_raw, c_lv))
+        )
+        if congested_adjacent:
+            adjacent.append("friction/capacity pressure is visible, but the CONGESTED regime rule was not met")
+
+        if adjacent:
+            return (
+                "Stable label with adjacent pressure: "
+                + "; ".join(adjacent[:2])
+                + f". Scorecard: Demand {d_lv}; Friction {f_lv}; Capacity {c_lv}."
+            )
+
+        return f"Stable regime: Demand {d_lv}; Friction {f_lv}; Capacity {c_lv}."
+
     if lab == "STABLE":
-        one = _scorecard_text()
+        one = _stable_text()
     elif basis == "regime_axes":
         one = _axis_text()
     else:
@@ -446,10 +517,16 @@ def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[st
             "basis": basis,
             "label": lab,
             "reason": reason,
+            "status_note": one,
             "scorecard": {
-                "demand": {"level": d_lv, "score": d_dim.get("score")},
-                "friction": {"level": f_lv, "score": f_dim.get("score")},
-                "capacity": {"level": c_lv, "score": c_dim.get("score")},
+                "demand": {"level": d_lv, "score": d_score, "score_raw": d_raw},
+                "friction": {"level": f_lv, "score": f_score, "score_raw": f_raw},
+                "capacity": {"level": c_lv, "score": c_score, "score_raw": c_raw},
+            },
+            "regime_support": {
+                "heating_supported": heating_supported,
+                "cheap_supported": cheap_supported,
+                "congested_supported": congested_supported,
             },
             "regime_axes": {
                 "demand": {
@@ -473,7 +550,6 @@ def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[st
             },
         },
     }
-
 def _gold_json_dir(chain: str, granularity: str = "daily") -> Path:
     g = (granularity or "daily").lower().strip()
     if g == "weekly":
@@ -1215,3 +1291,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
