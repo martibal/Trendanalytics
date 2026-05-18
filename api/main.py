@@ -20,6 +20,14 @@ from api.analog_engine import compute_analogs_and_forward_stats
 from api.whn.service import infer_whn_from_gold
 from api.market_scorecard import compute_market_scorecard
 from api.regime_engine import compute_regime, reconcile_regime_with_scorecard
+from api.confidence_engine import (
+    build_confidence_payload_v2,
+    compute_confidence_from_gold_v2,
+    compute_confidence_snapshot_from_gold_v2,
+    compute_data_quality_details_v2,
+    compute_label_clarity_v2,
+)
+
 
 
 APP_TITLE = "CSS API"
@@ -573,57 +581,6 @@ def _load_gold_df(chain: str, granularity: str = "daily") -> pd.DataFrame:
     return pd.DataFrame()
 
 
-def _compute_confidence_from_gold(df: pd.DataFrame, *, chain: str, gold_status: Optional[dict] = None) -> Optional[float]:
-    if df is None or df.empty:
-        return 0.0
-
-    d = df.copy()
-    if "date" not in d.columns and "day" in d.columns:
-        d = d.rename(columns={"day": "date"})
-    if "date" not in d.columns:
-        return 0.0
-
-    d["date"] = pd.to_datetime(d["date"], errors="coerce")
-    d = d.dropna(subset=["date"]).sort_values("date")
-    if d.empty:
-        return 0.0
-
-    asof = d["date"].iloc[-1].date()
-    lag_days = (_utc_today() - asof).days
-    freshness = math.exp(-max(0, lag_days) / 7.0)
-
-    recent_start = d["date"].iloc[-1] - pd.Timedelta(days=30)
-    r = d[d["date"] >= recent_start].copy()
-    if r.empty:
-        r = d.tail(min(len(d), 30)).copy()
-
-    if gold_status and isinstance(gold_status, dict):
-        for k in ("confidence_score", "confidence_numeric", "confidence", "score"):
-            v = gold_status.get(k)
-            if isinstance(v, (int, float)) and math.isfinite(float(v)):
-                return float(max(0.0, min(1.0, float(v))))
-
-    base_fields = ["tx_count_daily", "median_tx_fee_native", "median_tx_value_native", "avg_block_time_sec"]
-    if chain != "bitcoin":
-        base_fields.append("unique_active_addresses")
-    if chain in ("ethereum",):
-        base_fields.append("gas_utilization_pct")
-
-    present = [c for c in base_fields if c in r.columns]
-    if not present:
-        completeness = 0.0
-    else:
-        rates = []
-        for c in present:
-            s = pd.to_numeric(r[c], errors="coerce")
-            rates.append(float(s.notna().mean()))
-        completeness = float(sum(rates) / len(rates))
-
-    n = len(d)
-    suff = float(max(0.0, min(1.0, n / 120.0)))
-    conf = freshness * completeness * suff
-    return float(max(0.0, min(1.0, conf)))
-
 
 def _compute_confidence_snapshot_from_gold(
     df: pd.DataFrame,
@@ -632,171 +589,13 @@ def _compute_confidence_snapshot_from_gold(
     gold_status: Optional[dict] = None,
     asof_date: Optional[date] = None,
 ) -> Dict[str, Any]:
-    """Compute confidence for a specific historical as-of date.
-
-    This helper is meant for META history rebuilds. It intentionally excludes
-    "freshness vs today" from the confidence score so old rows are not penalized
-    merely for being old. Freshness remains available as a separate lag field.
-    """
-    if df is None or df.empty:
-        target_asof = asof_date.isoformat() if hasattr(asof_date, "isoformat") else None
-        return {
-            "chain": chain,
-            "missing": True,
-            "date": target_asof,
-            "asof_date": target_asof,
-            "confidence_score": 0.0,
-            "lag_days_vs_asof_date": None,
-            "lag_days_vs_utc_today": _compute_lag_days(target_asof),
-            "semantics": "evidence_sufficiency_asof_date",
-            "source": "gold_snapshot",
-            "components": {
-                "metric_coverage": 0.0,
-                "recent_density": 0.0,
-                "history_depth": 0.0,
-            },
-        }
-
-    d = df.copy()
-    if "date" not in d.columns and "day" in d.columns:
-        d = d.rename(columns={"day": "date"})
-    if "date" not in d.columns:
-        target_asof = asof_date.isoformat() if hasattr(asof_date, "isoformat") else None
-        return {
-            "chain": chain,
-            "missing": True,
-            "date": target_asof,
-            "asof_date": target_asof,
-            "confidence_score": 0.0,
-            "lag_days_vs_asof_date": None,
-            "lag_days_vs_utc_today": _compute_lag_days(target_asof),
-            "semantics": "evidence_sufficiency_asof_date",
-            "source": "gold_snapshot",
-            "components": {
-                "metric_coverage": 0.0,
-                "recent_density": 0.0,
-                "history_depth": 0.0,
-            },
-        }
-
-    d["date"] = pd.to_datetime(d["date"], errors="coerce")
-    d = d.dropna(subset=["date"]).sort_values("date")
-    if d.empty:
-        target_asof = asof_date.isoformat() if hasattr(asof_date, "isoformat") else None
-        return {
-            "chain": chain,
-            "missing": True,
-            "date": target_asof,
-            "asof_date": target_asof,
-            "confidence_score": 0.0,
-            "lag_days_vs_asof_date": None,
-            "lag_days_vs_utc_today": _compute_lag_days(target_asof),
-            "semantics": "evidence_sufficiency_asof_date",
-            "source": "gold_snapshot",
-            "components": {
-                "metric_coverage": 0.0,
-                "recent_density": 0.0,
-                "history_depth": 0.0,
-            },
-        }
-
-    target_asof = asof_date or d["date"].iloc[-1].date()
-    d = d[d["date"].dt.date <= target_asof].copy()
-    if d.empty:
-        return {
-            "chain": chain,
-            "missing": True,
-            "date": target_asof.isoformat(),
-            "asof_date": target_asof.isoformat(),
-            "confidence_score": 0.0,
-            "lag_days_vs_asof_date": None,
-            "lag_days_vs_utc_today": _compute_lag_days(target_asof.isoformat()),
-            "semantics": "evidence_sufficiency_asof_date",
-            "source": "gold_snapshot",
-            "components": {
-                "metric_coverage": 0.0,
-                "recent_density": 0.0,
-                "history_depth": 0.0,
-            },
-        }
-
-    last_obs = d["date"].iloc[-1].date()
-    lag_days_vs_asof = max(0, (target_asof - last_obs).days)
-
-    if gold_status and isinstance(gold_status, dict):
-        for k in ("confidence_score", "confidence_numeric", "confidence", "score"):
-            v = gold_status.get(k)
-            if isinstance(v, (int, float)) and math.isfinite(float(v)):
-                score = float(max(0.0, min(1.0, float(v))))
-                return {
-                    "chain": chain,
-                    "missing": False,
-                    "date": target_asof.isoformat(),
-                    "asof_date": target_asof.isoformat(),
-                    "confidence_score": score,
-                    "lag_days_vs_asof_date": lag_days_vs_asof,
-                    "lag_days_vs_utc_today": _compute_lag_days(target_asof.isoformat()),
-                    "semantics": "evidence_sufficiency_asof_date",
-                    "source": "gold_status",
-                    "components": {
-                        "metric_coverage": None,
-                        "recent_density": None,
-                        "history_depth": None,
-                    },
-                }
-
-    recent_start = pd.Timestamp(target_asof) - pd.Timedelta(days=29)
-    r = d[d["date"] >= recent_start].copy()
-    if r.empty:
-        r = d.tail(min(len(d), 30)).copy()
-
-    base_fields = ["tx_count_daily", "median_tx_fee_native", "median_tx_value_native", "avg_block_time_sec"]
-    if chain != "bitcoin":
-        base_fields.append("unique_active_addresses")
-    if chain in ("ethereum",):
-        base_fields.append("gas_utilization_pct")
-
-    present = [c for c in base_fields if c in r.columns]
-    if present:
-        rates = []
-        for c in present:
-            s = pd.to_numeric(r[c], errors="coerce")
-            rates.append(float(s.notna().mean()))
-        metric_coverage = float(sum(rates) / len(rates))
-    else:
-        metric_coverage = 0.0
-
-    recent_days_observed = int(r["date"].dt.date.nunique()) if "date" in r.columns else len(r)
-    recent_density = float(max(0.0, min(1.0, recent_days_observed / 30.0)))
-
-    history_days = int(d["date"].dt.date.nunique())
-    history_depth = float(max(0.0, min(1.0, history_days / 120.0)))
-
-    # Weighted blend for smoother, less "mechanical" scores than a raw product.
-    score = (
-        0.50 * metric_coverage
-        + 0.30 * recent_density
-        + 0.20 * history_depth
+    return compute_confidence_snapshot_from_gold_v2(
+        df,
+        chain=chain,
+        gold_status=gold_status,
+        asof_date=asof_date,
+        publish_lag_days_policy=PUBLISH_LAG_DAYS_POLICY,
     )
-
-    score = float(max(0.0, min(1.0, score)))
-
-    return {
-        "chain": chain,
-        "missing": False,
-        "date": target_asof.isoformat(),
-        "asof_date": target_asof.isoformat(),
-        "confidence_score": score,
-        "lag_days_vs_asof_date": lag_days_vs_asof,
-        "lag_days_vs_utc_today": _compute_lag_days(target_asof.isoformat()),
-        "semantics": "evidence_sufficiency_asof_date",
-        "source": "gold_snapshot",
-        "components": {
-            "metric_coverage": metric_coverage,
-            "recent_density": recent_density,
-            "history_depth": history_depth,
-        },
-    }
 
 
 def _slice_gold_df(df: pd.DataFrame, date_from: Optional[str], date_to: Optional[str], max_rows: Optional[int]) -> List[Dict[str, Any]]:
@@ -1063,193 +862,28 @@ def _freshness_factor_asof(lag_days: Optional[int], chain: str) -> Optional[floa
     return max(0.0, 0.70 - ((lag_days - soft) / span) * 0.70)
 
 
+
 def _compute_data_quality_details(df: Optional[pd.DataFrame], *, chain: str, gold_status: Optional[Dict[str, Any]] = None, asof_date: Optional[str] = None) -> Dict[str, Any]:
-    d = _normalize_gold_daily_df(df)
-    if d.empty:
-        return {
-            "score": None,
-            "updated_through": None,
-            "lag_days_vs_asof_date": None,
-            "components": {
-                "current_row_coverage": None,
-                "recent_metric_coverage": None,
-                "recent_density": None,
-                "history_depth": None,
-                "freshness_asof": None,
-            },
-        }
-
-    latest_row = d.iloc[-1]
-    updated_through = latest_row["date"].isoformat() if hasattr(latest_row["date"], "isoformat") else str(latest_row["date"])
-
-    if asof_date:
-        try:
-            asof_dt = _parse_iso_date(asof_date)
-        except Exception:
-            asof_dt = latest_row["date"]
-    else:
-        asof_dt = latest_row["date"]
-
-    lag_days_vs_asof_date = max(0, (asof_dt - latest_row["date"]).days)
-
-    current_row_coverage = _row_metric_coverage(latest_row, chain)
-
-    recent_start = asof_dt - timedelta(days=29)
-    recent_rows = d[d["date"] >= recent_start].copy()
-    expected_recent_days = 30
-    observed_recent_days = int(recent_rows["date"].nunique()) if not recent_rows.empty else 0
-    recent_density = min(1.0, observed_recent_days / expected_recent_days)
-
-    if not recent_rows.empty:
-        row_coverages = [
-            _row_metric_coverage(row, chain)
-            for _, row in recent_rows.iterrows()
-        ]
-        row_coverages = [float(v) for v in row_coverages if isinstance(v, (int, float)) and math.isfinite(float(v))]
-        recent_metric_coverage = (sum(row_coverages) / len(row_coverages)) if row_coverages else current_row_coverage
-    else:
-        recent_metric_coverage = current_row_coverage
-
-    history_depth = min(1.0, float(d["date"].nunique()) / 90.0)
-    freshness_asof = _freshness_factor_asof(lag_days_vs_asof_date, chain)
-
-    weighted_parts = [
-        (current_row_coverage, 0.30),
-        (recent_metric_coverage, 0.20),
-        (recent_density, 0.20),
-        (history_depth, 0.15),
-        (freshness_asof, 0.15),
-    ]
-    num = 0.0
-    den = 0.0
-    for value, weight in weighted_parts:
-        if isinstance(value, (int, float)) and math.isfinite(float(value)):
-            num += float(value) * weight
-            den += weight
-    score = None if den <= 0 else max(0.0, min(1.0, num / den))
-
-    return {
-        "score": score,
-        "updated_through": updated_through,
-        "lag_days_vs_asof_date": lag_days_vs_asof_date,
-        "components": {
-            "current_row_coverage": current_row_coverage,
-            "recent_metric_coverage": recent_metric_coverage,
-            "recent_density": recent_density,
-            "history_depth": history_depth,
-            "freshness_asof": freshness_asof,
-        },
-    }
+    return compute_data_quality_details_v2(
+        df,
+        chain=chain,
+        gold_status=gold_status,
+        asof_date=asof_date,
+        publish_lag_days_policy=PUBLISH_LAG_DAYS_POLICY,
+    )
 
 
 def _compute_confidence_from_gold(df: Optional[pd.DataFrame], *, chain: str, gold_status: Optional[Dict[str, Any]] = None) -> Optional[float]:
-    details = _compute_data_quality_details(df, chain=chain, gold_status=gold_status)
-    value = details.get("score")
-    return float(value) if isinstance(value, (int, float)) and math.isfinite(float(value)) else None
-
-
-def _score_level_margin(score: Optional[float], level: Optional[str]) -> Optional[float]:
-    if score is None or not isinstance(score, (int, float)) or not math.isfinite(float(score)):
-        return None
-    s = float(score)
-    norm = str(level or "").strip().lower()
-    if not norm:
-        if s >= 67:
-            norm = "high"
-        elif s <= 33:
-            norm = "low"
-        else:
-            norm = "normal"
-    if norm in {"balanced"}:
-        norm = "normal"
-    if norm in {"normal", "neutral"}:
-        margin = min(max(0.0, s - 33.0), max(0.0, 67.0 - s))
-        return max(0.0, min(1.0, margin / 17.0))
-    if norm in {"high", "elevated", "heating", "congested"}:
-        return max(0.0, min(1.0, (s - 67.0) / 33.0))
-    if norm in {"low", "cheap", "cooling"}:
-        return max(0.0, min(1.0, (33.0 - s) / 33.0))
-    if s >= 67:
-        return max(0.0, min(1.0, (s - 67.0) / 33.0))
-    if s <= 33:
-        return max(0.0, min(1.0, (33.0 - s) / 33.0))
-    return max(0.0, min(1.0, min(s - 33.0, 67.0 - s) / 17.0))
-
-
-def _driver_signal_support(regime: Optional[Dict[str, Any]], *, stable_mode: bool = False) -> Optional[float]:
-    drivers = []
-    if isinstance(regime, dict):
-        raw = regime.get("drivers")
-        if isinstance(raw, list):
-            drivers = raw[:5]
-    zs: List[float] = []
-    for driver in drivers:
-        if not isinstance(driver, dict):
-            continue
-        z = driver.get("z_robust")
-        if isinstance(z, (int, float)) and math.isfinite(float(z)):
-            zs.append(max(0.0, min(1.0, abs(float(z)) / 3.0)))
-    if not zs:
-        return None
-    mean_z = sum(zs) / len(zs)
-    if stable_mode:
-        return max(0.0, min(1.0, 1.0 - mean_z))
-    return mean_z
+    return compute_confidence_from_gold_v2(
+        df,
+        chain=chain,
+        gold_status=gold_status,
+        publish_lag_days_policy=PUBLISH_LAG_DAYS_POLICY,
+    )
 
 
 def _compute_label_clarity(scorecard: Optional[Dict[str, Any]], regime: Optional[Dict[str, Any]]) -> Optional[float]:
-    if not isinstance(scorecard, dict):
-        return None
-
-    dims = ((scorecard.get("dimensions") or {}) if isinstance(scorecard.get("dimensions"), dict) else {})
-    valid_scores: List[float] = []
-    margins: List[float] = []
-    for axis in ("demand", "friction", "capacity"):
-        block = dims.get(axis) if isinstance(dims.get(axis), dict) else {}
-        score = block.get("score")
-        level = block.get("level")
-        if isinstance(score, (int, float)) and math.isfinite(float(score)):
-            valid_scores.append(float(score))
-        margin = _score_level_margin(score if isinstance(score, (int, float)) else None, level if isinstance(level, str) else None)
-        if isinstance(margin, (int, float)) and math.isfinite(float(margin)):
-            margins.append(float(margin))
-
-    if not valid_scores and not margins:
-        return None
-
-    axis_margin = (sum(margins) / len(margins)) if margins else None
-    neutrality = max(0.0, min(1.0, 1.0 - (sum(abs(v - 50.0) for v in valid_scores) / max(1, len(valid_scores))) / 17.0)) if valid_scores else None
-
-    label = ""
-    if isinstance(regime, dict):
-        label = str(regime.get("label") or "").upper().strip()
-
-    if label in {"", "UNKNOWN/DEGRADED"}:
-        return 0.0
-
-    if label == "STABLE":
-        driver_support = _driver_signal_support(regime, stable_mode=True)
-        parts = [
-            (neutrality, 0.60),
-            (axis_margin, 0.25),
-            (driver_support, 0.15),
-        ]
-    else:
-        driver_support = _driver_signal_support(regime, stable_mode=False)
-        parts = [
-            (axis_margin, 0.65),
-            (driver_support, 0.35),
-        ]
-
-    num = 0.0
-    den = 0.0
-    for value, weight in parts:
-        if isinstance(value, (int, float)) and math.isfinite(float(value)):
-            num += float(value) * weight
-            den += weight
-    if den <= 0:
-        return None
-    return max(0.0, min(1.0, num / den))
+    return compute_label_clarity_v2(scorecard, regime)
 
 
 def _build_confidence_payload(
@@ -1261,36 +895,26 @@ def _build_confidence_payload(
     regime: Optional[Dict[str, Any]] = None,
     asof_date: Optional[str] = None,
 ) -> Dict[str, Any]:
-    details = _compute_data_quality_details(df, chain=chain, gold_status=gold_status, asof_date=asof_date)
-    data_quality_score = details.get("score")
-    label_confidence_score = _compute_label_clarity(scorecard, regime)
+    return build_confidence_payload_v2(
+        df,
+        chain=chain,
+        gold_status=gold_status,
+        scorecard=scorecard,
+        regime=regime,
+        asof_date=asof_date,
+        publish_lag_days_policy=PUBLISH_LAG_DAYS_POLICY,
+        confidence_threshold=CONFIDENCE_THRESHOLD,
+    )
 
-    if isinstance(data_quality_score, (int, float)) and math.isfinite(float(data_quality_score)):
-        if isinstance(label_confidence_score, (int, float)) and math.isfinite(float(label_confidence_score)):
-            confidence_score = max(0.0, min(1.0, math.sqrt(float(data_quality_score) * float(label_confidence_score))))
-        else:
-            confidence_score = float(data_quality_score)
-    else:
-        confidence_score = None
 
-    updated_through = details.get("updated_through")
-    effective_date = updated_through or asof_date
-
-    return {
-        "chain": chain,
-        "missing": confidence_score is None,
-        "date": effective_date,
-        "asof_date": asof_date,
-        "updated_through": updated_through,
-        "confidence_score": confidence_score,
-        "data_quality_score": float(data_quality_score) if isinstance(data_quality_score, (int, float)) and math.isfinite(float(data_quality_score)) else None,
-        "label_confidence_score": float(label_confidence_score) if isinstance(label_confidence_score, (int, float)) and math.isfinite(float(label_confidence_score)) else None,
-        "lag_days_vs_asof_date": details.get("lag_days_vs_asof_date"),
-        "lag_days_vs_utc_today": _compute_lag_days(effective_date),
-        "semantics": "combined_data_quality_and_label_stability",
-        "source": "gold_history",
-        "components": details.get("components") or {},
-    }
+def _attach_candidate_label(regime: Optional[Dict[str, Any]], confidence: Optional[Dict[str, Any]]) -> None:
+    if not isinstance(regime, dict) or not isinstance(confidence, dict):
+        return
+    candidate = confidence.get("candidate_label")
+    if not isinstance(candidate, dict):
+        return
+    if str(regime.get("label") or "").upper() == "UNKNOWN/DEGRADED":
+        regime["candidate_label"] = candidate
 
 
 def compute_overview(chain: str, *, asof: Optional[str] = None) -> Dict[str, Any]:
@@ -1357,7 +981,7 @@ def compute_overview(chain: str, *, asof: Optional[str] = None) -> Dict[str, Any
         asof_date=preliminary_scorecard.get("asof_date"),
         window_days=7,
         confidence_score=data_quality_seed,
-        confidence_threshold=CONFIDENCE_THRESHOLD,
+        confidence_threshold=0.0,
     )
     preliminary_regime = reconcile_regime_with_scorecard(preliminary_regime, preliminary_scorecard)
 
@@ -1382,6 +1006,7 @@ def compute_overview(chain: str, *, asof: Optional[str] = None) -> Dict[str, Any
         confidence_threshold=CONFIDENCE_THRESHOLD,
     )
     regime = reconcile_regime_with_scorecard(regime, scorecard)
+    _attach_candidate_label(regime, conf)
 
     status = _status_from_regime_and_scorecard(regime, scorecard)
     missing = bool(gs.get("missing", False) and (df is None or df.empty))

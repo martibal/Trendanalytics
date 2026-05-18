@@ -107,6 +107,67 @@ type LandingHero = {
   };
 };
 
+type ChainBriefLatest = {
+  schema?: string;
+  brief_status?: string;
+  chain?: string;
+  window?: {
+    kind?: string;
+    days?: number;
+    start_date?: string;
+    end_date?: string;
+    updated_through?: string;
+    is_intraday?: boolean;
+  };
+  latest?: {
+    label?: string;
+    confidence_score?: number;
+    status?: string;
+  };
+  regime_path?: {
+    labels?: string[];
+    dominant_label?: string;
+    dominant_label_days?: number;
+    previous_dominant_label?: string;
+    previous_dominant_label_days?: number;
+    latest_label_run_days?: number;
+    label_changes?: number;
+    volatility?: string;
+  };
+  movement?: {
+    type?: string;
+    transition?: string;
+    persistence?: string;
+  };
+  drivers?: {
+    primary_axis?: string;
+    demand?: string;
+    friction?: string;
+    capacity?: string;
+  };
+  confidence?: {
+    latest?: number;
+    average_7d?: number;
+    direction?: string;
+    minimum_7d?: number;
+  };
+  brief?: {
+    headline?: string;
+    plain?: string;
+    advanced?: string;
+  };
+  guardrails?: {
+    not_intraday?: boolean;
+    not_prediction?: boolean;
+    not_investment_advice?: boolean;
+  };
+  provenance?: {
+    source_layers?: string[];
+    briefs_methodology_version?: string;
+    generated_at?: string;
+  };
+};
+
 type DerivedRow = {
   chain?: string;
   date?: string;
@@ -279,6 +340,44 @@ function fmtScore100(v?: number) {
 function fmtPct0to100(v?: number) {
   if (typeof v !== "number" || Number.isNaN(v)) return "—";
   return `${v.toFixed(1)}%`;
+}
+
+function fmtBriefScore(v?: number) {
+  if (typeof v !== "number" || Number.isNaN(v)) return "—";
+  return v.toFixed(3);
+}
+
+function prettifySnake(value?: string | null) {
+  if (!value) return "—";
+  return value.replace(/_/g, " ");
+}
+
+function briefWindowLabel(brief?: ChainBriefLatest | null) {
+  const start = brief?.window?.start_date;
+  const end = brief?.window?.end_date ?? brief?.window?.updated_through;
+  if (start && end) return `${start} → ${end}`;
+  if (end) return `through ${end}`;
+  return "latest published window";
+}
+
+function dominantBriefLabel(brief?: ChainBriefLatest | null) {
+  const dominant = brief?.regime_path?.dominant_label;
+  const days = brief?.regime_path?.dominant_label_days;
+  const total = brief?.window?.days;
+  if (dominant && typeof days === "number" && typeof total === "number") {
+    return `${dominant} · ${days}/${total} days`;
+  }
+  if (dominant) return dominant;
+  return brief?.latest?.label ?? "—";
+}
+
+function primaryBriefDriver(brief?: ChainBriefLatest | null) {
+  const axis = brief?.drivers?.primary_axis;
+  if (!axis) return "No single primary axis published in the latest brief.";
+  const axisDetail = brief?.drivers?.[axis as "demand" | "friction" | "capacity"];
+  return axisDetail
+    ? `${axis}: ${prettifySnake(axisDetail)}`
+    : `${axis} is the primary published brief axis.`;
 }
 
 function confidenceBand(v?: number) {
@@ -1773,12 +1872,14 @@ export default async function ChainPage({
   const heroPath = `landing/${chainId}/hero.json`;
   const goldPath = `gold/${chainId}/last${effectiveWindowDays}d.json`;
   const derivedPath = `derived/${chainId}/last${effectiveWindowDays}d.json`;
+  const briefPath = `briefs/chains/${chainId}/latest.json`;
 
-  const [meta, hero, goldPayload, derivedPayload] = await Promise.all([
+  const [meta, hero, goldPayload, derivedPayload, chainBrief] = await Promise.all([
     readPublishedJson<MetaLatest>(metaPath),
     readPublishedJson<LandingHero>(heroPath),
     readPublishedJson<GoldRow[] | { rows?: GoldRow[] }>(goldPath),
     readPublishedJson<DerivedRow[] | { rows?: DerivedRow[] }>(derivedPath),
+    readPublishedJson<ChainBriefLatest>(briefPath),
   ]);
 
   if (!meta) return notFound();
@@ -1859,6 +1960,10 @@ export default async function ChainPage({
 
   const regimeLabel = meta.status?.label ?? meta.regime?.label ?? "UNKNOWN";
   const oneLiner = meta.status?.one_liner;
+  const briefHeadline = chainBrief?.brief?.headline;
+  const briefPlain = chainBrief?.brief?.plain;
+  const briefDominant = dominantBriefLabel(chainBrief);
+  const briefPrimaryDriver = primaryBriefDriver(chainBrief);
 
   const conf = meta.confidence?.confidence_score;
   const confBand = confidenceBand(conf);
@@ -2045,13 +2150,66 @@ export default async function ChainPage({
             </aside>
           </div>
 
-          {/* Focus strip — chain-specific interpretation guidance */}
-          <div className="border-t border-[var(--line)] mt-2 py-5">
-            <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "24px", alignItems: "start" }}>
-              <div className="eyebrow" style={{ paddingTop: "2px" }}>What to watch</div>
-              <p className="text-sm text-[var(--ink2)] max-w-3xl leading-7">
-                {chainFocus[chainId] ?? cfg.primer?.whatMakesItDifferent ?? cfg.subtitle}
-              </p>
+          {/* Above-the-fold context: brief + profile + market interpretation */}
+          <div className="border-t border-[var(--line)] mt-8 py-6">
+            <div className="grid gap-4 lg:grid-cols-3">
+              <section className="context-panel p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="eyebrow">Latest 7-day Brief</div>
+                  <Link href="/briefs" className="text-link">Briefs →</Link>
+                </div>
+                <p className="mt-4 text-[var(--ink)] text-sm leading-7">
+                  {briefHeadline ?? briefPlain ?? "No latest chain Brief is currently published for this chain."}
+                </p>
+                <div className="mt-5 grid grid-cols-2 gap-3 border-t border-[var(--line)] pt-4">
+                  <div>
+                    <div className="font-mono text-[10px] uppercase tracking-[.12em] text-[var(--gold)]">Window</div>
+                    <div className="mt-2 font-mono text-[12px] leading-5 text-[var(--ink2)]">{briefWindowLabel(chainBrief)}</div>
+                  </div>
+                  <div>
+                    <div className="font-mono text-[10px] uppercase tracking-[.12em] text-[var(--gold)]">Dominant</div>
+                    <div className="mt-2 font-mono text-[12px] leading-5 text-[var(--ink2)]">{briefDominant}</div>
+                  </div>
+                  <div>
+                    <div className="font-mono text-[10px] uppercase tracking-[.12em] text-[var(--gold)]">Brief confidence</div>
+                    <div className="mt-2 font-mono text-[12px] leading-5 text-[var(--ink2)]">{fmtBriefScore(chainBrief?.confidence?.average_7d)} avg 7d</div>
+                  </div>
+                  <div>
+                    <div className="font-mono text-[10px] uppercase tracking-[.12em] text-[var(--gold)]">Volatility</div>
+                    <div className="mt-2 font-mono text-[12px] leading-5 text-[var(--ink2)]">{prettifySnake(chainBrief?.regime_path?.volatility)}</div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="context-panel p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="eyebrow">Chain profile</div>
+                  <MoreLink id={`profile-${chainId}`} />
+                </div>
+                <p className="mt-4 text-[var(--ink)] text-sm leading-7">
+                  {cfg.primer?.shortFact ?? cfg.subtitle}
+                </p>
+                <p className="mt-4 text-sm leading-7 text-[var(--ink2)]">
+                  {cfg.primer?.whatMakesItDifferent ?? meta.profile?.note ?? cfg.note ?? cfg.subtitle}
+                </p>
+              </section>
+
+              <section className="context-panel p-5">
+                <div className="eyebrow">What to watch</div>
+                <p className="mt-4 text-[var(--ink)] text-sm leading-7">
+                  {chainFocus[chainId] ?? cfg.primer?.whatMakesItDifferent ?? cfg.subtitle}
+                </p>
+                <div className="mt-5 border-t border-[var(--line)] pt-4">
+                  <div className="font-mono text-[10px] uppercase tracking-[.12em] text-[var(--gold)]">Brief driver</div>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ink2)]">{briefPrimaryDriver}</p>
+                </div>
+                {cfg.primer?.whyUsersCare ? (
+                  <div className="mt-4 border-t border-[var(--line)] pt-4">
+                    <div className="font-mono text-[10px] uppercase tracking-[.12em] text-[var(--gold)]">Why users care</div>
+                    <p className="mt-2 text-sm leading-6 text-[var(--ink2)]">{cfg.primer.whyUsersCare}</p>
+                  </div>
+                ) : null}
+              </section>
             </div>
           </div>
 
@@ -2061,12 +2219,13 @@ export default async function ChainPage({
       <div className="page-shell" style={{ paddingTop: "56px", paddingBottom: "96px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "72px" }}>
 
-        {/* ── Chain intro ── */}
+        {/* ── Chain details ── */}
         {cfg.primer ? (
           <section className="border-t border-[var(--line)] pt-8">
             <div className="section-head">
               <div>
-                <div className="eyebrow mb-3">About {displayName}</div>
+                <div className="eyebrow mb-3">Profile details</div>
+                <h2 className="ua-h2">How {displayName} behaves</h2>
                 <MoreLink id={`profile-${chainId}`} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -2312,19 +2471,6 @@ export default async function ChainPage({
           )}
         </section>
 
-        {/* ── Chain profile (moved to bottom) ── */}
-        <section className="border-t border-[var(--line)] pt-10">
-          <div className="section-head">
-            <div>
-              <div className="eyebrow mb-3">Chain profile</div>
-              <MoreLink id={`profile-${chainId}`} />
-            </div>
-            <div className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
-              {chainProfilePair.basic}
-            </div>
-          </div>
-        </section>
-
         {/* ── Data contract ── */}
         <section className="border-t border-[var(--line)] pt-8">
           <details>
@@ -2334,6 +2480,7 @@ export default async function ChainPage({
               <div>Meta: <InlineCode>{metaPath}</InlineCode></div>
               <div>Gold: <InlineCode>{goldPath}</InlineCode></div>
               <div>Derived: <InlineCode>{derivedPath}</InlineCode></div>
+              <div>Briefs: <InlineCode>{briefPath}</InlineCode></div>
               <div>Runtime chart points use observed published dates inside the selected window.</div>
             </div>
           </details>
@@ -2343,7 +2490,7 @@ export default async function ChainPage({
         <div className="border-y border-[var(--line)] py-6 flex flex-wrap items-center justify-between gap-6">
           <div>
             <div className="eyebrow mb-2">Want the JSON behind these charts?</div>
-            <p className="text-sm text-[var(--ink2)] max-w-lg">Every label here is backed by a determinism hash and a full confidence score. A subscription gives you API access to the complete Meta JSON.</p>
+            <p className="text-sm text-[var(--ink2)] max-w-lg">Every label here is backed by a determinism hash and a full confidence score. A subscription gives you API access to the complete Gold, Derived, Meta, and Briefs JSON layers.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href="/sign-up" className="btn-ghost">Sign up free</Link>

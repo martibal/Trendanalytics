@@ -27,7 +27,7 @@ from typing import Any, Dict
 import pandas as pd
 
 
-METHODOLOGY_VERSION = os.environ.get("METHODOLOGY_VERSION", "1.0")
+METHODOLOGY_VERSION = os.environ.get("METHODOLOGY_VERSION", "1.1")
 
 
 def _parse_date(s: str) -> dt.date:
@@ -142,7 +142,7 @@ def main() -> None:
                 asof_date=asof_iso,
                 window_days=7,
                 confidence_score=data_quality_seed,
-                confidence_threshold=CONFIDENCE_THRESHOLD,
+                confidence_threshold=0.0,
             )
             preliminary_regime = reconcile_regime_with_scorecard(preliminary_regime, preliminary_scorecard)
 
@@ -176,6 +176,9 @@ def main() -> None:
                 confidence_threshold=CONFIDENCE_THRESHOLD,
             )
             regime = reconcile_regime_with_scorecard(regime, scorecard)
+            candidate = confidence.get("candidate_label") if isinstance(confidence, dict) else None
+            if isinstance(regime, dict) and str(regime.get("label") or "").upper() == "UNKNOWN/DEGRADED" and isinstance(candidate, dict):
+                regime["candidate_label"] = candidate
             status = _status_from_regime_and_scorecard(regime, scorecard)
 
             updated_through = confidence.get("updated_through") or _last_gold_date_iso(slice_df)

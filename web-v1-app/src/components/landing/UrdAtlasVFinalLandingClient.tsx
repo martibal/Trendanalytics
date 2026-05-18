@@ -661,15 +661,17 @@ export default function UrdAtlasVFinalLandingClient({
 
       {/* ── HERO ── */}
       <section className="ua-vf-hero" id="top">
-        <div className="ua-vf-shell ua-vf-hero-grid">
+        <div className="ua-vf-shell ua-vf-hero-grid" style={{ alignItems: "start" }}>
           <div className="ua-vf-hero-copy ua-vf-reveal is-visible">
-            <div className="ua-vf-eyebrow">Daily on-chain reference data</div>
+            <div className="ua-vf-eyebrow" style={{ paddingTop: "0" }}>Daily network intelligence for Bitcoin, Ethereum, Arbitrum and Base</div>
             <h1 className="ua-vf-h1">
-              Separate blockchain <em>noise</em> from structural change.
+              How busy has the blockchain network been <em>lately?</em>
             </h1>
-            <p>
-              Daily Gold, Derived, Meta, and Briefs JSON for BTC, ETH, ARB, and BASE. Use it
-              directly, or join regime context to your own data by chain and date.
+            <p style={{ marginBottom: "24px" }}>
+              Urd Atlas measures transaction activity, fee pressure and capacity across Bitcoin,
+              Ethereum, Arbitrum and Base every day and publishes one verified, documented answer
+              per chain. Know exactly whether each network has been running at its usual pace,
+              building pressure, or easing off before you make your next move.
             </p>
             <div className="ua-vf-btn-row">
               <a href="#json" className="ua-vf-btn-primary">
@@ -687,7 +689,6 @@ export default function UrdAtlasVFinalLandingClient({
               <span>No forecasts</span>
               <span>No recommendations</span>
             </div>
-
 
           </div>
 
@@ -1232,11 +1233,9 @@ export default function UrdAtlasVFinalLandingClient({
       <section className="ua-vf-section" id="pricing">
         <div className="ua-vf-shell">
           <Reveal forceVisible={forcePricingReveal}>
-            <div className="ua-vf-section-head">
-              <div className="ua-vf-eyebrow">Pricing</div>
-              <div>
-                <h2 className="ua-vf-h2">Simple access to the published layer.</h2>
-              </div>
+            <div style={{ textAlign: "center", marginBottom: "40px" }}>
+              <div className="ua-vf-eyebrow" style={{ marginBottom: "12px" }}>Pricing</div>
+              <h2 className="ua-vf-h2">Simple access to the published layer.</h2>
             </div>
 
             <div className="ua-vf-pricing-grid">

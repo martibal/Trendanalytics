@@ -1,4 +1,4 @@
-// src/app/about/page.tsx
+﻿// src/app/about/page.tsx
 import type { ReactNode } from "react";
 import Link from "next/link";
 
@@ -87,7 +87,7 @@ export default async function AboutPage() {
               a regime shift or just noise from a single application?
             </p>
             <p className="text-[var(--ink2)] text-sm leading-7 max-w-3xl mt-4">
-              Urd Atlas answers by comparing each chain's current metrics against its own recent
+              Urd Atlas answers by comparing each chain&apos;s current metrics against its own recent
               history, applying a documented classification model, and publishing a daily descriptive
               label along with the full breakdown of why that label was assigned.
             </p>
@@ -251,3 +251,4 @@ export default async function AboutPage() {
     </main>
   );
 }
+

@@ -1,4 +1,4 @@
-// src/app/privacy/page.tsx
+﻿// src/app/privacy/page.tsx
 import Link from "next/link";
 import type { ReactNode } from "react";
 import "server-only";
@@ -58,7 +58,7 @@ export default function PrivacyPage() {
           </Section>
 
           <Section title="4. Authentication and Identity">
-            <p>Urd Atlas uses Clerk for authentication and account session handling. Authentication data is therefore also subject to Clerk's own product and privacy terms.</p>
+            <p>Urd Atlas uses Clerk for authentication and account session handling. Authentication data is therefore also subject to Clerk&apos;s own product and privacy terms.</p>
             <p>The site may process account-linked identifiers needed to determine whether a user has access to subscriber-only features such as dashboard routes, API keys, or authenticated file delivery.</p>
           </Section>
 
@@ -79,7 +79,7 @@ export default function PrivacyPage() {
 
           <Section title="8. Published Data and Traceability Metadata">
             <p>Public routes may expose dataset version, methodology version, source mode, freshness context, chain-specific lag, and canonical contract fields.</p>
-            <p>These fields are part of the product's transparency model and are intended to describe the published analytics state rather than identify end users.</p>
+            <p>These fields are part of the product&apos;s transparency model and are intended to describe the published analytics state rather than identify end users.</p>
           </Section>
 
           <Section title="9. Why Data Is Processed">
@@ -110,7 +110,7 @@ export default function PrivacyPage() {
 
           <Section title="13. Your Rights and Requests">
             <p>Depending on applicable law, users may have rights related to access, correction, deletion, restriction, or objection in relation to their personal data.</p>
-            <p>Requests are handled according to the operator's applicable legal obligations and the service records required to operate, secure, and support the platform.</p>
+            <p>Requests are handled according to the operator&apos;s applicable legal obligations and the service records required to operate, secure, and support the platform.</p>
           </Section>
 
           <Section title="14. Related Documents">
@@ -124,3 +124,6 @@ export default function PrivacyPage() {
     </main>
   );
 }
+
+
+

@@ -1,5 +1,5 @@
-import ShortFullContent from "@/components/site/ShortFullContent";
-import { MethodologyHeader, MethodologyNav, Section, SimpleTable, MethodologyContent, MethodologyPageShell } from "../_components";
+﻿import ShortFullContent from "@/components/site/ShortFullContent";
+import { InlineCode, MethodologyHeader, MethodologyNav, Section, SimpleTable, MethodologyContent, MethodologyPageShell } from "../_components";
 
 export default async function MethodologyChangelogPage() {
   return (
@@ -71,7 +71,25 @@ export default async function MethodologyChangelogPage() {
           </div>
         }
       />
+
+
+        <Section title="Confidence v2 — profile-aware evidence scoring">
+          <p>
+            Confidence now uses the same composite formula, <InlineCode>sqrt(data_quality_score × label_confidence_score)</InlineCode>,
+            but the inputs are more specific: data quality is measured against the actual chain-specific evidence surface, and label confidence
+            is measured against the label-specific rule that produced the classification.
+          </p>
+          <ul className="list-disc pl-5">
+            <li>Structurally non-applicable fields no longer reduce data quality.</li>
+            <li>Optional fields remain visible but do not reduce confidence when they are not part of the current regime evidence surface.</li>
+            <li>Label confidence uses raw scorecard/regime evidence, not confidence-degraded display scores.</li>
+            <li>Meta rows now expose <InlineCode>confidence.candidate_label</InlineCode> when a label is withheld by the confidence gate.</li>
+            <li>Audit tooling is available through <InlineCode>pipeline/tools/audit_confidence_v2.py</InlineCode>.</li>
+          </ul>
+        </Section>
+
       </MethodologyContent>
     </MethodologyPageShell>
   );
 }
+
