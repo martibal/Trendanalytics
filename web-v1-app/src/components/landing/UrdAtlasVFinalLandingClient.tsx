@@ -1225,6 +1225,44 @@ export default function UrdAtlasVFinalLandingClient({
                 </p>
               </details>
             </div>
+          
+            <div className="ua-vf-trust-row ua-vf-methodology-links" style={{ marginTop: "24px" }}>
+              <Link
+                href="/methodology"
+                className="ua-vf-trust-item"
+                style={{ textDecoration: "none" }}
+              >
+                <strong>How Urd Atlas works</strong>
+                <span>Beginner-first overview of the path from public chain data to Gold, Derived, Meta, and Briefs JSON.</span>
+              </Link>
+
+              <Link
+                href="/methodology/reference"
+                className="ua-vf-trust-item"
+                style={{ textDecoration: "none" }}
+              >
+                <strong>Methodology reference</strong>
+                <span>Canonical public explanation of regime labels, confidence, scorecards, and interpretation boundaries.</span>
+              </Link>
+
+              <Link
+                href="/methodology/fields"
+                className="ua-vf-trust-item"
+                style={{ textDecoration: "none" }}
+              >
+                <strong>Field dictionary</strong>
+                <span>Lookup layer for JSON fields, Confidence v2 components, Briefs fields, and scorecard semantics.</span>
+              </Link>
+
+              <Link
+                href="/methodology/changelog"
+                className="ua-vf-trust-item"
+                style={{ textDecoration: "none" }}
+              >
+                <strong>Methodology changelog</strong>
+                <span>Documents the retroactive Confidence v2 rebuild and subscriber impact for cached Meta or Briefs files.</span>
+              </Link>
+            </div>
           </Reveal>
         </div>
       </section>
