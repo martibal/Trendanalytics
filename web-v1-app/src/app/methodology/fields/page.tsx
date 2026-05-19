@@ -32,13 +32,12 @@ const GOLD_FIELDS: FieldEntry[] = [
   {
     field: "median_tx_value_native",
     meaning: "Typical same-day transaction value in native denomination.",
-    notes: "Used in the friction proxy ratio.",
+    notes: "Optional for some chain profiles in Confidence v2; visible when available, but not always a confidence penalty when absent.",
   },
   {
     field: "avg_block_time_sec",
     meaning: "Typical daily inter-block interval behaviour.",
-    notes:
-      "Interpret as a robust typical block interval field, not as a strict arithmetic mean claim.",
+    notes: "Interpret as a robust typical block interval field, not as a strict arithmetic mean claim.",
   },
 ];
 
@@ -46,17 +45,91 @@ const META_FIELDS: FieldEntry[] = [
   {
     field: "confidence.confidence_score",
     meaning: "Top-line confidence of the published analytical state.",
-    notes: "Gate threshold is 0.40.",
+    notes: (
+      <>
+        Confidence v2 uses <FieldCode>sqrt(data_quality_score × label_confidence_score)</FieldCode>. The
+        gate threshold remains <FieldCode>0.40</FieldCode>.
+      </>
+    ),
+  },
+  {
+    field: "confidence.methodology_version",
+    meaning: "Specific confidence methodology used for the row.",
+    notes: (
+      <>
+        Current value is <FieldCode>confidence_v2_profile_evidence</FieldCode> for Confidence v2 rows.
+      </>
+    ),
+  },
+  {
+    field: "confidence.data_quality_score",
+    meaning: "Profile-aware data completeness and freshness score.",
+    notes:
+      "Measures whether the chain-specific evidence surface is complete, fresh, dense, and historically deep enough. Structurally non-applicable fields are excluded from the denominator.",
+  },
+  {
+    field: "confidence.label_confidence_score",
+    meaning: "Label-specific evidence clarity score.",
+    notes:
+      "Measures whether the evidence supports the specific published label. HEATING, CONGESTED, CHEAP, and STABLE are evaluated against different evidence patterns.",
+  },
+  {
+    field: "confidence.candidate_label",
+    meaning: "The label supported by the evidence before the confidence gate is applied.",
+    notes:
+      "Used for auditability when the normal label is withheld as UNKNOWN/DEGRADED or when users need to inspect thin-margin classifications.",
+  },
+  {
+    field: "confidence.components.data_quality.required_metrics",
+    meaning: "Chain-specific metric list used for data-quality coverage.",
+    notes:
+      "These are the fields that count toward data-quality coverage for the chain profile. The list can differ across BTC, ETH L1, and L2 profiles.",
+  },
+  {
+    field: "confidence.components.data_quality.structurally_not_applicable",
+    meaning: "Fields that do not belong in the chain-specific confidence denominator.",
+    notes:
+      "Example: EVM-only execution fields are not data-quality penalties for Bitcoin. They are excluded because the product methodology does not treat them as expected BTC evidence.",
+  },
+  {
+    field: "confidence.components.data_quality.optional_not_penalized",
+    meaning: "Visible fields that are not treated as required confidence inputs for the current chain profile.",
+    notes:
+      "These fields may still be published or useful, but absence does not automatically reduce data quality under Confidence v2.",
+  },
+  {
+    field: "confidence.components.label_confidence.uses_score_raw",
+    meaning: "Whether label confidence was evaluated from raw scorecard evidence.",
+    notes:
+      "Current Confidence v2 rows use raw scorecard/regime evidence, not confidence-degraded display scores.",
+  },
+  {
+    field: "confidence.components.label_confidence.used",
+    meaning: "Component values used inside the label-specific confidence calculation.",
+    notes:
+      "The names vary by label family. STABLE emphasizes neutrality and lack of strong drivers; HEATING emphasizes demand/trend evidence; CONGESTED and CHEAP emphasize their relevant friction/capacity evidence.",
+  },
+  {
+    field: "status.one_liner",
+    meaning: "Readable public explanation of the current status.",
+    notes:
+      "Now distinguishes adjacent scorecard pressure from actual regime-threshold crossings. A STABLE label can include elevated scorecard pressure if the regime-axis threshold was not crossed.",
+  },
+  {
+    field: "status.explanation_support.status_note",
+    meaning: "Machine-readable copy source for nuanced status explanation.",
+    notes:
+      "Used when status needs to explain why a scorecard axis looks elevated or low while the regime label remains STABLE.",
   },
   {
     field: "regime.label",
     meaning: "Published descriptive state.",
-    notes: "May change day to day when threshold conditions change.",
+    notes: "May change day to day when threshold conditions change. Rows below the confidence gate can be withheld as UNKNOWN/DEGRADED.",
   },
   {
     field: "regime.determinism_hash",
     meaning: "Canonical public integrity anchor for named regime rows.",
-    notes: "Used for public row traceability.",
+    notes: "Used for public row traceability when a non-gated label is published.",
   },
 ];
 
@@ -64,8 +137,7 @@ const BRIEF_FIELDS: FieldEntry[] = [
   {
     field: "schema",
     meaning: "Brief artifact schema identifier.",
-    notes:
-      "Used to distinguish chain 7-day briefs, cross-chain briefs, site briefs, and manifest files.",
+    notes: "Used to distinguish chain 7-day briefs, cross-chain briefs, site briefs, and manifest files.",
   },
   {
     field: "brief_status",
@@ -85,8 +157,7 @@ const BRIEF_FIELDS: FieldEntry[] = [
   {
     field: "movement.type",
     meaning: "Readable movement classification for the latest window.",
-    notes:
-      "Summarizes whether the latest regime path is stable, shifting, degraded, or low confidence.",
+    notes: "Summarizes whether the latest regime path is stable, shifting, degraded, or low confidence.",
   },
 ];
 
@@ -105,9 +176,9 @@ const SCORECARD_FIELDS: FieldEntry[] = [
   {
     field: "scorecard.dimensions.<axis>.score_raw",
     verificationClass: "C",
-    meaning: "Internal raw score before confidence degradation.",
+    meaning: "Raw score before confidence degradation.",
     notes:
-      "The historical normalization and calibration are publicly described in family terms, but not fully disclosed at implementation detail.",
+      "Used by Confidence v2 as part of label confidence. The historical normalization and calibration are publicly described in family terms, but not fully disclosed at implementation detail.",
   },
 ];
 
@@ -133,10 +204,7 @@ function FieldGrid({ entries }: { entries: FieldEntry[] }) {
   return (
     <div className="mt-4 grid min-w-0 gap-3">
       {entries.map((entry) => (
-        <article
-          key={entry.field}
-          className="min-w-0 rounded-xl border border-[var(--line)] bg-[rgba(22,40,64,.56)] p-4"
-        >
+        <article key={entry.field} className="min-w-0 rounded-xl border border-[var(--line)] bg-[rgba(22,40,64,.56)] p-4">
           <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <FieldCode>{entry.field}</FieldCode>
             {entry.verificationClass ? (
@@ -156,9 +224,7 @@ function FieldGrid({ entries }: { entries: FieldEntry[] }) {
 function NotePanel({ title, children }: { title: string; children: ReactNode }) {
   return (
     <article className="min-w-0 rounded-xl border border-[var(--line)] bg-[rgba(22,40,64,.45)] p-4">
-      <h3 className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--gold)]">
-        {title}
-      </h3>
+      <h3 className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--gold)]">{title}</h3>
       <div className="mt-3 space-y-3 text-sm leading-7 text-[var(--ink2)]">{children}</div>
     </article>
   );
@@ -179,8 +245,8 @@ export default function MethodologyFieldsPage() {
           pageKey="methodology-fields"
           summary={
             <>
-              Use this page to look up what a published field means, how to interpret it, and
-              whether it is directly reproducible or only independently checkable.
+              Use this page to look up what a published field means, how to interpret it, and whether
+              it is directly reproducible or only independently checkable.
             </>
           }
           bullets={[
@@ -189,12 +255,12 @@ export default function MethodologyFieldsPage() {
               structural contract detail for parsing.
             </>,
             <>
-              Every entry should answer three questions: what the field is, why it exists, and what
-              common misreadings to avoid.
+              Confidence v2 fields explain why data quality can be high while label confidence remains
+              modest, and why non-applicable fields are not counted as missing evidence.
             </>,
             <>
-              Basic meaning comes first. Advanced and traceability detail remain available in the
-              full version.
+              Basic meaning comes first. Advanced and traceability detail remain available in the full
+              version.
             </>,
           ]}
           whyItMatters={
@@ -231,6 +297,54 @@ export default function MethodologyFieldsPage() {
                 <FieldGrid entries={BRIEF_FIELDS} />
               </Section>
 
+              <Section title="Field note: Confidence v2">
+                <NotePanel title="Composite confidence">
+                  <p>
+                    <FieldCode>confidence.confidence_score</FieldCode> is not a standalone judgement.
+                    It is the geometric mean of data quality and label confidence.
+                  </p>
+                  <FormulaBlock>{"sqrt(data_quality_score × label_confidence_score)"}</FormulaBlock>
+                  <p>
+                    A row can therefore have perfect data quality and still have moderate confidence if
+                    the label evidence is thin, adjacent, or mixed.
+                  </p>
+                </NotePanel>
+                <NotePanel title="Profile-aware data quality">
+                  <p>
+                    <FieldCode>confidence.components.data_quality.required_metrics</FieldCode> lists the
+                    metrics that actually count toward coverage for this chain profile.
+                  </p>
+                  <p>
+                    <FieldCode>structurally_not_applicable</FieldCode> fields are excluded from the
+                    denominator. <FieldCode>optional_not_penalized</FieldCode> fields remain visible but
+                    do not reduce confidence when absent.
+                  </p>
+                </NotePanel>
+                <WarningCallout title="Important interpretation warning">
+                  <p>
+                    A higher <FieldCode>data_quality_score</FieldCode> after Confidence v2 does not mean
+                    the model became more optimistic. It means the data-quality denominator now matches
+                    the evidence surface that is actually meaningful for that chain.
+                  </p>
+                </WarningCallout>
+              </Section>
+
+              <Section title="Field note: status explanations">
+                <p>
+                  <FieldCode>status.one_liner</FieldCode> is the public readable explanation of the
+                  current state. For borderline stable rows it can now explicitly state that the scorecard
+                  shows adjacent pressure while the regime-axis evidence did not cross the threshold for
+                  <FieldCode>HEATING</FieldCode>, <FieldCode>CHEAP</FieldCode>, or <FieldCode>CONGESTED</FieldCode>.
+                </p>
+                <Callout title="Why this matters">
+                  <p>
+                    The scorecard is a continuous descriptive surface. The regime label is a categorical
+                    thresholded state. They should be read together, but they are not identical. The status
+                    text is allowed to explain that distinction.
+                  </p>
+                </Callout>
+              </Section>
+
               <Section title="Field note: scorecard dimensions">
                 <p>
                   <FieldCode>scorecard.dimensions.&lt;axis&gt;.score</FieldCode> is the published
@@ -251,18 +365,16 @@ export default function MethodologyFieldsPage() {
                 <NotePanel title="Driver z-score">
                   <p>
                     <FieldCode>regime.drivers[].z_robust</FieldCode> is the driver-layer z-score
-                    published for a regime driver row. It is computed from 180-day raw daily values,
-                    not from the 7-day smoothed scorecard series.
+                    published for a regime driver row. It is computed from 180-day raw daily values, not
+                    from the 7-day smoothed scorecard series.
                   </p>
                 </NotePanel>
                 <WarningCallout title="Important comparison warning">
                   <p>
-                    Do not expect <FieldCode>regime.drivers[].z_robust</FieldCode> to numerically
-                    match a scorecard dimension score or the internal z-family behind that score. The
-                    driver z-score and the scorecard normalization use different input series,
-                    different windows, and different purposes. A high published driver z-score does
-                    not guarantee a high scorecard dimension score for the same metric on the same day,
-                    and the reverse is also true.
+                    Do not expect <FieldCode>regime.drivers[].z_robust</FieldCode> to numerically match a
+                    scorecard dimension score or the internal z-family behind that score. The driver
+                    z-score and the scorecard normalization use different input series, different windows,
+                    and different purposes.
                   </p>
                 </WarningCallout>
               </Section>
@@ -270,9 +382,7 @@ export default function MethodologyFieldsPage() {
               <Section title="Field note: fee burden proxy">
                 <NotePanel title="Current value">
                   <p>
-                    <FieldCode>
-                      scorecard.dimensions.friction.components.fee_burden_proxy.current
-                    </FieldCode>{" "}
+                    <FieldCode>scorecard.dimensions.friction.components.fee_burden_proxy.current</FieldCode>{" "}
                     is not a native fee amount. It is the current value of an internal friction proxy.
                   </p>
                   <FormulaBlock>{"median_tx_fee_native / median_tx_value_native"}</FormulaBlock>
@@ -285,8 +395,8 @@ export default function MethodologyFieldsPage() {
                   <p>
                     A friction score can be elevated even when absolute fees are not unusually high in
                     native terms, because the friction component is based on fee burden relative to
-                    transferred value. Customers should read this field as a burden proxy rather than
-                    as a direct fee amount.
+                    transferred value. Customers should read this field as a burden proxy rather than as
+                    a direct fee amount.
                   </p>
                 </Callout>
               </Section>
@@ -303,12 +413,10 @@ export default function MethodologyFieldsPage() {
                 </NotePanel>
                 <WarningCallout title="Directional consequence">
                   <p>
-                    This means the BTC capacity score is not a direct measure of slow blocks only. It
-                    is a measure of unusual block-time behaviour around the recent norm in either
-                    direction. A period of unusually fast but stable block times and a period of
-                    unusually slow but stable block times can both produce low instability. Customers
-                    should read BTC capacity as a stress-or-instability proxy, not as a directional
-                    slow-block indicator.
+                    This means the BTC capacity score is not a direct measure of slow blocks only. It is a
+                    measure of unusual block-time behaviour around the recent norm in either direction.
+                    Customers should read BTC capacity as a stress-or-instability proxy, not as a
+                    directional slow-block indicator.
                   </p>
                 </WarningCallout>
               </Section>
@@ -320,44 +428,14 @@ export default function MethodologyFieldsPage() {
                 </p>
                 <WarningCallout title="Downstream use warning">
                   <p>
-                    Labels can change day to day in response to threshold crossings. This matters most
-                    for <FieldCode>CONGESTED</FieldCode> and <FieldCode>CHEAP</FieldCode>, which do not
-                    have a separate universal multi-day confirmation window. <FieldCode>HEATING</FieldCode>{" "}
-                    depends in part on a trend condition and therefore has a different stability
-                    profile. Customers who need multi-day regime stability for downstream analytics
-                    should apply their own minimum-duration or smoothing rule.
+                    Labels can change day to day in response to threshold crossings. This matters most for{" "}
+                    <FieldCode>CONGESTED</FieldCode> and <FieldCode>CHEAP</FieldCode>, which do not have a
+                    separate universal multi-day confirmation window. <FieldCode>HEATING</FieldCode> depends
+                    in part on a trend condition and therefore has a different stability profile. Customers
+                    who need multi-day regime stability should apply their own minimum-duration or smoothing
+                    rule.
                   </p>
                 </WarningCallout>
-              </Section>
-
-              <Section title="Important notes">
-                <ul className="list-disc space-y-3 pl-5">
-                  <li>
-                    <FieldCode>regime.drivers[].z_robust</FieldCode> and scorecard dimension scores
-                    are not expected to numerically match because they use different input series,
-                    windows, and normalization families.
-                  </li>
-                  <li>
-                    <FieldCode>regime.label</FieldCode> is a daily classification layer, not a
-                    built-in minimum-duration segmentation series for backtesting.
-                  </li>
-                  <li>
-                    For Bitcoin, capacity should be interpreted as block-time instability relative to
-                    the recent norm, not as a directional slow-block measure.
-                  </li>
-                  <li>
-                    The friction scorecard uses an internal <FieldCode>fee_burden_proxy</FieldCode>{" "}
-                    component defined as{" "}
-                    <FieldCode>median_tx_fee_native / median_tx_value_native</FieldCode>. This is a
-                    normalized ratio, not an absolute fee value. The current field published inside{" "}
-                    <FieldCode>
-                      scorecard.dimensions.friction.components.fee_burden_proxy.current
-                    </FieldCode>{" "}
-                    reflects this ratio in native units. A high friction score driven by{" "}
-                    <FieldCode>fee_burden_proxy</FieldCode> means fees are elevated relative to
-                    transaction value on this chain, not that the absolute native fee is high.
-                  </li>
-                </ul>
               </Section>
             </div>
           }
