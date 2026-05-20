@@ -1,76 +1,105 @@
 // src/app/mobile/plans/page.tsx
 import Link from "next/link";
 import type { ReactNode } from "react";
+
 import CheckoutButton from "@/components/landing/CheckoutButton";
-import MobileBottomNav from "@/components/mobile/MobileBottomNav";
-import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
+import {
+  MobileCard,
+  MobileMetric,
+  MobilePage,
+  MobilePrimaryLink,
+  MobileSection,
+} from "@/components/mobile/MobileShell";
 
 const buttonClass =
-  "mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-gradient-to-b from-[#ffae63] to-[#ff7d2f] px-5 text-[13px] font-black text-[#09111d] shadow-[0_16px_38px_rgba(255,125,47,0.22)] transition active:scale-[0.99]";
+  "mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-[#c49230]/38 bg-[#c49230] px-5 text-[13px] font-black text-[#061322] shadow-[0_18px_44px_rgba(196,146,48,0.20)] transition active:scale-[0.99]";
 
 function Plan({
   name,
   price,
   detail,
   children,
+  highlights,
 }: {
   name: string;
   price: string;
   detail: string;
   children: ReactNode;
+  highlights: string[];
 }) {
   return (
-    <section className="rounded-[26px] border border-sky-100/14 bg-white/[0.075] p-5 shadow-[0_22px_64px_rgba(0,0,0,0.20),inset_0_1px_0_rgba(255,255,255,0.08)]">
+    <MobileCard>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-sky-200">{name}</div>
-          <div className="mt-2 text-[30px] font-black tracking-[-0.06em] text-white">{price}</div>
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c49230]">
+            {name}
+          </div>
+          <div className="mt-2 text-[31px] font-black leading-none tracking-[-0.06em] text-white">
+            {price}
+          </div>
         </div>
       </div>
-      <p className="mt-3 text-[13px] font-semibold leading-6 text-slate-300">{detail}</p>
+
+      <p className="mt-3 text-[13px] font-semibold leading-6 text-[#d7e8fb]">{detail}</p>
+
+      <div className="mt-4 grid gap-2">
+        {highlights.map((item) => (
+          <div key={item} className="rounded-2xl border border-white/10 bg-black/[0.12] px-3 py-2 text-[12px] font-semibold leading-5 text-[#cfe0f4]">
+            {item}
+          </div>
+        ))}
+      </div>
+
       {children}
-    </section>
+    </MobileCard>
   );
 }
 
 export default function MobilePlansPage() {
   return (
-    <div className="min-h-screen bg-[#040b14] text-white">
-      <div className="min-h-screen bg-[radial-gradient(circle_at_18%_-5%,rgba(126,208,255,0.20),transparent_18rem),radial-gradient(circle_at_92%_8%,rgba(255,154,74,0.12),transparent_16rem),linear-gradient(180deg,#040b14_0%,#071425_100%)] pb-28">
-        <header className="px-4 pt-[calc(env(safe-area-inset-top)+16px)]">
-          <div className="flex items-center justify-between gap-3">
-            <Link href="/mobile" className="text-[20px] font-black tracking-[-0.04em] text-white">
-              Urd Atlas
-            </Link>
-            <MobileRouteMenu />
-          </div>
+    <MobilePage
+      active="plans"
+      eyebrow="Mobile plans"
+      title={<>Access the same JSON layers shown on the mobile site.</>}
+      subtitle={
+        <>
+          Pricing mirrors the main product: public browsing, one-chain JSON access,
+          or full four-chain access. All paid plans include Gold, Derived, Meta and Briefs.
+        </>
+      }
+    >
+      <MobileSection>
+        <div className="grid grid-cols-3 gap-2">
+          <MobileMetric label="Free" value="$0" sub="Browse public context" />
+          <MobileMetric label="Single" value="$49" sub="One chain / month" />
+          <MobileMetric label="Full" value="$149" sub="All chains / month" />
+        </div>
+      </MobileSection>
 
-          <div className="mt-8">
-            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-200">Subscriber plans</div>
-            <h1 className="mt-2 text-[36px] font-black leading-none tracking-[-0.07em] text-white">
-              Choose access level.
-            </h1>
-            <p className="mt-3 max-w-md text-[14px] font-semibold leading-6 text-slate-300">
-              Three active options: free public browsing, one-chain JSON access, or full four-chain JSON access.
-            </p>
-          </div>
-        </header>
-
-        <main className="space-y-4 px-4 py-5">
+      <MobileSection eyebrow="Plans" title="Choose your access level.">
+        <div className="space-y-3">
           <Plan
             name="Free"
             price="$0"
-            detail="Public historical charts and mobile browsing. No authenticated JSON delivery."
+            detail="Public chain context, sample JSON, methodology pages, and track-record browsing."
+            highlights={[
+              "Public mobile pages",
+              "Sample JSON and methodology",
+              "No authenticated API delivery",
+            ]}
           >
-            <Link href="/mobile/track-record" className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-sky-100/14 bg-white/[0.07] px-5 text-[13px] font-black text-slate-100">
-              Browse public track record
-            </Link>
+            <MobilePrimaryLink href="/mobile/track-record">Browse public track record</MobilePrimaryLink>
           </Plan>
 
           <Plan
             name="Single Chain"
             price="$49/mo"
-            detail="One blockchain. Gold, Derived, Meta, and Briefs JSON. Built for users who want one chain in their own workflow."
+            detail="One blockchain with daily Gold, Derived, Meta, and Briefs JSON."
+            highlights={[
+              "One chosen chain",
+              "Gold, Derived, Meta and Briefs",
+              "Built for focused chain-specific workflows",
+            ]}
           >
             <CheckoutButton plan="basic" className={buttonClass}>
               Start Single Chain
@@ -80,20 +109,34 @@ export default function MobilePlansPage() {
           <Plan
             name="Full Access"
             price="$149/mo"
-            detail="All supported chains: BTC, ETH, ARB and BASE. Full daily JSON access across Gold, Derived, Meta, and Briefs."
+            detail="All supported chains: BTC, ETH, ARB and BASE, including cross-chain Briefs."
+            highlights={[
+              "All four supported chains",
+              "Cross-chain context",
+              "Best for research workflows",
+            ]}
           >
             <CheckoutButton plan="pro" className={buttonClass}>
               Start Full Access
             </CheckoutButton>
           </Plan>
+        </div>
+      </MobileSection>
 
-          <div className="rounded-2xl border border-orange-200/16 bg-orange-300/8 px-4 py-3 text-[12px] font-semibold leading-5 text-orange-50/90">
-            The separate full-history package is not shown on mobile because it is not an active offer.
+      <MobileSection eyebrow="Boundary" title="What this is not.">
+        <MobileCard tone="warning">
+          <p className="text-[12px] leading-6 text-[#f2dfbd]">
+            Urd Atlas is not a signal product. It does not publish price data, forecasts,
+            buy/sell language, or portfolio recommendations. Subscription gives access to
+            descriptive reference-data JSON and readable Briefs.
+          </p>
+          <div className="mt-4">
+            <Link href="/mobile/api-docs" className="text-[13px] font-black text-[#f5d386] underline decoration-[#c49230]/35 underline-offset-4">
+              Read the mobile API reference →
+            </Link>
           </div>
-        </main>
-
-        <MobileBottomNav active="plans" />
-      </div>
-    </div>
+        </MobileCard>
+      </MobileSection>
+    </MobilePage>
   );
 }

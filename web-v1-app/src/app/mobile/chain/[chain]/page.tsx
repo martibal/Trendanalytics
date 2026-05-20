@@ -1,31 +1,23 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
-import { CHAINS, type ChainId } from "@/config/chains";
-import { readStorageObject } from "@/lib/storage";
-import MobileBottomNav from "@/components/mobile/MobileBottomNav";
-import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
+import { notFound } from "next/navigation";
+
 import MobileChainChart from "@/components/mobile/MobileChainChart";
 import {
+  MobileCard,
+  MobileMetric,
+  MobilePage,
+  MobilePill,
+  MobileSection,
+} from "@/components/mobile/MobileShell";
+import { CHAINS, type ChainId } from "@/config/chains";
+import {
+  CHAIN_COLORS,
   parseMobileChainState,
   regimeColor,
-  regimeBg,
-  CHAIN_COLORS,
 } from "@/lib/mobile/data";
+import { readStorageObject } from "@/lib/storage";
+
 import "server-only";
-
-function arrayBufferToUtf8(buffer: ArrayBuffer): string {
-  return new TextDecoder("utf-8").decode(new Uint8Array(buffer));
-}
-
-async function readPublishedJson<T>(path: string): Promise<T | null> {
-  const result = await readStorageObject(path);
-  if (!result) return null;
-  try {
-    return JSON.parse(arrayBufferToUtf8(result.body)) as T;
-  } catch {
-    return null;
-  }
-}
 
 type MetaHistoryRow = {
   date?: string;
@@ -42,6 +34,45 @@ type HistoryBundle =
       data?: MetaHistoryRow[];
     };
 
+type BriefJson = {
+  brief?: {
+    headline?: string;
+    plain?: string;
+  };
+  headline?: string;
+  plain?: string;
+  window?: {
+    updated_through?: string;
+    start?: string;
+    end?: string;
+  };
+  confidence?: {
+    average?: number;
+    latest?: number;
+    confidence_score?: number;
+  };
+  regime_path?: {
+    dominant_label?: string;
+    latest_label?: string;
+    changes?: number;
+    latest_run_days?: number;
+  };
+};
+
+function arrayBufferToUtf8(buffer: ArrayBuffer): string {
+  return new TextDecoder("utf-8").decode(new Uint8Array(buffer));
+}
+
+async function readPublishedJson<T>(path: string): Promise<T | null> {
+  const result = await readStorageObject(path);
+  if (!result) return null;
+  try {
+    return JSON.parse(arrayBufferToUtf8(result.body)) as T;
+  } catch {
+    return null;
+  }
+}
+
 function extractHistoryRows(bundle: HistoryBundle | null): MetaHistoryRow[] {
   if (!bundle) return [];
   if (Array.isArray(bundle)) return bundle;
@@ -56,7 +87,7 @@ async function buildHistoryRows(chain: ChainId) {
 
   for (const window of candidateWindows) {
     const bundle = await readPublishedJson<HistoryBundle>(
-      `data/published/v1/meta/${chain}/last${window}d.json`
+      `data/published/v1/meta/${chain}/last${window}d.json`,
     );
     const rows = extractHistoryRows(bundle)
       .filter((r) => typeof r.date === "string")
@@ -87,55 +118,19 @@ async function buildHistoryRows(chain: ChainId) {
   };
 }
 
-function ScoreBar({
-  label,
-  score,
-  color,
-  description,
-}: {
-  label: string;
-  score: number | null;
-  color: string;
-  description: string;
-}) {
-  const pct = typeof score === "number" ? Math.max(0, Math.min(100, score)) : 50;
-  const isAbove50 = pct > 50;
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between">
-        <div>
-          <span className="text-[12px] font-bold text-white">{label}</span>
-          <span className="ml-2 text-[10px] text-slate-500">{description}</span>
-        </div>
-        <span className="ml-2 shrink-0 text-[12px] font-bold text-white">
-          {typeof score === "number" ? Math.round(score) : "—"}
-          <span className="text-[10px] font-normal text-slate-500">/100</span>
-        </span>
-      </div>
-      <div className="relative h-2.5 w-full rounded-full bg-white/10">
-        <div className="absolute left-1/2 top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/25" />
-        <div
-          className="absolute top-0 h-2.5 rounded-full transition-all duration-700"
-          style={{
-            left: isAbove50 ? "50%" : `${pct}%`,
-            width: `${Math.abs(pct - 50)}%`,
-            backgroundColor: isAbove50 ? color : "#3B82F6",
-          }}
-        />
-      </div>
-      <div className="mt-0.5 flex justify-between">
-        <span className="text-[9px] text-slate-600">Low</span>
-        <span className="text-[9px] text-slate-600">Neutral (50)</span>
-        <span className="text-[9px] text-slate-600">High</span>
-      </div>
-    </div>
-  );
+function formatAxisLevel(value?: string | null): string {
+  if (!value) return "—";
+  return value.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function confidenceText(score: number | null): string {
+  return typeof score === "number" ? score.toFixed(3) : "—";
 }
 
 function TrendArrow({ trend }: { trend: string | null }) {
-  if (trend === "HEATING") return <span className="font-bold text-amber-300">↑</span>;
-  if (trend === "COOLING") return <span className="font-bold text-blue-300">↓</span>;
-  return <span className="text-slate-500">→</span>;
+  if (trend === "HEATING") return <span className="font-black text-amber-200">↑</span>;
+  if (trend === "COOLING") return <span className="font-black text-sky-200">↓</span>;
+  return <span className="text-slate-400">→</span>;
 }
 
 const CHAIN_NAV_KEY: Record<ChainId, string> = {
@@ -153,26 +148,19 @@ export default async function MobileChainPage({
   const resolvedParams = await params;
   const chainId = resolvedParams.chain as ChainId;
   const cfg = CHAINS[chainId];
+
   if (!cfg) notFound();
 
-  const [meta, history] = await Promise.all([
-    readPublishedJson<Record<string, unknown>>(
-      `data/published/v1/meta/${chainId}/latest.json`
-    ),
+  const [meta, brief, history] = await Promise.all([
+    readPublishedJson<Record<string, unknown>>(`data/published/v1/meta/${chainId}/latest.json`),
+    readPublishedJson<BriefJson>(`data/published/v1/briefs/chains/${chainId}/latest.json`),
     buildHistoryRows(chainId),
   ]);
 
-  const historyRows = history.rows;
   const state = parseMobileChainState(chainId, cfg.label, cfg.name, meta as never);
+  const historyRows = history.rows;
   const color = regimeColor(state.regimeLabel);
-  const bg = regimeBg(state.regimeLabel);
   const chainColor = CHAIN_COLORS[chainId];
-
-  const counts = historyRows.reduce<Record<string, number>>((acc, r) => {
-    const k = r.label ?? "UNKNOWN/DEGRADED";
-    acc[k] = (acc[k] ?? 0) + 1;
-    return acc;
-  }, {});
 
   const confidenceValues = historyRows
     .filter((r) => r.confidence != null)
@@ -182,197 +170,171 @@ export default async function MobileChainPage({
       ? confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length
       : null;
 
+  const dominantBrief = brief?.regime_path?.dominant_label ?? brief?.regime_path?.latest_label ?? state.regimeLabel ?? "—";
+  const briefConfidence =
+    typeof brief?.confidence?.latest === "number"
+      ? brief.confidence.latest
+      : typeof brief?.confidence?.average === "number"
+        ? brief.confidence.average
+        : typeof brief?.confidence?.confidence_score === "number"
+          ? brief.confidence.confidence_score
+          : state.confidenceScore;
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#0A0E1A]">
-      <header
-        className="sticky top-0 z-10 border-b border-white/8 px-4 pt-safe-top backdrop-blur-sm"
-        style={{ background: bg }}
-      >
-        <div className="flex items-center gap-3 py-3">
-          <Link href="/mobile" className="pr-1 text-lg text-slate-400">
-            ←
-          </Link>
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-black"
-            style={{ backgroundColor: `${chainColor}22`, color: chainColor }}
-          >
-            {cfg.label}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-bold text-white">{cfg.name}</div>
-            <div className="text-[10px] text-slate-400">
-              {state.asOf ?? "—"} · {state.lagDays != null ? `${state.lagDays}d lag` : "—"}
-            </div>
-          </div>
-          <div
-            className="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-black tracking-wider"
-            style={{ color, backgroundColor: `${color}22`, border: `1px solid ${color}44` }}
-          >
-            {state.regimeLabel ?? "—"}
-          </div>
-          <MobileRouteMenu />
-        </div>
-      </header>
-
-      <main className="flex-1 space-y-4 px-4 py-4 pb-24">
-        {cfg.subtitle && (
-          <section className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-            <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-              About {cfg.label}
-            </div>
-            <p className="text-[12px] leading-[1.7] text-slate-300">{cfg.subtitle}</p>
-            {cfg.primer?.whatMakesItDifferent && (
-              <p className="mt-2 text-[11px] leading-[1.65] text-slate-500">
-                {cfg.primer.whatMakesItDifferent}
-              </p>
-            )}
-          </section>
-        )}
-
-        <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <div className="mb-1 text-[10px] uppercase tracking-wider text-slate-500">Current confidence</div>
-              <div className="text-[32px] font-black leading-none text-white">
-                {typeof state.confidenceScore === "number" ? state.confidenceScore.toFixed(3) : "—"}
-              </div>
-            </div>
-            <div className="text-right">
-              <div
-                className="rounded-xl px-3 py-1.5 text-[11px] font-bold"
-                style={{ color, backgroundColor: `${color}18`, border: `1px solid ${color}33` }}
-              >
-                {state.confidenceBand}
-              </div>
-              <div className="mt-1.5 text-[10px] text-slate-500">
-                {state.confidenceBand === "Good" && "Strong evidence"}
-                {state.confidenceBand === "Caution" && "Read with care"}
-                {state.confidenceBand === "Degraded" && "Below publish gate"}
-              </div>
-            </div>
-          </div>
-
-          <div className="h-1.5 w-full rounded-full bg-white/10">
+    <MobilePage
+      active={CHAIN_NAV_KEY[chainId]}
+      eyebrow={`${cfg.label} mobile chain page`}
+      title={<>{cfg.name}: latest status, Brief and chain context.</>}
+      subtitle={cfg.subtitle}
+      backHref="/mobile"
+    >
+      <MobileSection>
+        <MobileCard className="p-0">
+          <div className="flex items-center gap-3 border-b border-white/8 p-4">
             <div
-              className="h-1.5 rounded-full"
-              style={{
-                width: `${Math.round((state.confidenceScore ?? 0) * 100)}%`,
-                backgroundColor: color,
-              }}
-            />
-          </div>
-
-          {state.oneLiner && (
-            <p className="mt-3 text-[12px] leading-[1.65] text-slate-300">{state.oneLiner}</p>
-          )}
-        </section>
-
-        <section className="space-y-5 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-            Scorecard — 0 to 100, 50 is neutral
-          </div>
-          <ScoreBar label="Demand" score={state.scorecard.demand?.score ?? null} color="#00FF88" description="Usage pressure" />
-          <ScoreBar label="Friction" score={state.scorecard.friction?.score ?? null} color="#FF4444" description="Cost + failure" />
-          <ScoreBar label="Capacity" score={state.scorecard.capacity?.score ?? null} color="#FF4444" description="Block fullness" />
-          <p className="text-[10px] leading-[1.6] text-slate-600">
-            Scores above 50 mean the axis looks more pressured than usual. Below 50 means softer than usual. Low confidence pulls scores toward 50.
-          </p>
-        </section>
-
-        {state.drivers.length > 0 && (
-          <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-            <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-              Driver attribution — why this label
+              className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-[18px] font-black text-white"
+              style={{ backgroundColor: chainColor }}
+            >
+              {cfg.label}
             </div>
-            <div className="space-y-3">
-              {state.drivers.map((d) => (
-                <div key={d.metric} className="rounded-xl border border-white/6 bg-black/10 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12px] font-bold text-white">{d.metric}</div>
-                      <div className="mt-0.5 text-[10px] text-slate-500">{d.axis}</div>
-                    </div>
-                    <TrendArrow trend={d.trend} />
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400">
-                    {d.zRobust != null && <span>z {d.zRobust > 0 ? "+" : ""}{d.zRobust.toFixed(2)}</span>}
-                    {d.pct90d != null && <span>{Math.round(d.pct90d)}th pct</span>}
-                    {d.momentum != null && <span>mom {d.momentum > 0 ? "+" : ""}{d.momentum.toFixed(2)}</span>}
-                  </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c49230]">
+                Latest Meta state
+              </div>
+              <div className="mt-1 text-[18px] font-black text-white">{state.regimeLabel ?? "—"}</div>
+              <div className="mt-0.5 text-[11px] text-[#9eb4cf]">
+                {state.asOf ?? "—"} {state.lagDays != null ? `· ${state.lagDays}d lag` : ""}
+              </div>
+            </div>
+            <MobilePill tone={state.confidenceBand === "Good" ? "green" : state.confidenceBand === "Degraded" ? "red" : "gold"}>
+              {state.confidenceBand}
+            </MobilePill>
+          </div>
+
+          <div className="p-4">
+            <div className="grid grid-cols-2 gap-2">
+              <MobileMetric label="Confidence v2" value={confidenceText(state.confidenceScore)} />
+              <MobileMetric label="Determinism" value={state.determinismHash ? state.determinismHash.slice(0, 8) : "—"} />
+            </div>
+
+            {state.oneLiner ? (
+              <p className="mt-4 text-[13px] leading-6 text-[#d7e8fb]">{state.oneLiner}</p>
+            ) : null}
+          </div>
+        </MobileCard>
+      </MobileSection>
+
+      <MobileSection eyebrow="Latest Brief" title="Readable summary from the same Meta evidence.">
+        <MobileCard tone="gold">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-[17px] font-black leading-[1.12] tracking-[-0.04em] text-white">
+              {brief?.brief?.headline ?? brief?.headline ?? `${cfg.label} Brief`}
+            </h2>
+            <MobilePill tone="gold">{dominantBrief}</MobilePill>
+          </div>
+          <p className="mt-3 text-[12px] leading-6 text-[#f2dfbd]">
+            {brief?.brief?.plain ?? brief?.plain ?? "Brief data was not found for this chain."}
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <MobileMetric label="Brief confidence" value={confidenceText(briefConfidence ?? null)} />
+            <MobileMetric label="Updated through" value={brief?.window?.updated_through ?? brief?.window?.end ?? state.asOf ?? "—"} />
+          </div>
+        </MobileCard>
+      </MobileSection>
+
+      <MobileSection eyebrow="Chain profile" title={`Why ${cfg.label} behaves differently.`}>
+        <MobileCard>
+          <p className="text-[13px] leading-6 text-[#d7e8fb]">
+            {cfg.primer?.whatMakesItDifferent ?? cfg.note ?? cfg.subtitle}
+          </p>
+          {cfg.primer?.whyUsersCare ? (
+            <p className="mt-3 text-[12px] leading-6 text-[#9eb4cf]">{cfg.primer.whyUsersCare}</p>
+          ) : null}
+
+          {cfg.primer?.primaryDrivers?.length ? (
+            <div className="mt-4 space-y-2">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c49230]">
+                What to watch
+              </div>
+              {cfg.primer.primaryDrivers.map((driver) => (
+                <div key={driver} className="rounded-2xl border border-white/10 bg-black/[0.12] px-3 py-2 text-[12px] leading-5 text-[#cfe0f4]">
+                  {driver}
                 </div>
               ))}
             </div>
-          </section>
-        )}
+          ) : null}
+        </MobileCard>
+      </MobileSection>
 
-        <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-              History
-            </div>
-            <div className="rounded-lg bg-cyan-500/15 px-2.5 py-1 text-[10px] font-bold text-cyan-300">
-              {history.sourceWindow ? `${history.sourceWindow}d published view` : "No bundle"}
+      <MobileSection eyebrow="Scorecard" title="Demand, friction and capacity.">
+        <MobileCard>
+          <div className="grid grid-cols-3 gap-2">
+            <MobileMetric label="Demand" value={formatAxisLevel(state.scorecard.demand?.level)} sub={state.scorecard.demand?.score != null ? `${Math.round(state.scorecard.demand.score)}/100` : "—"} />
+            <MobileMetric label="Friction" value={formatAxisLevel(state.scorecard.friction?.level)} sub={state.scorecard.friction?.score != null ? `${Math.round(state.scorecard.friction.score)}/100` : "—"} />
+            <MobileMetric label="Capacity" value={formatAxisLevel(state.scorecard.capacity?.level)} sub={state.scorecard.capacity?.score != null ? `${Math.round(state.scorecard.capacity.score)}/100` : "—"} />
+          </div>
+          <p className="mt-4 text-[11px] leading-5 text-[#9eb4cf]">
+            Scores are chain-relative. 50 is neutral. Low confidence pulls display
+            scores toward 50; Confidence v2 itself is published separately.
+          </p>
+        </MobileCard>
+      </MobileSection>
+
+      {state.drivers.length > 0 ? (
+        <MobileSection eyebrow="Drivers" title="Why this label was supported.">
+          <div className="space-y-2">
+            {state.drivers.map((driver) => (
+              <MobileCard key={`${driver.axis}-${driver.metric}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] font-black text-white">{driver.metric}</div>
+                    <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#91a9c4]">
+                      {driver.axis}
+                    </div>
+                  </div>
+                  <TrendArrow trend={driver.trend} />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold text-[#cfe0f4]">
+                  {driver.zRobust != null ? <span>z {driver.zRobust > 0 ? "+" : ""}{driver.zRobust.toFixed(2)}</span> : null}
+                  {driver.pct90d != null ? <span>{Math.round(driver.pct90d)}th pct</span> : null}
+                  {driver.momentum != null ? <span>mom {driver.momentum > 0 ? "+" : ""}{driver.momentum.toFixed(2)}</span> : null}
+                </div>
+              </MobileCard>
+            ))}
+          </div>
+        </MobileSection>
+      ) : null}
+
+      <MobileSection eyebrow="History" title="Recent published label path.">
+        <MobileCard>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <MobilePill tone="blue">{history.sourceWindow ? `${history.sourceWindow}d` : "No bundle"}</MobilePill>
+            <div className="text-[11px] font-semibold text-[#9eb4cf]">
+              {avgConf != null ? `avg confidence ${avgConf.toFixed(3)}` : "avg confidence —"}
             </div>
           </div>
 
           <MobileChainChart rows={historyRows} chainColor={chainColor} />
 
-          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-            <span>
-              {historyRows.length > 0
-                ? `Showing ${historyRows.length} published rows${avgConf != null ? ` · avg confidence ${avgConf.toFixed(3)}` : ""}`
-                : "No published history rows were found for this mobile chart."}
-            </span>
-          </div>
-        </section>
+          <p className="mt-3 text-[11px] leading-5 text-[#9eb4cf]">
+            Showing {historyRows.length} published rows from the first available mobile bundle.
+          </p>
+        </MobileCard>
+      </MobileSection>
 
-        {historyRows.length > 0 && (
-          <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-            <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-              Label distribution
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {Object.entries(counts)
-                .sort((a, b) => b[1] - a[1])
-                .map(([label, count]) => {
-                  const chipColor = regimeColor(label);
-                  const pct = Math.round((count / historyRows.length) * 100);
-                  return (
-                    <span
-                      key={label}
-                      className="rounded-full px-2.5 py-1 text-[10px] font-bold"
-                      style={{
-                        color: chipColor,
-                        backgroundColor: `${chipColor}18`,
-                        border: `1px solid ${chipColor}33`,
-                      }}
-                    >
-                      {label.slice(0, 10)} · {count} ({pct}%)
-                    </span>
-                  );
-                })}
-            </div>
-          </section>
-        )}
-
-        {state.determinismHash && (
-          <div className="rounded-xl border border-white/6 bg-white/[0.02] px-4 py-3">
-            <div className="mb-1 text-[10px] text-slate-600">Determinism hash</div>
-            <div className="break-all font-mono text-[11px] text-slate-400">
-              {state.determinismHash}
-            </div>
-          </div>
-        )}
-
-        <div className="rounded-xl border border-cyan-500/15 bg-cyan-500/5 px-4 py-3 text-center">
-          <div className="text-[11px] text-slate-400">Want JSON access for {cfg.label}?</div>
-          <Link href="/mobile/plans" className="mt-1 inline-block text-[12px] font-semibold text-cyan-400">
-            View mobile plans →
+      <MobileSection eyebrow="Mobile links" title="Continue without leaving mobile.">
+        <div className="grid gap-2">
+          <Link href="/mobile/api-docs" className="rounded-2xl border border-white/12 bg-white/[0.06] p-4 text-[13px] font-black text-white">
+            JSON / API reference →
+          </Link>
+          <Link href="/mobile/methodology" className="rounded-2xl border border-white/12 bg-white/[0.06] p-4 text-[13px] font-black text-white">
+            Methodology →
+          </Link>
+          <Link href="/mobile/plans" className="rounded-2xl border border-white/12 bg-white/[0.06] p-4 text-[13px] font-black text-white">
+            Plans →
           </Link>
         </div>
-      </main>
-
-      <MobileBottomNav active={CHAIN_NAV_KEY[chainId]} />
-    </div>
+      </MobileSection>
+    </MobilePage>
   );
 }

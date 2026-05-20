@@ -1,275 +1,165 @@
 import Link from "next/link";
-import MobileBottomNav from "@/components/mobile/MobileBottomNav";
-import MobileRouteMenu from "@/components/mobile/MobileRouteMenu";
 
-const REGIME_LABELS = [
-  {
-    label: "STABLE",
-    color: "#00FF88",
-    plain: "All dimensions within this chain's own historical norms. No structural deviation detected.",
-    technical: "Demand, Friction, and Capacity axes all within Normal bands. Confidence ≥ 0.40. Default state when evidence does not meet any other threshold.",
-  },
-  {
-    label: "HEATING",
-    color: "#FFD700",
-    plain: "Demand is building and the recent direction still points upward — sustained, not a spike.",
-    technical: "Demand axis in High band AND at least one axis trend HEATING (MA7 ahead of MA30). Level alone is insufficient — requires directional persistence across multiple days.",
-  },
-  {
-    label: "CONGESTED",
-    color: "#FF4444",
-    plain: "The chain is under real pressure. Fees are elevated and blocks are filling up.",
-    technical: "Capacity or Friction axis in Extreme High band, OR combined pressure across multiple axes. Strongest evidence state. Typically high z-scores on fee and utilization metrics.",
-  },
-  {
-    label: "CHEAP",
-    color: "#3B82F6",
-    plain: "Fees and demand are materially below recent norms. The network looks lightly loaded.",
-    technical: "Demand and Friction axes both in Low or Extreme Low bands. MA7 running below MA30 on primary signals. Capacity looks unconstrained.",
-  },
-  {
-    label: "UNKNOWN / DEGRADED",
-    color: "#6B7280",
-    plain: "Evidence is not strong enough to support a named label. Shown instead of guessing.",
-    technical: "Confidence score < 0.40. Triggered by missing data, coverage gaps, or insufficient signal quality. Never silently promoted to a named regime.",
-  },
-];
+import {
+  MobileCard,
+  MobilePage,
+  MobilePill,
+  MobilePrimaryLink,
+  MobileSection,
+} from "@/components/mobile/MobileShell";
 
 const PIPELINE_STEPS = [
   {
     n: "01",
-    title: "Raw chain data ingested",
-    body: "Transaction counts, fees, block times, gas utilization, and active addresses are read from AWS Public Blockchain Data and assembled into the daily Gold layer in native units.",
+    title: "Public chain activity",
+    body: "The source evidence is blockchain network behavior: transaction counts, fees, block timing, execution quality, and capacity proxies where those semantics are valid for the chain.",
+    caveat: "The product does not ingest price data, exchange data, forecasts, social media or advisory signals.",
   },
   {
     n: "02",
-    title: "Each metric scored against chain history",
-    body: "Every metric is normalized using a robust z-score against that chain's own rolling 180-day baseline. Median and MAD are used instead of mean and std — making the score resistant to single outlier days.",
-    formula: "z = (x − median) / (MAD × 1.4826)",
+    title: "Daily feature aggregation",
+    body: "Raw observations are reduced into daily UTC measurements per chain. This is where noisy source rows become chain-date evidence.",
+    caveat: "Raw source rows are not redistributed. Customers receive aggregated, derived and interpretive JSON artifacts.",
   },
   {
     n: "03",
-    title: "Signals grouped into three axes",
-    body: "Individual z-scores are grouped into Demand (transaction activity), Friction (fees and failure rate), and Capacity (block fullness and timing). Each axis produces a score from 0–100 where 50 is neutral.",
+    title: "Gold and Derived",
+    body: "Gold records daily observations. Derived applies deterministic trend context such as rolling windows and moving averages.",
+    caveat: "Derived contextualizes movement. It does not predict future movement.",
   },
   {
     n: "04",
-    title: "Persistence filter applied",
-    body: "A signal must persist for at least 3 consecutive days before contributing to a regime change. MA7 vs MA30 momentum is checked to confirm directionality. Single-day spikes are filtered out.",
+    title: "Meta classification",
+    body: "Meta turns demand, friction and capacity evidence into a daily descriptive label with scorecard, drivers, freshness and determinism metadata.",
+    caveat: "Labels are descriptive reference data, not investment advice or trading instructions.",
   },
   {
     n: "05",
-    title: "Confidence scored",
-    body: "Five components are evaluated: data coverage today, recent coverage quality, 180-day history depth, recent data density, and freshness relative to expected cadence. Combined into a 0–1 score.",
+    title: "Confidence v2",
+    body: "Confidence combines profile-aware data quality with label-specific evidence strength using sqrt(data_quality_score × label_confidence_score).",
+    caveat: "Weak evidence remains weak. UNKNOWN/DEGRADED is allowed instead of forcing a named label.",
   },
   {
     n: "06",
-    title: "Label published — or not",
-    body: "If confidence ≥ 0.40, a named regime label is published with a SHA-256 determinism hash tied to the exact inputs. Below 0.40: UNKNOWN/DEGRADED is published. Never a weak label presented as strong.",
+    title: "Briefs and publication",
+    body: "Briefs summarize already-published Meta context in readable JSON. The website and API consume the same published artifact set.",
+    caveat: "Briefs explain the data. They do not create or override the classification.",
   },
-];
+] as const;
 
-const BANDING_THRESHOLDS = [
-  { band: "Extreme high", pct: "≥ 95th", z: "≥ +2.5", color: "#FF4444" },
-  { band: "High", pct: "≥ 80th", z: "≥ +1.5", color: "#FF8C42" },
-  { band: "Normal", pct: "20–80th", z: "−1.5 to +1.5", color: "#94A3B8" },
-  { band: "Low", pct: "≤ 20th", z: "≤ −1.5", color: "#3B82F6" },
-  { band: "Extreme low", pct: "≤ 5th", z: "≤ −2.5", color: "#60A5FA" },
-];
+const LABELS = [
+  ["STABLE", "Normal enough relative to chain history; may still have adjacent pressure below a regime threshold."],
+  ["HEATING", "Demand-led pressure with rule support. Not just a one-word synonym for price excitement."],
+  ["CONGESTED", "Elevated friction/capacity pressure based on the chain's valid evidence surface."],
+  ["CHEAP", "Low-friction state relative to that chain's own history."],
+  ["UNKNOWN/DEGRADED", "Evidence quality is not strong enough to publish a normal label."],
+] as const;
 
 export default function MobileMethodologyPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#0A0E1A]">
-      <header className="sticky top-0 z-10 border-b border-white/8 bg-[#0A0E1A]/95 px-4 pt-safe-top backdrop-blur-sm">
-        <div className="flex items-center justify-between gap-3 py-3">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Methodology</div>
-            <div className="mt-0.5 text-[14px] font-bold text-white">How the classification works</div>
-          </div>
-          <MobileRouteMenu />
+    <MobilePage
+      active="methodology"
+      eyebrow="Mobile methodology"
+      title={<>How Urd Atlas turns chain activity into reference data.</>}
+      subtitle={
+        <>
+          A compact, mobile-native explanation of the same process documented in
+          the full methodology pages: Gold, Derived, Meta, Briefs and Confidence v2.
+        </>
+      }
+      backHref="/mobile"
+    >
+      <MobileSection eyebrow="Core idea" title="One process, four published layers.">
+        <MobileCard tone="gold">
+          <p className="text-[13px] leading-6 text-[#f2dfbd]">
+            Urd Atlas starts with public blockchain activity and publishes four JSON
+            layers: Gold records what happened, Derived adds trend context, Meta
+            classifies the current regime and confidence, and Briefs explain the
+            latest state in readable form.
+          </p>
+        </MobileCard>
+      </MobileSection>
+
+      <MobileSection eyebrow="Pipeline" title="The mobile A-to-Z version.">
+        <div className="space-y-3">
+          {PIPELINE_STEPS.map((step) => (
+            <MobileCard key={step.n}>
+              <div className="flex gap-3">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#c49230]/32 bg-[#c49230]/12 text-[10px] font-black text-[#f5d386]">
+                  {step.n}
+                </span>
+                <div>
+                  <div className="text-[14px] font-black text-white">{step.title}</div>
+                  <p className="mt-1 text-[12px] leading-6 text-[#d7e8fb]">{step.body}</p>
+                  <p className="mt-2 text-[11px] leading-5 text-[#9eb4cf]">{step.caveat}</p>
+                </div>
+              </div>
+            </MobileCard>
+          ))}
         </div>
-      </header>
+      </MobileSection>
 
-      <main className="flex-1 space-y-5 px-4 py-4 pb-24">
-
-        {/* What this is */}
-        <section className="rounded-3xl border border-cyan-500/15 bg-cyan-500/[0.05] p-5">
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300 mb-2">What Urd Atlas does</div>
-          <p className="text-[13px] leading-[1.75] text-slate-100">
-            Every day, the pipeline reads raw blockchain data for BTC, ETH, ARB, and BASE —
-            scores each metric against that chain&apos;s own 180-day history — and publishes one
-            descriptive regime label per chain with a confidence score and driver attribution.
-          </p>
-          <p className="mt-3 text-[12px] leading-[1.7] text-slate-400">
-            Every output is strictly descriptive. No price targets. No forecasts. No recommendations.
-            The model describes current network state relative to recent history — nothing more.
-          </p>
-        </section>
-
-        {/* Pipeline steps */}
-        <section>
-          <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-            The six pipeline steps
+      <MobileSection eyebrow="Confidence v2" title="Confidence is evidence quality, not decoration.">
+        <MobileCard tone="blue">
+          <div className="rounded-2xl border border-white/10 bg-black/[0.18] p-3">
+            <code className="block text-center font-mono text-[12px] text-[#f5d386]">
+              confidence_score = sqrt(data_quality_score × label_confidence_score)
+            </code>
           </div>
-          <div className="space-y-2.5">
-            {PIPELINE_STEPS.map((step) => (
-              <div key={step.n} className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 shrink-0 text-[10px] font-black text-cyan-400 w-5">{step.n}</span>
-                  <div>
-                    <div className="text-[13px] font-bold text-white">{step.title}</div>
-                    <p className="mt-1.5 text-[12px] leading-[1.7] text-slate-300">{step.body}</p>
-                    {step.formula && (
-                      <div className="mt-2.5 rounded-lg border border-white/8 bg-black/25 px-3 py-2">
-                        <code className="font-mono text-[12px] text-cyan-300">{step.formula}</code>
-                      </div>
-                    )}
-                  </div>
-                </div>
+          <div className="mt-4 space-y-3 text-[12px] leading-6 text-[#d7e8fb]">
+            <p>
+              <strong className="text-white">data_quality_score</strong> asks whether
+              the relevant evidence surface for that chain is complete, fresh and usable.
+            </p>
+            <p>
+              <strong className="text-white">label_confidence_score</strong> asks whether
+              the evidence clearly supports the specific label being published.
+            </p>
+            <p>
+              Structurally non-applicable fields are excluded. Bitcoin is not penalized
+              for missing Ethereum-only gas fields, and L2 freshness is evaluated against
+              the L2 publication policy.
+            </p>
+          </div>
+        </MobileCard>
+      </MobileSection>
+
+      <MobileSection eyebrow="Labels" title="How to read the regime vocabulary.">
+        <div className="space-y-2">
+          {LABELS.map(([label, text]) => (
+            <MobileCard key={label}>
+              <div className="flex items-start justify-between gap-3">
+                <strong className="text-[13px] text-white">{label}</strong>
+                <MobilePill tone={label === "UNKNOWN/DEGRADED" ? "gray" : "blue"}>label</MobilePill>
               </div>
-            ))}
-          </div>
-        </section>
+              <p className="mt-2 text-[12px] leading-6 text-[#d7e8fb]">{text}</p>
+            </MobileCard>
+          ))}
+        </div>
+      </MobileSection>
 
-        {/* Regime labels */}
-        <section>
-          <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-            The five regime labels
-          </div>
-          <div className="space-y-2.5">
-            {REGIME_LABELS.map((r) => (
-              <div
-                key={r.label}
-                className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"
-                style={{ borderLeftColor: r.color + "60", borderLeftWidth: 3 }}
-              >
-                <div className="text-[12px] font-black tracking-wider" style={{ color: r.color }}>
-                  {r.label}
-                </div>
-                <p className="mt-1.5 text-[12px] leading-[1.7] text-slate-200">{r.plain}</p>
-                <p className="mt-1.5 text-[11px] leading-[1.65] text-slate-500">{r.technical}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Banding thresholds */}
-        <section className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-          <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-            Banding thresholds
-          </div>
-          <p className="mb-3 text-[12px] leading-[1.7] text-slate-400">
-            Both the percentile rank AND the z-score threshold must be met for a band assignment.
-            Meeting only one is insufficient.
+      <MobileSection eyebrow="Scorecard vs regime" title="Pressure can appear before a label changes.">
+        <MobileCard tone="warning">
+          <p className="text-[12px] leading-6 text-[#f2dfbd]">
+            The scorecard and the regime label are related but not identical. A chain can be
+            STABLE while Demand is High on the scorecard if the regime-axis rule did not
+            cross the HEATING threshold. The status explanation now calls this adjacent
+            pressure rather than hiding the nuance.
           </p>
-          <div className="space-y-2">
-            {BANDING_THRESHOLDS.map((t) => (
-              <div key={t.band} className="flex items-center gap-3 rounded-xl border border-white/5 bg-black/10 px-3 py-2">
-                <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
-                <span className="text-[11px] font-semibold text-white w-24 shrink-0">{t.band}</span>
-                <span className="text-[10px] text-slate-500 w-16">{t.pct} pct</span>
-                <code className="text-[10px] font-mono text-slate-400">{t.z}</code>
-              </div>
-            ))}
-          </div>
-        </section>
+        </MobileCard>
+      </MobileSection>
 
-        {/* Axes */}
-        <section>
-          <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-            The three scorecard axes
-          </div>
-          <div className="space-y-2.5">
-            {[
-              {
-                axis: "Demand",
-                color: "#00FF88",
-                question: "How much usage pressure is the chain carrying?",
-                metrics: ["tx_count_daily", "unique_active_addresses"],
-                body: "High when the chain is being used more than usual. Both metrics must show elevated z-scores and percentiles for Demand to reach a high band.",
-              },
-              {
-                axis: "Friction",
-                color: "#FF8C42",
-                question: "How costly or difficult is it to use the chain?",
-                metrics: ["median_tx_fee_native", "failed_tx_rate"],
-                body: "High when fees are elevated or transactions are failing at above-normal rates. BTC proxied differently due to no EVM gas semantics.",
-              },
-              {
-                axis: "Capacity",
-                color: "#FF4444",
-                question: "How constrained is the chain relative to its range?",
-                metrics: ["gas_utilization_pct", "avg_block_time_sec"],
-                body: "High when blocks are nearly full or block production is becoming irregular. EVM chains use gas_utilization_pct; BTC uses blocktime instability as proxy.",
-              },
-            ].map((a) => (
-              <div key={a.axis} className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: a.color }} />
-                  <span className="text-[13px] font-bold text-white">{a.axis}</span>
-                </div>
-                <p className="text-[11px] text-slate-500 italic mb-2">{a.question}</p>
-                <p className="text-[12px] leading-[1.7] text-slate-300">{a.body}</p>
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                  {a.metrics.map((m) => (
-                    <code key={m} className="rounded bg-black/25 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
-                      {m}
-                    </code>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Determinism hash */}
-        <section className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">
-            Determinism hash
-          </div>
-          <p className="text-[12px] leading-[1.7] text-slate-300">
-            Every published Meta artifact includes a SHA-256 fingerprint computed from the
-            exact inputs that produced that day&apos;s classification — the Gold values,
-            180-day baseline, threshold parameters, and methodology version.
-          </p>
-          <p className="mt-2.5 text-[12px] leading-[1.7] text-slate-400">
-            This hash lets you verify that a past label was not changed after publication.
-            Any retroactive reclassification would change the hash — making silent adjustments detectable.
-          </p>
-          <div className="mt-3 rounded-xl border border-white/6 bg-black/15 px-3 py-2">
-            <code className="font-mono text-[10px] text-slate-400">regime.determinism_hash</code>
-          </div>
-        </section>
-
-        {/* Interpretation boundary */}
-        <section className="rounded-3xl border border-amber-500/20 bg-amber-500/5 p-5">
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-300 mb-3">
-            Interpretation boundary
-          </div>
-          <div className="space-y-2">
-            {[
-              ["✓", "Describes current on-chain network state relative to recent history", "text-emerald-300"],
-              ["✓", "Classifies conditions into a stable regime vocabulary", "text-emerald-300"],
-              ["✓", "Quantifies evidence quality through confidence scoring", "text-emerald-300"],
-              ["✗", "Publishes price data or price targets", "text-red-300"],
-              ["✗", "Forecasts what conditions will look like tomorrow", "text-red-300"],
-              ["✗", "Recommends buying, selling, or any portfolio action", "text-red-300"],
-            ].map(([mark, text, color]) => (
-              <div key={text} className="flex items-start gap-2.5">
-                <span className={`shrink-0 text-[12px] font-bold ${color}`}>{mark}</span>
-                <span className="text-[12px] leading-[1.6] text-slate-300">{text}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <Link href="/mobile/wiki" className="block rounded-2xl border border-cyan-500/15 bg-cyan-500/5 p-4 text-center">
-          <div className="text-[12px] font-bold text-white">Browse the full term wiki →</div>
-          <div className="mt-1 text-[11px] text-slate-400">Every field, formula, and concept defined</div>
-        </Link>
-      </main>
-
-      <MobileBottomNav active="wiki" />
-    </div>
+      <MobileSection eyebrow="Read next" title="Mobile-only documentation links.">
+        <div className="grid gap-2">
+          <MobilePrimaryLink href="/mobile/api-docs">JSON / API reference</MobilePrimaryLink>
+          <Link href="/mobile/wiki" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/14 bg-white/[0.075] px-4 text-[13px] font-black text-white">
+            Term wiki
+          </Link>
+          <Link href="/mobile/track-record" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/14 bg-white/[0.075] px-4 text-[13px] font-black text-white">
+            Track record
+          </Link>
+        </div>
+      </MobileSection>
+    </MobilePage>
   );
 }
