@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -128,7 +128,7 @@ const PRICE_STRIP_CSS = `
 }
 
 .ua-vf-price-strip-price {
-  color: var(--ink);
+  color: var(--gold);
   font-family: var(--serif);
   font-size: 22px;
   font-weight: 400;
@@ -603,15 +603,168 @@ export default function UrdAtlasVFinalLandingClient({
   return (
     <main className="ua-vf">
       <style dangerouslySetInnerHTML={{ __html: `
+        .ua-vf-tour-hero-link {
+          display: inline-flex;
+          width: fit-content;
+          margin-top: 2px;
+          color: var(--gold) !important;
+          border-bottom-color: rgba(196, 146, 48, 0.45) !important;
+          font-size: 14px !important;
+          font-weight: 800 !important;
+          letter-spacing: 0.08em !important;
+          text-transform: none;
+          text-shadow: 0 0 18px rgba(196, 146, 48, 0.18);
+        }
+
+        .ua-vf-tour-hero-link:hover {
+          color: var(--gold2) !important;
+          border-bottom-color: rgba(196, 146, 48, 0.75) !important;
+        }
+
+        @media (max-width: 900px) {
+          .ua-vf-tour-hero-link {
+            font-size: 13px !important;
+            letter-spacing: 0.05em !important;
+          }
+        }
+      ` }} />
+      <style dangerouslySetInnerHTML={{ __html: `
+        .ua-vf-landing-super-title {
+          margin: -58px auto 40px;
+          max-width: 1120px;
+          text-align: center;
+          color: var(--gold) !important;
+          font-family: var(--serif);
+          font-size: clamp(36px, 4.05vw, 58px);
+          font-weight: 400;
+          line-height: 1.05;
+          letter-spacing: -0.045em;
+          text-wrap: balance;
+        }
+
+        .ua-vf-landing-super-title::after {
+          content: "";
+          display: block;
+          width: min(100%, 1120px);
+          height: 7px;
+          margin: 34px auto 0;
+          border-radius: 999px;
+          background:
+            radial-gradient(ellipse at center, rgba(196, 146, 48, 0.95) 0%, rgba(196, 146, 48, 0.58) 24%, rgba(196, 146, 48, 0.24) 52%, transparent 78%),
+            linear-gradient(90deg, transparent 0%, rgba(196, 146, 48, 0.22) 15%, rgba(196, 146, 48, 0.58) 48%, rgba(196, 146, 48, 0.58) 52%, rgba(196, 146, 48, 0.22) 85%, transparent 100%);
+          filter: drop-shadow(0 0 10px rgba(196, 146, 48, 0.16));
+          opacity: 0.92;
+        }
+
+        .ua-vf-hero-grid {
+          align-items: stretch !important;
+        }
+
+        .ua-vf-hero-copy {
+          min-height: 430px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+
+        .ua-vf-hero-question {
+          max-width: 650px;
+          font-size: clamp(3.8px, 4.0vw, 64px) !important;
+          line-height: 0.98 !important;
+          letter-spacing: -0.066em !important;
+        }
+
+        @media (max-width: 900px) {
+          .ua-vf-landing-super-title {
+            margin: -18px auto 38px;
+            font-size: clamp(24px, 7vw, 34px);
+            line-height: 1.08;
+          }
+
+          .ua-vf-hero-copy {
+            min-height: auto;
+          }
+
+          .ua-vf-hero-question {
+            font-size: clamp(42px, 13vw, 62px) !important;
+          }
+        }
+      ` }} />
+      <style dangerouslySetInnerHTML={{ __html: `
+        .ua-vf-hero-title-wrap {
+          text-align: center;
+          padding-top: clamp(4px, 1.2vw, 16px);
+          padding-bottom: clamp(38px, 5.2vw, 72px);
+        }
+
+        $11060px;
+          margin: 0 auto;
+          color: var(--gold);
+          font-family: var(--serif);
+          font-size: clamp(28px, 4.2vw, 56px);
+          font-weight: 400;
+          letter-spacing: -0.042em;
+          line-height: 1.02;
+          text-wrap: balance;
+          text-shadow:
+            0 18px 56px rgba(0,0,0,.34),
+            0 0 30px rgba(196,146,48,.16);
+        }
+
+        @media (max-width: 760px) {
+          .ua-vf-hero-title-wrap {
+            padding-top: 8px;
+            padding-bottom: 30px;
+          }
+
+          .ua-vf-hero-top-title {
+            font-size: clamp(30px, 4.55vw, 62px);
+            line-height: 1;
+            letter-spacing: -0.044em;
+          }
+        }
+        .ua-vf-hero-grid-balanced {
+          align-items: stretch !important;
+        }
+
+        .ua-vf-hero-grid-balanced .ua-vf-hero-copy {
+          display: flex;
+          min-height: 100%;
+          flex-direction: column;
+          justify-content: center;
+        }
+
+        $1610px;
+          font-size: clamp(38px, 4.15vw, 62px);
+          line-height: 1.05;
+          letter-spacing: -0.032em;
+        }
+
+        $1610px;
+        }
+
+        @media (max-width: 980px) {
+          .ua-vf-hero-grid-balanced {
+            align-items: start !important;
+          }
+
+          .ua-vf-hero-grid-balanced .ua-vf-hero-copy {
+            min-height: 0;
+            justify-content: flex-start;
+          }
+
+          $11.05;
+          }
+        }
         .ua-chain-hero-row:hover { background: var(--surface3) !important; padding-left: 26px !important; }
         .ua-chain-hero-row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: transparent; transition: background .2s; }
         .ua-chain-hero-row:hover::before { background: var(--gold); }
         .ua-chain-logo-mark { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line2); border-radius: 999px; background: rgba(232,224,208,.035); box-shadow: 0 0 0 1px rgba(232,224,208,.025), 0 10px 24px rgba(0,0,0,.18); }
         .ua-chain-logo-svg { width: 34px; height: 34px; display: block; filter: saturate(1.08) contrast(1.06); }
-        .ua-chain-logo-name { font-family: var(--mono); font-size: 9.5px; font-weight: 500; letter-spacing: .06em; color: var(--ink); line-height: 1.15; text-align: center; }
-        .ua-chain-logo-fallback { color: var(--ink); font-family: var(--mono); font-size: 20px; }
-        .ua-vf-regime-path .ua-vf-path-token { display: inline-grid; grid-template-columns: 1fr; gap: 4px; align-items: start; min-width: 96px; padding-bottom: 7px; color: var(--ink); }
-        .ua-vf-path-token b { color: var(--ink); font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: .04em; line-height: 1.1; text-transform: none; }
+        .ua-chain-logo-name { font-family: var(--mono); font-size: 9.5px; font-weight: 500; letter-spacing: .06em; color: var(--gold); line-height: 1.15; text-align: center; }
+        .ua-chain-logo-fallback { color: var(--gold); font-family: var(--mono); font-size: 20px; }
+        .ua-vf-regime-path .ua-vf-path-token { display: inline-grid; grid-template-columns: 1fr; gap: 4px; align-items: start; min-width: 96px; padding-bottom: 7px; color: var(--gold); }
+        .ua-vf-path-token b { color: var(--gold); font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: .04em; line-height: 1.1; text-transform: none; }
         .ua-vf-path-token i { color: var(--gold); font-family: var(--mono); font-size: 8px; font-style: normal; font-weight: 500; letter-spacing: .14em; line-height: 1; text-transform: uppercase; }
         .ua-vf-path-token strong { color: currentColor; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; line-height: 1.1; text-transform: uppercase; }
         @media (max-width: 560px) {
@@ -661,13 +814,18 @@ export default function UrdAtlasVFinalLandingClient({
 
       {/* ── HERO ── */}
       <section className="ua-vf-hero" id="top">
-        <div className="ua-vf-shell ua-vf-hero-grid" style={{ alignItems: "start" }}>
+        <div className="ua-vf-shell">
+          <div className="ua-vf-landing-super-title">Urd Atlas - Daily network intelligence for Bitcoin, Ethereum, Arbitrum and Base</div>
+        </div>
+        <div className="ua-vf-shell ua-vf-hero-title-wrap ua-vf-reveal is-visible">
+</div>
+
+        <div className="ua-vf-shell ua-vf-hero-grid ua-vf-hero-grid-balanced" style={{ alignItems: "stretch" }}>
           <div className="ua-vf-hero-copy ua-vf-reveal is-visible">
-            <div className="ua-vf-eyebrow" style={{ paddingTop: "0" }}>Daily network intelligence for Bitcoin, Ethereum, Arbitrum and Base</div>
-            <h1 className="ua-vf-h1">
+            <h2 className="ua-vf-h1 ua-vf-hero-question">
               How busy has the blockchain network been <em>lately?</em>
-            </h1>
-            <p style={{ marginBottom: "24px" }}>
+            </h2>
+            <p className="ua-vf-hero-question-copy" style={{ marginBottom: "24px" }}>
               Urd Atlas measures transaction activity, fee pressure and capacity across Bitcoin,
               Ethereum, Arbitrum and Base every day and publishes one verified, documented answer
               per chain. Know exactly whether each network has been running at its usual pace,
@@ -677,10 +835,10 @@ export default function UrdAtlasVFinalLandingClient({
               <a href="#json" className="ua-vf-btn-primary">
                 Inspect JSON
               </a>
-              <a href="#brief" className="ua-vf-btn-ghost">
+              <a href="#brief" className="ua-vf-btn-primary">
                 Read latest Brief
               </a>
-              <Link href="/tour" className="ua-vf-text-link">
+              <Link href="/tour" className="ua-vf-text-link ua-vf-tour-hero-link">
                 New to Urd Atlas? Take the quick tour →
               </Link>
             </div>
@@ -1331,3 +1489,8 @@ export default function UrdAtlasVFinalLandingClient({
     </main>
   );
 }
+
+
+
+
+
