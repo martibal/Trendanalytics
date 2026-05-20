@@ -1,4 +1,4 @@
-// src/app/api/v1/files/[...path]/route.ts
+﻿// src/app/api/v1/files/[...path]/route.ts
 import path from "path";
 import { NextResponse } from "next/server";
 
@@ -10,9 +10,10 @@ import {
   type WindowToken,
 } from "@/lib/auth/entitlements";
 import { buildRateLimitHeaders, enforceAccountRateLimit } from "@/lib/auth/rateLimit";
-import { currentDataSource, readStorageObject } from "@/lib/storage";
+import { readStorageObject } from "@/lib/storage";
 import type { ChainId } from "@/config/chains";
 import { getOrCreateRequestId, logApiEvent } from "@/lib/auditLog";
+import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
 
 type RouteContext = {
   params: Promise<{ path: string[] }>;
@@ -47,7 +48,7 @@ function parseFilePathSegments(segments: string[]): ParsedFilePath | null {
     // Briefs are published under briefs/chains/<chain>/latest.json.
     // Site-level and cross-chain brief bundles remain public data artifacts
     // and are not routed through the per-chain subscriber entitlement gate.
-    if (segments.length < 4 || segments[1] !== "chains") {
+    if (segments.length !== 4 || segments[1] !== "chains") {
       return null;
     }
 
@@ -64,7 +65,7 @@ function parseFilePathSegments(segments: string[]): ParsedFilePath | null {
     };
   }
 
-  if (segments.length < 3) {
+  if (segments.length !== 3 && segments.length !== 4) {
     return null;
   }
 
@@ -91,6 +92,33 @@ function withRequestId(
   };
 }
 
+function publicFileErrorDetail(
+  status: number,
+  code: "unauthenticated" | "forbidden" | "not_found" | "server_error" | "rate_limited",
+  detail?: string
+): string | null {
+  if (process.env.NODE_ENV !== "production" && process.env.VERCEL_ENV !== "production") {
+    return detail ?? null;
+  }
+
+  if (status === 404 || code === "not_found") {
+    return "not_found";
+  }
+
+  if (status === 403 || code === "forbidden") {
+    return "forbidden";
+  }
+
+  if (status === 401 || code === "unauthenticated") {
+    return "unauthenticated";
+  }
+
+  if (status === 429 || code === "rate_limited") {
+    return "rate_limited";
+  }
+
+  return "server_error";
+}
 function jsonError(
   requestId: string,
   status: number,
@@ -103,7 +131,7 @@ function jsonError(
     {
       code,
       message,
-      detail: detail ?? null,
+      detail: publicFileErrorDetail(status, code, detail),
     },
     {
       status,
@@ -127,15 +155,16 @@ function sanitizeSegments(segments: string[]): string[] | null {
 }
 
 function inferWindowFromTail(tail: string[]): WindowToken | null {
-  if (tail.length === 0) return null;
-
-  const first = tail[0];
-  if (isWindowToken(first)) {
-    return first;
-  }
-
   if (tail.length === 1 && tail[0] === "latest.json") {
     return "latest";
+  }
+
+  if (tail.length === 2) {
+    const [windowRaw, filename] = tail;
+
+    if (filename === "latest.json" && isWindowToken(windowRaw) && windowRaw !== "latest") {
+      return windowRaw;
+    }
   }
 
   return null;
@@ -148,6 +177,21 @@ function buildStoragePath(segments: string[]): string {
 export async function GET(request: Request, context: RouteContext) {
   const startedAtMs = Date.now();
   const requestId = getOrCreateRequestId(request.headers);
+  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "file-api", requestId);
+
+  if (!preAuthRateLimit.ok) {
+    await logApiEvent({
+      requestId,
+      eventType: "rate_limited",
+      path: new URL(request.url).pathname,
+      method: request.method,
+      statusCode: 429,
+      startedAtMs,
+      detail: preAuthRateLimit.detail,
+    });
+
+    return preAuthRateLimit.response;
+  }
 
   let accountId: string | null = null;
   let keyId: string | null = null;
@@ -344,11 +388,8 @@ export async function GET(request: Request, context: RouteContext) {
         "Content-Length": String(file.contentLength),
         "Cache-Control": "private, no-store",
         "X-Account-Id": authResult.accountId,
-        "X-API-Key-Prefix": authResult.keyPrefix,
         "X-Entitlement-Tier": authResult.entitlement.tier,
         "X-Entitlement-Window": inferredWindow,
-        "X-Data-Source": currentDataSource(),
-        "X-Storage-Backend": file.source,
         ...(file.etag ? { ETag: file.etag } : {}),
         ...(file.lastModified ? { "Last-Modified": file.lastModified } : {}),
       },
@@ -381,3 +422,6 @@ export async function GET(request: Request, context: RouteContext) {
     );
   }
 }
+
+
+

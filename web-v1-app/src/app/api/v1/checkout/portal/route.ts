@@ -1,9 +1,10 @@
-// src/app/api/v1/checkout/portal/route.ts
+﻿// src/app/api/v1/checkout/portal/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
 import { getCurrentAccountView } from "@/lib/auth/account";
 
+import { validateSameOriginRequest } from "@/lib/security/origin";
 function getStripeClient(): Stripe | null {
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
 
@@ -41,7 +42,12 @@ function dashboardReturnUrl(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const stripe = getStripeClient();
+    const originGuard = validateSameOriginRequest(request);
+
+  if (!originGuard.ok) {
+    return originGuard.response;
+  }
+const stripe = getStripeClient();
 
   if (!stripe) {
     return jsonError(
@@ -113,3 +119,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+

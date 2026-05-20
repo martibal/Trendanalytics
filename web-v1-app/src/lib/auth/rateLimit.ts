@@ -1,4 +1,4 @@
-// src/lib/auth/rateLimit.ts
+﻿// src/lib/auth/rateLimit.ts
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import type { SubscriptionTier } from "@/lib/auth/entitlements";
@@ -12,7 +12,7 @@ export type RateLimitDecision = {
   reset: number;
   retryAfter: number | null;
   tier: RateLimitTier;
-  source: "upstash" | "memory";
+  source: "upstash" | "memory" | "fail_closed";
 };
 
 type MemoryWindow = {
@@ -23,11 +23,31 @@ type MemoryWindow = {
 const WINDOW_MS = 60_000;
 const BASIC_LIMIT = 60;
 const PRO_LIMIT = 300;
+const FAIL_CLOSED_RETRY_AFTER_SECONDS = 60;
 
 const memoryStore = new Map<string, MemoryWindow>();
 
 function getLimitForTier(tier: RateLimitTier): number {
   return tier === "pro" ? PRO_LIMIT : BASIC_LIMIT;
+}
+
+function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+}
+
+function buildFailClosedDecision(tier: RateLimitTier): RateLimitDecision {
+  const now = Date.now();
+  const reset = now + FAIL_CLOSED_RETRY_AFTER_SECONDS * 1000;
+
+  return {
+    success: false,
+    limit: 0,
+    remaining: 0,
+    reset,
+    retryAfter: FAIL_CLOSED_RETRY_AFTER_SECONDS,
+    tier,
+    source: "fail_closed",
+  };
 }
 
 function getRedisClient(): Redis | null {
@@ -131,22 +151,43 @@ async function applyUpstashRateLimit(accountId: string, tier: RateLimitTier): Pr
   const ratelimit = getRatelimiter(tier);
 
   if (!ratelimit) {
+    if (isProductionRuntime()) {
+      console.error("[rateLimit] production rate-limit backend is not configured; failing closed", {
+        tier,
+      });
+
+      return buildFailClosedDecision(tier);
+    }
+
     return applyMemoryRateLimit(accountId, tier);
   }
 
-  const result = await ratelimit.limit(accountId);
-  const reset = typeof result.reset === "number" ? result.reset : Date.now() + WINDOW_MS;
-  const retryAfter = result.success ? null : Math.max(1, Math.ceil((reset - Date.now()) / 1000));
+  try {
+    const result = await ratelimit.limit(accountId);
+    const reset = typeof result.reset === "number" ? result.reset : Date.now() + WINDOW_MS;
+    const retryAfter = result.success ? null : Math.max(1, Math.ceil((reset - Date.now()) / 1000));
 
-  return {
-    success: result.success,
-    limit: result.limit,
-    remaining: result.remaining,
-    reset,
-    retryAfter,
-    tier,
-    source: "upstash",
-  };
+    return {
+      success: result.success,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset,
+      retryAfter,
+      tier,
+      source: "upstash",
+    };
+  } catch (error) {
+    console.error("[rateLimit] rate-limit backend failed", {
+      tier,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    if (isProductionRuntime()) {
+      return buildFailClosedDecision(tier);
+    }
+
+    return applyMemoryRateLimit(accountId, tier);
+  }
 }
 
 export async function enforceAccountRateLimit(

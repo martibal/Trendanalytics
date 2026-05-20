@@ -1,4 +1,4 @@
-// src/app/api/v1/checkout/route.ts
+﻿// src/app/api/v1/checkout/route.ts
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import Stripe from "stripe";
@@ -6,6 +6,7 @@ import Stripe from "stripe";
 import type { ChainId } from "@/config/chains";
 import { db } from "@/lib/db";
 
+import { validateSameOriginRequest } from "@/lib/security/origin";
 type CheckoutPlan = "basic" | "pro";
 type StripeKeyMode = "missing" | "test" | "live" | "restricted_test" | "restricted_live" | "unknown";
 
@@ -407,10 +408,52 @@ async function handleCheckout(request: Request) {
   }
 }
 
+
+function checkoutNavigationError(detail: string) {
+  return NextResponse.json(
+    {
+      code: "checkout_navigation_not_allowed",
+      message: "Checkout must be started from Urd Atlas.",
+      detail,
+    },
+    {
+      status: 403,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
+  );
+}
+
+function validateCheckoutNavigationRequest(request: Request) {
+  const secFetchSite = request.headers.get("sec-fetch-site")?.toLowerCase() ?? null;
+
+  if (secFetchSite === "cross-site") {
+    return {
+      ok: false as const,
+      response: checkoutNavigationError("Cross-site checkout navigation is not allowed."),
+    };
+  }
+
+  return { ok: true as const };
+}
 export async function GET(request: Request) {
+  const navigationGuard = validateCheckoutNavigationRequest(request);
+
+  if (!navigationGuard.ok) {
+    return navigationGuard.response;
+  }
+
   return handleCheckout(request);
 }
 
 export async function POST(request: Request) {
-  return handleCheckout(request);
+    const originGuard = validateSameOriginRequest(request);
+
+  if (!originGuard.ok) {
+    return originGuard.response;
+  }
+return handleCheckout(request);
 }
+
+

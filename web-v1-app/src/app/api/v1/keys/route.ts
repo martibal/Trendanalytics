@@ -1,4 +1,4 @@
-// src/app/api/v1/keys/route.ts
+﻿// src/app/api/v1/keys/route.ts
 import crypto from "node:crypto";
 
 import { auth } from "@clerk/nextjs/server";
@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 
+import { validateSameOriginRequest } from "@/lib/security/origin";
 type CreateKeyRequestBody = {
   label?: string | null;
 };
@@ -94,7 +95,12 @@ async function getAuthenticatedAccount() {
 }
 
 export async function POST(request: Request) {
-  try {
+    const originGuard = validateSameOriginRequest(request);
+
+  if (!originGuard.ok) {
+    return originGuard.response;
+  }
+try {
     const { userId, account } = await getAuthenticatedAccount();
 
     if (!userId) {
@@ -200,7 +206,12 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  try {
+    const originGuard = validateSameOriginRequest(request);
+
+  if (!originGuard.ok) {
+    return originGuard.response;
+  }
+try {
     const { userId, account } = await getAuthenticatedAccount();
 
     if (!userId) {
@@ -290,3 +301,5 @@ export async function DELETE(request: Request) {
     );
   }
 }
+
+
