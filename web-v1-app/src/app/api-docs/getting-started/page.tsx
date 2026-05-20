@@ -1,4 +1,4 @@
-import ShortFullContent from "@/components/site/ShortFullContent";
+﻿import ShortFullContent from "@/components/site/ShortFullContent";
 import PageHero from "@/components/site/PageHero";
 import {
   UrdButtonLink,
@@ -139,6 +139,7 @@ export default function GettingStartedJsonApiPage() {
         bullets={[
           <>If you only do one thing before buying, download one sample Meta file and inspect its label, confidence, and determinism hash.</>,
           <>If you only do one thing after buying, create an API key and fetch one latest.json file successfully.</>,
+          <>Each account can keep up to two non-revoked API keys. API keys are checked against the account&apos;s current active subscription every time they are used.</>,
           <>Single Chain gives one chain with 90 days. Research gives all four chains with 365 days. Full archive access, when offered, remains a separate add-on.</>,
         ]}
         whyItMatters={<>A new user should be able to understand the product and reach a first successful API request without reading the entire guide.</>}
@@ -518,6 +519,54 @@ export default function GettingStartedJsonApiPage() {
           </Callout>
         </Section>
 
+
+        {/* ── 6B. API key rules ── */}
+        <Section id="api-key-rules" eyebrow="API key rules" title="How API keys are checked">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <UrdCard className="rounded-2xl p-5">
+              <h3 className="text-base font-black text-[#0d2447]">One key, current entitlement</h3>
+              <p className="mt-3 text-sm font-semibold leading-7 text-[#27476f]">
+                The API key does not permanently store a separate plan. Each request is checked
+                against the account&apos;s current subscription status, entitled chain, allowed file
+                genres, and allowed history window. If the subscription is inactive, subscriber
+                file delivery is blocked even if the key string itself still exists.
+              </p>
+            </UrdCard>
+
+            <UrdCard className="rounded-2xl p-5">
+              <h3 className="text-base font-black text-[#0d2447]">Maximum two non-revoked keys</h3>
+              <p className="mt-3 text-sm font-semibold leading-7 text-[#27476f]">
+                Each account can have up to two non-revoked API keys. Active and suspended keys
+                count toward this limit. Revoked keys do not count. To create a third key, revoke
+                an existing key first from Dashboard.
+              </p>
+            </UrdCard>
+
+            <UrdCard className="rounded-2xl p-5">
+              <h3 className="text-base font-black text-[#0d2447]">Single Chain scope</h3>
+              <p className="mt-3 text-sm font-semibold leading-7 text-[#27476f]">
+                Single Chain keys can fetch Gold, Meta, Derived, and Briefs for the selected chain
+                only. Available windows are latest, 7d, 30d, and 90d. Requests for another chain or
+                for 180d/365d return a forbidden response.
+              </p>
+            </UrdCard>
+
+            <UrdCard className="rounded-2xl p-5">
+              <h3 className="text-base font-black text-[#0d2447]">Research scope</h3>
+              <p className="mt-3 text-sm font-semibold leading-7 text-[#27476f]">
+                Research keys can fetch Gold, Meta, Derived, and Briefs for Bitcoin, Ethereum,
+                Arbitrum, and Base. Available windows are latest, 7d, 30d, 90d, 180d, and 365d.
+              </p>
+            </UrdCard>
+          </div>
+
+          <Callout color="amber">
+            <span className="font-black text-[#0d2447]">Cancellation behavior:</span>{" "}
+            API keys work only while the subscription is active. If cancellation is scheduled for
+            the end of the billing period, access remains active until then. If the subscription is
+            cancelled immediately, subscriber API access stops when the subscription status becomes inactive.
+          </Callout>
+        </Section>
         {/* ── 7. First request ── */}
         <Section id="first-request" eyebrow="Chapter 7" title="How to make your first API request">
           <p className="text-sm leading-7 text-[#27476f]">
@@ -819,7 +868,12 @@ python3 fetch_urdatlas.py`}</CodeBlock>
               Nothing is lost. You can fetch the window files (7d, 30d, 90d) to get
               any days you missed, within your plan history depth.
             </QA>
-            <QA question="Can I use the same API key on multiple machines?">
+            <QA question="Can I use the same API key on multiple machines?">            <QA question="How many API keys can I create?">
+              Each account can have up to two non-revoked API keys. Active and suspended keys
+              count toward this limit. Revoked keys do not count. If you need to create a third
+              key, revoke an existing key first from Dashboard.
+            </QA>
+
               Yes. Copy the key string and use it wherever you want. You can also create
               a second key in Dashboard for a different machine.
             </QA>
@@ -875,3 +929,5 @@ python3 fetch_urdatlas.py`}</CodeBlock>
     </UrdPage>
   );
 }
+
+
