@@ -683,6 +683,14 @@ export default function UrdAtlasVFinalLandingClient({
           text-shadow: 0 0 18px rgba(196, 146, 48, 0.18);
         }
 
+        .ua-vf-hero-copy .ua-vf-btn-primary {
+          color: #061322 !important;
+        }
+
+        .ua-vf-price-card .ua-vf-btn-primary {
+          color: #061322 !important;
+        }
+
         .ua-vf-tour-hero-link:hover {
           color: var(--gold2) !important;
           border-bottom-color: rgba(196, 146, 48, 0.75) !important;
