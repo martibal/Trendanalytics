@@ -26,6 +26,7 @@ export function MobilePage({
   backHref,
   backLabel = "Back",
   actions,
+  showTopMenu = true,
 }: {
   active?: MobileActiveKey | string;
   eyebrow: string;
@@ -35,6 +36,7 @@ export function MobilePage({
   backHref?: string;
   backLabel?: string;
   actions?: ReactNode;
+  showTopMenu?: boolean;
 }) {
   return (
     <div className="min-h-screen bg-[#050d18] text-[#eef7ff]">
@@ -66,12 +68,12 @@ export function MobilePage({
               )}
             </div>
 
-            <MobileRouteMenu />
+            {showTopMenu ? <MobileRouteMenu /> : null}
           </div>
         </header>
 
         <main className="px-4">
-          <section className="pt-7 pb-5">
+          <section className="pb-5 pt-7">
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c49230]">
               {eyebrow}
             </div>
@@ -108,7 +110,7 @@ export function MobileSection({
 }) {
   return (
     <section id={id} className="scroll-mt-28">
-      {(eyebrow || title) ? (
+      {eyebrow || title ? (
         <div className="mb-3">
           {eyebrow ? (
             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#91b8db]">

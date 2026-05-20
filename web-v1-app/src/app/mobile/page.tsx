@@ -103,11 +103,13 @@ function heroDisplayAsOf(hero?: LandingHero | null): string | null {
 
 function lagDaysFromIsoDay(date?: string | null): number | null {
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+
   const [y, m, d] = date.split("-").map(Number);
   const asOfMs = Date.UTC(y, m - 1, d);
   const now = new Date();
   const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const diff = todayMs - asOfMs;
+
   return diff >= 0 ? Math.floor(diff / 86400000) : null;
 }
 
@@ -169,6 +171,7 @@ async function buildBriefs(): Promise<MobileBriefState[]> {
 
 function formatPublishedDate(publishedAt?: string | null): string | null {
   if (!publishedAt) return null;
+
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Oslo",
     day: "2-digit",
@@ -179,7 +182,11 @@ function formatPublishedDate(publishedAt?: string | null): string | null {
 
 function formatAxisLevel(value?: string | null): string {
   if (!value) return "—";
-  return value.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+
+  return value
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function confidenceText(score: number | null): string {
@@ -269,7 +276,7 @@ function BriefCard({ brief }: { brief: MobileBriefState }) {
   );
 }
 
-function StepCard({ n, title, children }: { n: string; title: string; children: ReactNode }) {
+function ProcessStep({ n, title, children }: { n: string; title: string; children: ReactNode }) {
   return (
     <MobileCard className="p-4">
       <div className="flex gap-3">
@@ -281,6 +288,27 @@ function StepCard({ n, title, children }: { n: string; title: string; children: 
           <div className="mt-1 text-[12px] leading-6 text-[#cfe0f4]">{children}</div>
         </div>
       </div>
+    </MobileCard>
+  );
+}
+
+function ProductExplanation() {
+  return (
+    <MobileCard tone="gold">
+      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#f5d386]">
+        What the product is
+      </div>
+      <p className="mt-3 text-[13px] font-semibold leading-6 text-[#eef7ff]">
+        Urd Atlas takes public raw blockchain datasets from AWS, ingests them into
+        a daily pipeline, and computes descriptive network-state reference data.
+      </p>
+      <p className="mt-3 text-[12px] leading-6 text-[#cfe0f4]">
+        The output is published JSON: <strong>Gold</strong> for measurements,{" "}
+        <strong>Derived</strong> for trend context, <strong>Meta</strong> for regime
+        and confidence, and <strong>Briefs</strong> for readable summaries. You can read
+        the files directly for network interpretation or join them into your own
+        existing pipeline by chain and date.
+      </p>
     </MobileCard>
   );
 }
@@ -298,23 +326,23 @@ export default async function MobileOverviewPage() {
   return (
     <MobilePage
       active="overview"
-      eyebrow="Mobile 2.0"
-      title={<>A compact version of the Urd Atlas landing.</>}
+      eyebrow="Urd Atlas"
+      title={<>Daily network-state JSON for BTC, ETH, ARB and BASE.</>}
       subtitle={
         <>
-          Daily network reference data for BTC, ETH, ARB and BASE: Gold observations,
-          Derived trends, Meta regime labels, and Briefs summaries. No price data,
-          no forecasts, no recommendations.
+          Published reference data for interpreting blockchain network conditions.
+          No price data, no forecasts, no recommendations.
         </>
       }
+      showTopMenu={false}
       actions={
         <div className="grid grid-cols-2 gap-2">
-          <MobilePrimaryLink href="#states">Latest states</MobilePrimaryLink>
+          <MobilePrimaryLink href="#product">What it is</MobilePrimaryLink>
           <Link
-            href="/mobile/methodology"
+            href="#states"
             className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/14 bg-white/[0.075] px-4 text-[13px] font-black text-white active:scale-[0.99]"
           >
-            Methodology
+            Latest states
           </Link>
         </div>
       }
@@ -327,6 +355,10 @@ export default async function MobileOverviewPage() {
         </div>
       </MobileSection>
 
+      <MobileSection id="product">
+        <ProductExplanation />
+      </MobileSection>
+
       <MobileSection id="states" eyebrow="Latest states" title="One current regime per chain.">
         <div className="space-y-3">
           {states.map((state) => (
@@ -336,6 +368,10 @@ export default async function MobileOverviewPage() {
       </MobileSection>
 
       <MobileSection id="briefs" eyebrow="Briefs" title="Readable context from the same Meta evidence.">
+        <div className="mb-2 flex items-center justify-between gap-3 text-[11px] font-semibold text-[#9eb4cf]">
+          <span>Swipe sideways to read all chains.</span>
+          <span className="text-[#f5d386]">BTC · ETH · ARB · BASE →</span>
+        </div>
         <div className="flex snap-x gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {briefs.map((brief) => (
             <div key={brief.chain} className="min-w-[86%] snap-center">
@@ -345,20 +381,24 @@ export default async function MobileOverviewPage() {
         </div>
       </MobileSection>
 
-      <MobileSection eyebrow="How it works" title="From public chain activity to published JSON.">
+      <MobileSection eyebrow="How it works" title="From AWS raw data to published files.">
         <div className="space-y-3">
-          <StepCard n="01" title="Public chain activity">
-            The input is network behavior: transactions, fees, block timing, utilization and
-            activity breadth. Price, news and recommendations are excluded.
-          </StepCard>
-          <StepCard n="02" title="Gold and Derived">
-            Gold records daily measurements. Derived adds deterministic trend context such
-            as rolling averages and moving windows.
-          </StepCard>
-          <StepCard n="03" title="Meta and Briefs">
-            Meta classifies the regime and confidence. Briefs turn the latest Meta context
-            into readable JSON summaries for direct use.
-          </StepCard>
+          <ProcessStep n="01" title="Ingest public raw data">
+            Public blockchain datasets are read into the internal pipeline. Raw source
+            rows are not redistributed.
+          </ProcessStep>
+          <ProcessStep n="02" title="Compute daily network features">
+            The pipeline aggregates activity, fee pressure, block timing, utilization,
+            and other chain-specific evidence into daily measurements.
+          </ProcessStep>
+          <ProcessStep n="03" title="Publish JSON layers">
+            Gold records measurements, Derived adds trend context, Meta publishes regime
+            and confidence, and Briefs summarize the latest state for direct reading.
+          </ProcessStep>
+          <ProcessStep n="04" title="Use it directly or join it">
+            Read the JSON as a standalone network-state product, or join it to your own
+            data on <strong>chain + date</strong> as an external regime/context layer.
+          </ProcessStep>
         </div>
       </MobileSection>
 
@@ -374,19 +414,19 @@ export default async function MobileOverviewPage() {
             </code>
           </div>
           <p className="mt-3 text-[11px] leading-5 text-[#9eb4cf]">
-            Bitcoin is not penalized for Ethereum-only fields. L2 freshness is judged against
-            L2 policy. Weak evidence can still publish UNKNOWN/DEGRADED.
+            Bitcoin is not penalized for Ethereum-only fields. L2 freshness is judged
+            against L2 policy. Weak evidence can still publish UNKNOWN/DEGRADED.
           </p>
         </MobileCard>
       </MobileSection>
 
-      <MobileSection eyebrow="Mobile routes" title="Every link stays in the mobile surface.">
+      <MobileSection eyebrow="Continue" title="Go deeper when you need it.">
         <div className="grid gap-2">
           <Link href="/mobile/api-docs" className="rounded-2xl border border-white/12 bg-white/[0.06] p-4 text-[13px] font-black text-white">
             JSON / API reference →
           </Link>
           <Link href="/mobile/methodology" className="rounded-2xl border border-white/12 bg-white/[0.06] p-4 text-[13px] font-black text-white">
-            Mobile methodology →
+            Methodology →
           </Link>
           <Link href="/mobile/track-record" className="rounded-2xl border border-white/12 bg-white/[0.06] p-4 text-[13px] font-black text-white">
             Track record →
@@ -394,6 +434,16 @@ export default async function MobileOverviewPage() {
           <Link href="/mobile/plans" className="rounded-2xl border border-white/12 bg-white/[0.06] p-4 text-[13px] font-black text-white">
             Plans →
           </Link>
+        </div>
+      </MobileSection>
+
+      <MobileSection>
+        <div className="rounded-2xl border border-white/10 bg-black/[0.10] px-4 py-3 text-center text-[11px] leading-5 text-[#9eb4cf]">
+          Simplified mobile view. For the full desktop experience, open{" "}
+          <Link href="/" className="font-black text-[#f5d386] underline decoration-[#c49230]/35 underline-offset-4">
+            urdatlas.com
+          </Link>{" "}
+          on a larger screen.
         </div>
       </MobileSection>
     </MobilePage>
