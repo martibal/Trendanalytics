@@ -602,6 +602,73 @@ export default function UrdAtlasVFinalLandingClient({
 
   return (
     <main className="ua-vf">
+      <style data-ua-hero-kpis dangerouslySetInnerHTML={{ __html: `
+        .ua-vf-landing-super-title {
+          margin-bottom: 26px !important;
+          color: var(--gold) !important;
+        }
+
+        .ua-vf-hero-kpis {
+          width: min(100%, 1120px);
+          margin: 0 auto 66px;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          border-top: 1px solid rgba(196, 146, 48, 0.30);
+          border-bottom: 1px solid rgba(196, 146, 48, 0.30);
+          background:
+            linear-gradient(90deg, transparent, rgba(196, 146, 48, 0.055), transparent),
+            rgba(8, 15, 26, 0.16);
+        }
+
+        .ua-vf-hero-kpi {
+          min-height: 78px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 8px;
+          padding: 16px 22px;
+          border-left: 1px solid rgba(196, 146, 48, 0.22);
+          text-align: center;
+        }
+
+        .ua-vf-hero-kpi:first-child {
+          border-left: 0;
+        }
+
+        .ua-vf-hero-kpi strong {
+          color: var(--gold);
+          font-family: var(--serif);
+          font-size: 24px;
+          font-weight: 400;
+          line-height: 1;
+          letter-spacing: -0.025em;
+        }
+
+        .ua-vf-hero-kpi span {
+          color: rgba(196, 146, 48, 0.76);
+          font-family: var(--mono);
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 0.08em;
+          line-height: 1.25;
+          text-transform: lowercase;
+        }
+
+        @media (max-width: 900px) {
+          .ua-vf-hero-kpis {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-bottom: 38px;
+          }
+
+          .ua-vf-hero-kpi:nth-child(odd) {
+            border-left: 0;
+          }
+
+          .ua-vf-hero-kpi:nth-child(n + 3) {
+            border-top: 1px solid rgba(196, 146, 48, 0.20);
+          }
+        }
+      ` }} />
       <style dangerouslySetInnerHTML={{ __html: `
         .ua-vf-tour-hero-link {
           display: inline-flex;
@@ -646,7 +713,7 @@ export default function UrdAtlasVFinalLandingClient({
           content: "";
           display: block;
           width: min(100%, 1120px);
-          height: 7px;
+          height: 3px;
           margin: 34px auto 0;
           border-radius: 999px;
           background:
@@ -816,11 +883,28 @@ export default function UrdAtlasVFinalLandingClient({
       <section className="ua-vf-hero" id="top">
         <div className="ua-vf-shell">
           <div className="ua-vf-landing-super-title">Urd Atlas - Daily network intelligence for Bitcoin, Ethereum, Arbitrum and Base</div>
+        {/* ── HERO KPIS ── */}
+        <div className="ua-vf-hero-kpis" aria-label="Urd Atlas product facts">
+          <div className="ua-vf-hero-kpi">
+            <strong>{pipelineDaysDisplay}</strong>
+            <span>published pipeline days</span>
+          </div>
+          <div className="ua-vf-hero-kpi">
+            <strong>4</strong>
+            <span>chains covered</span>
+          </div>
+          <div className="ua-vf-hero-kpi">
+            <strong>0</strong>
+            <span>price fields</span>
+          </div>
+          <div className="ua-vf-hero-kpi">
+            <strong>Daily</strong>
+            <span>not intraday</span>
+          </div>
         </div>
-        <div className="ua-vf-shell ua-vf-hero-title-wrap ua-vf-reveal is-visible">
-</div>
-
-        <div className="ua-vf-shell ua-vf-hero-grid ua-vf-hero-grid-balanced" style={{ alignItems: "stretch" }}>
+        {/* ── /HERO KPIS ── */}
+        </div>
+<div className="ua-vf-shell ua-vf-hero-grid ua-vf-hero-grid-balanced" style={{ alignItems: "stretch" }}>
           <div className="ua-vf-hero-copy ua-vf-reveal is-visible">
             <h2 className="ua-vf-h1 ua-vf-hero-question">
               How busy has the blockchain network been <em>lately?</em>
@@ -1080,33 +1164,6 @@ export default function UrdAtlasVFinalLandingClient({
           </a>
         </div>
       </nav>
-
-      {/* ── KPIs ── */}
-      <section className="ua-vf-kpis">
-        <div className="ua-vf-shell ua-vf-kpi-grid">
-          <div className="ua-vf-kpi">
-            <strong>{pipelineDaysDisplay}</strong>
-            <span>published pipeline days</span>
-          </div>
-          <div className="ua-vf-kpi">
-            <strong>4</strong>
-            <span>chains covered</span>
-          </div>
-          <div className="ua-vf-kpi">
-            <strong>v1</strong>
-            <span>methodology version</span>
-          </div>
-          <div className="ua-vf-kpi">
-            <strong>0</strong>
-            <span>price fields</span>
-          </div>
-          <div className="ua-vf-kpi">
-            <strong>Daily</strong>
-            <span>not intraday</span>
-          </div>
-        </div>
-      </section>
-
       {/* ── USE PATH ── */}
       <section className="ua-vf-section">
         <div className="ua-vf-shell">
@@ -1489,6 +1546,7 @@ export default function UrdAtlasVFinalLandingClient({
     </main>
   );
 }
+
 
 
 
