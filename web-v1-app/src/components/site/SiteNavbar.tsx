@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -92,7 +92,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
       <div className="progress" style={{ width: `${progress}%` }} />
       <div className="ua-site-nav-inner">
         <Link href="/" onClick={closeMenus} className="ua-site-brand" aria-label="Urd Atlas home">
-          <span className="ua-site-brand-mark" aria-hidden="true">ᚢ</span>
+          <img className="ua-site-brand-mark" src="/web-bilder/ygg-transparent.png" alt="" aria-hidden="true" />
           <span>URD ATLAS</span>
         </Link>
 
@@ -137,3 +137,4 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
 export default function SiteNavbar() {
   return <SiteNavbarInner pathname={usePathname()} />;
 }
+
