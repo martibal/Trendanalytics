@@ -1,4 +1,4 @@
-﻿// src/app/api/v1/checkout/route.ts
+// src/app/api/v1/checkout/route.ts
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import Stripe from "stripe";
@@ -76,6 +76,29 @@ function isProductionCheckoutRequest(request: Request): boolean {
   );
 }
 
+function publicCheckoutErrorDetail(status: number, code: string, detail?: string): string | null {
+  if (process.env.NODE_ENV !== "production" && process.env.VERCEL_ENV !== "production") {
+    return detail ?? null;
+  }
+
+  if (status === 400 || code === "invalid_plan") {
+    return "invalid_plan";
+  }
+
+  if (status === 401 || code === "auth_required") {
+    return "auth_required";
+  }
+
+  if (status === 503 || code === "checkout_not_configured") {
+    return "checkout_not_configured";
+  }
+
+  if (status === 500 || code === "account_error" || code === "stripe_error") {
+    return "server_error";
+  }
+
+  return "server_error";
+}
 function jsonError(
   status: number,
   code:
@@ -91,7 +114,7 @@ function jsonError(
     {
       code,
       message,
-      detail: detail ?? null,
+      detail: publicCheckoutErrorDetail(status, code, detail),
     },
     { status }
   );
@@ -455,5 +478,3 @@ export async function POST(request: Request) {
   }
 return handleCheckout(request);
 }
-
-
