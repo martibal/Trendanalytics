@@ -1,4 +1,4 @@
-﻿// src/app/api/v1/checkout/portal/route.ts
+// src/app/api/v1/checkout/portal/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
@@ -21,6 +21,25 @@ type PortalErrorCode =
   | "subscription_not_connected"
   | "server_error";
 
+function publicPortalErrorDetail(status: number, code: string, detail?: string): string | null {
+  if (process.env.NODE_ENV !== "production" && process.env.VERCEL_ENV !== "production") {
+    return detail ?? null;
+  }
+
+  if (status === 401 || code === "unauthenticated") {
+    return "unauthenticated";
+  }
+
+  if (status === 409 || code === "subscription_not_connected") {
+    return "subscription_not_connected";
+  }
+
+  if (status === 503 || code === "portal_not_configured") {
+    return "portal_not_configured";
+  }
+
+  return "server_error";
+}
 function jsonError(
   status: number,
   code: PortalErrorCode,
@@ -31,7 +50,7 @@ function jsonError(
     {
       code,
       message,
-      detail: detail ?? null,
+      detail: publicPortalErrorDetail(status, code, detail),
     },
     { status }
   );
@@ -119,5 +138,3 @@ const stripe = getStripeClient();
     );
   }
 }
-
-
