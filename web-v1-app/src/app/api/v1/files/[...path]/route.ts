@@ -1,4 +1,4 @@
-﻿// src/app/api/v1/files/[...path]/route.ts
+// src/app/api/v1/files/[...path]/route.ts
 import path from "path";
 import { NextResponse } from "next/server";
 
@@ -387,7 +387,6 @@ export async function GET(request: Request, context: RouteContext) {
         "Content-Type": file.contentType,
         "Content-Length": String(file.contentLength),
         "Cache-Control": "private, no-store",
-        "X-Account-Id": authResult.accountId,
         "X-Entitlement-Tier": authResult.entitlement.tier,
         "X-Entitlement-Window": inferredWindow,
         ...(file.etag ? { ETag: file.etag } : {}),
@@ -422,6 +421,3 @@ export async function GET(request: Request, context: RouteContext) {
     );
   }
 }
-
-
-
