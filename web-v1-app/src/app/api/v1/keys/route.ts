@@ -1,4 +1,4 @@
-﻿// src/app/api/v1/keys/route.ts
+// src/app/api/v1/keys/route.ts
 import crypto from "node:crypto";
 
 import { auth } from "@clerk/nextjs/server";
@@ -16,6 +16,33 @@ type RevokeKeyRequestBody = {
   keyId?: string;
 };
 
+function publicKeyErrorDetail(status: number, code: string, detail?: string): string | null {
+  if (process.env.NODE_ENV !== "production" && process.env.VERCEL_ENV !== "production") {
+    return detail ?? null;
+  }
+
+  if (status === 401 || code === "unauthenticated") {
+    return "unauthenticated";
+  }
+
+  if (status === 400 || code === "invalid_request") {
+    return "invalid_request";
+  }
+
+  if (status === 403 || code === "inactive_subscription") {
+    return "forbidden";
+  }
+
+  if (status === 404 || code === "account_not_found" || code === "not_found") {
+    return "not_found";
+  }
+
+  if (status === 409 || code === "key_limit_reached") {
+    return "key_limit_reached";
+  }
+
+  return "server_error";
+}
 function jsonError(
   status: number,
   code:
@@ -33,7 +60,7 @@ function jsonError(
     {
       code,
       message,
-      detail: detail ?? null,
+      detail: publicKeyErrorDetail(status, code, detail),
     },
     { status }
   );
@@ -301,5 +328,3 @@ try {
     );
   }
 }
-
-
