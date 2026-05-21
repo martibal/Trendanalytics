@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 import { validateSameOriginRequest } from "@/lib/security/origin";
+import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
 type CreateKeyRequestBody = {
   label?: string | null;
 };
@@ -127,7 +128,14 @@ export async function POST(request: Request) {
   if (!originGuard.ok) {
     return originGuard.response;
   }
-try {
+
+  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "keys-api");
+
+  if (!preAuthRateLimit.ok) {
+    return preAuthRateLimit.response;
+  }
+
+  try {
     const { userId, account } = await getAuthenticatedAccount();
 
     if (!userId) {
@@ -238,7 +246,14 @@ export async function DELETE(request: Request) {
   if (!originGuard.ok) {
     return originGuard.response;
   }
-try {
+
+  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "keys-api");
+
+  if (!preAuthRateLimit.ok) {
+    return preAuthRateLimit.response;
+  }
+
+  try {
     const { userId, account } = await getAuthenticatedAccount();
 
     if (!userId) {
