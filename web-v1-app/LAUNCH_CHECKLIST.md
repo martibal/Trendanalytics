@@ -1,4 +1,4 @@
-# Launch Checklist — Urd Atlas
+﻿# Launch Checklist — Urd Atlas
 
 Alle trinn må være på plass før `npm run build && deploy`.
 
@@ -17,8 +17,8 @@ Logg inn på [dashboard.stripe.com](https://dashboard.stripe.com) og opprett:
 Kopier **Price ID** (starter med `price_`) inn i `.env`:
 
 ```env
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_SECRET_KEY=<stripe-live-secret-key>
+STRIPE_WEBHOOK_SECRET=<stripe-webhook-signing-secret>
 STRIPE_PRICE_BASIC=price_...
 STRIPE_PRICE_PRO=price_...
 STRIPE_PRICE_HISTORY_ADDON=price_...
@@ -48,7 +48,7 @@ Logg inn på [dashboard.clerk.com](https://dashboard.clerk.com):
 
 ```env
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
-CLERK_SECRET_KEY=sk_live_...
+CLERK_SECRET_KEY=<clerk-live-secret-key>
 ```
 
 3. I Clerk Dashboard → Redirects:
@@ -63,8 +63,8 @@ CLERK_SECRET_KEY=sk_live_...
 2. Kopier connection strings til `.env`:
 
 ```env
-DATABASE_URL=postgresql://...?pgbouncer=true
-DIRECT_URL=postgresql://...
+DATABASE_URL=<production-transaction-pooler-url>
+DIRECT_URL=<production-direct-database-url>
 ```
 
 3. Kjør migrasjoner:
@@ -81,7 +81,7 @@ S3_BUCKET=urdatlas-data
 S3_REGION=eu-west-1
 S3_PREFIX=published/v1
 AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
+AWS_SECRET_ACCESS_KEY=<aws-secret-access-key-if-used>
 ```
 
 ## 6. Upstash Redis — rate limiting
@@ -90,7 +90,7 @@ Opprett en database på [upstash.com](https://upstash.com):
 
 ```env
 UPSTASH_REDIS_REST_URL=https://...
-UPSTASH_REDIS_REST_TOKEN=...
+UPSTASH_REDIS_REST_TOKEN=<upstash-rest-token>
 ```
 
 ## 7. App miljø
@@ -200,3 +200,4 @@ Dette er det som styrer hvilken chain en Basic-subscriber kan hente JSON for.
 3. Bruk Stripe test-kort `4242 4242 4242 4242`
 4. Returnerer til `/dashboard?checkout=success` → grønn banner
 5. Refresh → ser aktiv plan, ETH som entitled chain, kan opprette API-nøkkel
+
