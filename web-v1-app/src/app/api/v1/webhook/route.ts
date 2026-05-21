@@ -19,6 +19,25 @@ function getStripeClient(): Stripe | null {
   return new Stripe(secretKey);
 }
 
+function publicWebhookErrorDetail(
+  status: number,
+  code: "webhook_not_configured" | "invalid_signature" | "server_error",
+  detail?: string
+): string | null {
+  if (process.env.NODE_ENV !== "production" && process.env.VERCEL_ENV !== "production") {
+    return detail ?? null;
+  }
+
+  if (status === 400 || code === "invalid_signature") {
+    return "invalid_signature";
+  }
+
+  if (status === 503 || code === "webhook_not_configured") {
+    return "webhook_not_configured";
+  }
+
+  return "server_error";
+}
 function jsonError(
   status: number,
   code: "webhook_not_configured" | "invalid_signature" | "server_error",
@@ -29,7 +48,7 @@ function jsonError(
     {
       code,
       message,
-      detail: detail ?? null,
+      detail: publicWebhookErrorDetail(status, code, detail),
     },
     { status }
   );
