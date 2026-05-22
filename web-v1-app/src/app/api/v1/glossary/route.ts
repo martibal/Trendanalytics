@@ -1,11 +1,18 @@
 // src/app/api/v1/glossary/route.ts
 import { NextResponse } from "next/server";
+import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
 import { readDatasetManifest } from "@/lib/dataset";
 import { loadGlossaryApiEntries } from "@/lib/glossary/entries";
 
 export const revalidate = 300;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "public-read-api");
+
+  if (!preAuthRateLimit.ok) {
+    return preAuthRateLimit.response;
+  }
+
   const dataset = await readDatasetManifest();
 
   const entries = await loadGlossaryApiEntries();
