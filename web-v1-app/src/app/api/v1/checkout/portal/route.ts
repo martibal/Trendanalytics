@@ -5,6 +5,7 @@ import Stripe from "stripe";
 import { getCurrentAccountView } from "@/lib/auth/account";
 
 import { validateSameOriginRequest } from "@/lib/security/origin";
+import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
 function getStripeClient(): Stripe | null {
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
 
@@ -66,7 +67,14 @@ export async function POST(request: NextRequest) {
   if (!originGuard.ok) {
     return originGuard.response;
   }
-const stripe = getStripeClient();
+
+  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "portal-api");
+
+  if (!preAuthRateLimit.ok) {
+    return preAuthRateLimit.response;
+  }
+
+  const stripe = getStripeClient();
 
   if (!stripe) {
     return jsonError(
