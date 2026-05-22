@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest } from "@/lib/dataset";
-import { currentDataSource, readStorageObject } from "@/lib/storage";
+import { readStorageObject } from "@/lib/storage";
 
 export const revalidate = 300;
 
@@ -148,7 +148,6 @@ export async function GET() {
     {
       ok: true,
       generated_at_utc: new Date().toISOString(),
-      data_source: currentDataSource(),
       dataset: dataset
         ? {
             version: dataset.version ?? null,

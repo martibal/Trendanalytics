@@ -1,7 +1,6 @@
 // src/app/api/v1/glossary/route.ts
 import { NextResponse } from "next/server";
 import { readDatasetManifest } from "@/lib/dataset";
-import { currentDataSource } from "@/lib/storage";
 import { loadGlossaryApiEntries } from "@/lib/glossary/entries";
 
 export const revalidate = 300;
@@ -15,7 +14,6 @@ export async function GET() {
     {
       ok: true,
       generated_at_utc: new Date().toISOString(),
-      data_source: currentDataSource(),
       dataset: dataset
         ? {
             version: dataset.version ?? null,
