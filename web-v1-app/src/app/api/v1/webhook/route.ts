@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { ApiKeyStatus, SubscriptionStatus, SubscriptionTier } from "@prisma/client";
 
 import { db } from "@/lib/db";
+import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
 
 type StripeSubscriptionWithOptionalCurrentPeriodEnd = Stripe.Subscription & {
   current_period_end?: number | null;
@@ -303,6 +304,12 @@ async function syncSubscriptionFromStripe(
 }
 
 export async function POST(request: Request) {
+  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "stripe-webhook");
+
+  if (!preAuthRateLimit.ok) {
+    return preAuthRateLimit.response;
+  }
+
   const stripe = getStripeClient();
 
   if (!stripe) {
