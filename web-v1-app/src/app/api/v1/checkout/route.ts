@@ -7,6 +7,7 @@ import type { ChainId } from "@/config/chains";
 import { db } from "@/lib/db";
 
 import { validateSameOriginRequest } from "@/lib/security/origin";
+import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
 type CheckoutPlan = "basic" | "pro";
 type StripeKeyMode = "missing" | "test" | "live" | "restricted_test" | "restricted_live" | "unknown";
 
@@ -467,6 +468,12 @@ export async function GET(request: Request) {
     return navigationGuard.response;
   }
 
+  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "checkout-api");
+
+  if (!preAuthRateLimit.ok) {
+    return preAuthRateLimit.response;
+  }
+
   return handleCheckout(request);
 }
 
@@ -475,6 +482,12 @@ export async function POST(request: Request) {
 
   if (!originGuard.ok) {
     return originGuard.response;
+  }
+
+  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "checkout-api");
+
+  if (!preAuthRateLimit.ok) {
+    return preAuthRateLimit.response;
   }
 return handleCheckout(request);
 }
