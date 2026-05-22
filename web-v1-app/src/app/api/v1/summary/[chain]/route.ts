@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest } from "@/lib/dataset";
 import { readStorageObject } from "@/lib/storage";
+import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
 
 export const revalidate = 300;
 
@@ -144,7 +145,13 @@ function jsonError(status: number, code: string, message: string, detail?: strin
   );
 }
 
-export async function GET(_: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
+  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "public-read-api");
+
+  if (!preAuthRateLimit.ok) {
+    return preAuthRateLimit.response;
+  }
+
   const { chain } = await context.params;
 
   if (!isChainId(chain)) {
