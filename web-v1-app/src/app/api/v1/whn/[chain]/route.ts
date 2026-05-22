@@ -36,7 +36,6 @@ type MetaLatest = {
     label?: string;
     asof_date?: string;
     window_days?: number;
-    determinism_hash?: string;
     drivers?: Driver[];
   };
   profile?: {
@@ -115,7 +114,7 @@ export async function GET(_: Request, context: RouteContext) {
   const meta = await readPublishedJson<MetaLatest>(metaPath);
 
   if (!meta) {
-    return jsonError(404, "not_found", "Published chain WHN context not available.", metaPath);
+    return jsonError(404, "not_found", "Published chain WHN context not available.", "not_found");
   }
 
   const drivers = Array.isArray(meta.regime?.drivers) ? sortDrivers(meta.regime.drivers) : [];
@@ -161,7 +160,6 @@ export async function GET(_: Request, context: RouteContext) {
             ? meta.confidence.lag_days_vs_utc_today
             : null,
         window_days: meta.regime?.window_days ?? null,
-        determinism_hash: meta.regime?.determinism_hash ?? null,
         profile_note: meta.profile?.note ?? null,
       },
       whats_happening_now: topDrivers.map((driver, index) => ({
@@ -177,17 +175,16 @@ export async function GET(_: Request, context: RouteContext) {
           typeof driver.momentum_7d_vs_30d === "number"
             ? driver.momentum_7d_vs_30d
             : null,
-        current:
-          typeof driver.current === "number" ? driver.current : null,
       })),
       traceability: {
-        source_path: metaPath,
-        source_field: "regime.drivers[]",
         canonical_contract: {
           meta_latest: true,
           source_of_truth: "published meta latest",
           sorting_rule: "abs(z_robust) descending",
           max_rows: 5,
+          public_current_values_exposed: false,
+          public_determinism_hash_exposed: false,
+          subscriber_file_api_required_for_full_artifacts: true,
           runtime_repair: false,
         },
       },
