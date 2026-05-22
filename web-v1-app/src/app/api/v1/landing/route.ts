@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest } from "@/lib/dataset";
 import { readStorageObject } from "@/lib/storage";
+import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
 
 export const revalidate = 300;
 
@@ -99,7 +100,13 @@ function confidenceBand(value?: number | null): "Good" | "Caution" | "Degraded" 
   return "Degraded";
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "public-read-api");
+
+  if (!preAuthRateLimit.ok) {
+    return preAuthRateLimit.response;
+  }
+
   const dataset = await readDatasetManifest();
 
   const chains = await Promise.all(
