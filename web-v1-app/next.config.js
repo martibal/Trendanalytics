@@ -1,4 +1,4 @@
-﻿// next.config.js
+// next.config.js
 
 const SECURITY_HEADERS = [
   {
@@ -58,6 +58,9 @@ const nextConfig = {
     root: __dirname,
   },
   allowedDevOrigins: ["localhost:3000", "127.0.0.1:3000"],
+  outputFileTracingIncludes: {
+    "/*": ["../data/published/v1/**/*"],
+  },
   async headers() {
     return [
       {
