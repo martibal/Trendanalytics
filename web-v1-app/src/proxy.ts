@@ -73,6 +73,22 @@ export default clerkMiddleware((_auth, req) => {
   const url      = req.nextUrl.clone();
   const pathname = url.pathname;
   const view     = url.searchParams.get("view");
+  if (isBlockedDirectArtifactPath(pathname)) {
+    return NextResponse.json(
+      {
+        code: "not_found",
+        message: "File path does not exist.",
+        detail: "not_found",
+      },
+      {
+        status: 404,
+        headers: {
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex, nofollow, noarchive",
+        },
+      }
+    );
+  }
 
   // ?view=desktop → sett cookie, fjern param, bli på samme side
   if (view === "desktop") {
