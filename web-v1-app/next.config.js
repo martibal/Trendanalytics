@@ -1,5 +1,7 @@
 // next.config.js
 
+const path = require("path");
+
 const SECURITY_HEADERS = [
   {
     key: "Strict-Transport-Security",
@@ -53,9 +55,12 @@ const API_SECURITY_HEADERS = [
   },
 ];
 
+const repoRoot = path.join(__dirname, "..");
+
 const nextConfig = {
+  outputFileTracingRoot: repoRoot,
   turbopack: {
-    root: __dirname,
+    root: repoRoot,
   },
   allowedDevOrigins: ["localhost:3000", "127.0.0.1:3000"],
   outputFileTracingIncludes: {
