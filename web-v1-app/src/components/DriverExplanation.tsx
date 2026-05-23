@@ -134,7 +134,7 @@ export default function DriverExplanation({
               </>
             )
           }
-          sourcePath="/public/data/published/v1/meta/<chain>/latest.json"
+          sourcePath="/api/v1/files/meta/<chain>/latest.json"
           fieldPath="regime.drivers[]"
         />
 
@@ -142,7 +142,7 @@ export default function DriverExplanation({
           <div className="font-medium text-foreground">Traceability</div>
           <ul className="mt-2 list-disc pl-5">
             <li>
-              Source: <InlineCode>/public/data/published/v1/meta/&lt;chain&gt;/latest.json</InlineCode>
+              Source: <InlineCode>/api/v1/files/meta/&lt;chain&gt;/latest.json</InlineCode>
             </li>
             <li>
               Field: <InlineCode>regime.drivers[]</InlineCode>

@@ -13,7 +13,7 @@ export type ChainPrimer = {
 export type ChainConfig = {
   /**
    * Canonical chain id used in routes and published JSON paths:
-   * /public/data/published/v1/<genre>/<chain>/...
+   * /api/v1/files/<genre>/<chain>/...
    */
   id: ChainId;
 

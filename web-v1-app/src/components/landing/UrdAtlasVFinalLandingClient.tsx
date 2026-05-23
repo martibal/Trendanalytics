@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -66,7 +66,7 @@ function getPublishedAtDisplay(manifest: DatasetManifest | null): string {
 
 // ---------------------------------------------------------------------------
 // JSON inspector options — reads the actual published latest.json files from
-// /public/data/published/v1, not simplified marketing examples.
+// /api/v1/files, not simplified marketing examples.
 // ---------------------------------------------------------------------------
 
 type JsonChain = "bitcoin" | "ethereum" | "arbitrum" | "base";
@@ -1554,9 +1554,3 @@ export default function UrdAtlasVFinalLandingClient({
     </main>
   );
 }
-
-
-
-
-
-

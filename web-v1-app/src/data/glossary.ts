@@ -32,7 +32,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Regime label",
     category: "regime",
     units: "category",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "status.label",
     description: {
       basic:
@@ -46,7 +46,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "STABLE",
     category: "regime",
     units: "regime state",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "status.label",
     description: {
       basic:
@@ -60,7 +60,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "HEATING",
     category: "regime",
     units: "regime state",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "status.label",
     description: {
       basic:
@@ -74,7 +74,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "CONGESTED",
     category: "regime",
     units: "regime state",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "status.label",
     description: {
       basic:
@@ -88,7 +88,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "CHEAP",
     category: "regime",
     units: "regime state",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "status.label",
     description: {
       basic:
@@ -102,7 +102,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "UNKNOWN/DEGRADED",
     category: "regime",
     units: "regime state",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "status.label",
     description: {
       basic:
@@ -116,7 +116,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Regime one-liner",
     category: "regime",
     units: "text",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "status.one_liner",
     description: {
       basic:
@@ -130,7 +130,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Regime color",
     category: "regime",
     units: "UI token",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "status.color",
     description: {
       basic:
@@ -144,7 +144,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Confidence score",
     category: "confidence",
     units: "0..1",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.confidence_score",
     description: {
       basic:
@@ -158,7 +158,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Data quality score",
     category: "confidence",
     units: "0..1",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.data_quality_score",
     description: {
       basic:
@@ -172,7 +172,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Label confidence score",
     category: "confidence",
     units: "0..1",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.label_confidence_score",
     description: {
       basic:
@@ -186,7 +186,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Current row coverage",
     category: "confidence",
     units: "0..1",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.components.current_row_coverage",
     description: {
       basic:
@@ -200,7 +200,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Recent metric coverage",
     category: "confidence",
     units: "0..1",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.components.recent_metric_coverage",
     description: {
       basic:
@@ -214,7 +214,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Recent density",
     category: "confidence",
     units: "0..1",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.components.recent_density",
     description: {
       basic:
@@ -228,7 +228,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "History depth",
     category: "confidence",
     units: "0..1",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.components.history_depth",
     description: {
       basic:
@@ -242,7 +242,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Freshness as-of",
     category: "confidence",
     units: "0..1",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.components.freshness_asof",
     description: {
       basic:
@@ -256,7 +256,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "As-of lag days",
     category: "freshness",
     units: "days",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.lag_days_vs_asof_date",
     description: {
       basic:
@@ -270,7 +270,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Lag days vs today",
     category: "freshness",
     units: "days",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.lag_days_vs_utc_today",
     description: {
       basic:
@@ -284,7 +284,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Confidence missing flag",
     category: "confidence",
     units: "boolean",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.missing",
     description: {
       basic:
@@ -298,7 +298,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Confidence semantics",
     category: "confidence",
     units: "text",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "confidence.semantics",
     description: {
       basic:
@@ -312,7 +312,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Demand score",
     category: "scorecard",
     units: "0..100",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "scorecard.dimensions.demand.score",
     description: {
       basic:
@@ -326,7 +326,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Friction score",
     category: "scorecard",
     units: "0..100",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "scorecard.dimensions.friction.score",
     description: {
       basic:
@@ -340,7 +340,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Capacity score",
     category: "scorecard",
     units: "0..100",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "scorecard.dimensions.capacity.score",
     description: {
       basic:
@@ -354,7 +354,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Scorecard level",
     category: "scorecard",
     units: "category",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "scorecard.dimensions.<axis>.level",
     description: {
       basic:
@@ -368,7 +368,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Coverage factor",
     category: "scorecard",
     units: "0..1",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "scorecard.dimensions.<axis>.coverage_factor",
     description: {
       basic:
@@ -382,7 +382,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Effective confidence",
     category: "scorecard",
     units: "0..1",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "scorecard.dimensions.<axis>.effective_confidence",
     description: {
       basic:
@@ -396,7 +396,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Scorecard interpretation note",
     category: "scorecard",
     units: "text",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "scorecard.notes.interpretation",
     description: {
       basic:
@@ -410,7 +410,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Driver metric",
     category: "drivers",
     units: "metric key",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "regime.drivers[].metric",
     description: {
       basic:
@@ -424,7 +424,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Driver axis",
     category: "drivers",
     units: "category",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "regime.drivers[].axis",
     description: {
       basic:
@@ -438,7 +438,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Driver trend",
     category: "drivers",
     units: "category",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "regime.drivers[].trend",
     description: {
       basic:
@@ -452,7 +452,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Driver robust z-score",
     category: "drivers",
     units: "z-score",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "regime.drivers[].z_robust",
     description: {
       basic:
@@ -466,7 +466,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Driver 90d percentile",
     category: "drivers",
     units: "percentile",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "regime.drivers[].pct_90d",
     description: {
       basic:
@@ -480,7 +480,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Driver momentum (7d vs 30d)",
     category: "drivers",
     units: "delta",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "regime.drivers[].momentum_7d_vs_30d",
     description: {
       basic:
@@ -494,7 +494,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Driver current value",
     category: "drivers",
     units: "raw metric unit",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "regime.drivers[].current",
     description: {
       basic:
@@ -508,7 +508,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Daily transaction count",
     category: "drivers",
     units: "transactions per day",
-    sourcePath: "/public/data/published/v1/gold/<chain>/<date>.json",
+    sourcePath: "/api/v1/files/gold/<chain>/<date>.json",
     fieldPath: "tx_count_daily",
     description: {
       basic:
@@ -522,7 +522,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Unique active addresses",
     category: "drivers",
     units: "addresses per day",
-    sourcePath: "/public/data/published/v1/gold/<chain>/<date>.json",
+    sourcePath: "/api/v1/files/gold/<chain>/<date>.json",
     fieldPath: "unique_active_addresses",
     description: {
       basic:
@@ -536,7 +536,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Transactions per active address",
     category: "drivers",
     units: "transactions per address",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "scorecard.dimensions.demand.components.tx_per_user.current",
     description: {
       basic:
@@ -550,7 +550,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Median transaction fee",
     category: "drivers",
     units: "native units per transaction",
-    sourcePath: "/public/data/published/v1/gold/<chain>/<date>.json",
+    sourcePath: "/api/v1/files/gold/<chain>/<date>.json",
     fieldPath: "median_tx_fee_native",
     description: {
       basic:
@@ -564,7 +564,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Median transaction value",
     category: "drivers",
     units: "native units per transaction",
-    sourcePath: "/public/data/published/v1/gold/<chain>/<date>.json",
+    sourcePath: "/api/v1/files/gold/<chain>/<date>.json",
     fieldPath: "median_tx_value_native",
     description: {
       basic:
@@ -578,7 +578,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Fee burden proxy",
     category: "drivers",
     units: "ratio",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "scorecard.dimensions.friction.components.fee_burden_proxy.current",
     description: {
       basic:
@@ -592,7 +592,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Failed transaction rate",
     category: "drivers",
     units: "fraction or percent",
-    sourcePath: "/public/data/published/v1/gold/<chain>/<date>.json",
+    sourcePath: "/api/v1/files/gold/<chain>/<date>.json",
     fieldPath: "failed_tx_rate",
     description: {
       basic:
@@ -606,7 +606,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Gas utilization",
     category: "drivers",
     units: "percent",
-    sourcePath: "/public/data/published/v1/gold/<chain>/<date>.json",
+    sourcePath: "/api/v1/files/gold/<chain>/<date>.json",
     fieldPath: "gas_utilization_pct",
     description: {
       basic:
@@ -620,7 +620,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Average block time",
     category: "drivers",
     units: "seconds",
-    sourcePath: "/public/data/published/v1/gold/<chain>/<date>.json",
+    sourcePath: "/api/v1/files/gold/<chain>/<date>.json",
     fieldPath: "avg_block_time_sec",
     description: {
       basic:
@@ -634,7 +634,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Block time instability",
     category: "drivers",
     units: "derived instability signal",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "scorecard.dimensions.capacity.components.blocktime_instability.current",
     description: {
       basic:
@@ -648,7 +648,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Updated through",
     category: "freshness",
     units: "YYYY-MM-DD",
-    sourcePath: "/public/data/published/v1/meta/<chain>/latest.json",
+    sourcePath: "/api/v1/files/meta/<chain>/latest.json",
     fieldPath: "updated_through",
     description: {
       basic:
@@ -662,7 +662,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Dataset version",
     category: "metadata",
     units: "version string",
-    sourcePath: "/public/data/published/v1/dataset.json",
+    sourcePath: "/api/v1/files/dataset.json",
     fieldPath: "version",
     description: {
       basic:
@@ -676,7 +676,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Dataset published at",
     category: "metadata",
     units: "timestamp",
-    sourcePath: "/public/data/published/v1/dataset.json",
+    sourcePath: "/api/v1/files/dataset.json",
     fieldPath: "published_at",
     description: {
       basic:
@@ -690,7 +690,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "Methodology version",
     category: "metadata",
     units: "version string",
-    sourcePath: "/public/data/published/v1/dataset.json",
+    sourcePath: "/api/v1/files/dataset.json",
     fieldPath: "methodology_version",
     description: {
       basic:
@@ -704,7 +704,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "7-day moving average",
     category: "charts",
     units: "same as raw metric",
-    sourcePath: "/public/data/published/v1/derived/<chain>/<date>.json",
+    sourcePath: "/api/v1/files/derived/<chain>/<date>.json",
     fieldPath: "derived.metrics.<metric>__ma7",
     description: {
       basic:
@@ -718,7 +718,7 @@ export const GLOSSARY_ENTRIES: GlossaryEntry[] = [
     label: "30-day moving average",
     category: "charts",
     units: "same as raw metric",
-    sourcePath: "/public/data/published/v1/derived/<chain>/<date>.json",
+    sourcePath: "/api/v1/files/derived/<chain>/<date>.json",
     fieldPath: "derived.metrics.<metric>__ma30",
     description: {
       basic:
