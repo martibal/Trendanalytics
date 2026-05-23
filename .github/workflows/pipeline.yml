@@ -125,14 +125,14 @@ jobs:
         shell: pwsh
         run: |
           python pipeline/tools/validate_meta_methodology_safety.py --root .
-          python pipeline/tools/validate_meta_methodology_safety.py --root . --meta-root web-v1-app/public/data/published/v1/meta
+          python pipeline/tools/validate_meta_methodology_safety.py --root . --meta-root data/published/v1/meta
 
-          if (!(Test-Path "web-v1-app/public/data/published/v1/meta")) {
-            throw "Missing web-v1-app published META output."
+          if (!(Test-Path "data/published/v1/meta")) {
+            throw "Missing canonical published META output."
           }
 
-          if (!(Test-Path "web-v1-app/public/data/published/v1/briefs/site/latest.json")) {
-            throw "Missing Regime Briefs site bundle: web-v1-app/public/data/published/v1/briefs/site/latest.json"
+          if (!(Test-Path "data/published/v1/briefs/site/latest.json")) {
+            throw "Missing Regime Briefs site bundle: data/published/v1/briefs/site/latest.json"
           }
 
       - name: Push local published-data commit with remote sync
