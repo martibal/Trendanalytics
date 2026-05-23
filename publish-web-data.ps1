@@ -74,7 +74,7 @@ if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
     $SourceRoot = Join-Path $RepoRoot "data\published\v1"
 }
 if ([string]::IsNullOrWhiteSpace($TargetRoot)) {
-    $TargetRoot = Join-Path $WebAppRoot "public\data\published\v1"
+    $TargetRoot = Join-Path $WebAppRoot ".private-data\published\v1"
 }
 
 Ensure-PathExists -PathValue $RepoRoot -Label "Repo root"
@@ -99,7 +99,7 @@ if ($DryRun) {
     if (-not $SkipBuild) {
         Write-Host "cd `"$WebAppRoot`" ; npm run build"
     }
-    Write-Host "cd `"$RepoRoot`" ; git add sync-published-data.ps1 web-v1-app/public/data/published/v1"
+    Write-Host "cd `"$RepoRoot`" ; git add sync-published-data.ps1 web-v1-app/.private-data/published/v1"
     if (-not $SkipPush) {
         Write-Host "cd `"$RepoRoot`" ; git commit -m `"Update published data snapshot ...`""
         Write-Host "cd `"$RepoRoot`" ; git push origin $Branch"
@@ -129,11 +129,11 @@ else {
 
 Write-Step "Staging sync script and published data"
 Invoke-Native -WorkingDirectory $RepoRoot -FilePath "git" -Arguments @("add", "sync-published-data.ps1")
-Invoke-Native -WorkingDirectory $RepoRoot -FilePath "git" -Arguments @("add", "web-v1-app/public/data/published/v1")
+Invoke-Native -WorkingDirectory $RepoRoot -FilePath "git" -Arguments @("add", "web-v1-app/.private-data/published/v1")
 
 Push-Location $RepoRoot
 try {
-    $statusOutput = git status --short -- sync-published-data.ps1 web-v1-app/public/data/published/v1
+    $statusOutput = git status --short -- sync-published-data.ps1 web-v1-app/.private-data/published/v1
     $statusOutput = @($statusOutput | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
     if ($statusOutput.Count -eq 0) {
