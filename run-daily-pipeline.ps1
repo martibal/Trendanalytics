@@ -203,7 +203,7 @@ function Invoke-WebBriefsBuilderIfPresent {
 
     $webRoot = Join-Path $RepoRoot "web-v1-app"
     $briefBuilder = Join-Path $webRoot "scripts\build_briefs\build_all_briefs.py"
-    $publishedRoot = Join-Path $webRoot "public\data\published\v1"
+    $publishedRoot = Join-Path $RepoRoot "data\published\v1"
 
     if (-not (Test-Path -LiteralPath $webRoot)) {
         Write-Log "Web app folder not found, skipping web Regime Briefs builder: $webRoot"
@@ -218,7 +218,7 @@ function Invoke-WebBriefsBuilderIfPresent {
     Ensure-PathExists -PathValue $publishedRoot -Label "web-v1-app published data root"
 
     $python = Resolve-PythonExecutable
-    Write-Log "STEP 3A: Rebuild Regime Briefs in web-v1-app public data"
+    Write-Log "STEP 3A: Rebuild Regime Briefs in canonical published data"
     Invoke-Native -WorkingDirectory $webRoot -FilePath $python -Arguments @(
         $briefBuilder,
         "--root", $publishedRoot
@@ -229,20 +229,20 @@ function Validate-WebPublishedMetaIfPresent {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
     $validator = Join-Path $RepoRoot "pipeline\tools\validate_meta_methodology_safety.py"
-    $webMetaRoot = Join-Path $RepoRoot "web-v1-app\public\data\published\v1\meta"
+    $webMetaRoot = Join-Path $RepoRoot "data\published\v1\meta"
 
     if (-not (Test-Path -LiteralPath $validator)) {
-        Write-Log "META methodology validator not found, skipping web META validation: $validator"
+        Write-Log "META methodology validator not found, skipping canonical META validation: $validator"
         return
     }
 
     if (-not (Test-Path -LiteralPath $webMetaRoot)) {
-        Write-Log "web-v1-app META root not found, skipping web META validation: $webMetaRoot"
+        Write-Log "Canonical META root not found, skipping canonical META validation: $webMetaRoot"
         return
     }
 
     $python = Resolve-PythonExecutable
-    Write-Log "STEP 3B: Validate web-v1-app published META methodology"
+    Write-Log "STEP 3B: Validate canonical published META methodology"
     Invoke-Native -WorkingDirectory $RepoRoot -FilePath $python -Arguments @(
         $validator,
         "--root", $RepoRoot,
@@ -296,7 +296,7 @@ function Commit-PublishedSnapshotIfNeeded {
         [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
-    $publishedPath = "web-v1-app/public/data/published/v1"
+    $publishedPath = "data/published/v1"
 
     Write-Log "STEP 2B: SkipPush mode detected - ensure local commit exists for published snapshot"
 
