@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$SourceRoot = "D:\css\main\data\published\v1",
-    [string]$TargetRoot = "D:\css\main\web-v1-app\public\data\published\v1",
+    [string]$TargetRoot = "D:\css\main\web-v1-app\.private-data\published\v1",
     [switch]$SkipGitStatus
 )
 
@@ -80,10 +80,10 @@ function Show-GitSummary {
         return
     }
 
-    Write-Step "Git status for web app after sync"
+    Write-Step "Git status for private published-data mirror after sync"
     Push-Location $gitRoot
     try {
-        git status --short -- web-v1-app/public/data/published/v1
+        git status --short -- web-v1-app/.private-data/published/v1
     }
     finally {
         Pop-Location
@@ -195,5 +195,5 @@ if (-not $SkipGitStatus) {
 }
 
 Write-Step "Sync complete"
-Write-Host "Published data is now mirrored into the web app as real files." -ForegroundColor Green
+Write-Host "Published data is now mirrored into the private web app data folder as real files." -ForegroundColor Green
 Write-Host "Next steps: npm run build, then git add/commit/push if the output looks correct." -ForegroundColor Green
