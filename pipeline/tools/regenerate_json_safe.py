@@ -6,7 +6,7 @@ This script intentionally runs only JSON-generation steps:
   1. rebuild META history from existing local GOLD artifacts
   2. publish META into data/published/v1/meta
   3. validate META methodological safety
-  4. optionally sync data/published/v1 into the active Next.js app public folder
+  4. optionally mirror data/published/v1 into the active Next.js app private data folder
   5. rebuild Regime Briefs if a builder exists in root/scripts or web-v1-app/scripts
 
 It does not call download tools and does not regenerate gold/derived parquet files.
@@ -56,13 +56,13 @@ def _sync_published_to_web(root: Path) -> Optional[Path]:
     src = root / "data" / "published" / "v1"
     web = _find_web_app(root)
     if web is None:
-        print("[regenerate_json_safe] No web app folder found; skipping web-public sync.")
+        print("[regenerate_json_safe] No web app folder found; skipping web-private sync.")
         return None
-    dst = web / "public" / "data" / "published" / "v1"
+    dst = web / ".private-data" / "published" / "v1"
     if not src.exists():
         raise SystemExit(f"Published data root not found: {src}")
 
-    print(f"[regenerate_json_safe] Syncing published data -> web public: {src} -> {dst}")
+    print(f"[regenerate_json_safe] Syncing published data -> web private data: {src} -> {dst}")
     if dst.exists():
         shutil.rmtree(dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -79,12 +79,12 @@ def _find_brief_builder(root: Path, web_app: Optional[Path]) -> Optional[Tuple[P
     if web_app is not None:
         web_builder = web_app / "scripts" / "build_briefs" / "build_all_briefs.py"
         if web_builder.exists():
-            return web_builder, web_app, ["--root", "public/data/published/v1"]
+            return web_builder, web_app, ["--root", str(root / "data" / "published" / "v1")]
 
     # Explicit fallback for the current known app name even if sync was skipped.
     web_v1_app_builder = root / "web-v1-app" / "scripts" / "build_briefs" / "build_all_briefs.py"
     if web_v1_app_builder.exists():
-        return web_v1_app_builder, root / "web-v1-app", ["--root", "public/data/published/v1"]
+        return web_v1_app_builder, root / "web-v1-app", ["--root", str(root / "data" / "published" / "v1")]
 
     return None
 
@@ -95,7 +95,7 @@ def main() -> int:
     ap.add_argument("--start", default=None, help="Optional YYYY-MM-DD start date. Default: earliest available GOLD date.")
     ap.add_argument("--windows", default="7,30,90,180,365", help="Comma-separated meta window files to materialize.")
     ap.add_argument("--skip-briefs", action="store_true", help="Do not run Regime Brief builder even if present.")
-    ap.add_argument("--skip-web-sync", action="store_true", help="Do not copy data/published/v1 to web public data folder.")
+    ap.add_argument("--skip-web-sync", action="store_true", help="Do not mirror data/published/v1 to the web private data folder.")
     args = ap.parse_args()
 
     root = Path(args.root).resolve()
