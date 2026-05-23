@@ -25,31 +25,37 @@ function toArrayBuffer(buffer: Buffer): ArrayBuffer {
   return bytes.buffer;
 }
 
-function getDefaultPublishedDataRoot(): string {
-  return path.join(process.cwd(), "public", "data", "published", "v1");
+function getConfiguredLocalDataRoot(): string | null {
+  const configured = process.env.LOCAL_DATA_PATH?.trim();
+  return configured ? configured : null;
 }
 
-function getLocalDataRoot(): string {
-  const configured = process.env.LOCAL_DATA_PATH?.trim();
+function getCandidateDataRoots(): string[] {
+  const configured = getConfiguredLocalDataRoot();
 
   if (configured) {
-    return configured;
+    return [configured];
   }
 
-  return getDefaultPublishedDataRoot();
+  const appRoot = process.cwd();
+
+  return [
+    path.join(appRoot, "..", "data", "published", "v1"),
+    path.join(appRoot, "data", "published", "v1"),
+    path.join(appRoot, ".private-data", "published", "v1"),
+    path.join(appRoot, "public", "data", "published", "v1"),
+  ];
 }
 
-function buildLocalAbsolutePath(storagePath: string): string {
-  const root = getLocalDataRoot();
+function buildLocalAbsolutePath(root: string, storagePath: string): string {
   const cleaned = storagePath.replace(/^\/+/, "");
   return path.join(root, cleaned);
 }
 
-export async function readLocalStorageObject(
+async function readLocalFile(
+  absolutePath: string,
   storagePath: string
 ): Promise<StorageReadResult | null> {
-  const absolutePath = buildLocalAbsolutePath(storagePath);
-
   try {
     const stat = await fs.stat(absolutePath);
 
@@ -81,4 +87,19 @@ export async function readLocalStorageObject(
       `Failed to read local storage object at '${absolutePath}' for storage path '${storagePath}'.`
     );
   }
+}
+
+export async function readLocalStorageObject(
+  storagePath: string
+): Promise<StorageReadResult | null> {
+  for (const root of getCandidateDataRoots()) {
+    const absolutePath = buildLocalAbsolutePath(root, storagePath);
+    const result = await readLocalFile(absolutePath, storagePath);
+
+    if (result) {
+      return result;
+    }
+  }
+
+  return null;
 }
