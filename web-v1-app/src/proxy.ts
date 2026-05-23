@@ -19,6 +19,18 @@ import { NextRequest, NextResponse, userAgent } from "next/server";
 
 const DESKTOP_COOKIE     = "urd-force-desktop";
 const DESKTOP_COOKIE_TTL = 60 * 60 * 2; // 2 timer
+const BLOCKED_DIRECT_ARTIFACT_PREFIXES = [
+  "/data/published/v1/meta/",
+  "/data/published/v1/gold/",
+  "/data/published/v1/derived/",
+  "/data/published/v1/briefs/",
+];
+
+function isBlockedDirectArtifactPath(pathname: string): boolean {
+  return BLOCKED_DIRECT_ARTIFACT_PREFIXES.some((prefix) =>
+    pathname.startsWith(prefix)
+  );
+}
 
 function isMobileRequest(req: NextRequest): boolean {
   if (req.cookies.get(DESKTOP_COOKIE)?.value === "1") return false;
