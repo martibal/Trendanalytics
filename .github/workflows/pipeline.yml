@@ -1,4 +1,4 @@
-﻿name: Daily Pipeline Publish
+name: Daily Pipeline Publish
 
 on:
   workflow_dispatch:
@@ -26,8 +26,6 @@ jobs:
       CSS_JSON_FINALIZER_LOOKBACK_DAYS: "90"
       CSS_CLEANUP_EPHEMERAL_RAW: "1"
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
     steps:
       - name: Checkout repository
@@ -83,6 +81,9 @@ jobs:
       - name: Generate Prisma client
         shell: pwsh
         working-directory: .\web-v1-app
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: |
           npx prisma generate --schema .\prisma\schema.prisma
 
@@ -246,4 +247,3 @@ jobs:
             reports
             pipeline/_work/prod/status
           if-no-files-found: ignore
-
