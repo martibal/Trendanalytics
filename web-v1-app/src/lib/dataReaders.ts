@@ -237,7 +237,7 @@ export async function readDerivedFromDailyFiles(
 
     return {
       rows,
-      source: `disk:/public/data/published/v1/derived/${chain}/YYYY-MM-DD.json`,
+      source: `subscriber-api:/api/v1/files/derived/${chain}/YYYY-MM-DD.json`,
     };
   } catch {
     return null;
@@ -312,7 +312,7 @@ export async function readGoldFromDailyFiles(
 
     return {
       rows,
-      source: `disk:/public/data/published/v1/gold/${chain}/YYYY-MM-DD.json`,
+      source: `subscriber-api:/api/v1/files/gold/${chain}/YYYY-MM-DD.json`,
     };
   } catch {
     return null;
