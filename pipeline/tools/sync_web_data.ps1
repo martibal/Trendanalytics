@@ -22,7 +22,7 @@ function Copy-Tree([string]$src, [string]$dst) {
   if (-not (Test-Path $src)) { throw "Source missing: $src" }
   Ensure-Dir $dst
 
-  Write-Log "Mirror copy: $src -> $dst"
+  Write-Log "Mirror copy to private data folder: $src -> $dst"
   if ($DryRun) { return }
 
   robocopy $src $dst /MIR /NFL /NDL /NJH /NJS /NP /R:2 /W:1 | Out-Null
@@ -58,7 +58,7 @@ try {
     throw "No web app folder found under root. Expected: $webV1App, $webV1 or $webLegacy"
   }
 
-  $dst = Join-Path $targetWeb 'public\data\published\v1'
+  $dst = Join-Path $targetWeb '.private-data\published\v1'
 
   Write-Log "=== SYNC WEB DATA START ==="
   Write-Log "root        = $Root"
