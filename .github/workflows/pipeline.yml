@@ -237,6 +237,68 @@ jobs:
 
           $response | ConvertTo-Json -Depth 10
 
+      - name: Scan pipeline artifacts for accidental secrets
+        if: always()
+        shell: pwsh
+        run: |
+          $roots = @(
+            "logs",
+            "reports",
+            "pipeline\_work\prod\status"
+          )
+
+          $patterns = [ordered]@{
+            "stripe_live_secret" = "sk_live_[A-Za-z0-9]+"
+            "stripe_restricted_live" = "rk_live_[A-Za-z0-9]+"
+            "stripe_webhook_secret" = "whsec_[A-Za-z0-9]+"
+            "aws_access_key_id" = "AKIA[0-9A-Z]{16}"
+            "private_key_block" = "-----BEGIN .*PRIVATE KEY-----"
+            "postgres_connection_url" = "postgres(?:ql)?://[^ `"`"']+"
+            "database_url_assignment" = "DATABASE_URL\s*="
+            "direct_url_assignment" = "DIRECT_URL\s*="
+            "clerk_secret_assignment" = "CLERK_SECRET_KEY\s*="
+            "stripe_secret_assignment" = "STRIPE_SECRET_KEY\s*="
+            "upstash_token_assignment" = "UPSTASH_REDIS_REST_TOKEN\s*="
+          }
+
+          $hits = New-Object System.Collections.Generic.List[object]
+
+          foreach ($root in $roots) {
+            $rootPath = Join-Path $env:GITHUB_WORKSPACE $root
+
+            if (!(Test-Path -LiteralPath $rootPath)) {
+              continue
+            }
+
+            Get-ChildItem -LiteralPath $rootPath -Recurse -File -ErrorAction SilentlyContinue |
+              ForEach-Object {
+                $file = $_.FullName
+                $lineNo = 0
+
+                Get-Content -LiteralPath $file -ErrorAction SilentlyContinue |
+                  ForEach-Object {
+                    $lineNo++
+
+                    foreach ($name in $patterns.Keys) {
+                      if ($_ -match $patterns[$name]) {
+                        $hits.Add([pscustomobject]@{
+                          Kind = $name
+                          File = $file.Replace($env:GITHUB_WORKSPACE, "").TrimStart("\", "/")
+                          Line = $lineNo
+                        })
+                      }
+                    }
+                  }
+              }
+          }
+
+          if ($hits.Count -gt 0) {
+            Write-Host "Potential secret material detected in workflow artifacts. Values are intentionally not printed."
+            $hits | Sort-Object Kind, File, Line | Format-Table -AutoSize
+            throw "Refusing to upload artifacts that may contain secrets."
+          }
+
+          Write-Host "Artifact secret scan passed."
       - name: Upload pipeline artifacts
         if: always()
         uses: actions/upload-artifact@v4
