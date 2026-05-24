@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @jest-environment node
  */
 
@@ -16,7 +16,7 @@ jest.mock("@/lib/storage", () => ({
 }));
 
 describe("GET /api/v1/status", () => {
-  let GET: () => Promise<Response>;
+  let GET: (request: Request) => Promise<Response>;
 
   beforeEach(async () => {
     jest.resetModules();
@@ -109,7 +109,7 @@ describe("GET /api/v1/status", () => {
       return null;
     });
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.urdatlas.com/api/v1/status"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -177,7 +177,7 @@ describe("GET /api/v1/status", () => {
   it("returns unknown when meta is missing", async () => {
     mockReadStorageObject.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.urdatlas.com/api/v1/status"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -217,7 +217,7 @@ describe("GET /api/v1/status", () => {
       return null;
     });
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.urdatlas.com/api/v1/status"));
     const body = await response.json();
 
     const bitcoin = body.chains.find((row: { chain: string }) => row.chain === "bitcoin");
@@ -234,7 +234,7 @@ describe("GET /api/v1/status", () => {
     mockReadDatasetManifest.mockResolvedValue(null);
     mockReadStorageObject.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.urdatlas.com/api/v1/status"));
     const body = await response.json();
 
     expect(response.status).toBe(200);

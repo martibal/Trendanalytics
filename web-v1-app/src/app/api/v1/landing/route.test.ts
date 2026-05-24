@@ -18,7 +18,7 @@ jest.mock("@/lib/storage", () => ({
 }));
 
 describe("GET /api/v1/landing", () => {
-  let GET: () => Promise<Response>;
+  let GET: (request: Request) => Promise<Response>;
 
   beforeAll(async () => {
     const mod = await import("./route");
@@ -141,7 +141,7 @@ describe("GET /api/v1/landing", () => {
       return null;
     });
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.urdatlas.com/api/v1/landing"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -232,7 +232,7 @@ describe("GET /api/v1/landing", () => {
   it("returns null-ish chain fields when meta is missing", async () => {
     landingMocks.readStorageObject.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.urdatlas.com/api/v1/landing"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -254,7 +254,7 @@ describe("GET /api/v1/landing", () => {
     landingMocks.readDatasetManifest.mockResolvedValue(null);
     landingMocks.readStorageObject.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.urdatlas.com/api/v1/landing"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -274,7 +274,7 @@ describe("GET /api/v1/landing", () => {
       source: "local",
     });
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.urdatlas.com/api/v1/landing"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
