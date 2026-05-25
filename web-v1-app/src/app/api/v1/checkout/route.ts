@@ -117,7 +117,12 @@ function jsonError(
       message,
       detail: publicCheckoutErrorDetail(status, code, detail),
     },
-    { status }
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
   );
 }
 
@@ -411,7 +416,9 @@ async function handleCheckout(request: Request) {
       );
     }
 
-    return NextResponse.redirect(session.url, { status: 303 });
+    const response = NextResponse.redirect(session.url, { status: 303 });
+    response.headers.set("Cache-Control", "no-store");
+    return response;
   } catch (error) {
     console.error("[checkout] Stripe session creation failed", {
       plan,
@@ -433,48 +440,21 @@ async function handleCheckout(request: Request) {
 }
 
 
-function checkoutNavigationError(detail: string) {
+export async function GET() {
   return NextResponse.json(
     {
-      code: "checkout_navigation_not_allowed",
-      message: "Checkout must be started from Urd Atlas.",
-      detail,
+      code: "method_not_allowed",
+      message: "Checkout must be started with POST.",
+      detail: "method_not_allowed",
     },
     {
-      status: 403,
+      status: 405,
       headers: {
+        Allow: "POST",
         "Cache-Control": "no-store",
       },
     }
   );
-}
-
-function validateCheckoutNavigationRequest(request: Request) {
-  const secFetchSite = request.headers.get("sec-fetch-site")?.toLowerCase() ?? null;
-
-  if (secFetchSite === "cross-site") {
-    return {
-      ok: false as const,
-      response: checkoutNavigationError("Cross-site checkout navigation is not allowed."),
-    };
-  }
-
-  return { ok: true as const };
-}
-export async function GET(request: Request) {
-  const navigationGuard = validateCheckoutNavigationRequest(request);
-
-  if (!navigationGuard.ok) {
-    return navigationGuard.response;
-  }
-
-  const preAuthRateLimit = await enforcePreAuthRateLimit(request, "checkout-api");
-
-  if (!preAuthRateLimit.ok) {
-    return preAuthRateLimit.response;
-  }
-
-  return handleCheckout(request);
 }
 
 export async function POST(request: Request) {

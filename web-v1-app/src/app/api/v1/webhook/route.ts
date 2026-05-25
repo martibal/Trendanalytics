@@ -59,6 +59,64 @@ function normalizeTier(value: string | null | undefined): SubscriptionTier {
   return value === "pro" ? SubscriptionTier.pro : SubscriptionTier.basic;
 }
 
+function configuredPriceIdForTier(tier: SubscriptionTier): string | null {
+  const value =
+    tier === SubscriptionTier.pro
+      ? process.env.STRIPE_PRICE_PRO
+      : process.env.STRIPE_PRICE_BASIC;
+
+  return value?.trim() || null;
+}
+
+function tierFromStripePriceId(priceId: string | null | undefined): SubscriptionTier | null {
+  const normalized = priceId?.trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const basicPriceId = configuredPriceIdForTier(SubscriptionTier.basic);
+  const proPriceId = configuredPriceIdForTier(SubscriptionTier.pro);
+
+  if (basicPriceId && normalized === basicPriceId) {
+    return SubscriptionTier.basic;
+  }
+
+  if (proPriceId && normalized === proPriceId) {
+    return SubscriptionTier.pro;
+  }
+
+  return null;
+}
+
+function tierFromStripeSubscription(subscription: Stripe.Subscription): SubscriptionTier | null {
+  for (const item of subscription.items.data) {
+    const tier = tierFromStripePriceId(item.price?.id);
+
+    if (tier) {
+      return tier;
+    }
+  }
+
+  return null;
+}
+
+async function verifiedTierFromSubscriptionId(
+  stripe: Stripe,
+  subscriptionId: string
+): Promise<SubscriptionTier> {
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const tier = tierFromStripeSubscription(subscription);
+
+  if (!tier) {
+    throw new Error(
+      `Stripe subscription ${subscriptionId} does not contain STRIPE_PRICE_BASIC or STRIPE_PRICE_PRO.`
+    );
+  }
+
+  return tier;
+}
+
 function normalizeEntitledChain(value: string | null | undefined): string | null {
   if (!value) {
     return null;
@@ -142,6 +200,7 @@ function getSubscriptionCurrentPeriodEnd(
 }
 
 async function upsertAccountAndSubscriptionFromCheckoutSession(
+  stripe: Stripe,
   session: Stripe.Checkout.Session
 ) {
   const metadata = session.metadata ?? {};
@@ -162,9 +221,18 @@ async function upsertAccountAndSubscriptionFromCheckoutSession(
     );
   }
 
-  const tier = normalizeTier(metadata.checkout_plan);
+  if (typeof session.subscription !== "string" || !session.subscription.trim()) {
+    throw new Error("checkout.session.completed missing subscription id for price verification.");
+  }
+
+  const tier = await verifiedTierFromSubscriptionId(stripe, session.subscription);
   const entitledChain = tier === SubscriptionTier.pro ? null : getSelectedCheckoutChain(session);
-  const historyUnlocked = normalizeHistoryUnlocked(metadata.history_unlocked);
+
+  if (tier === SubscriptionTier.basic && !entitledChain) {
+    throw new Error("Basic checkout session is missing a valid entitled_chain selection.");
+  }
+
+const historyUnlocked = normalizeHistoryUnlocked(metadata.history_unlocked);
 
   await db.account.upsert({
     where: { id: accountId },
@@ -221,9 +289,21 @@ async function syncSubscriptionFromStripe(
   const customerId =
     typeof subscription.customer === "string" ? subscription.customer : "";
   const subscriptionId = subscription.id;
-  const tier = normalizeTier(metadata.checkout_plan);
+  const tier = tierFromStripeSubscription(subscription);
+
+  if (!tier) {
+    throw new Error(
+      `Stripe subscription ${subscription.id} does not contain STRIPE_PRICE_BASIC or STRIPE_PRICE_PRO.`
+    );
+  }
+
   const entitledChain = normalizeEntitledChain(metadata.entitled_chain);
-  const historyUnlocked = normalizeHistoryUnlocked(metadata.history_unlocked);
+
+  if (tier === SubscriptionTier.basic && !entitledChain) {
+    throw new Error(`Stripe subscription ${subscription.id} is missing a valid entitled_chain for Basic tier.`);
+  }
+
+const historyUnlocked = normalizeHistoryUnlocked(metadata.history_unlocked);
 
   if (!customerId) {
     throw new Error("Stripe subscription event missing string customer id.");
@@ -367,7 +447,7 @@ export async function POST(request: Request) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        await upsertAccountAndSubscriptionFromCheckoutSession(session);
+        await upsertAccountAndSubscriptionFromCheckoutSession(stripe, session);
 
         console.log("[stripe webhook] checkout.session.completed", {
           id: session.id,

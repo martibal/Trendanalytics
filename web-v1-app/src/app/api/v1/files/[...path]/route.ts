@@ -3,6 +3,7 @@ import path from "path";
 import { NextResponse } from "next/server";
 
 import { validateRequestApiKey, buildAuthErrorResponseBody } from "@/lib/auth/validateToken";
+import { touchPersistedApiKeyLastUsedAt } from "@/lib/auth/apiKeys";
 import {
   evaluateFileEntitlement,
   isWindowToken,
@@ -379,6 +380,9 @@ export async function GET(request: Request, context: RouteContext) {
       genre,
       window,
     });
+
+
+    await touchPersistedApiKeyLastUsedAt(authResult.keyId, authResult.record.lastUsedAt);
 
     return new NextResponse(file.body, {
       status: 200,

@@ -53,7 +53,12 @@ function jsonError(
       message,
       detail: publicPortalErrorDetail(status, code, detail),
     },
-    { status }
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
   );
 }
 
@@ -134,7 +139,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.redirect(portalSession.url, { status: 303 });
+    const response = NextResponse.redirect(portalSession.url, { status: 303 });
+    response.headers.set("Cache-Control", "no-store");
+    return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Stripe portal error.";
 

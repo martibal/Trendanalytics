@@ -16,6 +16,22 @@ import { db } from "@/lib/db";
 const TERMS_VERSION = "2026-04-13";
 const TERMS_ACCEPTANCE_COOKIE = "ua_terms_acceptance_pending";
 
+function shouldLogAccountDebug(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.VERCEL_ENV !== "production";
+}
+
+function logAccountDebug(message: string, data?: Record<string, unknown>): void {
+  if (shouldLogAccountDebug()) {
+    console.info(message, data);
+  }
+}
+
+function logAccountWarn(message: string, data?: Record<string, unknown>): void {
+  if (shouldLogAccountDebug()) {
+    console.warn(message, data);
+  }
+}
+
 const ACCOUNT_INCLUDE = {
   subscriptions: {
     orderBy: {
@@ -281,7 +297,7 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
   const authConfigured = isAuthConfigured();
 
   if (!authConfigured) {
-    console.info("[account] auth not configured");
+    logAccountDebug("[account] auth not configured");
 
     const snapshot = buildPublicSnapshot();
     const labels = snapshotLabels(snapshot);
@@ -305,7 +321,7 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("clerkMiddleware") || message.includes("auth() was called but Clerk can't detect usage")) {
-      console.warn("[account] auth unavailable without clerk middleware; falling back to public snapshot", { message });
+      logAccountWarn("[account] auth unavailable without clerk middleware; falling back to public snapshot", { message });
       const snapshot = buildPublicSnapshot();
       const labels = snapshotLabels(snapshot);
       return {
@@ -324,7 +340,7 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
 
   const authProviderUserId = authState.userId ?? null;
 
-  console.info("[account] auth state", {
+  logAccountDebug("[account] auth state", {
     hasUserId: Boolean(authProviderUserId),
     userId: authProviderUserId,
   });
@@ -348,7 +364,7 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
   try {
     let account = await loadAccountWithRelations(authProviderUserId);
 
-    console.info("[account] findUnique result", {
+    logAccountDebug("[account] findUnique result", {
       userId: authProviderUserId,
       found: Boolean(account),
       accountId: account?.id ?? null,
@@ -380,7 +396,7 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
         throw new Error("missing_current_terms_acceptance");
       }
 
-      console.info("[account] creating account row", {
+      logAccountDebug("[account] creating account row", {
         userId: authProviderUserId,
         email,
         termsVersion: pendingTermsAcceptance.termsVersion,
@@ -402,7 +418,7 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
         throw new Error("account_created_but_not_reloadable");
       }
 
-      console.info("[account] account row created", {
+      logAccountDebug("[account] account row created", {
         userId: authProviderUserId,
         accountId: account.id,
         termsVersion: account.termsVersion ?? null,
