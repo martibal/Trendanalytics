@@ -368,9 +368,32 @@ try {
       }
     }
 
+    $activeChains = @(
+      foreach ($c in $chains) {
+        $featureDir = Join-Path $FEATURES_ROOT $c
+        $featureFiles = @(
+          Get-ChildItem -Path $featureDir -File -Filter '*.parquet' -ErrorAction SilentlyContinue
+        )
+
+        if ($featureFiles.Length -gt 0) {
+          $c
+        }
+      }
+    )
+
+    if ($activeChains.Length -eq 0) {
+      Write-Log "No feature parquet files were built or available for this incremental run."
+      Write-Log "Pipeline exits successfully as a no-op before GOLD/DERIVED/META publication."
+      Write-Log '=== PIPELINE OK (NO-OP) ==='
+      return
+    }
+
+    $activeChainsCsv = ($activeChains -join ',')
+    Write-Log ("Active chains for calculated artifact rebuild: " + $activeChainsCsv)
+
     Write-Log 'STEP 2: Build GOLD timeseries'
 
-    foreach ($c in $chains) {
+    foreach ($c in $activeChains) {
       Write-Log ("  build gold timeseries: " + $c)
 
       & $PY -u $PY_BUILD_GOLD_TS --chain $c --features_root $FEATURES_ROOT --gold_root $GOLD_PARQUET_ROOT --status_root $STATUS_ROOT --reports_dir $REPORTS_DIR
@@ -381,7 +404,7 @@ try {
 
     Write-Log 'STEP 3: Build GOLD weekly'
 
-    foreach ($c in $chains) {
+    foreach ($c in $activeChains) {
       Write-Log ("  build gold weekly: " + $c)
 
       & $PY -u $PY_BUILD_GOLD_WEEKLY --chain $c --gold_root $GOLD_PARQUET_ROOT --gold_weekly_root $GOLD_WEEKLY_ROOT
@@ -392,18 +415,17 @@ try {
 
     Write-Log 'STEP 4: Sync GOLD json history + windows'
 
-    & $PY -u $PY_SYNC_GOLD --repo-root $MAIN_ROOT --gold-root $GOLD_PARQUET_ROOT --out-root $GOLD_JSON_ROOT --chains $chainsCsv --mode $syncModeGold --windows $windowsCsv
+    & $PY -u $PY_SYNC_GOLD --repo-root $MAIN_ROOT --gold-root $GOLD_PARQUET_ROOT --out-root $GOLD_JSON_ROOT --chains $activeChainsCsv --mode $syncModeGold --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) {
       throw "sync_gold_json_history.py failed rc=$LASTEXITCODE"
     }
 
     Write-Log 'STEP 5: Export DERIVED json history + windows'
 
-    & $PY -u $PY_EXPORT_DERIVED --root $MAIN_ROOT --gold-json-root $GOLD_JSON_ROOT --meta-json-root $META_JSON_ROOT --out-root $DERIVED_OUT_ROOT --chains $chainsCsv --mode $modeIncRebuild --windows $windowsCsv
+    & $PY -u $PY_EXPORT_DERIVED --root $MAIN_ROOT --gold-json-root $GOLD_JSON_ROOT --meta-json-root $META_JSON_ROOT --out-root $DERIVED_OUT_ROOT --chains $activeChainsCsv --mode $modeIncRebuild --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) {
       throw "export_derived_json_history.py failed rc=$LASTEXITCODE"
     }
-
     Write-Log 'STEP 6: Export META json history + windows'
     Write-Log '  forcing api.main paths for META export to the freshly calculated run outputs'
     Write-Log ("  GOLD_DIR        = " + $GOLD_JSON_ROOT)
