@@ -36,6 +36,7 @@ const WINDOW_MS = 60_000;
 const DEFAULT_PREAUTH_LIMIT_PER_MINUTE = 600;
 const SCOPE_DEFAULT_LIMITS_PER_MINUTE: Record<string, number> = {
   "checkout-api": 30,
+  "portal-api": 30,
   "keys-api": 30,
   "stripe-webhook": 120,
   "public-read-api": 120,
