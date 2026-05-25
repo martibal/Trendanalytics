@@ -51,8 +51,35 @@ function jsonError(
       message,
       detail: publicWebhookErrorDetail(status, code, detail),
     },
-    { status }
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
   );
+}
+
+function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+}
+
+function logStripeWebhookEvent(
+  message: string,
+  data: Record<string, unknown>
+): void {
+  if (isProductionRuntime()) {
+    console.log(message, {
+      eventType: data.eventType ?? null,
+      eventId: data.eventId ?? null,
+      objectId: data.objectId ?? null,
+      status: data.status ?? null,
+      mode: data.mode ?? null,
+    });
+    return;
+  }
+
+  console.log(message, data);
 }
 
 function normalizeTier(value: string | null | undefined): SubscriptionTier {
@@ -449,11 +476,13 @@ export async function POST(request: Request) {
 
         await upsertAccountAndSubscriptionFromCheckoutSession(stripe, session);
 
-        console.log("[stripe webhook] checkout.session.completed", {
-          id: session.id,
+        logStripeWebhookEvent("[stripe webhook] checkout.session.completed", {
+          eventType: event.type,
+          eventId: event.id,
+          objectId: session.id,
           mode: session.mode,
           customer: session.customer,
-          client_reference_id: session.client_reference_id,
+          clientReferenceId: session.client_reference_id,
           metadata: session.metadata,
         });
         break;
@@ -466,8 +495,10 @@ export async function POST(request: Request) {
 
         await syncSubscriptionFromStripe(subscription, event.type);
 
-        console.log(`[stripe webhook] ${event.type}`, {
-          id: subscription.id,
+        logStripeWebhookEvent(`[stripe webhook] ${event.type}`, {
+          eventType: event.type,
+          eventId: event.id,
+          objectId: subscription.id,
           customer: subscription.customer,
           status: subscription.status,
           metadata: subscription.metadata,
@@ -479,8 +510,10 @@ export async function POST(request: Request) {
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
 
-        console.log(`[stripe webhook] ${event.type}`, {
-          id: invoice.id,
+        logStripeWebhookEvent(`[stripe webhook] ${event.type}`, {
+          eventType: event.type,
+          eventId: event.id,
+          objectId: invoice.id,
           customer: invoice.customer,
           status: invoice.status,
         });
@@ -488,9 +521,9 @@ export async function POST(request: Request) {
       }
 
       default: {
-        console.log("[stripe webhook] unhandled event", {
-          type: event.type,
-          id: event.id,
+        logStripeWebhookEvent("[stripe webhook] unhandled event", {
+          eventType: event.type,
+          eventId: event.id,
         });
       }
     }

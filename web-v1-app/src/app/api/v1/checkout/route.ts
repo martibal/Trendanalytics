@@ -77,6 +77,44 @@ function isProductionCheckoutRequest(request: Request): boolean {
   );
 }
 
+function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+}
+
+function logCheckoutInfo(message: string, data: Record<string, unknown>): void {
+  if (isProductionRuntime()) {
+    console.info(message, {
+      plan: data.plan ?? null,
+      requestHost: data.requestHost ?? null,
+      stripeSecretMode: data.stripeSecretMode ?? null,
+      hasBasicPrice: data.hasBasicPrice ?? null,
+      hasProPrice: data.hasProPrice ?? null,
+    });
+    return;
+  }
+
+  console.info(message, data);
+}
+
+function logCheckoutError(message: string, data: Record<string, unknown>): void {
+  if (isProductionRuntime()) {
+    const error = data.error;
+
+    console.error(message, {
+      plan: data.plan ?? null,
+      requestHost: data.requestHost ?? null,
+      stripeSecretMode: data.stripeSecretMode ?? null,
+      error:
+        error && typeof error === "object" && "name" in error
+          ? { name: (error as { name?: unknown }).name }
+          : null,
+    });
+    return;
+  }
+
+  console.error(message, data);
+}
+
 function publicCheckoutErrorDetail(status: number, code: string, detail?: string): string | null {
   if (process.env.NODE_ENV !== "production" && process.env.VERCEL_ENV !== "production") {
     return detail ?? null;
@@ -248,8 +286,7 @@ async function resolveAccount(params: {
 
     return account;
   } catch (error) {
-    console.error("[checkout] account upsert failed", {
-      authProviderUserId: params.authProviderUserId,
+    logCheckoutError("[checkout] account upsert failed", {
       error:
         error instanceof Error
           ? { name: error.name, message: error.message, stack: error.stack }
@@ -285,7 +322,7 @@ async function handleCheckout(request: Request) {
 
   const priceId = priceIdForPlan(plan);
 
-  console.info("[checkout] runtime Stripe configuration", {
+  logCheckoutInfo("[checkout] runtime Stripe configuration", {
     vercelEnv: process.env.VERCEL_ENV ?? null,
     requestHost: new URL(request.url).hostname,
     stripeSecretMode: keyMode,
@@ -335,7 +372,9 @@ async function handleCheckout(request: Request) {
     const signInUrl = new URL("/sign-in", appUrl);
     signInUrl.searchParams.set("redirect_url", returnUrl);
 
-    return NextResponse.redirect(signInUrl);
+    const response = NextResponse.redirect(signInUrl);
+    response.headers.set("Cache-Control", "no-store");
+    return response;
   }
 
   let account: Awaited<ReturnType<typeof resolveAccount>>;
@@ -420,9 +459,10 @@ async function handleCheckout(request: Request) {
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {
-    console.error("[checkout] Stripe session creation failed", {
+    logCheckoutError("[checkout] Stripe session creation failed", {
       plan,
       priceId,
+      requestHost: new URL(request.url).hostname,
       stripeSecretMode: keyMode,
       error:
         error instanceof Error
@@ -458,7 +498,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    const originGuard = validateSameOriginRequest(request);
+  const originGuard = validateSameOriginRequest(request);
 
   if (!originGuard.ok) {
     return originGuard.response;
@@ -469,5 +509,5 @@ export async function POST(request: Request) {
   if (!preAuthRateLimit.ok) {
     return preAuthRateLimit.response;
   }
-return handleCheckout(request);
+  return handleCheckout(request);
 }
