@@ -76,7 +76,7 @@ export default function PrivacyPage() {
             <li>email address and subscriber profile information,</li>
             <li>subscription status, billing state, and entitlement scope,</li>
             <li>API key metadata such as prefix, last-used timestamp, and key status,</li>
-            <li>request metadata needed for delivery, rate limiting, security, and abuse prevention,</li>
+            <li>request metadata needed for delivery, rate limiting, quota enforcement, security, and abuse prevention,</li>
             <li>support or contact information you voluntarily provide.</li>
           </ul>
         </Section>
@@ -104,7 +104,7 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="6. API Access, Keys, and Security Logging">
+        <Section title="6. API Access, Keys, Quotas, and Security Logging">
           <p>
             Authenticated file delivery requires API keys. Urd Atlas may process API key
             metadata and request metadata needed for:
@@ -112,13 +112,21 @@ export default function PrivacyPage() {
           <ul className="list-disc pl-5">
             <li>authentication and entitlement enforcement,</li>
             <li>security monitoring,</li>
-            <li>rate limiting,</li>
+            <li>rate limiting and daily quota enforcement,</li>
             <li>abuse prevention,</li>
             <li>subscriber support and operational troubleshooting.</li>
           </ul>
           <p>
+            Request metadata may include route, method, request identifier, account identifier,
+            API key identifier, entitlement tier, chain, data genre, requested window, status code,
+            coarse latency bucket, rate-limit state, quota state, and timestamps needed to operate,
+            secure, and troubleshoot authenticated delivery.
+          </p>
+          <p>
             Secret API keys should only be displayed once at creation and should not be recoverable
-            in plaintext afterward.
+            in plaintext afterward. Urd Atlas is designed to store API key verification material as
+            non-plaintext credential data and operational metadata rather than storing recoverable
+            API secrets.
           </p>
         </Section>
 

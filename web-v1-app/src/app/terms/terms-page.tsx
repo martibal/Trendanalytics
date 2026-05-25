@@ -194,7 +194,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="8. API Keys and Security">
+        <Section title="8. API Keys, Fair Use, and Security">
           <p>
             Authenticated file delivery requires a valid API key supplied via the documented
             request header.
@@ -202,6 +202,24 @@ export default function TermsPage() {
           <p>
             API keys are confidential credentials. You are responsible for safeguarding them and
             for any activity performed with a valid key associated with your account.
+          </p>
+          <p>
+            API access is subject to technical rate limits, daily fair-use quotas, entitlement
+            checks, security controls, and operational safeguards. Unless otherwise agreed in
+            writing, the default daily authenticated file-delivery quota is 500 requests per UTC
+            day for Basic access and 5,000 requests per UTC day for Pro access.
+          </p>
+          <p>
+            Urd Atlas may throttle, reject, suspend, or revoke access if request volume, request
+            patterns, automation, credential sharing, scraping, redistribution, attempted
+            circumvention, or other use creates security, legal, billing, infrastructure, or
+            operational risk.
+          </p>
+          <p>
+            Quotas and rate limits are intended to protect service availability and prevent
+            excessive or abusive usage. They may be changed, reduced, increased, or applied
+            differently where necessary to protect the service, comply with legal obligations,
+            operate subscriptions, or support legitimate customer use.
           </p>
           <p>
             Urd Atlas may suspend or revoke keys for security, abuse prevention, entitlement

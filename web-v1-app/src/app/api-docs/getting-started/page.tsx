@@ -1,4 +1,4 @@
-﻿import ShortFullContent from "@/components/site/ShortFullContent";
+import ShortFullContent from "@/components/site/ShortFullContent";
 import PageHero from "@/components/site/PageHero";
 import {
   UrdButtonLink,
@@ -235,6 +235,23 @@ export default function GettingStartedJsonApiPage() {
               it in screenshots, or commit it to a public code repository. If compromised,
               revoke it from Dashboard and create a new one.
             </Callout>
+            <Callout color="cyan">
+              <span className="font-black text-[#0d2447]">Fair-use limits:</span>{" "}
+              Authenticated API access is subject to technical rate limits and daily
+              request quotas. By default, Single Chain access allows 500 authenticated
+              file-delivery requests per UTC day, and Research access allows 5,000
+              authenticated file-delivery requests per UTC day. These limits protect
+              service availability and help prevent accidental or abusive overuse.
+            </Callout>
+            <p className="mt-3 text-sm leading-7 text-[#27476f]">
+              API responses may include <InlineCode>X-RateLimit-Limit</InlineCode>,{" "}
+              <InlineCode>X-RateLimit-Remaining</InlineCode>,{" "}
+              <InlineCode>X-DailyQuota-Limit</InlineCode>,{" "}
+              <InlineCode>X-DailyQuota-Remaining</InlineCode>, and{" "}
+              <InlineCode>Retry-After</InlineCode> headers. If you receive a{" "}
+              <InlineCode>429</InlineCode> response, slow down or wait until the relevant
+              reset time before retrying.
+            </p>
           </div>
         </Section>
 
@@ -929,5 +946,3 @@ python3 fetch_urdatlas.py`}</CodeBlock>
     </UrdPage>
   );
 }
-
-
