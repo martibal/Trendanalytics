@@ -1479,6 +1479,17 @@ export default function UrdAtlasVFinalLandingClient({
                 <span>Lookup layer for JSON fields, Confidence v2 components, Briefs fields, and scorecard semantics.</span>
               </Link>
 
+              <a
+                href="/whitepaper/Urd_Atlas_Whitepaper.pdf"
+                className="ua-vf-trust-item"
+                style={{ textDecoration: "none" }}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <strong>Whitepaper</strong>
+                <span>Methodology and data reference for diligence, verification, provenance, API delivery, and public sample interpretation.</span>
+              </a>
+
               <Link
                 href="/methodology/changelog"
                 className="ua-vf-trust-item"
