@@ -1625,12 +1625,12 @@ export default function UrdAtlasVFinalLandingClient({
                   position: "relative",
                   minHeight: "188px",
                   padding: "24px 22px 58px",
-                  border: "1px solid rgba(196,146,48,.34)",
-                  borderTop: "2px solid #C49230",
+                  border: "1px solid rgba(232,224,208,.14)",
+                  borderTop: "2px solid rgba(196,146,48,.28)",
                   borderRadius: "5px",
                   background:
-                    "linear-gradient(180deg, rgba(196,146,48,.18), rgba(17,30,48,.58) 64%, rgba(13,31,53,.78))",
-                  boxShadow: "0 14px 34px rgba(0,0,0,.18)",
+                    "linear-gradient(180deg, rgba(196,146,48,.105), rgba(17,30,48,.52) 64%, rgba(13,31,53,.72))",
+                  boxShadow: "0 10px 28px rgba(0,0,0,.14)",
                   textDecoration: "none",
                   cursor: "pointer",
                   transition: "transform .16s ease, border-color .18s ease, box-shadow .18s ease",
@@ -1639,29 +1639,16 @@ export default function UrdAtlasVFinalLandingClient({
                 rel="noopener noreferrer"
                 onMouseEnter={(event) => {
                   event.currentTarget.style.transform = "translateY(-4px)";
-                  event.currentTarget.style.borderColor = "rgba(196,146,48,.55)";
-                  event.currentTarget.style.boxShadow = "0 22px 58px rgba(0,0,0,.30)";
+                  event.currentTarget.style.borderColor = "rgba(196,146,48,.42)";
+                  event.currentTarget.style.boxShadow = "0 20px 52px rgba(0,0,0,.28)";
                 }}
                 onMouseLeave={(event) => {
                   event.currentTarget.style.transform = "translateY(0)";
-                  event.currentTarget.style.borderColor = "rgba(196,146,48,.34)";
-                  event.currentTarget.style.boxShadow = "0 14px 34px rgba(0,0,0,.18)";
+                  event.currentTarget.style.borderColor = "rgba(232,224,208,.14)";
+                  event.currentTarget.style.boxShadow = "0 10px 28px rgba(0,0,0,.14)";
                 }}
               >
-                <strong>
-                  Whitepaper{" "}
-                  <span
-                    style={{
-                      display: "inline",
-                      color: "#C49230",
-                      fontSize: "9px",
-                      letterSpacing: ".12em",
-                      marginLeft: "6px",
-                    }}
-                  >
-                    PDF
-                  </span>
-                </strong>
+                <strong>Whitepaper</strong>
                 <span>Methodology and data reference for diligence, verification, provenance, API delivery, and public sample interpretation.</span>
                 <span
                   style={{
@@ -1672,10 +1659,10 @@ export default function UrdAtlasVFinalLandingClient({
                     width: "auto",
                     minHeight: "24px",
                     padding: "4px 9px",
-                    border: "1px solid rgba(196,146,48,.42)",
+                    border: "1px solid rgba(196,146,48,.28)",
                     borderRadius: "999px",
-                    color: "#080F1A",
-                    background: "#C49230",
+                    color: "#C49230",
+                    background: "rgba(196,146,48,.07)",
                     fontFamily: "var(--mono)",
                     fontSize: "10px",
                     letterSpacing: ".12em",
