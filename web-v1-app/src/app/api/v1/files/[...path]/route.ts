@@ -10,7 +10,12 @@ import {
   type FileGenre,
   type WindowToken,
 } from "@/lib/auth/entitlements";
-import { buildRateLimitHeaders, enforceAccountRateLimit } from "@/lib/auth/rateLimit";
+import {
+  buildDailyQuotaHeaders,
+  buildRateLimitHeaders,
+  enforceAccountRateLimit,
+  enforceDailyApiQuota,
+} from "@/lib/auth/rateLimit";
 import { readStorageObject } from "@/lib/storage";
 import type { ChainId } from "@/config/chains";
 import { getOrCreateRequestId, logApiEvent } from "@/lib/auditLog";
@@ -252,6 +257,37 @@ export async function GET(request: Request, context: RouteContext) {
           "rate_limited",
           "Rate limit exceeded.",
           "Too many authenticated file requests for the current billing tier.",
+          rateLimitHeaders
+        );
+      }
+
+      const quotaDecision = await enforceDailyApiQuota(
+        authResult.accountId,
+        authResult.keyId,
+        authResult.entitlement.tier
+      );
+
+      Object.assign(rateLimitHeaders, buildDailyQuotaHeaders(quotaDecision));
+
+      if (!quotaDecision.success) {
+        await logApiEvent({
+          requestId,
+          eventType: "rate_limited",
+          path: new URL(request.url).pathname,
+          method: request.method,
+          statusCode: 429,
+          startedAtMs,
+          accountId,
+          keyId,
+          detail: "Daily API quota exceeded for the current billing tier.",
+        });
+
+        return jsonError(
+          requestId,
+          429,
+          "rate_limited",
+          "Daily API quota exceeded.",
+          "Daily API quota exceeded for the current billing tier.",
           rateLimitHeaders
         );
       }
