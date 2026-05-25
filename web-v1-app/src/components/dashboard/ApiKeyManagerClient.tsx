@@ -270,6 +270,11 @@ export default function ApiKeyManagerClient({
     }
   }
 
+  function handleHideSecret() {
+    setCreatedSecret(null);
+    setCopied(false);
+  }
+
   return (
     <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -376,8 +381,15 @@ export default function ApiKeyManagerClient({
             >
               {copied ? "Copied" : "Copy secret"}
             </button>
+            <button
+              type="button"
+              onClick={handleHideSecret}
+              className="rounded-full border border-emerald-700 bg-white/70 px-3 py-2 text-sm font-black text-emerald-900 transition hover:bg-white"
+            >
+              Hide secret
+            </button>
             <span className="text-xs font-semibold text-emerald-900">
-              Store it in your integration before revoking any older key.
+              Store it in your integration, then hide it from this screen.
             </span>
           </div>
         </div>
