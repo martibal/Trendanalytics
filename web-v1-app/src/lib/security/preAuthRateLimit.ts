@@ -1,4 +1,4 @@
-﻿import "server-only";
+import "server-only";
 
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
@@ -34,6 +34,13 @@ type MemoryWindow = {
 
 const WINDOW_MS = 60_000;
 const DEFAULT_PREAUTH_LIMIT_PER_MINUTE = 600;
+const SCOPE_DEFAULT_LIMITS_PER_MINUTE: Record<string, number> = {
+  "checkout-api": 30,
+  "keys-api": 30,
+  "stripe-webhook": 120,
+  "public-read-api": 120,
+  "file-api": 300,
+};
 const FAIL_CLOSED_RETRY_AFTER_SECONDS = 60;
 
 const memoryStore = new Map<string, MemoryWindow>();
@@ -42,15 +49,40 @@ function isProductionRuntime(): boolean {
   return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 }
 
-function getLimit(): number {
-  const raw = process.env.PREAUTH_RATE_LIMIT_PER_MINUTE?.trim();
-  const parsed = raw ? Number.parseInt(raw, 10) : DEFAULT_PREAUTH_LIMIT_PER_MINUTE;
+function envKeyForScope(scope: string): string {
+  const normalized = scope
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return normalized ? `PREAUTH_RATE_LIMIT_${normalized}_PER_MINUTE` : "PREAUTH_RATE_LIMIT_PER_MINUTE";
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = value ? Number.parseInt(value, 10) : fallback;
 
   if (!Number.isFinite(parsed) || parsed < 1) {
-    return DEFAULT_PREAUTH_LIMIT_PER_MINUTE;
+    return fallback;
   }
 
   return parsed;
+}
+
+function getLimit(scope: string): number {
+  const scopedRaw = process.env[envKeyForScope(scope)]?.trim();
+  const globalRaw = process.env.PREAUTH_RATE_LIMIT_PER_MINUTE?.trim();
+  const scopeDefault = SCOPE_DEFAULT_LIMITS_PER_MINUTE[scope] ?? DEFAULT_PREAUTH_LIMIT_PER_MINUTE;
+
+  if (scopedRaw) {
+    return parsePositiveInteger(scopedRaw, scopeDefault);
+  }
+
+  if (globalRaw) {
+    return parsePositiveInteger(globalRaw, scopeDefault);
+  }
+
+  return scopeDefault;
 }
 
 function getRedisClient(): Redis | null {
@@ -239,7 +271,7 @@ export async function enforcePreAuthRateLimit(
   scope: string,
   requestId?: string | null
 ): Promise<PreAuthRateLimitDecision> {
-  const limit = getLimit();
+  const limit = getLimit(scope);
   const key = getClientIp(request);
   const ratelimit = getRatelimiter(scope, limit);
 
@@ -301,4 +333,3 @@ export async function enforcePreAuthRateLimit(
     return applyMemoryRateLimit(key, scope, limit, requestId);
   }
 }
-
