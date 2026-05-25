@@ -1,4 +1,4 @@
-﻿import "server-only";
+import "server-only";
 
 import { NextResponse } from "next/server";
 
@@ -37,12 +37,18 @@ function addConfiguredOrigin(origins: Set<string>, value: string | null | undefi
   }
 }
 
+function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+}
+
 function getAllowedOrigins(request: Request): Set<string> {
   const origins = new Set<string>();
 
-  const requestOrigin = normalizeOrigin(request.url);
-  if (requestOrigin) {
-    origins.add(requestOrigin);
+  if (!isProductionRuntime()) {
+    const requestOrigin = normalizeOrigin(request.url);
+    if (requestOrigin) {
+      origins.add(requestOrigin);
+    }
   }
 
   addConfiguredOrigin(origins, process.env.NEXT_PUBLIC_APP_URL);
@@ -56,12 +62,20 @@ function getAllowedOrigins(request: Request): Set<string> {
   return origins;
 }
 
+function publicOriginGuardDetail(detail: string): string {
+  if (isProductionRuntime()) {
+    return "origin_not_allowed";
+  }
+
+  return detail;
+}
+
 function originGuardError(detail: string) {
   return NextResponse.json(
     {
       code: "origin_not_allowed",
       message: "Request origin is not allowed.",
-      detail,
+      detail: publicOriginGuardDetail(detail),
     },
     {
       status: 403,

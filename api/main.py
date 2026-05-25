@@ -1,4 +1,4 @@
-﻿# api/main.py
+# api/main.py
 from __future__ import annotations
 
 import os
@@ -122,6 +122,21 @@ class GoldCacheEntry:
 _GOLD_CACHE: Dict[str, GoldCacheEntry] = {}
 
 app = FastAPI(title=APP_TITLE)
+
+
+def _legacy_public_data_routes_enabled() -> bool:
+    return os.getenv("CSS_ALLOW_LEGACY_PUBLIC_DATA_ROUTES", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _validate_legacy_public_data_request(chain: str, filename: str) -> None:
+    if not _legacy_public_data_routes_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    if chain not in SUPPORTED_CHAINS:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    if not re.match(r"^[A-Za-z0-9_.-]+\.json$", filename or ""):
+        raise HTTPException(status_code=404, detail="Not found")
 
 
 # --- No-cache middleware for UI assets (eliminates build/cache confusion) -----
@@ -1266,14 +1281,14 @@ else:
 def get_css_json(chain: str, filename: str):
     p = GOLD_DIR / chain / filename
     if not p.exists():
-        raise HTTPException(status_code=404, detail=f"Not found: {chain}/{filename}")
+        raise HTTPException(status_code=404, detail="Not found")
     return FileResponse(str(p))
 
 @app.get("/data/css_json_meta/{chain}/{filename}")
 def get_css_json_meta(chain: str, filename: str):
     p = META_DIR / chain / filename
     if not p.exists():
-        raise HTTPException(status_code=404, detail=f"Not found: {chain}/{filename}")
+        raise HTTPException(status_code=404, detail="Not found")
     return FileResponse(str(p))
 
 
@@ -1291,4 +1306,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

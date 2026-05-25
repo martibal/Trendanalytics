@@ -6,6 +6,7 @@ import { ApiKeyStatus, SubscriptionStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
+import { getOrCreateRequestId, logApiEvent } from "@/lib/auditLog";
 
 import { validateSameOriginRequest } from "@/lib/security/origin";
 import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
@@ -63,7 +64,12 @@ function jsonError(
       message,
       detail: publicKeyErrorDetail(status, code, detail),
     },
-    { status }
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
   );
 }
 
@@ -123,7 +129,10 @@ async function getAuthenticatedAccount() {
 }
 
 export async function POST(request: Request) {
-    const originGuard = validateSameOriginRequest(request);
+  const requestId = getOrCreateRequestId(request.headers);
+  const startedAtMs = Date.now();
+
+  const originGuard = validateSameOriginRequest(request);
 
   if (!originGuard.ok) {
     return originGuard.response;
@@ -214,9 +223,34 @@ export async function POST(request: Request) {
       },
     });
 
+    await logApiEvent({
+
+      requestId,
+
+      eventType: "api_key_created",
+
+      path: new URL(request.url).pathname,
+
+      method: request.method,
+
+      statusCode: 201,
+
+      startedAtMs,
+
+      accountId: account.id,
+
+      keyId: created.id,
+
+      detail: label ? "labeled_key_created" : "unlabeled_key_created",
+
+    });
+
     return NextResponse.json(
+
       {
+
         secret,
+
         key: {
           id: created.id,
           label: created.label,
@@ -226,7 +260,12 @@ export async function POST(request: Request) {
           createdAt: created.createdAt.toISOString(),
         },
       },
-      { status: 201 }
+      {
+        status: 201,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown API key creation error.";
@@ -241,7 +280,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-    const originGuard = validateSameOriginRequest(request);
+  const requestId = getOrCreateRequestId(request.headers);
+  const startedAtMs = Date.now();
+
+  const originGuard = validateSameOriginRequest(request);
 
   if (!originGuard.ok) {
     return originGuard.response;
@@ -325,12 +367,42 @@ export async function DELETE(request: Request) {
       });
     }
 
+    await logApiEvent({
+
+      requestId,
+
+      eventType: "api_key_revoked",
+
+      path: new URL(request.url).pathname,
+
+      method: request.method,
+
+      statusCode: 200,
+
+      startedAtMs,
+
+      accountId: account.id,
+
+      keyId: existing.id,
+
+      detail: "api_key_revoked",
+
+    });
+
     return NextResponse.json(
+
       {
+
         revoked: true,
+
         keyId: existing.id,
       },
-      { status: 200 }
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown API key revoke error.";

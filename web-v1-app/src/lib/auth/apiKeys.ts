@@ -224,6 +224,50 @@ export function buildApiKeyLast4(token: string): string {
   return token.slice(Math.max(0, token.length - 4));
 }
 
+
+const LAST_USED_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
+
+function shouldUpdateLastUsedAt(lastUsedAt: string | null): boolean {
+  if (!lastUsedAt) {
+    return true;
+  }
+
+  const parsed = new Date(lastUsedAt);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return true;
+  }
+
+  return Date.now() - parsed.getTime() >= LAST_USED_UPDATE_INTERVAL_MS;
+}
+
+export async function touchPersistedApiKeyLastUsedAt(
+  keyId: string,
+  lastUsedAt: string | null
+): Promise<void> {
+  if (!keyId || !shouldUpdateLastUsedAt(lastUsedAt)) {
+    return;
+  }
+
+  try {
+    await db.apiKey.updateMany({
+      where: {
+        id: keyId,
+        status: {
+          not: ApiKeyStatus.revoked,
+        },
+      },
+      data: {
+        lastUsedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    console.warn("[apiKeys] failed to update lastUsedAt", {
+      keyId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 export function parseDevApiKeysJson(raw: string): ApiKeyRecord[] {
   let parsed: unknown;
 

@@ -10,7 +10,9 @@ export type AuditEventType =
   | "auth_failed"
   | "rate_limited"
   | "file_served"
-  | "server_error";
+  | "server_error"
+  | "api_key_created"
+  | "api_key_revoked";
 
 export type LatencyBucket =
   | "lt_50ms"
@@ -46,12 +48,16 @@ export function createRequestId(): string {
   return randomUUID();
 }
 
+function isSafeRequestId(value: string): boolean {
+  return /^[A-Za-z0-9._:-]{1,128}$/.test(value);
+}
+
 export function getOrCreateRequestId(headers: Headers): string {
   const headerValue =
     headers.get("x-request-id")?.trim() ||
     headers.get("x-correlation-id")?.trim();
 
-  if (headerValue) {
+  if (headerValue && isSafeRequestId(headerValue)) {
     return headerValue;
   }
 
