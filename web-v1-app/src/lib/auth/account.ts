@@ -32,6 +32,26 @@ function logAccountWarn(message: string, data?: Record<string, unknown>): void {
   }
 }
 
+function logAccountError(message: string, data?: Record<string, unknown>): void {
+  if (shouldLogAccountDebug()) {
+    console.error(message, data);
+    return;
+  }
+
+  const error = data?.error;
+
+  console.error(message, {
+    code: data?.code ?? null,
+    hasUserId: Boolean(data?.userId),
+    hasEmail: Boolean(data?.email),
+    expectedTermsVersion: data?.expectedTermsVersion ?? null,
+    error:
+      error && typeof error === "object" && "name" in error
+        ? { name: (error as { name?: unknown }).name }
+        : null,
+  });
+}
+
 const ACCOUNT_INCLUDE = {
   subscriptions: {
     orderBy: {
@@ -388,7 +408,8 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
       );
 
       if (!pendingTermsAcceptance) {
-        console.error("[account] missing current terms acceptance for new account", {
+        logAccountError("[account] missing current terms acceptance for new account", {
+          code: "missing_current_terms_acceptance",
           userId: authProviderUserId,
           email,
           expectedTermsVersion: TERMS_VERSION,
@@ -475,7 +496,8 @@ export async function getCurrentAccountView(): Promise<CurrentAccountView> {
       historyDepthLabel: getHistoryDepthLabel(entitlementSnapshot),
     };
   } catch (error) {
-    console.error("[account] getCurrentAccountView failed", {
+    logAccountError("[account] getCurrentAccountView failed", {
+      code: "get_current_account_view_failed",
       userId: authProviderUserId,
       error:
         error instanceof Error
