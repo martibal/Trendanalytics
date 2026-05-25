@@ -476,6 +476,7 @@ type Props = {
   chains: LandingChainData[];
   briefs: Record<string, LandingBriefData>;
   updatedThrough: string;
+  lastRun?: string;
   pipelineDays?: number;
 };
 
@@ -487,6 +488,7 @@ export default function UrdAtlasVFinalLandingClient({
   chains,
   briefs,
   updatedThrough,
+  lastRun = "—",
   pipelineDays = 0,
 }: Props) {
   const [progress, setProgress] = useState(0);
@@ -498,7 +500,7 @@ export default function UrdAtlasVFinalLandingClient({
   const [jsonLoadState, setJsonLoadState] = useState<JsonLoadState>("loading");
   const [modalOpen, setModalOpen] = useState(false);
   const [forcePricingReveal, setForcePricingReveal] = useState(false);
-  const [lastRunDisplay, setLastRunDisplay] = useState("—");
+  const [lastRunDisplay, setLastRunDisplay] = useState(lastRun);
 
   const pipelineDaysDisplay = Number.isFinite(pipelineDays) && pipelineDays > 0
     ? pipelineDays.toLocaleString("en-US")
@@ -512,7 +514,7 @@ export default function UrdAtlasVFinalLandingClient({
     let cancelled = false;
 
     async function loadPublishedJson() {
-      const path = `/data/published/v1/${selectedJsonPath}`;
+      const path = `/api/v1/samples/${selectedJsonPath}`;
 
       setJsonLoadState("loading");
 
@@ -1356,8 +1358,8 @@ export default function UrdAtlasVFinalLandingClient({
                 </div>
 
                 <p className="ua-vf-json-note">
-                  This inspector reads the actual published latest.json files from the same public
-                  dataset path used by the application: {selectedJsonPath}.
+                  This inspector reads public sample latest.json files through the same server-side
+                  storage layer used by the application: {selectedJsonPath}.
                 </p>
 
                 <button

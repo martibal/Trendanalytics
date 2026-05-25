@@ -57,6 +57,11 @@ type HeroJson = {
   };
 };
 
+type DatasetJson = {
+  published_at?: string;
+  computed_at_utc?: string;
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -173,6 +178,21 @@ function formatBriefPathDate(date: string): string {
   } catch {
     return date;
   }
+}
+
+function formatRunDate(value: string | undefined): string {
+  if (!value) return "—";
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return parsed.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 function countLabelChanges(labels: Label[]): number {
@@ -372,6 +392,12 @@ async function buildUpdatedThrough(): Promise<string> {
   }
 }
 
+async function buildLastRun(): Promise<string> {
+  const dataset = await readJson<DatasetJson>("data/published/v1/dataset.json");
+
+  return formatRunDate(dataset?.published_at ?? dataset?.computed_at_utc);
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -385,10 +411,11 @@ function buildPipelineDays(): number {
 }
 
 export default async function HomePage() {
-  const [chains, briefs, updatedThrough] = await Promise.all([
+  const [chains, briefs, updatedThrough, lastRun] = await Promise.all([
     buildChainData(),
     buildBriefData(),
     buildUpdatedThrough(),
+    buildLastRun(),
   ]);
 
   const pipelineDays = buildPipelineDays();
@@ -398,6 +425,7 @@ export default async function HomePage() {
       chains={chains}
       briefs={briefs}
       updatedThrough={updatedThrough}
+      lastRun={lastRun}
       pipelineDays={pipelineDays}
     />
   );
