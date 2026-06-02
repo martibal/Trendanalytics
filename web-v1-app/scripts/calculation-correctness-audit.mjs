@@ -842,6 +842,8 @@ const MAX_TERMINAL_FAILURES = 40;
 const ROLLING_WINDOW_AUDIT_MAX_DATES_PER_CHAIN = 120;
 const ROLLING_WINDOW_RELATIVE_TOLERANCE = 1e-9;
 const ROLLING_WINDOW_ABSOLUTE_TOLERANCE = 1e-9;
+const NULL_ZERO_AUDIT_MAX_DATES_PER_CHAIN = 180;
+const CONFIDENCE_FORMULA_ABSOLUTE_TOLERANCE = 1e-9;
 
 function listDatedJsonFiles(genre, chain) {
   const chainDir = path.join(publishedRoot, genre, chain);
@@ -1161,6 +1163,435 @@ function evaluateRollingWindowCorrectness() {
     findings,
   };
 }
+function walkLeafValues(value, parts = [], out = []) {
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      out.push({
+        field: normalizePathForArrays([...parts, "[]"]),
+        value,
+        valueType: "empty_array",
+      });
+      return out;
+    }
+
+    value.forEach((item) => {
+      walkLeafValues(item, [...parts, "[]"], out);
+    });
+
+    return out;
+  }
+
+  if (isPlainObject(value)) {
+    const entries = Object.entries(value);
+
+    if (entries.length === 0) {
+      out.push({
+        field: normalizePathForArrays(parts),
+        value,
+        valueType: "empty_object",
+      });
+      return out;
+    }
+
+    for (const [key, child] of entries) {
+      walkLeafValues(child, [...parts, key], out);
+    }
+
+    return out;
+  }
+
+  out.push({
+    field: normalizePathForArrays(parts),
+    value,
+    valueType: value === null ? "null" : typeof value,
+  });
+
+  return out;
+}
+
+function isFiniteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isNear(actual, expected, tolerance = CONFIDENCE_FORMULA_ABSOLUTE_TOLERANCE) {
+  return Math.abs(actual - expected) <= tolerance;
+}
+
+function isSentinelString(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  return /^(nan|infinity|-infinity|null|none|undefined|n\/a)$/iu.test(value.trim());
+}
+
+function shouldCheckSentinelString(field) {
+  return (
+    field.startsWith("gold.") ||
+    field.startsWith("derived.") ||
+    field.startsWith("confidence.") ||
+    field.startsWith("coverage.") ||
+    field.startsWith("freshness.") ||
+    field.startsWith("regime.") ||
+    field.startsWith("scorecard.") ||
+    field.startsWith("publish_confidence.")
+  );
+}
+
+function metricNameFromPath(field) {
+  const parts = field.split(".");
+  return parts.length >= 2 ? parts[parts.length - 2] : "";
+}
+
+function leafNameFromPath(field) {
+  const parts = field.split(".");
+  return parts[parts.length - 1] ?? field;
+}
+
+function isDirectMetricLeaf(field) {
+  const leaf = leafNameFromPath(field);
+
+  return (
+    leaf === "current" ||
+    leaf === "current_raw" ||
+    leaf === "transformed_current" ||
+    BASE_GOLD_METRICS.includes(leaf) ||
+    /__(ma7|ma30)$/u.test(leaf)
+  );
+}
+
+function numericBoundsForField(genre, field) {
+  const lowerField = field.toLowerCase();
+  const leaf = leafNameFromPath(lowerField);
+  const metricName = metricNameFromPath(lowerField);
+
+  if (
+    lowerField.includes("confidence_score") ||
+    lowerField.includes("data_quality_score") ||
+    lowerField.includes("label_confidence_score") ||
+    lowerField.includes("coverage_factor") ||
+    lowerField.includes("effective_confidence") ||
+    lowerField.includes("current_row_coverage") ||
+    lowerField.includes("freshness_asof") ||
+    lowerField.includes("history_depth") ||
+    lowerField.includes("recent_density") ||
+    lowerField.includes("recent_metric_coverage") ||
+    lowerField.endsWith("non_null_ratio") ||
+    lowerField.endsWith("nonnull_ratio")
+  ) {
+    return { min: 0, max: 1, label: "[0,1] confidence/coverage ratio" };
+  }
+
+  if (
+    lowerField.includes("pct_90d") ||
+    lowerField.includes("pct_lookback")
+  ) {
+    return { min: 0, max: 100, label: "[0,100] percentile field" };
+  }
+
+  if (
+    /^scorecard\.dimensions\.(demand|friction|capacity)\.(score|score_raw)$/u.test(field) ||
+    /^scorecard\.dimensions\.(demand|friction|capacity)\.components\.[a-z0-9_]+\.score_raw$/u.test(field)
+  ) {
+    return { min: 0, max: 100, label: "[0,100] scorecard score" };
+  }
+
+  if (
+    lowerField.endsWith("lag_days") ||
+    lowerField.includes("lag_days_vs")
+  ) {
+    return { min: 0, max: Number.POSITIVE_INFINITY, label: "non-negative lag-days field" };
+  }
+
+  if (
+    (
+      leaf === "failed_tx_rate" ||
+      leaf === "gas_utilization_pct" ||
+      (
+        isDirectMetricLeaf(field) &&
+        (metricName === "failed_tx_rate" || metricName === "gas_utilization_pct")
+      )
+    )
+  ) {
+    return { min: 0, max: 1, label: "[0,1] rate/utilization field" };
+  }
+
+  if (
+    (
+      genre === "gold" ||
+      genre === "derived" ||
+      field.startsWith("regime.signals.") ||
+      field.startsWith("scorecard.dimensions.")
+    ) &&
+    isDirectMetricLeaf(field) &&
+    (
+      lowerField.includes("tx_count") ||
+      lowerField.includes("addresses") ||
+      lowerField.includes("value_transferred") ||
+      lowerField.includes("tx_value") ||
+      lowerField.includes("tx_fee") ||
+      lowerField.includes("block_time") ||
+      lowerField.includes("block_count")
+    )
+  ) {
+    return { min: 0, max: Number.POSITIVE_INFINITY, label: "non-negative observed metric value" };
+  }
+
+  return null;
+}
+function findOutOfBounds(value, bounds) {
+  if (!isFiniteNumber(value) || !bounds) {
+    return null;
+  }
+
+  if (value < bounds.min || value > bounds.max) {
+    return `Expected ${bounds.label}, got ${value}`;
+  }
+
+  return null;
+}
+
+function latestDatedItemsForGenreChain(genre, chain, maxDates = NULL_ZERO_AUDIT_MAX_DATES_PER_CHAIN) {
+  return listDatedJsonFiles(genre, chain).slice(-maxDates);
+}
+
+function evaluateNullZeroSemantics() {
+  const findings = [];
+  const checkedFiles = [];
+  let checkedLeaves = 0;
+  let boundedNumericChecks = 0;
+
+  for (const genre of GENRES) {
+    for (const chain of CHAINS) {
+      for (const item of latestDatedItemsForGenreChain(genre, chain)) {
+        const json = readJson(item.file);
+        const relativeFile = path.relative(root, item.file);
+        checkedFiles.push(relativeFile);
+
+        for (const leaf of walkLeafValues(json)) {
+          checkedLeaves += 1;
+          const field = normalizeObservedAuditField(genre, canonicalizeObservedField(genre, leaf.field));
+
+          if (typeof leaf.value === "string" && shouldCheckSentinelString(field) && isSentinelString(leaf.value)) {
+            findings.push({
+              severity: "fail",
+              auditItem: "C-005",
+              code: "STRING_SENTINEL_USED_FOR_NUMERIC_OR_NULL",
+              genre,
+              field,
+              detail: `${relativeFile} uses string sentinel ${JSON.stringify(leaf.value)}. Use JSON null for missing values and numeric 0 only for real observed zero.`,
+            });
+          }
+
+          if (isFiniteNumber(leaf.value)) {
+            const bounds = numericBoundsForField(genre, field);
+            const boundsError = findOutOfBounds(leaf.value, bounds);
+
+            if (bounds) {
+              boundedNumericChecks += 1;
+            }
+
+            if (boundsError) {
+              findings.push({
+                severity: "fail",
+                auditItem: "C-005",
+                code: "NUMERIC_VALUE_OUT_OF_POLICY_BOUNDS",
+                genre,
+                field,
+                detail: `${relativeFile}: ${boundsError}.`,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (checkedFiles.length === 0) {
+    findings.push({
+      severity: "warn",
+      auditItem: "C-005",
+      code: "NO_FILES_CHECKED_FOR_NULL_ZERO_SEMANTICS",
+      genre: "published-data",
+      field: "published files",
+      detail: "No published files were checked for null/zero semantics.",
+    });
+  }
+
+  return {
+    checkedFiles: checkedFiles.length,
+    checkedLeaves,
+    boundedNumericChecks,
+    maxDatesPerChain: NULL_ZERO_AUDIT_MAX_DATES_PER_CHAIN,
+    findings,
+  };
+}
+
+function evaluateConfidenceDegradation() {
+  const findings = [];
+  const checkedFiles = [];
+  let formulaChecks = 0;
+  let publishGateChecks = 0;
+  let regimeGateChecks = 0;
+
+  for (const chain of CHAINS) {
+    for (const item of latestDatedItemsForGenreChain("meta", chain)) {
+      const json = readJson(item.file);
+      const relativeFile = path.relative(root, item.file);
+      const confidence = nestedValue(json, ["confidence"]);
+      const publishConfidence = nestedValue(json, ["publish_confidence"]);
+      const regimeGate = nestedValue(json, ["regime", "gate"]);
+
+      if (!isPlainObject(confidence)) {
+        continue;
+      }
+
+      checkedFiles.push(relativeFile);
+
+      const confidenceScore = confidence.confidence_score;
+      const dataQualityScore = confidence.data_quality_score;
+      const labelConfidenceScore = confidence.label_confidence_score;
+
+      for (const [field, value] of [
+        ["confidence.confidence_score", confidenceScore],
+        ["confidence.data_quality_score", dataQualityScore],
+        ["confidence.label_confidence_score", labelConfidenceScore],
+      ]) {
+        if (value !== undefined && value !== null && !isFiniteNumber(value)) {
+          findings.push({
+            severity: "fail",
+            auditItem: "C-006",
+            code: "CONFIDENCE_FIELD_NOT_NUMERIC_OR_NULL",
+            genre: "meta",
+            field,
+            detail: `${relativeFile}: ${field} must be a finite number or null.`,
+          });
+        }
+
+        if (isFiniteNumber(value) && (value < 0 || value > 1)) {
+          findings.push({
+            severity: "fail",
+            auditItem: "C-006",
+            code: "CONFIDENCE_FIELD_OUT_OF_RANGE",
+            genre: "meta",
+            field,
+            detail: `${relativeFile}: ${field} must be in [0,1], got ${value}.`,
+          });
+        }
+      }
+
+      if (
+        confidence.formula === "sqrt(data_quality_score * label_confidence_score)" &&
+        isFiniteNumber(confidenceScore) &&
+        isFiniteNumber(dataQualityScore) &&
+        isFiniteNumber(labelConfidenceScore)
+      ) {
+        formulaChecks += 1;
+        const expected = Math.sqrt(dataQualityScore * labelConfidenceScore);
+
+        if (!isNear(confidenceScore, expected)) {
+          findings.push({
+            severity: "fail",
+            auditItem: "C-006",
+            code: "CONFIDENCE_FORMULA_MISMATCH",
+            genre: "meta",
+            field: "confidence.confidence_score",
+            detail: `${relativeFile}: confidence_score ${confidenceScore} does not match sqrt(data_quality_score * label_confidence_score) = ${expected}.`,
+          });
+        }
+      }
+
+      if (
+        isPlainObject(publishConfidence) &&
+        isFiniteNumber(publishConfidence.confidence_score) &&
+        isFiniteNumber(publishConfidence.threshold) &&
+        typeof publishConfidence.eligible === "boolean"
+      ) {
+        publishGateChecks += 1;
+        const expectedEligible = publishConfidence.confidence_score >= publishConfidence.threshold;
+
+        if (publishConfidence.eligible !== expectedEligible) {
+          findings.push({
+            severity: "fail",
+            auditItem: "C-006",
+            code: "PUBLISH_CONFIDENCE_GATE_MISMATCH",
+            genre: "meta",
+            field: "publish_confidence.eligible",
+            detail: `${relativeFile}: eligible=${publishConfidence.eligible}, but confidence_score ${publishConfidence.confidence_score} vs threshold ${publishConfidence.threshold} implies ${expectedEligible}.`,
+          });
+        }
+      }
+
+      if (
+        isPlainObject(regimeGate) &&
+        isFiniteNumber(regimeGate.confidence_score) &&
+        isFiniteNumber(regimeGate.threshold) &&
+        typeof regimeGate.status === "string"
+      ) {
+        regimeGateChecks += 1;
+        const aboveThreshold = regimeGate.confidence_score >= regimeGate.threshold;
+
+        if (aboveThreshold && regimeGate.status !== "ok") {
+          findings.push({
+            severity: "fail",
+            auditItem: "C-006",
+            code: "REGIME_GATE_STATUS_UNEXPECTEDLY_DEGRADED",
+            genre: "meta",
+            field: "regime.gate.status",
+            detail: `${relativeFile}: confidence_score ${regimeGate.confidence_score} is above threshold ${regimeGate.threshold}, but regime gate status is ${regimeGate.status}.`,
+          });
+        }
+
+        if (!aboveThreshold && regimeGate.status === "ok") {
+          findings.push({
+            severity: "fail",
+            auditItem: "C-006",
+            code: "REGIME_GATE_STATUS_NOT_DEGRADED",
+            genre: "meta",
+            field: "regime.gate.status",
+            detail: `${relativeFile}: confidence_score ${regimeGate.confidence_score} is below threshold ${regimeGate.threshold}, but regime gate status is ok.`,
+          });
+        }
+      }
+
+      if (
+        isFiniteNumber(confidenceScore) &&
+        isFiniteNumber(dataQualityScore) &&
+        dataQualityScore < 0.4 &&
+        confidenceScore > 0.7
+      ) {
+        findings.push({
+          severity: "fail",
+          auditItem: "C-006",
+          code: "HIGH_CONFIDENCE_WITH_LOW_DATA_QUALITY",
+          genre: "meta",
+          field: "confidence.confidence_score",
+          detail: `${relativeFile}: confidence_score ${confidenceScore} is high while data_quality_score ${dataQualityScore} is low.`,
+        });
+      }
+    }
+  }
+
+  if (checkedFiles.length === 0) {
+    findings.push({
+      severity: "warn",
+      auditItem: "C-006",
+      code: "NO_META_FILES_CHECKED_FOR_CONFIDENCE_DEGRADATION",
+      genre: "meta",
+      field: "confidence",
+      detail: "No meta files were checked for confidence degradation.",
+    });
+  }
+
+  return {
+    checkedFiles: checkedFiles.length,
+    formulaChecks,
+    publishGateChecks,
+    regimeGateChecks,
+    maxDatesPerChain: NULL_ZERO_AUDIT_MAX_DATES_PER_CHAIN,
+    findings,
+  };
+}
 function evaluate() {
   const { observed, missingFiles } = collectObservedFields();
   const observedUnique = uniqueObserved(observed);
@@ -1170,7 +1601,13 @@ function evaluate() {
   const rollingWindowAudit = evaluateRollingWindowCorrectness();
   findings.push(...rollingWindowAudit.findings);
 
-  for (const missingFile of missingFiles) {
+  
+  const nullZeroAudit = evaluateNullZeroSemantics();
+  findings.push(...nullZeroAudit.findings);
+
+  const confidenceDegradationAudit = evaluateConfidenceDegradation();
+  findings.push(...confidenceDegradationAudit.findings);
+for (const missingFile of missingFiles) {
     findings.push({
       severity: "fail",
       auditItem: "C-001",
@@ -1229,7 +1666,9 @@ function evaluate() {
     genres: GENRES,
     observedFields: observedUnique,
     rollingWindowAudit,
-    rollingWindowSummary: summarizeRollingWindowFindings(findings),
+    
+    nullZeroAudit,
+    confidenceDegradationAudit,rollingWindowSummary: summarizeRollingWindowFindings(findings),
     calculationInventory: CALCULATION_INVENTORY,
     findings,
   };
@@ -1402,6 +1841,36 @@ function markdownReport(result) {
   }
 
   lines.push("");
+  lines.push("");
+  lines.push("## Null/zero semantics audit");
+  lines.push("");
+  lines.push(`Checked files: ${result.nullZeroAudit.checkedFiles}`);
+  lines.push(`Checked scalar leaves: ${result.nullZeroAudit.checkedLeaves}`);
+  lines.push(`Bounded numeric checks: ${result.nullZeroAudit.boundedNumericChecks}`);
+  lines.push(`Max dated files per chain scanned: ${result.nullZeroAudit.maxDatesPerChain}`);
+  lines.push("");
+  lines.push("Policy:");
+  lines.push("- JSON null means missing or structurally unavailable.");
+  lines.push("- Numeric 0 means an observed zero, not missing.");
+  lines.push("- String sentinels such as NaN, Infinity, None, undefined, N/A, or string null are not allowed for calculated fields.");
+  lines.push("- Confidence, coverage, rates, percentiles, lag days, and scorecard scores must stay inside their documented numeric ranges.");
+
+  lines.push("");
+  lines.push("## Confidence degradation audit");
+  lines.push("");
+  lines.push(`Checked meta files: ${result.confidenceDegradationAudit.checkedFiles}`);
+  lines.push(`Formula checks: ${result.confidenceDegradationAudit.formulaChecks}`);
+  lines.push(`Publish-gate checks: ${result.confidenceDegradationAudit.publishGateChecks}`);
+  lines.push(`Regime-gate checks: ${result.confidenceDegradationAudit.regimeGateChecks}`);
+  lines.push(`Max meta files per chain scanned: ${result.confidenceDegradationAudit.maxDatesPerChain}`);
+  lines.push("");
+  lines.push("Policy:");
+  lines.push("- confidence_score, data_quality_score, and label_confidence_score must be finite numbers in [0,1] when present.");
+  lines.push("- confidence_score must match sqrt(data_quality_score * label_confidence_score) when that formula is declared.");
+  lines.push("- publish_confidence.eligible must match confidence_score >= threshold.");
+  lines.push("- regime.gate.status must not remain ok below its confidence threshold.");
+
+  lines.push("");
   lines.push("## Findings");
   lines.push("");
 
@@ -1432,9 +1901,11 @@ function markdownReport(result) {
   lines.push("- C-002 Metric Definition Completeness: checked for required definition metadata.");
   lines.push("- C-003 Rolling Window Arithmetic: recomputes derived ma7/ma30 samples from gold files.");
   lines.push("- C-004 No-Lookahead Causality: recomputation uses only current and prior calendar dates.");
+  lines.push("- C-005 Null/Zero Semantics: checks JSON null vs numeric zero policy, string sentinels, and numeric range bounds.");
+  lines.push("- C-006 Confidence Degradation: checks confidence formula, bounded confidence components, publish gate, and regime gate consistency.");
   lines.push("");
   lines.push(
-    "This script does not yet verify full fixture replay, edge cases, null/zero policy, confidence degradation logic, historical reproducibility, or deterministic hash behavior. Those are later Section C stages."
+    "This script does not yet verify full fixture replay, adversarial edge-case fixtures, historical reproducibility, or deterministic hash behavior. Those are later Section C stages."
   );
   lines.push("");
   return `${lines.join("\n")}\n`;
