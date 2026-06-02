@@ -159,7 +159,7 @@ export function whoThisIsForExplanation(): ExplainContent {
           cite a specific axis and a specific historical position rather than gestural language.
         </p>
 
-        <p className="mt-4 font-medium text-white">Risk, valuation, and compliance functions.</p>
+        <p className="mt-4 font-medium text-white">Risk, governance, and compliance functions.</p>
         <p className="mt-2">
           Each row exposes a <InlineCode>determinism_hash</InlineCode>, a{" "}
           <InlineCode>methodology_version</InlineCode>, and the publication confidence band the row

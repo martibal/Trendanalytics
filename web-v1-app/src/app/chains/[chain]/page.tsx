@@ -880,11 +880,11 @@ function confidenceExplanation(conf?: number, dataQuality?: number, labelSupport
         </p>
         <p className="mt-3">
           The correct advanced reading is to treat confidence as a model-governance and
-          interpretability control. High confidence means the row is more complete and the current
-          classification is more internally coherent; low confidence means either coverage or support
-          is weak enough that the label should be read defensively. It is deliberately orthogonal to
-          freshness: a row may be recent but poorly supported, or older but still structurally
-          coherent.
+          interpretability control. Higher confidence indicates fuller published evidence and stronger
+          internal support for the current descriptive classification; lower confidence indicates that
+          coverage or label support is weak enough that the label should be read defensively. It is
+          deliberately orthogonal to freshness: a row may be recent but weakly supported, or older but
+          still supported by internally consistent evidence.
         </p>
       </>
     ),

@@ -3,10 +3,12 @@
 """
 Export DERIVED JSON history (one file per chain/day) into data/calculated/derived.
 
-v1 goals:
+v2 goals:
 - Produce a stable derived layer immediately usable by a future web frontend.
 - Compute MA7 and MA30 for all numeric GOLD fields (excluding date/chain).
 - Optionally bring over a small, non-sensitive META confidence subset into derived.
+- Make incremental mode revision-safe by rewriting derived day-files when their
+  source GOLD/META lineage or derived producer version has changed.
 
 Inputs:
 - data/calculated/gold/<chain>/YYYY-MM-DD.json
@@ -21,11 +23,16 @@ Outputs:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
+
+
+DERIVED_PRODUCER_VERSION = "derived-json-history-v2-lineage-safe"
+ROLLING_FORMULA = "pandas.Series.rolling(window=N, min_periods=1).mean() over date-sorted GOLD rows"
 
 
 def _ensure_dir(p: Path) -> None:
@@ -36,6 +43,24 @@ def _write_json(path: Path, obj: Any) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
     tmp.replace(path)
+
+
+def _read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _canonical_json_bytes(obj: Any) -> bytes:
+    return json.dumps(
+        obj,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+
+
+def _sha256_json(obj: Any) -> str:
+    return hashlib.sha256(_canonical_json_bytes(obj)).hexdigest()
 
 
 def _parse_windows(s: str) -> List[int]:
@@ -53,11 +78,16 @@ def _parse_windows(s: str) -> List[int]:
 def _load_day_files(folder: Path, start: str) -> List[Dict[str, Any]]:
     if not folder.exists():
         return []
+
     out: List[Dict[str, Any]] = []
     for fp in sorted(folder.glob("????-??-??.json")):
         if fp.stem < start:
             continue
-        out.append(json.loads(fp.read_text(encoding="utf-8")))
+        obj = _read_json(fp)
+        if not isinstance(obj, dict):
+            raise ValueError(f"[DERIVED] Expected object in {fp}, got {type(obj).__name__}")
+        out.append(obj)
+
     return out
 
 
@@ -74,11 +104,103 @@ def _pick_meta_confidence(meta: Dict[str, Any]) -> Dict[str, Any]:
     c = meta.get("confidence", {}) if isinstance(meta, dict) else {}
     if not isinstance(c, dict):
         return {}
+
     out: Dict[str, Any] = {}
     for k in ("confidence_score", "data_freshness_days", "coverage_score", "quality_score"):
         if k in c:
             out[k] = c[k]
+
     return out
+
+
+def _load_meta_map(meta_chain_root: Path, start: str) -> Dict[str, Dict[str, Any]]:
+    meta_map: Dict[str, Dict[str, Any]] = {}
+
+    if not meta_chain_root.exists():
+        return meta_map
+
+    for fp in sorted(meta_chain_root.glob("????-??-??.json")):
+        if fp.stem < start:
+            continue
+
+        try:
+            obj = _read_json(fp)
+        except Exception:
+            continue
+
+        if isinstance(obj, dict):
+            meta_map[fp.stem] = obj
+
+    return meta_map
+
+
+def _source_signature(
+    *,
+    chain: str,
+    day: str,
+    gold_row: Dict[str, Any],
+    meta_row: Optional[Dict[str, Any]],
+    metric_cols: List[str],
+) -> Dict[str, Any]:
+    return {
+        "producer": DERIVED_PRODUCER_VERSION,
+        "formula": ROLLING_FORMULA,
+        "chain": chain,
+        "date": day,
+        "gold_sha256": _sha256_json(gold_row),
+        "meta_sha256": _sha256_json(meta_row) if isinstance(meta_row, dict) else None,
+        "metric_columns": metric_cols,
+        "rolling_windows": [7, 30],
+    }
+
+
+def _existing_source_signature(existing_obj: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(existing_obj, dict):
+        return None
+
+    derived = existing_obj.get("derived")
+    if not isinstance(derived, dict):
+        return None
+
+    source = derived.get("source")
+    return source if isinstance(source, dict) else None
+
+
+def _existing_metrics(existing_obj: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(existing_obj, dict):
+        return None
+
+    derived = existing_obj.get("derived")
+    if not isinstance(derived, dict):
+        return None
+
+    metrics = derived.get("metrics")
+    return metrics if isinstance(metrics, dict) else None
+
+
+def _needs_write(target: Path, rec: Dict[str, Any]) -> bool:
+    if not target.exists():
+        return True
+
+    try:
+        existing = _read_json(target)
+    except Exception:
+        return True
+
+    derived = rec.get("derived")
+    if not isinstance(derived, dict):
+        return True
+
+    next_source = derived.get("source")
+    next_metrics = derived.get("metrics")
+
+    if _existing_source_signature(existing) != next_source:
+        return True
+
+    if _existing_metrics(existing) != next_metrics:
+        return True
+
+    return False
 
 
 def _derive_chain(
@@ -113,20 +235,19 @@ def _derive_chain(
         df[f"{c}__ma7"] = _rolling_mean(df[c], 7)
         df[f"{c}__ma30"] = _rolling_mean(df[c], 30)
 
-    meta_map: Dict[str, Dict[str, Any]] = {}
-    if meta_chain_root.exists():
-        for fp in sorted(meta_chain_root.glob("????-??-??.json")):
-            if fp.stem < start:
-                continue
-            try:
-                meta_map[fp.stem] = json.loads(fp.read_text(encoding="utf-8"))
-            except Exception:
-                continue
+    meta_map = _load_meta_map(meta_chain_root, start=start)
+    gold_by_date: Dict[str, Dict[str, Any]] = {str(item["date"]): item for item in gold_days if "date" in item}
 
     records: List[Dict[str, Any]] = []
     for _, row in df.iterrows():
         day = str(row["date"])
+        gold_row = gold_by_date.get(day)
+        if not isinstance(gold_row, dict):
+            raise ValueError(f"[DERIVED] {chain}: could not map GOLD source row for {day}")
+
+        meta_row = meta_map.get(day)
         derived_metrics: Dict[str, Any] = {}
+
         for c in metric_cols:
             v7 = row.get(f"{c}__ma7")
             v30 = row.get(f"{c}__ma30")
@@ -138,8 +259,15 @@ def _derive_chain(
             "chain": chain,
             "derived": {
                 "metrics": derived_metrics,
-                "context_blocks": [],  # populated later
-                "meta_confidence": _pick_meta_confidence(meta_map.get(day, {})) if meta_map else {},
+                "context_blocks": [],
+                "meta_confidence": _pick_meta_confidence(meta_row) if isinstance(meta_row, dict) else {},
+                "source": _source_signature(
+                    chain=chain,
+                    day=day,
+                    gold_row=gold_row,
+                    meta_row=meta_row,
+                    metric_cols=metric_cols,
+                ),
             },
         }
         records.append(rec)
@@ -148,11 +276,11 @@ def _derive_chain(
 
     wrote = 0
     if mode == "incremental":
-        existing = {p.stem for p in out_chain_root.glob("????-??-??.json")}
         for rec in records:
-            if rec["date"] in existing:
+            target = out_chain_root / f"{rec['date']}.json"
+            if not _needs_write(target, rec):
                 continue
-            _write_json(out_chain_root / f"{rec['date']}.json", rec)
+            _write_json(target, rec)
             wrote += 1
     else:
         for rec in records:
@@ -164,7 +292,7 @@ def _derive_chain(
         chunk = records[-w:] if len(records) >= w else records
         _write_json(out_chain_root / f"last{w}d.json", chunk)
 
-    print(f"[DERIVED] {chain}: wrote {wrote} day-file(s), latest/lastXd refreshed")
+    print(f"[DERIVED] {chain}: wrote {wrote} changed day-file(s), latest/lastXd refreshed")
     return wrote
 
 
@@ -202,7 +330,7 @@ def main() -> int:
             windows=windows,
         )
 
-    print(f"[DERIVED] Done. Total day-files written: {total}")
+    print(f"[DERIVED] Done. Total changed day-files written: {total}")
     return 0
 
 

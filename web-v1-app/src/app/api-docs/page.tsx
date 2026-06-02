@@ -51,6 +51,7 @@ export default async function ApiDocsPage() {
           <div className="mt-2">Published revision <InlineCode>{dataset?.version ?? "—"}</InlineCode></div>
           <div className="mt-1">Methodology <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
           <div className="mt-2 text-[var(--urd-text-body)]">Public provenance is anchored in date, updated_through, methodology_version, published revision, and regime.determinism_hash.</div>
+          <div className="mt-2 text-[var(--urd-text-body)]">Product boundary: no price data, no forecasts, and no investment advice. API outputs are descriptive on-chain reference data only.</div>
         </div>
       </PageHero>
 

@@ -19,7 +19,7 @@ const AUDIENCE_CARDS = [
     eyebrow: "For traders",
     headline: "Test whether a strategy holds in every chain condition — or only some",
     body:
-      "Tag every day in your own backtest with the published on-chain regime, then split your PnL by regime. See which conditions actually carry the edge.",
+      "Tag every day in your own backtest with the published on-chain regime, then split your PnL by regime. See which conditions account for the observed performance pattern.",
   },
   {
     key: "analysts",
@@ -45,7 +45,7 @@ const QUICK_USES = [
   },
   {
     label: "Confidence-gated pipelines",
-    note: "Drop rows below the 0.40 publication threshold from training and live runs.",
+    note: "Drop rows below the 0.40 publication threshold from training and production analysis.",
   },
   {
     label: "Hash-anchored audit trail",
@@ -78,7 +78,7 @@ export default function WhoThisIsFor() {
                   Strict on-chain context, delivered as JSON your existing pipelines can read.
                 </h2>
                 <p className="mt-3 max-w-[760px] text-[15px] font-medium leading-7 text-[#27476f]">
-                  No price. No forecast. No recommendations. A daily, named on-chain state per
+                  No price data. No forecasts. No recommendations. A daily, named on-chain state per
                   chain with confidence and provenance — so the same record drives a backtest, a
                   research note, and a compliance citation.
                 </p>
@@ -196,8 +196,8 @@ function WhoForModal() {
           <p>
             A strategy that is profitable on average can still lose money systematically in
             specific market conditions. With a regime label on every day, a backtest can be split
-            by condition. The strategy is not judged by its average — it is judged by where the
-            average actually comes from.
+            by condition. The strategy is not judged by its average — it is grouped by where the
+            observed results came from.
           </p>
 
           <SubHead>Analysts use this to write concrete notes.</SubHead>
@@ -249,12 +249,12 @@ function WhoForModal() {
             historical position rather than gestural language.
           </p>
 
-          <SubHead>Risk, valuation, and compliance functions.</SubHead>
+          <SubHead>Risk, governance, and compliance functions.</SubHead>
           <p>
             Each row exposes a <Code>determinism_hash</Code>, a{" "}
             <Code>methodology_version</Code>, and the publication confidence band the row fell
-            into at the time of publishing. Together these provide reproducibility guarantees
-            adequate for regulator-readable documentation, LP reporting, and post-mortem
+            into at the time of publishing. Together these provide reproducibility evidence
+            suitable for regulator-readable documentation, LP reporting, and post-mortem
             reconstruction. Weak evidence degrades to <Code>UNKNOWN/DEGRADED</Code> rather than
             being smoothed into a named regime, which is the relevant property for defensible
             record-keeping.
@@ -286,26 +286,25 @@ function WhatForModal() {
         <ModalPanel tone="basic" label="Basic">
           <p>
             Urd Atlas publishes three JSON files per chain per day. Customers do not look at them
-            as charts — they read them with code, join them onto their own data, and let them
-            drive something else.
+            as charts — they read them with code, join them onto their own data, and use them as
+            documented context.
           </p>
 
           <SubHead>1. Tag every day with a regime, then split your own data by it.</SubHead>
           <p>
-            A trader takes her own table of daily PnL, attaches the published regime label to
-            each date, and groups the results. She might find that a strategy that looks
-            profitable on average actually delivers all of its returns in STABLE periods and
-            quietly bleeds during CONGESTED ones. That is not a verdict on the strategy — it is a
-            map of when the strategy belongs in the book and when it does not.
+            An analyst takes an internal table of daily PnL, attaches the published regime label
+            to each date, and groups the results. The output shows how that internal series varied
+            across STABLE, HEATING, CONGESTED, CHEAP, and UNKNOWN/DEGRADED periods. That is not a
+            verdict or instruction; it is a historical grouping of the user&apos;s own records.
           </p>
 
-          <SubHead>2. Filter out unreliable days automatically.</SubHead>
+          <SubHead>2. Filter out weak-support days automatically.</SubHead>
           <p>
-            Not every day produces a clean signal. Some days the underlying data is delayed,
-            sparse, or noisy. Each row carries a confidence score from 0 to 1 and a publication
-            threshold (default 0.40). Below the threshold the label degrades to UNKNOWN/DEGRADED.
-            A pipeline can simply drop those rows from training and live execution, and the model
-            never learns from a bad day.
+            Not every day produces a well-supported label. Some days the underlying data is
+            delayed, sparse, or noisy. Each row carries a confidence score from 0 to 1 and a
+            publication threshold (default 0.40). Below the threshold the label degrades to
+            UNKNOWN/DEGRADED. A pipeline can exclude those rows from training and production
+            ingestion so weak-support rows do not enter downstream features.
           </p>
 
           <SubHead>3. Read the network in concrete language.</SubHead>
@@ -320,11 +319,11 @@ function WhatForModal() {
             The reader can open the row and verify every clause.
           </p>
 
-          <SubHead>4. Prove a past call after the fact.</SubHead>
+          <SubHead>4. Verify a past classification after the fact.</SubHead>
           <p>
             Each published row has a determinism hash — a short fingerprint tied to its inputs
-            and method. Months later, a desk can cite that hash and prove the classification was
-            real on that date and has not been edited. This matters for post-mortems, investor
+            and method. Months later, a desk can cite that hash and verify the classification was
+            present on that date and has not been edited. This matters for post-mortems, investor
             letters, and internal audit trails.
           </p>
 
@@ -354,7 +353,7 @@ function WhatForModal() {
             <Code>methodology_version</Code> are tracked alongside the join.
           </p>
 
-          <SubHead>Confidence-gated training and execution.</SubHead>
+          <SubHead>Confidence-gated training and production ingestion.</SubHead>
           <p>
             Filter on <Code>confidence.confidence_score &gt;= threshold</Code> (canonical 0.40,
             configurable upward) before passing rows into a model. This excludes

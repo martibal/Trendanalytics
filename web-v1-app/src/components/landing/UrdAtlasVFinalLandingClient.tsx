@@ -922,8 +922,8 @@ export default function UrdAtlasVFinalLandingClient({
             <p className="ua-vf-hero-question-copy" style={{ marginBottom: "24px" }}>
               Urd Atlas measures transaction activity, fee pressure and capacity across Bitcoin,
               Ethereum, Arbitrum and Base every day and publishes one verified, documented answer
-              per chain. Know exactly whether each network has been running at its usual pace,
-              building pressure, or easing off before you make your next move.
+              per chain. Each chain card shows whether the latest published network state is running
+              near its usual pace, building pressure, or easing off relative to its own recent history.
             </p>
             <div className="ua-vf-btn-row">
               <a href="#json" className="ua-vf-btn-primary">

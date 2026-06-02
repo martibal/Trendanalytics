@@ -41,6 +41,14 @@ export default function MethodologyOverviewPage() {
 
         <MethodologyNav />
 
+        <Callout title="Product boundary">
+          <p>
+            Methodology pages document descriptive on-chain reference data only: no price data, no forecasts,
+            and no recommendation outputs. Confidence and coverage explain how well the
+            published row is supported; they do not turn regime labels into advice or market predictions.
+          </p>
+        </Callout>
+
         <ShortFullContent
           pageKey="methodology-overview"
           summary={
