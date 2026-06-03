@@ -1,5 +1,6 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /*START FILE*/
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -56,6 +57,9 @@ function discoverPublishedRoot() {
 }
 
 const publishedRoot = discoverPublishedRoot();
+const privateMirrorRoot = path.resolve(path.join(root, ".private-data", "published", "v1"));
+const publicPublishedRoot = path.resolve(path.join(root, "public", "data", "published", "v1"));
+const fileApiRoutePath = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
 
 function ensureReportDir() {
   fs.mkdirSync(reportDir, { recursive: true });
@@ -477,6 +481,330 @@ function evaluateDerivedLineage(findings) {
   return { checked, withSource };
 }
 
+function evaluatePrivateMirrorConsistency(findings) {
+  const sourceFiles = listFilesRecursive(publishedRoot);
+  const mirrorFiles = listFilesRecursive(privateMirrorRoot);
+  const mirrorByRelativePath = new Map();
+
+  let compared = 0;
+  let missing = 0;
+  let mismatched = 0;
+  let extra = 0;
+
+  if (!fs.existsSync(privateMirrorRoot)) {
+    addFinding(
+      findings,
+      "fail",
+      "D-007",
+      "PRIVATE_MIRROR_ROOT_MISSING",
+      path.relative(root, privateMirrorRoot),
+      "The private webapp published-data mirror is missing. Run publish-web-data.ps1 -SkipPush before build/deploy."
+    );
+
+    return {
+      sourceFiles: sourceFiles.length,
+      mirrorFiles: 0,
+      compared,
+      missing: sourceFiles.length,
+      mismatched,
+      extra,
+    };
+  }
+
+  for (const file of mirrorFiles) {
+    const relative = normalizeRelativePath(path.relative(privateMirrorRoot, file));
+    mirrorByRelativePath.set(relative, file);
+  }
+
+  for (const sourceFile of sourceFiles) {
+    const relative = normalizeRelativePath(path.relative(publishedRoot, sourceFile));
+    const mirrorFile = mirrorByRelativePath.get(relative);
+
+    if (!mirrorFile) {
+      missing += 1;
+      addFinding(
+        findings,
+        "fail",
+        "D-007",
+        "PRIVATE_MIRROR_FILE_MISSING",
+        path.relative(root, path.join(privateMirrorRoot, relative)),
+        `Private mirror is missing source published file ${relative}.`
+      );
+      continue;
+    }
+
+    compared += 1;
+
+    if (sha256File(sourceFile) !== sha256File(mirrorFile)) {
+      mismatched += 1;
+      addFinding(
+        findings,
+        "fail",
+        "D-007",
+        "PRIVATE_MIRROR_FILE_MISMATCH",
+        path.relative(root, mirrorFile),
+        `Private mirror file does not byte-match source published file ${relative}.`
+      );
+    }
+  }
+
+  const sourceRelativePaths = new Set(
+    sourceFiles.map((file) => normalizeRelativePath(path.relative(publishedRoot, file)))
+  );
+
+  for (const mirrorFile of mirrorFiles) {
+    const relative = normalizeRelativePath(path.relative(privateMirrorRoot, mirrorFile));
+
+    if (!sourceRelativePaths.has(relative)) {
+      extra += 1;
+      addFinding(
+        findings,
+        "warn",
+        "D-007",
+        "PRIVATE_MIRROR_EXTRA_FILE",
+        path.relative(root, mirrorFile),
+        `Private mirror contains a file not present in source published root: ${relative}.`
+      );
+    }
+  }
+
+  return {
+    sourceFiles: sourceFiles.length,
+    mirrorFiles: mirrorFiles.length,
+    compared,
+    missing,
+    mismatched,
+    extra,
+  };
+}
+
+function evaluatePublicExposureBoundary(findings) {
+  const forbiddenGenres = ["gold", "meta", "derived"];
+  let forbiddenFiles = 0;
+  let checkedDirectories = 0;
+
+  if (!fs.existsSync(publicPublishedRoot)) {
+    return {
+      publicRootExists: false,
+      checkedDirectories,
+      forbiddenFiles,
+    };
+  }
+
+  for (const genre of forbiddenGenres) {
+    const dir = path.join(publicPublishedRoot, genre);
+    checkedDirectories += 1;
+
+    const files = listFilesRecursive(dir);
+    forbiddenFiles += files.length;
+
+    for (const file of files.slice(0, 100)) {
+      addFinding(
+        findings,
+        "fail",
+        "D-008",
+        "SUBSCRIBER_ARTIFACT_PUBLICLY_EXPOSED",
+        path.relative(root, file),
+        `${genre} artifact exists under web-v1-app/public/data/published/v1. Subscriber-bound datasets must be served from the private mirror/API gate, not the public static directory.`
+      );
+    }
+
+    if (files.length > 100) {
+      addFinding(
+        findings,
+        "fail",
+        "D-008",
+        "SUBSCRIBER_ARTIFACT_PUBLIC_EXPOSURE_CAPPED",
+        path.relative(root, dir),
+        `${files.length} ${genre} files exist under the public static published-data tree; terminal/report findings were capped.`
+      );
+    }
+  }
+
+  return {
+    publicRootExists: true,
+    checkedDirectories,
+    forbiddenFiles,
+  };
+}
+
+function evaluateFileApiRouteContract(findings) {
+  const relativeFile = path.relative(root, fileApiRoutePath);
+
+  const result = {
+    routeExists: fs.existsSync(fileApiRoutePath),
+    hasPrivateStoragePathPrefix: false,
+    hasEntitlementEvaluation: false,
+    readsStorageObject: false,
+    entitlementBeforeStorageRead: false,
+    hasPrivateNoStoreCache: false,
+    hasRequestIdHeader: false,
+  };
+
+  if (!result.routeExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-009",
+      "FILE_API_ROUTE_MISSING",
+      relativeFile,
+      "Expected subscriber file-delivery route is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(fileApiRoutePath, "utf8").replace(/^\uFEFF/u, "");
+
+  result.hasPrivateStoragePathPrefix =
+    source.includes('path.posix.join("data", "published", "v1"') ||
+    source.includes("path.posix.join('data', 'published', 'v1'");
+
+  result.hasEntitlementEvaluation = source.includes("evaluateFileEntitlement(");
+  result.readsStorageObject = source.includes("readStorageObject(storagePath)");
+  result.hasPrivateNoStoreCache = source.includes('"Cache-Control": "private, no-store"') || source.includes("'Cache-Control': 'private, no-store'");
+  result.hasRequestIdHeader = source.includes('"X-Request-Id"') || source.includes("'X-Request-Id'");
+
+  const entitlementIndex = source.indexOf("evaluateFileEntitlement(");
+  const readIndex = source.indexOf("readStorageObject(storagePath)");
+  result.entitlementBeforeStorageRead = entitlementIndex >= 0 && readIndex >= 0 && entitlementIndex < readIndex;
+
+  if (!result.hasPrivateStoragePathPrefix) {
+    addFinding(
+      findings,
+      "fail",
+      "D-009",
+      "FILE_API_STORAGE_PREFIX_CONTRACT_MISSING",
+      relativeFile,
+      "File API route must build storage paths under data/published/v1."
+    );
+  }
+
+  if (!result.hasEntitlementEvaluation) {
+    addFinding(
+      findings,
+      "fail",
+      "D-009",
+      "FILE_API_ENTITLEMENT_EVALUATION_MISSING",
+      relativeFile,
+      "File API route must evaluate subscriber entitlement before serving files."
+    );
+  }
+
+  if (!result.readsStorageObject) {
+    addFinding(
+      findings,
+      "fail",
+      "D-009",
+      "FILE_API_STORAGE_READ_MISSING",
+      relativeFile,
+      "File API route must read files through readStorageObject(storagePath)."
+    );
+  }
+
+  if (!result.entitlementBeforeStorageRead) {
+    addFinding(
+      findings,
+      "fail",
+      "D-009",
+      "FILE_API_STORAGE_READ_BEFORE_ENTITLEMENT",
+      relativeFile,
+      "File API route must evaluate entitlement before reading the storage object."
+    );
+  }
+
+  if (!result.hasPrivateNoStoreCache) {
+    addFinding(
+      findings,
+      "fail",
+      "D-009",
+      "FILE_API_PRIVATE_CACHE_HEADER_MISSING",
+      relativeFile,
+      "File API route must return Cache-Control: private, no-store for subscriber-bound file responses."
+    );
+  }
+
+  if (!result.hasRequestIdHeader) {
+    addFinding(
+      findings,
+      "fail",
+      "D-009",
+      "FILE_API_REQUEST_ID_HEADER_MISSING",
+      relativeFile,
+      "File API route should include X-Request-Id for auditability."
+    );
+  }
+
+  return result;
+}
+
+function evaluateJsonEncodingAndParse(findings) {
+  const jsonFiles = [
+    path.join(root, "package.json"),
+    ...listFilesRecursive(publishedRoot).filter((file) => file.endsWith(".json")),
+    ...listFilesRecursive(privateMirrorRoot).filter((file) => file.endsWith(".json")),
+  ];
+
+  const textFilesThatMustNotHaveBom = [
+    path.join(root, "package.json"),
+    path.join(root, "scripts", "publication-integrity-audit.mjs"),
+  ];
+
+  let parsedJsonFiles = 0;
+  let jsonFilesWithBom = 0;
+  let invalidJsonFiles = 0;
+  let textFilesWithBom = 0;
+
+  for (const file of textFilesThatMustNotHaveBom) {
+    if (hasUtf8Bom(file)) {
+      textFilesWithBom += 1;
+      addFinding(
+        findings,
+        "fail",
+        "D-010",
+        "TEXT_FILE_HAS_UTF8_BOM",
+        path.relative(root, file),
+        "Text file starts with a UTF-8 BOM. This has previously broken package parsing/build behavior and should not be reintroduced."
+      );
+    }
+  }
+
+  for (const file of jsonFiles) {
+    if (hasUtf8Bom(file)) {
+      jsonFilesWithBom += 1;
+      addFinding(
+        findings,
+        "fail",
+        "D-010",
+        "JSON_FILE_HAS_UTF8_BOM",
+        path.relative(root, file),
+        "JSON file starts with a UTF-8 BOM."
+      );
+    }
+
+    try {
+      JSON.parse(fs.readFileSync(file, "utf8").replace(/^\uFEFF/u, ""));
+      parsedJsonFiles += 1;
+    } catch (error) {
+      invalidJsonFiles += 1;
+      addFinding(
+        findings,
+        "fail",
+        "D-010",
+        "JSON_FILE_PARSE_ERROR",
+        path.relative(root, file),
+        error instanceof Error ? error.message : "JSON parse failed."
+      );
+    }
+  }
+
+  return {
+    parsedJsonFiles,
+    jsonFilesWithBom,
+    invalidJsonFiles,
+    textFilesWithBom,
+  };
+}
 function evaluate() {
   const findings = [];
 
@@ -490,6 +818,10 @@ function evaluate() {
   evaluateLatestPointers(findings, inventory);
   evaluateWindowFiles(findings, inventory);
   const derivedLineage = evaluateDerivedLineage(findings);
+  const privateMirrorAudit = evaluatePrivateMirrorConsistency(findings);
+  const publicExposureAudit = evaluatePublicExposureBoundary(findings);
+  const fileApiRouteContract = evaluateFileApiRouteContract(findings);
+  const jsonEncodingAudit = evaluateJsonEncodingAndParse(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -499,6 +831,10 @@ function evaluate() {
     datasetPresent: !!dataset,
     inventory,
     derivedLineage,
+    privateMirrorAudit,
+    publicExposureAudit,
+    fileApiRouteContract,
+    jsonEncodingAudit,
     findings,
   };
 }
@@ -528,6 +864,42 @@ function markdownReport(result) {
   lines.push(`With derived.source lineage block: ${result.derivedLineage.withSource}`);
   lines.push("");
   lines.push("Note: this audit verifies lineage block presence and source/date/window consistency. It does not recompute Python canonical JSON hashes because Python and JavaScript serialize floating-point numbers differently.");
+  lines.push("");
+  lines.push("");
+  lines.push("## Private mirror consistency");
+  lines.push("");
+  lines.push(`Source published files: ${result.privateMirrorAudit.sourceFiles}`);
+  lines.push(`Private mirror files: ${result.privateMirrorAudit.mirrorFiles}`);
+  lines.push(`Compared files: ${result.privateMirrorAudit.compared}`);
+  lines.push(`Missing in mirror: ${result.privateMirrorAudit.missing}`);
+  lines.push(`Mismatched mirror files: ${result.privateMirrorAudit.mismatched}`);
+  lines.push(`Extra mirror files: ${result.privateMirrorAudit.extra}`);
+  lines.push("");
+
+  lines.push("## Public exposure boundary");
+  lines.push("");
+  lines.push(`Public published root exists: ${result.publicExposureAudit.publicRootExists}`);
+  lines.push(`Checked subscriber-bound public directories: ${result.publicExposureAudit.checkedDirectories}`);
+  lines.push(`Forbidden public files: ${result.publicExposureAudit.forbiddenFiles}`);
+  lines.push("");
+
+  lines.push("## File API route contract");
+  lines.push("");
+  lines.push(`Route exists: ${result.fileApiRouteContract.routeExists}`);
+  lines.push(`Storage prefix under data/published/v1: ${result.fileApiRouteContract.hasPrivateStoragePathPrefix}`);
+  lines.push(`Entitlement evaluation present: ${result.fileApiRouteContract.hasEntitlementEvaluation}`);
+  lines.push(`Storage read present: ${result.fileApiRouteContract.readsStorageObject}`);
+  lines.push(`Entitlement before storage read: ${result.fileApiRouteContract.entitlementBeforeStorageRead}`);
+  lines.push(`Private no-store cache header: ${result.fileApiRouteContract.hasPrivateNoStoreCache}`);
+  lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
+  lines.push("");
+
+  lines.push("## JSON and encoding integrity");
+  lines.push("");
+  lines.push(`Parsed JSON files: ${result.jsonEncodingAudit.parsedJsonFiles}`);
+  lines.push(`JSON files with UTF-8 BOM: ${result.jsonEncodingAudit.jsonFilesWithBom}`);
+  lines.push(`Invalid JSON files: ${result.jsonEncodingAudit.invalidJsonFiles}`);
+  lines.push(`Protected text files with UTF-8 BOM: ${result.jsonEncodingAudit.textFilesWithBom}`);
   lines.push("");
   lines.push("## Findings");
   lines.push("");
