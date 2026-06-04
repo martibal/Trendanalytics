@@ -60,6 +60,7 @@ const publishedRoot = discoverPublishedRoot();
 const privateMirrorRoot = path.resolve(path.join(root, ".private-data", "published", "v1"));
 const publicPublishedRoot = path.resolve(path.join(root, "public", "data", "published", "v1"));
 const fileApiRoutePath = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
+const fileApiDocsPath = path.join(root, "src", "app", "api-docs", "page.tsx");
 
 function ensureReportDir() {
   fs.mkdirSync(reportDir, { recursive: true });
@@ -71,6 +72,59 @@ function readJson(file) {
 
 function writeJson(file, obj) {
   fs.writeFileSync(file, `${JSON.stringify(obj, null, 2)}\n`, "utf8");
+}
+
+function sha256File(file) {
+  return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+}
+
+function normalizeRelativePath(value) {
+  return value.split(path.sep).join("/");
+}
+
+function listFilesRecursive(dir) {
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+
+  const out = [];
+  const stack = [dir];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const fullPath = path.join(current, entry.name);
+
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+        continue;
+      }
+
+      if (entry.isFile()) {
+        out.push(fullPath);
+      }
+    }
+  }
+
+  return out.sort();
+}
+
+function hasUtf8Bom(file) {
+  if (!fs.existsSync(file)) {
+    return false;
+  }
+
+  const fd = fs.openSync(file, "r");
+
+  try {
+    const buffer = Buffer.alloc(3);
+    const bytesRead = fs.readSync(fd, buffer, 0, 3, 0);
+
+    return bytesRead === 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf;
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 function isPlainObject(value) {
@@ -805,6 +859,160 @@ function evaluateJsonEncodingAndParse(findings) {
     textFilesWithBom,
   };
 }
+function expectedArtifactPathForApiSegments(segments) {
+  if (!Array.isArray(segments) || segments.length < 3) {
+    return null;
+  }
+
+  const [genre, chain, third, fourth] = segments;
+
+  if (!GENRES.includes(genre) || !CHAINS.includes(chain)) {
+    return null;
+  }
+
+  if (segments.length === 3 && third === "latest.json") {
+    return path.join(privateMirrorRoot, genre, chain, "latest.json");
+  }
+
+  if (segments.length === 4 && fourth === "latest.json") {
+    const windowMap = new Map([
+      ["7d", "last7d.json"],
+      ["30d", "last30d.json"],
+      ["90d", "last90d.json"],
+      ["180d", "last180d.json"],
+      ["365d", "last365d.json"],
+    ]);
+
+    const windowFile = windowMap.get(third);
+    return windowFile ? path.join(privateMirrorRoot, genre, chain, windowFile) : null;
+  }
+
+  return null;
+}
+
+function documentedFileApiPatterns() {
+  if (!fs.existsSync(fileApiDocsPath)) {
+    return [];
+  }
+
+  const source = fs.readFileSync(fileApiDocsPath, "utf8").replace(/^\uFEFF/u, "");
+  const patterns = new Set();
+  const regex = /\/api\/v1\/files\/[^"`<>\s)]+/gu;
+  let match = regex.exec(source);
+
+  while (match) {
+    patterns.add(match[0]);
+    match = regex.exec(source);
+  }
+
+  return [...patterns].sort();
+}
+
+function sampleApiFilePaths() {
+  const out = [];
+
+  for (const genre of GENRES) {
+    for (const chain of CHAINS) {
+      out.push({
+        apiPath: `/api/v1/files/${genre}/${chain}/latest.json`,
+        segments: [genre, chain, "latest.json"],
+      });
+
+      for (const windowDays of WINDOWS) {
+        out.push({
+          apiPath: `/api/v1/files/${genre}/${chain}/${windowDays}d/latest.json`,
+          segments: [genre, chain, `${windowDays}d`, "latest.json"],
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+function evaluateFileApiArtifactMapping(findings) {
+  const documentedPatterns = documentedFileApiPatterns();
+  const samples = sampleApiFilePaths();
+
+  let checked = 0;
+  let missingExpectedArtifacts = 0;
+  let impossibleMappings = 0;
+
+  for (const sample of samples) {
+    const expectedArtifact = expectedArtifactPathForApiSegments(sample.segments);
+
+    if (!expectedArtifact) {
+      impossibleMappings += 1;
+      addFinding(
+        findings,
+        "fail",
+        "D-011",
+        "FILE_API_PATH_HAS_NO_ARTIFACT_MAPPING",
+        sample.apiPath,
+        "The API file path shape cannot be mapped to a known published artifact file."
+      );
+      continue;
+    }
+
+    checked += 1;
+
+    if (!fs.existsSync(expectedArtifact)) {
+      missingExpectedArtifacts += 1;
+      addFinding(
+        findings,
+        "fail",
+        "D-011",
+        "FILE_API_EXPECTED_ARTIFACT_MISSING",
+        sample.apiPath,
+        `Expected private artifact is missing: ${path.relative(root, expectedArtifact)}.`
+      );
+    }
+  }
+
+  const routeSource = fs.existsSync(fileApiRoutePath)
+    ? fs.readFileSync(fileApiRoutePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const usesRawSegmentsAsStoragePath =
+    routeSource.includes("buildStoragePath(parsedPath.storageSegments)") &&
+    routeSource.includes("path.posix.join(\"data\", \"published\", \"v1\", ...segments)");
+
+  if (usesRawSegmentsAsStoragePath) {
+    addFinding(
+      findings,
+      "fail",
+      "D-011",
+      "FILE_API_ROUTE_USES_RAW_WINDOW_SEGMENTS",
+      path.relative(root, fileApiRoutePath),
+      "The file API route appears to use raw request segments as the storage path. Documented paths such as /90d/latest.json must be translated to last90d.json before storage read."
+    );
+  }
+
+  const docsMentionWindowLatest = documentedPatterns.some((pattern) =>
+    pattern.includes("[window]/latest.json") ||
+    /\/(7d|30d|90d|180d|365d)\/latest\.json$/u.test(pattern)
+  );
+
+  if (!docsMentionWindowLatest) {
+    addFinding(
+      findings,
+      "warn",
+      "D-011",
+      "FILE_API_DOCS_DO_NOT_SHOW_WINDOW_LATEST_SHAPE",
+      path.relative(root, fileApiDocsPath),
+      "API docs do not appear to document the window/latest.json authenticated file shape."
+    );
+  }
+
+  return {
+    documentedPatterns,
+    sampledPaths: samples.length,
+    checked,
+    missingExpectedArtifacts,
+    impossibleMappings,
+    routeUsesRawSegmentsAsStoragePath: usesRawSegmentsAsStoragePath,
+  };
+}
 function evaluate() {
   const findings = [];
 
@@ -822,6 +1030,7 @@ function evaluate() {
   const publicExposureAudit = evaluatePublicExposureBoundary(findings);
   const fileApiRouteContract = evaluateFileApiRouteContract(findings);
   const jsonEncodingAudit = evaluateJsonEncodingAndParse(findings);
+  const fileApiArtifactMapping = evaluateFileApiArtifactMapping(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -835,6 +1044,7 @@ function evaluate() {
     publicExposureAudit,
     fileApiRouteContract,
     jsonEncodingAudit,
+    fileApiArtifactMapping,
     findings,
   };
 }
@@ -894,6 +1104,15 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## File API artifact mapping");
+  lines.push("");
+  lines.push(`Documented file API patterns: ${result.fileApiArtifactMapping.documentedPatterns.join(", ") || "none"}`);
+  lines.push(`Sampled API file paths: ${result.fileApiArtifactMapping.sampledPaths}`);
+  lines.push(`Mapped artifact checks: ${result.fileApiArtifactMapping.checked}`);
+  lines.push(`Missing expected artifacts: ${result.fileApiArtifactMapping.missingExpectedArtifacts}`);
+  lines.push(`Impossible mappings: ${result.fileApiArtifactMapping.impossibleMappings}`);
+  lines.push(`Route uses raw request segments as storage path: ${result.fileApiArtifactMapping.routeUsesRawSegmentsAsStoragePath}`);
+  lines.push("");
   lines.push("## JSON and encoding integrity");
   lines.push("");
   lines.push(`Parsed JSON files: ${result.jsonEncodingAudit.parsedJsonFiles}`);

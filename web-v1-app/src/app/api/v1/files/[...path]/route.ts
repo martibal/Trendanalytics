@@ -43,6 +43,22 @@ type ParsedFilePath = {
   storageSegments: string[];
 };
 
+function storageTailFromWindowTail(tail: string[]): string[] | null {
+  if (tail.length === 1 && tail[0] === "latest.json") {
+    return ["latest.json"];
+  }
+
+  if (tail.length === 2) {
+    const [windowRaw, filename] = tail;
+
+    if (filename === "latest.json" && isWindowToken(windowRaw) && windowRaw !== "latest") {
+      return [`last${windowRaw}.json`];
+    }
+  }
+
+  return null;
+}
+
 function parseFilePathSegments(segments: string[]): ParsedFilePath | null {
   const [genreRaw] = segments;
 
@@ -80,14 +96,16 @@ function parseFilePathSegments(segments: string[]): ParsedFilePath | null {
     return null;
   }
 
+  const windowTail = segments.slice(2);
+  const storageTail = storageTailFromWindowTail(windowTail);
+
   return {
     genre: genreRaw,
     chain: chainRaw,
-    windowTail: segments.slice(2),
-    storageSegments: segments,
+    windowTail,
+    storageSegments: storageTail ? [genreRaw, chainRaw, ...storageTail] : segments,
   };
 }
-
 function withRequestId(
   requestId: string,
   extraHeaders?: Record<string, string>
@@ -176,8 +194,8 @@ function inferWindowFromTail(tail: string[]): WindowToken | null {
   return null;
 }
 
-function buildStoragePath(segments: string[]): string {
-  return path.posix.join("data", "published", "v1", ...segments);
+function buildStoragePath(storageSegments: string[]): string {
+  return path.posix.join("data", "published", "v1", ...storageSegments);
 }
 
 export async function GET(request: Request, context: RouteContext) {
