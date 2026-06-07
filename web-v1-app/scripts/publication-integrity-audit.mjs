@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
 const authenticatedFileRoutePath = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
 const entitlementHelperModulePath = path.join(root, "src", "lib", "auth", "entitlements.ts");
 const auditLogModulePath = path.join(root, "src", "lib", "auditLog.ts");
@@ -8250,6 +8251,306 @@ function evaluateAuthenticatedFileDeliveryRouteContract(findings) {
 
   return result;
 }
+function evaluateAccountRateLimitDailyQuotaContract(findings) {
+  const result = {
+    moduleExists: fs.existsSync(accountRateLimitModulePath),
+
+    importsUpstashAndTierType: false,
+    decisionTypesValid: false,
+    memoryWindowTypeValid: false,
+    constantsValid: false,
+    dailyQuotaEnvDefaultsValid: false,
+    tierLimitHelpersValid: false,
+    utcDayHelpersValid: false,
+    productionRuntimeCheckValid: false,
+    failClosedRateLimitDecisionValid: false,
+    redisClientValid: false,
+    upstashSlidingWindowValid: false,
+    memoryKeyValid: false,
+    cleanupBothStoresValid: false,
+    memoryRateLimitValid: false,
+    upstashRateLimitFailClosedValid: false,
+    upstashRateLimitSuccessValid: false,
+    dailyQuotaFailClosedDecisionValid: false,
+    dailyQuotaMemoryKeyValid: false,
+    memoryDailyQuotaValid: false,
+    upstashDailyQuotaValid: false,
+    upstashDailyQuotaFailClosedValid: false,
+    exportedEnforcersValid: false,
+    rateLimitHeadersValid: false,
+    dailyQuotaHeadersValid: false,
+    noSecretOrRawKeyLeakage: false,
+  };
+
+  if (!result.moduleExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-045",
+      "ACCOUNT_RATE_LIMIT_MODULE_MISSING",
+      path.relative(root, accountRateLimitModulePath),
+      "src/lib/auth/rateLimit.ts is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(accountRateLimitModulePath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  result.importsUpstashAndTierType =
+    normalized.includes('import { Ratelimit } from "@upstash/ratelimit";') &&
+    normalized.includes('import { Redis } from "@upstash/redis";') &&
+    normalized.includes('import type { SubscriptionTier } from "@/lib/auth/entitlements";');
+
+  result.decisionTypesValid =
+    normalized.includes('export type RateLimitTier = Extract<SubscriptionTier, "basic" | "pro">;') &&
+    normalized.includes("export type RateLimitDecision = {") &&
+    normalized.includes("success: boolean;") &&
+    normalized.includes("limit: number;") &&
+    normalized.includes("remaining: number;") &&
+    normalized.includes("reset: number;") &&
+    normalized.includes("retryAfter: number | null;") &&
+    normalized.includes("tier: RateLimitTier;") &&
+    normalized.includes('source: "upstash" | "memory" | "fail_closed";') &&
+    normalized.includes("export type DailyApiQuotaDecision = {");
+
+  result.memoryWindowTypeValid =
+    normalized.includes("type MemoryWindow = {") &&
+    normalized.includes("count: number;") &&
+    normalized.includes("resetAt: number;") &&
+    normalized.includes("const memoryStore = new Map<string, MemoryWindow>();") &&
+    normalized.includes("const dailyQuotaMemoryStore = new Map<string, MemoryWindow>();");
+
+  result.constantsValid =
+    normalized.includes("const WINDOW_MS = 60_000;") &&
+    normalized.includes("const BASIC_LIMIT = 60;") &&
+    normalized.includes("const PRO_LIMIT = 300;") &&
+    normalized.includes("const FAIL_CLOSED_RETRY_AFTER_SECONDS = 60;");
+
+  result.dailyQuotaEnvDefaultsValid =
+    normalized.includes('const BASIC_DAILY_QUOTA = Number.parseInt(process.env.BASIC_DAILY_API_QUOTA ?? "500", 10);') &&
+    normalized.includes('const PRO_DAILY_QUOTA = Number.parseInt(process.env.PRO_DAILY_API_QUOTA ?? "5000", 10);');
+
+  result.tierLimitHelpersValid =
+    normalized.includes("function getLimitForTier(tier: RateLimitTier): number") &&
+    normalized.includes('return tier === "pro" ? PRO_LIMIT : BASIC_LIMIT;') &&
+    normalized.includes("function getDailyQuotaForTier(tier: RateLimitTier): number") &&
+    normalized.includes('const value = tier === "pro" ? PRO_DAILY_QUOTA : BASIC_DAILY_QUOTA;') &&
+    normalized.includes("if (!Number.isFinite(value) || value <= 0)") &&
+    normalized.includes("return tier === \"pro\" ? 5_000 : 500;") &&
+    normalized.includes("return Math.floor(value);");
+
+  result.utcDayHelpersValid =
+    normalized.includes("function getUtcDayToken(now = new Date()): string") &&
+    normalized.includes("return now.toISOString().slice(0, 10);") &&
+    normalized.includes("function getNextUtcMidnightMs(nowMs = Date.now()): number") &&
+    normalized.includes("return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0);") &&
+    normalized.includes("function getSecondsUntilNextUtcMidnight(nowMs = Date.now()): number") &&
+    normalized.includes("return Math.max(1, Math.ceil((getNextUtcMidnightMs(nowMs) - nowMs) / 1000));");
+
+  result.productionRuntimeCheckValid =
+    normalized.includes("function isProductionRuntime(): boolean") &&
+    normalized.includes('return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";');
+
+  result.failClosedRateLimitDecisionValid =
+    normalized.includes("function buildFailClosedDecision(tier: RateLimitTier): RateLimitDecision") &&
+    normalized.includes("const reset = now + FAIL_CLOSED_RETRY_AFTER_SECONDS * 1000;") &&
+    normalized.includes("success: false") &&
+    normalized.includes("limit: 0") &&
+    normalized.includes("remaining: 0") &&
+    normalized.includes("retryAfter: FAIL_CLOSED_RETRY_AFTER_SECONDS") &&
+    normalized.includes('source: "fail_closed"');
+
+  result.redisClientValid =
+    normalized.includes("function getRedisClient(): Redis | null") &&
+    normalized.includes("const url = process.env.UPSTASH_REDIS_REST_URL;") &&
+    normalized.includes("const token = process.env.UPSTASH_REDIS_REST_TOKEN;") &&
+    normalized.includes("if (!url || !token)") &&
+    normalized.includes("return null;") &&
+    normalized.includes("return new Redis({") &&
+    normalized.includes("url,") &&
+    normalized.includes("token,");
+
+  result.upstashSlidingWindowValid =
+    normalized.includes("function getRatelimiter(tier: RateLimitTier): Ratelimit | null") &&
+    normalized.includes("const redis = getRedisClient();") &&
+    normalized.includes("limiter: Ratelimit.slidingWindow(getLimitForTier(tier), \"60 s\")") &&
+    normalized.includes("analytics: false") &&
+    normalized.includes("prefix: `ta:rl:${tier}`");
+
+  result.memoryKeyValid =
+    normalized.includes("function getMemoryKey(accountId: string, tier: RateLimitTier): string") &&
+    normalized.includes("return `${tier}:${accountId}`;");
+
+  result.cleanupBothStoresValid =
+    normalized.includes("function cleanupMemoryStore(now: number)") &&
+    normalized.includes("for (const [key, value] of memoryStore.entries())") &&
+    normalized.includes("memoryStore.delete(key);") &&
+    normalized.includes("for (const [key, value] of dailyQuotaMemoryStore.entries())") &&
+    normalized.includes("dailyQuotaMemoryStore.delete(key);");
+
+  result.memoryRateLimitValid =
+    normalized.includes("function applyMemoryRateLimit(accountId: string, tier: RateLimitTier): RateLimitDecision") &&
+    normalized.includes("cleanupMemoryStore(now);") &&
+    normalized.includes("const limit = getLimitForTier(tier);") &&
+    normalized.includes("const key = getMemoryKey(accountId, tier);") &&
+    normalized.includes("if (!existing || existing.resetAt <= now)") &&
+    normalized.includes("count: 1") &&
+    normalized.includes("remaining: limit - 1") &&
+    normalized.includes("if (existing.count >= limit)") &&
+    normalized.includes("retryAfter") &&
+    normalized.includes("existing.count += 1") &&
+    normalized.includes("remaining: Math.max(0, limit - existing.count)");
+
+  result.upstashRateLimitFailClosedValid =
+    normalized.includes("async function applyUpstashRateLimit(accountId: string, tier: RateLimitTier): Promise<RateLimitDecision>") &&
+    normalized.includes("if (!ratelimit)") &&
+    normalized.includes("if (isProductionRuntime())") &&
+    normalized.includes("production rate-limit backend is not configured; failing closed") &&
+    normalized.includes("return buildFailClosedDecision(tier);") &&
+    normalized.includes("return applyMemoryRateLimit(accountId, tier);") &&
+    normalized.includes("} catch (error) {") &&
+    normalized.includes("rate-limit backend failed") &&
+    normalized.includes("if (isProductionRuntime())") &&
+    normalized.includes("return buildFailClosedDecision(tier);");
+
+  result.upstashRateLimitSuccessValid =
+    normalized.includes("const result = await ratelimit.limit(accountId);") &&
+    normalized.includes("const reset = typeof result.reset === \"number\" ? result.reset : Date.now() + WINDOW_MS;") &&
+    normalized.includes("const retryAfter = result.success ? null : Math.max(1, Math.ceil((reset - Date.now()) / 1000));") &&
+    normalized.includes("success: result.success") &&
+    normalized.includes("limit: result.limit") &&
+    normalized.includes("remaining: result.remaining") &&
+    normalized.includes('source: "upstash"');
+
+  result.dailyQuotaFailClosedDecisionValid =
+    normalized.includes("function buildDailyQuotaFailClosedDecision(tier: RateLimitTier): DailyApiQuotaDecision") &&
+    normalized.includes("const reset = now + FAIL_CLOSED_RETRY_AFTER_SECONDS * 1000;") &&
+    normalized.includes("success: false") &&
+    normalized.includes("limit: 0") &&
+    normalized.includes("remaining: 0") &&
+    normalized.includes("retryAfter: FAIL_CLOSED_RETRY_AFTER_SECONDS") &&
+    normalized.includes('source: "fail_closed"');
+
+  result.dailyQuotaMemoryKeyValid =
+    normalized.includes("function buildDailyQuotaMemoryKey(accountId: string, apiKeyId: string, tier: RateLimitTier): string") &&
+    normalized.includes("return `${getUtcDayToken()}:${tier}:${accountId}:${apiKeyId}`;");
+
+  result.memoryDailyQuotaValid =
+    normalized.includes("function applyMemoryDailyQuota(") &&
+    normalized.includes("accountId: string,") &&
+    normalized.includes("apiKeyId: string,") &&
+    normalized.includes("const limit = getDailyQuotaForTier(tier);") &&
+    normalized.includes("const resetAt = getNextUtcMidnightMs(now);") &&
+    normalized.includes("const key = buildDailyQuotaMemoryKey(accountId, apiKeyId, tier);") &&
+    normalized.includes("if (!existing || existing.resetAt <= now)") &&
+    normalized.includes("count: 1") &&
+    normalized.includes("remaining: limit - 1") &&
+    normalized.includes("if (existing.count >= limit)") &&
+    normalized.includes("existing.count += 1") &&
+    normalized.includes("remaining: Math.max(0, limit - existing.count)");
+
+  result.upstashDailyQuotaValid =
+    normalized.includes("async function applyUpstashDailyQuota(") &&
+    normalized.includes("const redis = getRedisClient();") &&
+    normalized.includes("const reset = getNextUtcMidnightMs(now);") &&
+    normalized.includes("const ttlSeconds = getSecondsUntilNextUtcMidnight(now);") &&
+    normalized.includes("const limit = getDailyQuotaForTier(tier);") &&
+    normalized.includes("const day = getUtcDayToken(new Date(now));") &&
+    normalized.includes("const key = `ta:quota:${day}:${tier}:${accountId}:${apiKeyId}`;") &&
+    normalized.includes("const count = await redis.incr(key);") &&
+    normalized.includes("if (count === 1)") &&
+    normalized.includes("await redis.expire(key, ttlSeconds);") &&
+    normalized.includes("const remaining = Math.max(0, limit - count);") &&
+    normalized.includes("const retryAfter = count > limit ? Math.max(1, Math.ceil((reset - now) / 1000)) : null;") &&
+    normalized.includes("success: count <= limit") &&
+    normalized.includes('source: "upstash"');
+
+  result.upstashDailyQuotaFailClosedValid =
+    normalized.includes("if (!redis)") &&
+    normalized.includes("if (isProductionRuntime())") &&
+    normalized.includes("production daily quota backend is not configured; failing closed") &&
+    normalized.includes("return buildDailyQuotaFailClosedDecision(tier);") &&
+    normalized.includes("return applyMemoryDailyQuota(accountId, apiKeyId, tier);") &&
+    normalized.includes("daily quota backend failed") &&
+    normalized.includes("if (isProductionRuntime())") &&
+    normalized.includes("return buildDailyQuotaFailClosedDecision(tier);");
+
+  result.exportedEnforcersValid =
+    normalized.includes("export async function enforceDailyApiQuota(") &&
+    normalized.includes("accountId: string,") &&
+    normalized.includes("apiKeyId: string,") &&
+    normalized.includes("tier: RateLimitTier") &&
+    normalized.includes("return applyUpstashDailyQuota(accountId, apiKeyId, tier);") &&
+    normalized.includes("export async function enforceAccountRateLimit(") &&
+    normalized.includes("return applyUpstashRateLimit(accountId, tier);");
+
+  result.dailyQuotaHeadersValid =
+    normalized.includes("export function buildDailyQuotaHeaders(decision: DailyApiQuotaDecision): Record<string, string>") &&
+    normalized.includes('"X-DailyQuota-Limit": String(decision.limit)') &&
+    normalized.includes('"X-DailyQuota-Remaining": String(decision.remaining)') &&
+    normalized.includes('"X-DailyQuota-Reset": String(Math.floor(decision.reset / 1000))') &&
+    normalized.includes('headers["Retry-After"] = String(decision.retryAfter);');
+
+  result.rateLimitHeadersValid =
+    normalized.includes("export function buildRateLimitHeaders(decision: RateLimitDecision): Record<string, string>") &&
+    normalized.includes('"X-RateLimit-Limit": String(decision.limit)') &&
+    normalized.includes('"X-RateLimit-Remaining": String(decision.remaining)') &&
+    normalized.includes('"X-RateLimit-Reset": String(Math.floor(decision.reset / 1000))') &&
+    normalized.includes('headers["Retry-After"] = String(decision.retryAfter);');
+
+  result.noSecretOrRawKeyLeakage =
+    !/secret|password|keyHash|key_hash|apiKeySecret|rawKey/u.test(
+      normalized
+        .replace(/UPSTASH_REDIS_REST_TOKEN/gu, "")
+        .replace(/token/gu, "")
+        .replace(/apiKeyId/gu, "")
+    );
+
+  const requiredChecks = [
+    ["ACCOUNT_RATE_LIMIT_IMPORTS_INVALID", result.importsUpstashAndTierType, "Account rate-limit helper must import Upstash Redis/Ratelimit and tier type."],
+    ["ACCOUNT_RATE_LIMIT_DECISION_TYPES_INVALID", result.decisionTypesValid, "Rate-limit and daily quota decisions must expose success/limit/remaining/reset/retryAfter/tier/source."],
+    ["ACCOUNT_RATE_LIMIT_MEMORY_WINDOW_INVALID", result.memoryWindowTypeValid, "Memory stores must track count and resetAt for rate-limit/quota fallback."],
+    ["ACCOUNT_RATE_LIMIT_CONSTANTS_INVALID", result.constantsValid, "Basic/pro per-minute limits and fail-closed retry-after must stay stable."],
+    ["ACCOUNT_DAILY_QUOTA_ENV_DEFAULTS_INVALID", result.dailyQuotaEnvDefaultsValid, "Daily quotas must use BASIC_DAILY_API_QUOTA/PRO_DAILY_API_QUOTA with 500/5000 defaults."],
+    ["ACCOUNT_RATE_LIMIT_TIER_HELPERS_INVALID", result.tierLimitHelpersValid, "Tier limit helpers must preserve 60/min basic, 300/min pro, and daily quota fallback defaults."],
+    ["ACCOUNT_DAILY_QUOTA_UTC_HELPERS_INVALID", result.utcDayHelpersValid, "Daily quota must reset at next UTC midnight."],
+    ["ACCOUNT_RATE_LIMIT_PRODUCTION_CHECK_INVALID", result.productionRuntimeCheckValid, "Production runtime check must use NODE_ENV or VERCEL_ENV."],
+    ["ACCOUNT_RATE_LIMIT_FAIL_CLOSED_INVALID", result.failClosedRateLimitDecisionValid, "Per-minute rate-limit fail-closed decision must be 0-limit with 60s retry-after."],
+    ["ACCOUNT_RATE_LIMIT_REDIS_CLIENT_INVALID", result.redisClientValid, "Redis client must use UPSTASH_REDIS_REST_URL/TOKEN and return null when missing."],
+    ["ACCOUNT_RATE_LIMIT_UPSTASH_WINDOW_INVALID", result.upstashSlidingWindowValid, "Per-minute Upstash limiter must use 60s sliding window and tier prefix."],
+    ["ACCOUNT_RATE_LIMIT_MEMORY_KEY_INVALID", result.memoryKeyValid, "Memory rate-limit key must be tier:accountId."],
+    ["ACCOUNT_RATE_LIMIT_MEMORY_CLEANUP_INVALID", result.cleanupBothStoresValid, "Memory cleanup must remove expired per-minute and daily quota entries."],
+    ["ACCOUNT_RATE_LIMIT_MEMORY_INVALID", result.memoryRateLimitValid, "Memory per-minute fallback must increment, enforce limit, and return retryAfter."],
+    ["ACCOUNT_RATE_LIMIT_UPSTASH_FAIL_CLOSED_INVALID", result.upstashRateLimitFailClosedValid, "Missing/failing Upstash per-minute backend must fail closed in production and memory-fallback outside production."],
+    ["ACCOUNT_RATE_LIMIT_UPSTASH_SUCCESS_INVALID", result.upstashRateLimitSuccessValid, "Upstash per-minute decision must map success/limit/remaining/reset/retryAfter/source."],
+    ["ACCOUNT_DAILY_QUOTA_FAIL_CLOSED_INVALID", result.dailyQuotaFailClosedDecisionValid, "Daily quota fail-closed decision must be 0-limit with 60s retry-after."],
+    ["ACCOUNT_DAILY_QUOTA_MEMORY_KEY_INVALID", result.dailyQuotaMemoryKeyValid, "Daily quota memory key must include UTC day, tier, accountId, and apiKeyId."],
+    ["ACCOUNT_DAILY_QUOTA_MEMORY_INVALID", result.memoryDailyQuotaValid, "Memory daily quota fallback must increment, enforce limit, reset at UTC midnight, and return retryAfter."],
+    ["ACCOUNT_DAILY_QUOTA_UPSTASH_INVALID", result.upstashDailyQuotaValid, "Upstash daily quota must incr key, expire at next UTC midnight, and enforce limit."],
+    ["ACCOUNT_DAILY_QUOTA_FAIL_CLOSED_BACKEND_INVALID", result.upstashDailyQuotaFailClosedValid, "Missing/failing daily quota backend must fail closed in production and memory-fallback outside production."],
+    ["ACCOUNT_RATE_LIMIT_EXPORTS_INVALID", result.exportedEnforcersValid, "Exported enforcers must delegate to Upstash-backed per-minute and daily quota functions."],
+    ["ACCOUNT_DAILY_QUOTA_HEADERS_INVALID", result.dailyQuotaHeadersValid, "Daily quota headers must expose limit/remaining/reset and Retry-After on failure."],
+    ["ACCOUNT_RATE_LIMIT_HEADERS_INVALID", result.rateLimitHeadersValid, "Per-minute rate-limit headers must expose limit/remaining/reset and Retry-After on failure."],
+    ["ACCOUNT_RATE_LIMIT_SECRET_LEAK_RISK", result.noSecretOrRawKeyLeakage, "Account rate-limit helper must not introduce secret/password/keyHash/raw-key fields."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-045",
+        code,
+        path.relative(root, accountRateLimitModulePath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -8301,6 +8602,7 @@ function evaluate() {
   const auditLogRequestIdContract = evaluateAuditLogRequestIdContract(findings);
   const entitlementSnapshotHelperContract = evaluateEntitlementSnapshotHelperContract(findings);
   const authenticatedFileDeliveryRouteContract = evaluateAuthenticatedFileDeliveryRouteContract(findings);
+  const accountRateLimitDailyQuotaContract = evaluateAccountRateLimitDailyQuotaContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -8348,6 +8650,7 @@ function evaluate() {
     auditLogRequestIdContract,
     entitlementSnapshotHelperContract,
     authenticatedFileDeliveryRouteContract,
+    accountRateLimitDailyQuotaContract,
     findings,
   };
 }
@@ -8407,6 +8710,35 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Account rate-limit daily quota contract");
+  lines.push("");
+  lines.push(`Module exists: ${result.accountRateLimitDailyQuotaContract.moduleExists}`);
+  lines.push(`Imports Upstash and tier type: ${result.accountRateLimitDailyQuotaContract.importsUpstashAndTierType}`);
+  lines.push(`Decision types valid: ${result.accountRateLimitDailyQuotaContract.decisionTypesValid}`);
+  lines.push(`Memory window type valid: ${result.accountRateLimitDailyQuotaContract.memoryWindowTypeValid}`);
+  lines.push(`Constants valid: ${result.accountRateLimitDailyQuotaContract.constantsValid}`);
+  lines.push(`Daily quota env defaults valid: ${result.accountRateLimitDailyQuotaContract.dailyQuotaEnvDefaultsValid}`);
+  lines.push(`Tier limit helpers valid: ${result.accountRateLimitDailyQuotaContract.tierLimitHelpersValid}`);
+  lines.push(`UTC day helpers valid: ${result.accountRateLimitDailyQuotaContract.utcDayHelpersValid}`);
+  lines.push(`Production runtime check valid: ${result.accountRateLimitDailyQuotaContract.productionRuntimeCheckValid}`);
+  lines.push(`Rate-limit fail-closed decision valid: ${result.accountRateLimitDailyQuotaContract.failClosedRateLimitDecisionValid}`);
+  lines.push(`Redis client valid: ${result.accountRateLimitDailyQuotaContract.redisClientValid}`);
+  lines.push(`Upstash sliding window valid: ${result.accountRateLimitDailyQuotaContract.upstashSlidingWindowValid}`);
+  lines.push(`Memory key valid: ${result.accountRateLimitDailyQuotaContract.memoryKeyValid}`);
+  lines.push(`Cleanup both stores valid: ${result.accountRateLimitDailyQuotaContract.cleanupBothStoresValid}`);
+  lines.push(`Memory rate-limit valid: ${result.accountRateLimitDailyQuotaContract.memoryRateLimitValid}`);
+  lines.push(`Upstash rate-limit fail-closed valid: ${result.accountRateLimitDailyQuotaContract.upstashRateLimitFailClosedValid}`);
+  lines.push(`Upstash rate-limit success valid: ${result.accountRateLimitDailyQuotaContract.upstashRateLimitSuccessValid}`);
+  lines.push(`Daily quota fail-closed decision valid: ${result.accountRateLimitDailyQuotaContract.dailyQuotaFailClosedDecisionValid}`);
+  lines.push(`Daily quota memory key valid: ${result.accountRateLimitDailyQuotaContract.dailyQuotaMemoryKeyValid}`);
+  lines.push(`Memory daily quota valid: ${result.accountRateLimitDailyQuotaContract.memoryDailyQuotaValid}`);
+  lines.push(`Upstash daily quota valid: ${result.accountRateLimitDailyQuotaContract.upstashDailyQuotaValid}`);
+  lines.push(`Upstash daily quota fail-closed valid: ${result.accountRateLimitDailyQuotaContract.upstashDailyQuotaFailClosedValid}`);
+  lines.push(`Exported enforcers valid: ${result.accountRateLimitDailyQuotaContract.exportedEnforcersValid}`);
+  lines.push(`Rate-limit headers valid: ${result.accountRateLimitDailyQuotaContract.rateLimitHeadersValid}`);
+  lines.push(`Daily quota headers valid: ${result.accountRateLimitDailyQuotaContract.dailyQuotaHeadersValid}`);
+  lines.push(`No secret/raw-key leakage: ${result.accountRateLimitDailyQuotaContract.noSecretOrRawKeyLeakage}`);
+  lines.push("");
   lines.push("## Authenticated file delivery route contract");
   lines.push("");
   lines.push(`Route exists: ${result.authenticatedFileDeliveryRouteContract.routeExists}`);
@@ -9169,6 +9501,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-045 Account Rate Limit Daily Quota Contract: verifies tier-based authenticated rate limits, daily API quotas, Upstash/env configuration, UTC-day quota reset, production fail-closed behavior, non-production memory fallback, and rate/quota headers.");
   lines.push("- D-044 Authenticated File Delivery Route Contract: verifies /api/v1/files/[...path] API-key authentication, pre-auth/account rate limits, entitlement checks before storage reads, documented window-to-artifact mapping, audit logging, last-used key touch, private no-store file responses, and redacted errors.");
   lines.push("- D-043 Entitlement Snapshot Helper Contract: verifies pure deterministic entitlement helper rules for public/basic/pro snapshots, allowed chains/genres/windows, history depth, date-range validation, file entitlement decisions, and entitlement factories.");
   lines.push("- D-042 Audit Log Request ID Contract: verifies server-only audit logging, safe request-id generation/acceptance, latency buckets, sanitized bounded JSONL entries, console fallback, non-throwing file append, and no secret/raw-key fields.");
