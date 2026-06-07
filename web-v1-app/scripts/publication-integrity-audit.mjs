@@ -63,6 +63,7 @@ const fileApiRoutePath = path.join(root, "src", "app", "api", "v1", "files", "[.
 const fileApiDocsPath = path.join(root, "src", "app", "api-docs", "page.tsx");
 const storageIndexPath = path.join(root, "src", "lib", "storage", "index.ts");
 const localStoragePath = path.join(root, "src", "lib", "storage", "localDev.ts");
+const s3StoragePath = path.join(root, "src", "lib", "storage", "s3.ts");
 
 function ensureReportDir() {
   fs.mkdirSync(reportDir, { recursive: true });
@@ -1235,6 +1236,167 @@ function evaluateLocalStorageResolution(findings) {
 
   return result;
 }
+function s3SmokeSamples() {
+  return [
+    "gold/bitcoin/latest.json",
+    "gold/base/latest.json",
+    "meta/bitcoin/last90d.json",
+    "meta/arbitrum/last365d.json",
+    "derived/ethereum/last30d.json",
+    "derived/base/last7d.json",
+  ];
+}
+
+function productionS3PrefixFromEnv() {
+  const raw = process.env.S3_PREFIX ?? "published/v1";
+  return raw.replace(/^\/+|\/+$/g, "");
+}
+
+function joinS3KeyForAudit(prefix, storagePath) {
+  const cleanedPath = String(storagePath).replace(/^\/+/u, "");
+  return prefix ? `${prefix}/${cleanedPath}` : cleanedPath;
+}
+
+function evaluateS3StorageContract(findings) {
+  const result = {
+    s3ModuleExists: fs.existsSync(s3StoragePath),
+    hasDefaultPublishedV1Prefix: false,
+    trimsS3Prefix: false,
+    joinsPrefixAndCleanedPath: false,
+    usesGetObjectCommand: false,
+    returnsNullForMissingObjects: false,
+    envPrefix: productionS3PrefixFromEnv(),
+    sampleKeys: [],
+  };
+
+  if (!result.s3ModuleExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-013",
+      "S3_STORAGE_MODULE_MISSING",
+      path.relative(root, s3StoragePath),
+      "S3 storage adapter is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(s3StoragePath, "utf8").replace(/^\uFEFF/u, "");
+
+  result.hasDefaultPublishedV1Prefix = source.includes('process.env.S3_PREFIX ?? "published/v1"');
+  result.trimsS3Prefix = source.includes('replace(/^\\/+|\\/+$/g, "")') || source.includes("replace(/^\\\\/+|\\\\/+$/g, \"\")");
+  result.joinsPrefixAndCleanedPath = source.includes('return prefix ? `${prefix}/${cleanedPath}` : cleanedPath;');
+  result.usesGetObjectCommand = source.includes("new GetObjectCommand(") && source.includes("Key: joinS3Key(storagePath)");
+  result.returnsNullForMissingObjects =
+    source.includes("NoSuchKey") &&
+    source.includes("The specified key does not exist") &&
+    source.includes("NotFound") &&
+    source.includes("return null;");
+
+  if (!result.hasDefaultPublishedV1Prefix) {
+    addFinding(
+      findings,
+      "fail",
+      "D-013",
+      "S3_DEFAULT_PREFIX_NOT_PUBLISHED_V1",
+      path.relative(root, s3StoragePath),
+      "S3 storage adapter must default S3_PREFIX to published/v1 so production object keys match the published artifact tree."
+    );
+  }
+
+  if (!result.trimsS3Prefix) {
+    addFinding(
+      findings,
+      "fail",
+      "D-013",
+      "S3_PREFIX_TRIM_MISSING",
+      path.relative(root, s3StoragePath),
+      "S3 storage adapter must trim leading/trailing slashes from S3_PREFIX."
+    );
+  }
+
+  if (!result.joinsPrefixAndCleanedPath) {
+    addFinding(
+      findings,
+      "fail",
+      "D-013",
+      "S3_PREFIX_JOIN_CONTRACT_MISSING",
+      path.relative(root, s3StoragePath),
+      "S3 storage adapter must join prefix and normalized storage path as prefix/path."
+    );
+  }
+
+  if (!result.usesGetObjectCommand) {
+    addFinding(
+      findings,
+      "fail",
+      "D-013",
+      "S3_GET_OBJECT_KEY_CONTRACT_MISSING",
+      path.relative(root, s3StoragePath),
+      "S3 storage adapter must read objects using Key: joinS3Key(storagePath)."
+    );
+  }
+
+  if (!result.returnsNullForMissingObjects) {
+    addFinding(
+      findings,
+      "fail",
+      "D-013",
+      "S3_MISSING_OBJECT_NULL_CONTRACT_MISSING",
+      path.relative(root, s3StoragePath),
+      "S3 storage adapter must return null for missing objects so the API route can return a clean 404."
+    );
+  }
+
+  for (const normalizedStoragePath of s3SmokeSamples()) {
+    const sourceArtifact = path.join(publishedRoot, normalizedStoragePath);
+    const privateArtifact = path.join(privateMirrorRoot, normalizedStoragePath);
+    const s3Key = joinS3KeyForAudit(result.envPrefix, normalizedStoragePath);
+
+    result.sampleKeys.push({
+      normalizedStoragePath,
+      s3Key,
+      sourceArtifactExists: fs.existsSync(sourceArtifact),
+      privateArtifactExists: fs.existsSync(privateArtifact),
+    });
+
+    if (!s3Key.startsWith("published/v1/")) {
+      addFinding(
+        findings,
+        "warn",
+        "D-013",
+        "S3_SAMPLE_KEY_PREFIX_NONSTANDARD",
+        s3Key,
+        "Computed S3 key does not start with published/v1/. This is only acceptable if production S3_PREFIX intentionally differs from the default."
+      );
+    }
+
+    if (!fs.existsSync(sourceArtifact)) {
+      addFinding(
+        findings,
+        "fail",
+        "D-013",
+        "S3_SAMPLE_SOURCE_ARTIFACT_MISSING",
+        path.relative(root, sourceArtifact),
+        `Sample S3 key ${s3Key} has no matching source published artifact.`
+      );
+    }
+
+    if (!fs.existsSync(privateArtifact)) {
+      addFinding(
+        findings,
+        "fail",
+        "D-013",
+        "S3_SAMPLE_PRIVATE_ARTIFACT_MISSING",
+        path.relative(root, privateArtifact),
+        `Sample S3 key ${s3Key} has no matching private mirror artifact.`
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -1254,6 +1416,7 @@ function evaluate() {
   const jsonEncodingAudit = evaluateJsonEncodingAndParse(findings);
   const fileApiArtifactMapping = evaluateFileApiArtifactMapping(findings);
   const localStorageResolution = evaluateLocalStorageResolution(findings);
+  const s3StorageContract = evaluateS3StorageContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -1269,6 +1432,7 @@ function evaluate() {
     jsonEncodingAudit,
     fileApiArtifactMapping,
     localStorageResolution,
+    s3StorageContract,
     findings,
   };
 }
@@ -1328,6 +1492,22 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## S3 storage contract");
+  lines.push("");
+  lines.push(`S3 module exists: ${result.s3StorageContract.s3ModuleExists}`);
+  lines.push(`Default S3 prefix is published/v1: ${result.s3StorageContract.hasDefaultPublishedV1Prefix}`);
+  lines.push(`Trims S3 prefix slashes: ${result.s3StorageContract.trimsS3Prefix}`);
+  lines.push(`Joins prefix and cleaned path: ${result.s3StorageContract.joinsPrefixAndCleanedPath}`);
+  lines.push(`Uses GetObjectCommand key contract: ${result.s3StorageContract.usesGetObjectCommand}`);
+  lines.push(`Returns null for missing objects: ${result.s3StorageContract.returnsNullForMissingObjects}`);
+  lines.push(`Effective audit S3 prefix: ${result.s3StorageContract.envPrefix}`);
+  lines.push("");
+  lines.push(tableRow(["Normalized storage path", "Computed S3 key", "Source exists", "Private exists"]));
+  lines.push(tableRow(["---", "---", "---", "---"]));
+  for (const row of result.s3StorageContract.sampleKeys) {
+    lines.push(tableRow([row.normalizedStoragePath, row.s3Key, row.sourceArtifactExists, row.privateArtifactExists]));
+  }
+  lines.push("");
   lines.push("## Local storage resolution");
   lines.push("");
   lines.push(`Storage index exists: ${result.localStorageResolution.storageIndexExists}`);
