@@ -7,6 +7,8 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const checkoutPortalRoutePath = path.join(root, "src", "app", "api", "v1", "checkout", "portal", "route.ts");
+const checkoutRoutePath = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
 const apiKeysRoutePath = path.join(root, "src", "app", "api", "v1", "keys", "route.ts");
 const apiKeyManagerClientPath = path.join(root, "src", "components", "dashboard", "ApiKeyManagerClient.tsx");
 const dashboardPagePath = path.join(root, "src", "app", "dashboard", "page.tsx");
@@ -6359,6 +6361,340 @@ function evaluateApiKeyRouteContract(findings) {
 
   return result;
 }
+function evaluateCheckoutBillingRouteContract(findings) {
+  const result = {
+    checkoutRouteExists: fs.existsSync(checkoutRoutePath),
+    portalRouteExists: fs.existsSync(checkoutPortalRoutePath),
+
+    checkoutImportsClerkAuth: false,
+    checkoutImportsStripeAndDb: false,
+    checkoutImportsSameOriginAndRateLimit: false,
+    checkoutTermsVersionPinned: false,
+    checkoutStripeKeyModeDetection: false,
+    checkoutAppUrlFallbackValid: false,
+    checkoutProductionRequiresLiveStripeKey: false,
+    checkoutErrorsNoStoreAndRedacted: false,
+    checkoutPlanNormalizationValid: false,
+    checkoutReadsPlanFromQueryJsonAndForm: false,
+    checkoutPriceEnvContractValid: false,
+    checkoutMetadataValid: false,
+    checkoutSignedInUserLookupValid: false,
+    checkoutAccountUpsertValid: false,
+    checkoutPostOrderValid: false,
+    checkoutGetMethodNotAllowed: false,
+    checkoutRedirectsUnauthenticatedToSignIn: false,
+    checkoutSessionParamsValid: false,
+    checkoutBasicCustomChainFieldValid: false,
+    checkoutSessionRedirectNoStore: false,
+
+    portalImportsStripeAndAccountView: false,
+    portalImportsSameOriginAndRateLimit: false,
+    portalStripeClientUsesSecretKey: false,
+    portalErrorsNoStoreAndRedacted: false,
+    portalReturnUrlValid: false,
+    portalPostOrderValid: false,
+    portalRequiresAuthenticatedAccount: false,
+    portalRequiresStripeCustomerId: false,
+    portalCreatesCustomerPortalSession: false,
+    portalRedirectNoStore: false,
+  };
+
+  const checkout = result.checkoutRouteExists
+    ? fs.readFileSync(checkoutRoutePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const portal = result.portalRouteExists
+    ? fs.readFileSync(checkoutPortalRoutePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const checkoutSource = checkout.replace(/\r\n/gu, "\n");
+  const portalSource = portal.replace(/\r\n/gu, "\n");
+
+  if (checkoutSource) {
+    result.checkoutImportsClerkAuth =
+      checkoutSource.includes('import { auth, currentUser } from "@clerk/nextjs/server";');
+
+    result.checkoutImportsStripeAndDb =
+      checkoutSource.includes('import Stripe from "stripe";') &&
+      checkoutSource.includes('import { db } from "@/lib/db";');
+
+    result.checkoutImportsSameOriginAndRateLimit =
+      checkoutSource.includes('import { validateSameOriginRequest } from "@/lib/security/origin";') &&
+      checkoutSource.includes('import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";');
+
+    result.checkoutTermsVersionPinned =
+      /const TERMS_VERSION = "\d{4}-\d{2}-\d{2}";/u.test(checkoutSource);
+
+    result.checkoutStripeKeyModeDetection =
+      checkoutSource.includes('type StripeKeyMode = "missing" | "test" | "live" | "restricted_test" | "restricted_live" | "unknown";') &&
+      checkoutSource.includes('if (key.startsWith("sk_test_")) return "test";') &&
+      checkoutSource.includes('if (key.startsWith("sk_live_")) return "live";') &&
+      checkoutSource.includes('if (key.startsWith("rk_test_")) return "restricted_test";') &&
+      checkoutSource.includes('if (key.startsWith("rk_live_")) return "restricted_live";');
+
+    result.checkoutAppUrlFallbackValid =
+      checkoutSource.includes("process.env.NEXT_PUBLIC_APP_URL?.trim()") &&
+      checkoutSource.includes("process.env.APP_URL?.trim()") &&
+      checkoutSource.includes("process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim()") &&
+      checkoutSource.includes("return url.origin.replace(/\\/+$/, \"\");");
+
+    result.checkoutProductionRequiresLiveStripeKey =
+      checkoutSource.includes("function isProductionCheckoutRequest(request: Request): boolean") &&
+      checkoutSource.includes('process.env.VERCEL_ENV === "production"') &&
+      checkoutSource.includes('host === "urdatlas.com"') &&
+      checkoutSource.includes('host === "www.urdatlas.com"') &&
+      checkoutSource.includes('if (isProductionCheckoutRequest(request) && keyMode !== "live")') &&
+      checkoutSource.includes("Expected STRIPE_SECRET_KEY to start with sk_live_.");
+
+    result.checkoutErrorsNoStoreAndRedacted =
+      checkoutSource.includes("function publicCheckoutErrorDetail(") &&
+      checkoutSource.includes('process.env.NODE_ENV !== "production"') &&
+      checkoutSource.includes('process.env.VERCEL_ENV !== "production"') &&
+      checkoutSource.includes('return "server_error";') &&
+      checkoutSource.includes('"Cache-Control": "no-store"');
+
+    result.checkoutPlanNormalizationValid =
+      checkoutSource.includes('type CheckoutPlan = "basic" | "pro";') &&
+      checkoutSource.includes('if (value === "basic" || value === "single-chain" || value === "single_chain")') &&
+      checkoutSource.includes('if (value === "pro" || value === "research")');
+
+    result.checkoutReadsPlanFromQueryJsonAndForm =
+      checkoutSource.includes("url.searchParams.get(\"plan\")") &&
+      checkoutSource.includes('contentType.includes("application/json")') &&
+      checkoutSource.includes('contentType.includes("application/x-www-form-urlencoded")') &&
+      checkoutSource.includes('contentType.includes("multipart/form-data")') &&
+      checkoutSource.includes("const formData = await request.formData();");
+
+    result.checkoutPriceEnvContractValid =
+      checkoutSource.includes("function priceIdForPlan(plan: CheckoutPlan): string | null") &&
+      checkoutSource.includes("process.env.STRIPE_PRICE_BASIC") &&
+      checkoutSource.includes("process.env.STRIPE_PRICE_PRO") &&
+      checkoutSource.includes("return value?.trim() || null;");
+
+    result.checkoutMetadataValid =
+      checkoutSource.includes("function checkoutMetadata(params: {") &&
+      checkoutSource.includes("checkout_plan: params.plan") &&
+      checkoutSource.includes("account_id: params.accountId") &&
+      checkoutSource.includes("auth_provider_user_id: params.authProviderUserId") &&
+      checkoutSource.includes('entitled_chain: params.plan === "basic" ? "checkout_selection" : ""') &&
+      checkoutSource.includes('history_unlocked: "false"');
+
+    result.checkoutSignedInUserLookupValid =
+      checkoutSource.includes("async function getSignedInUser()") &&
+      checkoutSource.includes("const authState = await auth();") &&
+      checkoutSource.includes("if (!authState.userId)") &&
+      checkoutSource.includes("const user = await currentUser().catch(() => null);") &&
+      checkoutSource.includes("primaryEmailAddress?.emailAddress") &&
+      checkoutSource.includes("sessionClaims?.email");
+
+    result.checkoutAccountUpsertValid =
+      checkoutSource.includes("async function resolveAccount(params: {") &&
+      checkoutSource.includes("await db.account.upsert({") &&
+      checkoutSource.includes("where: {\n        authProviderUserId: params.authProviderUserId") &&
+      checkoutSource.includes("email: params.email") &&
+      checkoutSource.includes("termsAcceptedAt: new Date()") &&
+      checkoutSource.includes("termsVersion: TERMS_VERSION") &&
+      checkoutSource.includes("subscriptions: {") &&
+      checkoutSource.includes('updatedAt: "desc"') &&
+      checkoutSource.includes("take: 1");
+
+    const checkoutPostIndex = checkoutSource.indexOf("export async function POST(request: Request)");
+    const checkoutHandleIndex = checkoutSource.indexOf("async function handleCheckout(request: Request)");
+    const postSource = checkoutPostIndex >= 0 ? checkoutSource.slice(checkoutPostIndex) : "";
+    const handleSource = checkoutHandleIndex >= 0 && checkoutPostIndex > checkoutHandleIndex
+      ? checkoutSource.slice(checkoutHandleIndex, checkoutPostIndex)
+      : "";
+
+    if (postSource) {
+      const originIndex = postSource.indexOf("const originGuard = validateSameOriginRequest(request);");
+      const rateLimitIndex = postSource.indexOf('const preAuthRateLimit = await enforcePreAuthRateLimit(request, "checkout-api");');
+      const handleIndex = postSource.indexOf("return handleCheckout(request);");
+
+      result.checkoutPostOrderValid =
+        originIndex >= 0 &&
+        rateLimitIndex >= 0 &&
+        handleIndex >= 0 &&
+        originIndex < rateLimitIndex &&
+        rateLimitIndex < handleIndex;
+    }
+
+    result.checkoutGetMethodNotAllowed =
+      checkoutSource.includes("export async function GET()") &&
+      checkoutSource.includes('code: "method_not_allowed"') &&
+      checkoutSource.includes('message: "Checkout must be started with POST."') &&
+      checkoutSource.includes('Allow: "POST"') &&
+      checkoutSource.includes('"Cache-Control": "no-store"');
+
+    if (handleSource) {
+      result.checkoutRedirectsUnauthenticatedToSignIn =
+        handleSource.includes("signedInUser = await getSignedInUser();") &&
+        handleSource.includes("if (!signedInUser)") &&
+        handleSource.includes('const signInUrl = new URL("/sign-in", appUrl);') &&
+        handleSource.includes('signInUrl.searchParams.set("redirect_url", returnUrl);') &&
+        handleSource.includes("NextResponse.redirect(signInUrl)") &&
+        handleSource.includes('response.headers.set("Cache-Control", "no-store")');
+
+      result.checkoutSessionParamsValid =
+        handleSource.includes("const sessionParams: Stripe.Checkout.SessionCreateParams = {") &&
+        handleSource.includes('mode: "subscription"') &&
+        handleSource.includes("line_items: [") &&
+        handleSource.includes("price: priceId") &&
+        handleSource.includes("quantity: 1") &&
+        handleSource.includes("client_reference_id: account.id") &&
+        handleSource.includes("metadata,") &&
+        handleSource.includes("subscription_data: {") &&
+        handleSource.includes("success_url: `${appUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`") &&
+        handleSource.includes("cancel_url: `${appUrl}/#pricing`") &&
+        handleSource.includes("sessionParams.customer = existingStripeCustomerId") &&
+        handleSource.includes("sessionParams.customer_email = signedInUser.email");
+
+      result.checkoutBasicCustomChainFieldValid =
+        handleSource.includes('if (plan === "basic")') &&
+        handleSource.includes("sessionParams.custom_fields = [") &&
+        handleSource.includes('key: "entitled_chain"') &&
+        handleSource.includes('custom: "Select chain"') &&
+        handleSource.includes('type: "dropdown"') &&
+        handleSource.includes("options: CHAIN_OPTIONS.map((chain)");
+
+      result.checkoutSessionRedirectNoStore =
+        handleSource.includes("const session = await stripe.checkout.sessions.create(sessionParams);") &&
+        handleSource.includes("if (!session.url)") &&
+        handleSource.includes("const response = NextResponse.redirect(session.url, { status: 303 });") &&
+        handleSource.includes('response.headers.set("Cache-Control", "no-store")');
+    }
+  }
+
+  if (portalSource) {
+    result.portalImportsStripeAndAccountView =
+      portalSource.includes('import Stripe from "stripe";') &&
+      portalSource.includes('import { getCurrentAccountView } from "@/lib/auth/account";');
+
+    result.portalImportsSameOriginAndRateLimit =
+      portalSource.includes('import { validateSameOriginRequest } from "@/lib/security/origin";') &&
+      portalSource.includes('import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";');
+
+    result.portalStripeClientUsesSecretKey =
+      portalSource.includes("function getStripeClient(): Stripe | null") &&
+      portalSource.includes("const secretKey = process.env.STRIPE_SECRET_KEY?.trim();") &&
+      portalSource.includes("if (!secretKey)") &&
+      portalSource.includes("return new Stripe(secretKey);");
+
+    result.portalErrorsNoStoreAndRedacted =
+      portalSource.includes("function publicPortalErrorDetail(") &&
+      portalSource.includes('process.env.NODE_ENV !== "production"') &&
+      portalSource.includes('process.env.VERCEL_ENV !== "production"') &&
+      portalSource.includes('return "server_error";') &&
+      portalSource.includes('"Cache-Control": "no-store"');
+
+    result.portalReturnUrlValid =
+      portalSource.includes("function dashboardReturnUrl(request: NextRequest)") &&
+      portalSource.includes('return new URL("/dashboard?billing=portal-return", request.nextUrl.origin).toString();');
+
+    const portalPostIndex = portalSource.indexOf("export async function POST(request: NextRequest)");
+    const postSource = portalPostIndex >= 0 ? portalSource.slice(portalPostIndex) : "";
+
+    if (postSource) {
+      const originIndex = postSource.indexOf("const originGuard = validateSameOriginRequest(request);");
+      const rateLimitIndex = postSource.indexOf('const preAuthRateLimit = await enforcePreAuthRateLimit(request, "portal-api");');
+      const stripeIndex = postSource.indexOf("const stripe = getStripeClient();");
+      const accountIndex = postSource.indexOf("accountView = await getCurrentAccountView();");
+      const authCheckIndex = postSource.indexOf("if (!accountView.isAuthenticated)");
+      const customerIndex = postSource.indexOf("const stripeCustomerId = accountView.account?.stripeCustomerId?.trim() ?? \"\";");
+      const sessionIndex = postSource.indexOf("const portalSession = await stripe.billingPortal.sessions.create({");
+      const responseIndex = postSource.indexOf("const response = NextResponse.redirect(portalSession.url, { status: 303 });");
+
+      result.portalPostOrderValid =
+        originIndex >= 0 &&
+        rateLimitIndex >= 0 &&
+        stripeIndex >= 0 &&
+        accountIndex >= 0 &&
+        originIndex < rateLimitIndex &&
+        rateLimitIndex < stripeIndex &&
+        stripeIndex < accountIndex;
+
+      result.portalRequiresAuthenticatedAccount =
+        accountIndex >= 0 &&
+        authCheckIndex >= 0 &&
+        accountIndex < authCheckIndex &&
+        postSource.includes('"Sign in before opening billing management."') &&
+        postSource.includes('"No authenticated subscriber session was found."');
+
+      result.portalRequiresStripeCustomerId =
+        customerIndex >= 0 &&
+        authCheckIndex >= 0 &&
+        authCheckIndex < customerIndex &&
+        postSource.includes("if (!stripeCustomerId)") &&
+        postSource.includes('"Billing is not connected for this account yet."') &&
+        postSource.includes('"subscription_not_connected"');
+
+      result.portalCreatesCustomerPortalSession =
+        sessionIndex >= 0 &&
+        customerIndex >= 0 &&
+        customerIndex < sessionIndex &&
+        postSource.includes("customer: stripeCustomerId") &&
+        postSource.includes("return_url: dashboardReturnUrl(request)") &&
+        postSource.includes("if (!portalSession.url)");
+
+      result.portalRedirectNoStore =
+        responseIndex >= 0 &&
+        sessionIndex >= 0 &&
+        sessionIndex < responseIndex &&
+        postSource.includes('response.headers.set("Cache-Control", "no-store")');
+    }
+  }
+
+  const requiredChecks = [
+    ["CHECKOUT_ROUTE_MISSING", result.checkoutRouteExists, checkoutRoutePath, "Checkout route must exist."],
+    ["CHECKOUT_PORTAL_ROUTE_MISSING", result.portalRouteExists, checkoutPortalRoutePath, "Checkout portal route must exist."],
+
+    ["CHECKOUT_CLERK_IMPORT_INVALID", result.checkoutImportsClerkAuth, checkoutRoutePath, "Checkout must import Clerk auth/currentUser."],
+    ["CHECKOUT_STRIPE_DB_IMPORT_INVALID", result.checkoutImportsStripeAndDb, checkoutRoutePath, "Checkout must import Stripe and db."],
+    ["CHECKOUT_ORIGIN_RATE_LIMIT_IMPORT_INVALID", result.checkoutImportsSameOriginAndRateLimit, checkoutRoutePath, "Checkout must import same-origin guard and pre-auth rate limit."],
+    ["CHECKOUT_TERMS_VERSION_INVALID", result.checkoutTermsVersionPinned, checkoutRoutePath, "Checkout account creation must pin TERMS_VERSION."],
+    ["CHECKOUT_STRIPE_KEY_MODE_INVALID", result.checkoutStripeKeyModeDetection, checkoutRoutePath, "Checkout must detect Stripe key mode including test/live/restricted variants."],
+    ["CHECKOUT_APP_URL_FALLBACK_INVALID", result.checkoutAppUrlFallbackValid, checkoutRoutePath, "Checkout must build app URL from configured env or request origin."],
+    ["CHECKOUT_PRODUCTION_LIVE_KEY_GUARD_INVALID", result.checkoutProductionRequiresLiveStripeKey, checkoutRoutePath, "Production checkout must require live Stripe secret key."],
+    ["CHECKOUT_ERROR_REDACTION_INVALID", result.checkoutErrorsNoStoreAndRedacted, checkoutRoutePath, "Checkout errors must be no-store and redact internal details in production."],
+    ["CHECKOUT_PLAN_NORMALIZATION_INVALID", result.checkoutPlanNormalizationValid, checkoutRoutePath, "Checkout plan normalization must map basic/single-chain and pro/research."],
+    ["CHECKOUT_PLAN_INPUTS_INVALID", result.checkoutReadsPlanFromQueryJsonAndForm, checkoutRoutePath, "Checkout must read plan from query, JSON, and form bodies."],
+    ["CHECKOUT_PRICE_ENV_INVALID", result.checkoutPriceEnvContractValid, checkoutRoutePath, "Checkout must use STRIPE_PRICE_BASIC and STRIPE_PRICE_PRO."],
+    ["CHECKOUT_METADATA_INVALID", result.checkoutMetadataValid, checkoutRoutePath, "Checkout metadata must bind plan, account id, auth provider id, chain placeholder, and history flag."],
+    ["CHECKOUT_SIGNED_IN_USER_INVALID", result.checkoutSignedInUserLookupValid, checkoutRoutePath, "Checkout must resolve signed-in Clerk user and email."],
+    ["CHECKOUT_ACCOUNT_UPSERT_INVALID", result.checkoutAccountUpsertValid, checkoutRoutePath, "Checkout must upsert account by authProviderUserId and include latest subscription."],
+    ["CHECKOUT_POST_ORDER_INVALID", result.checkoutPostOrderValid, checkoutRoutePath, "Checkout POST must run same-origin guard, pre-auth rate-limit, then handle checkout."],
+    ["CHECKOUT_GET_METHOD_INVALID", result.checkoutGetMethodNotAllowed, checkoutRoutePath, "Checkout GET must return 405 no-store with Allow: POST."],
+    ["CHECKOUT_UNAUTHENTICATED_REDIRECT_INVALID", result.checkoutRedirectsUnauthenticatedToSignIn, checkoutRoutePath, "Checkout must redirect unauthenticated users to sign-in with return URL."],
+    ["CHECKOUT_SESSION_PARAMS_INVALID", result.checkoutSessionParamsValid, checkoutRoutePath, "Checkout session params must create subscription session with account/customer metadata and dashboard success URL."],
+    ["CHECKOUT_BASIC_CHAIN_FIELD_INVALID", result.checkoutBasicCustomChainFieldValid, checkoutRoutePath, "Basic checkout must collect entitled_chain via Stripe custom dropdown."],
+    ["CHECKOUT_SESSION_REDIRECT_INVALID", result.checkoutSessionRedirectNoStore, checkoutRoutePath, "Checkout must redirect to Stripe Checkout with 303 and no-store."],
+
+    ["PORTAL_STRIPE_ACCOUNT_IMPORT_INVALID", result.portalImportsStripeAndAccountView, checkoutPortalRoutePath, "Portal route must import Stripe and getCurrentAccountView."],
+    ["PORTAL_ORIGIN_RATE_LIMIT_IMPORT_INVALID", result.portalImportsSameOriginAndRateLimit, checkoutPortalRoutePath, "Portal route must import same-origin guard and pre-auth rate limit."],
+    ["PORTAL_STRIPE_CLIENT_INVALID", result.portalStripeClientUsesSecretKey, checkoutPortalRoutePath, "Portal route must create Stripe client from STRIPE_SECRET_KEY and fail when missing."],
+    ["PORTAL_ERROR_REDACTION_INVALID", result.portalErrorsNoStoreAndRedacted, checkoutPortalRoutePath, "Portal errors must be no-store and redact internal details in production."],
+    ["PORTAL_RETURN_URL_INVALID", result.portalReturnUrlValid, checkoutPortalRoutePath, "Portal return URL must go back to dashboard portal-return state."],
+    ["PORTAL_POST_ORDER_INVALID", result.portalPostOrderValid, checkoutPortalRoutePath, "Portal POST must run same-origin guard, pre-auth rate-limit, Stripe config, then account view."],
+    ["PORTAL_AUTH_REQUIRED", result.portalRequiresAuthenticatedAccount, checkoutPortalRoutePath, "Portal route must require authenticated account view."],
+    ["PORTAL_CUSTOMER_ID_REQUIRED", result.portalRequiresStripeCustomerId, checkoutPortalRoutePath, "Portal route must require linked Stripe customer id."],
+    ["PORTAL_SESSION_CREATE_INVALID", result.portalCreatesCustomerPortalSession, checkoutPortalRoutePath, "Portal route must create Stripe billing portal session using customer id and return_url."],
+    ["PORTAL_REDIRECT_INVALID", result.portalRedirectNoStore, checkoutPortalRoutePath, "Portal route must redirect to Stripe portal with 303 and no-store."]
+  ];
+
+  for (const [code, ok, targetPath, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-039",
+        code,
+        path.relative(root, targetPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -6404,6 +6740,7 @@ function evaluate() {
   const clerkAuthSurfaceContract = evaluateClerkAuthSurfaceContract(findings);
   const dashboardAccountSurfaceContract = evaluateDashboardAccountSurfaceContract(findings);
   const apiKeyRouteContract = evaluateApiKeyRouteContract(findings);
+  const checkoutBillingRouteContract = evaluateCheckoutBillingRouteContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -6445,6 +6782,7 @@ function evaluate() {
     clerkAuthSurfaceContract,
     dashboardAccountSurfaceContract,
     apiKeyRouteContract,
+    checkoutBillingRouteContract,
     findings,
   };
 }
@@ -6504,6 +6842,41 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Checkout billing route contract");
+  lines.push("");
+  lines.push(`Checkout route exists: ${result.checkoutBillingRouteContract.checkoutRouteExists}`);
+  lines.push(`Portal route exists: ${result.checkoutBillingRouteContract.portalRouteExists}`);
+  lines.push(`Checkout imports Clerk auth: ${result.checkoutBillingRouteContract.checkoutImportsClerkAuth}`);
+  lines.push(`Checkout imports Stripe/db: ${result.checkoutBillingRouteContract.checkoutImportsStripeAndDb}`);
+  lines.push(`Checkout imports origin/rate-limit: ${result.checkoutBillingRouteContract.checkoutImportsSameOriginAndRateLimit}`);
+  lines.push(`Checkout terms version pinned: ${result.checkoutBillingRouteContract.checkoutTermsVersionPinned}`);
+  lines.push(`Checkout Stripe key mode detection: ${result.checkoutBillingRouteContract.checkoutStripeKeyModeDetection}`);
+  lines.push(`Checkout app URL fallback valid: ${result.checkoutBillingRouteContract.checkoutAppUrlFallbackValid}`);
+  lines.push(`Checkout production live-key guard: ${result.checkoutBillingRouteContract.checkoutProductionRequiresLiveStripeKey}`);
+  lines.push(`Checkout errors no-store/redacted: ${result.checkoutBillingRouteContract.checkoutErrorsNoStoreAndRedacted}`);
+  lines.push(`Checkout plan normalization valid: ${result.checkoutBillingRouteContract.checkoutPlanNormalizationValid}`);
+  lines.push(`Checkout reads plan inputs: ${result.checkoutBillingRouteContract.checkoutReadsPlanFromQueryJsonAndForm}`);
+  lines.push(`Checkout price env contract: ${result.checkoutBillingRouteContract.checkoutPriceEnvContractValid}`);
+  lines.push(`Checkout metadata valid: ${result.checkoutBillingRouteContract.checkoutMetadataValid}`);
+  lines.push(`Checkout signed-in user lookup valid: ${result.checkoutBillingRouteContract.checkoutSignedInUserLookupValid}`);
+  lines.push(`Checkout account upsert valid: ${result.checkoutBillingRouteContract.checkoutAccountUpsertValid}`);
+  lines.push(`Checkout POST order valid: ${result.checkoutBillingRouteContract.checkoutPostOrderValid}`);
+  lines.push(`Checkout GET method not allowed: ${result.checkoutBillingRouteContract.checkoutGetMethodNotAllowed}`);
+  lines.push(`Checkout unauthenticated redirect valid: ${result.checkoutBillingRouteContract.checkoutRedirectsUnauthenticatedToSignIn}`);
+  lines.push(`Checkout session params valid: ${result.checkoutBillingRouteContract.checkoutSessionParamsValid}`);
+  lines.push(`Checkout basic custom chain field valid: ${result.checkoutBillingRouteContract.checkoutBasicCustomChainFieldValid}`);
+  lines.push(`Checkout session redirect no-store: ${result.checkoutBillingRouteContract.checkoutSessionRedirectNoStore}`);
+  lines.push(`Portal imports Stripe/account view: ${result.checkoutBillingRouteContract.portalImportsStripeAndAccountView}`);
+  lines.push(`Portal imports origin/rate-limit: ${result.checkoutBillingRouteContract.portalImportsSameOriginAndRateLimit}`);
+  lines.push(`Portal Stripe client valid: ${result.checkoutBillingRouteContract.portalStripeClientUsesSecretKey}`);
+  lines.push(`Portal errors no-store/redacted: ${result.checkoutBillingRouteContract.portalErrorsNoStoreAndRedacted}`);
+  lines.push(`Portal return URL valid: ${result.checkoutBillingRouteContract.portalReturnUrlValid}`);
+  lines.push(`Portal POST order valid: ${result.checkoutBillingRouteContract.portalPostOrderValid}`);
+  lines.push(`Portal requires authenticated account: ${result.checkoutBillingRouteContract.portalRequiresAuthenticatedAccount}`);
+  lines.push(`Portal requires Stripe customer id: ${result.checkoutBillingRouteContract.portalRequiresStripeCustomerId}`);
+  lines.push(`Portal creates customer portal session: ${result.checkoutBillingRouteContract.portalCreatesCustomerPortalSession}`);
+  lines.push(`Portal redirect no-store: ${result.checkoutBillingRouteContract.portalRedirectNoStore}`);
+  lines.push("");
   lines.push("## API key route contract");
   lines.push("");
   lines.push(`Route exists: ${result.apiKeyRouteContract.routeExists}`);
@@ -7077,6 +7450,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-039 Checkout Billing Route Contract: verifies Stripe Checkout and Customer Portal routes, same-origin/pre-auth gating, Clerk/account binding, production live-key guard, session metadata, no-store redirects, and customer-id scoped portal access.");
   lines.push("- D-038 API Key Route Contract: verifies /api/v1/keys same-origin/pre-auth gating, Clerk/account/subscription checks, scrypt key creation, account-scoped revoke, audit logs, no-store responses, and no keyHash exposure.");
   lines.push("- D-037 Dashboard Account Surface Contract: verifies dashboard/account state, entitlement display, API-key manager mutation gating, Stripe portal gating, secret-once behavior, and endpoint-boundary copy.");
   lines.push("- D-036 Clerk Auth Surface Contract: verifies Clerk layout/sign-in/sign-up surfaces, safe unconfigured fallback, terms gating before SignUp, and no-advice product boundary copy.");
