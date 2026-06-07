@@ -2604,6 +2604,134 @@ function evaluatePublishScriptGateContract(findings) {
 
   return result;
 }
+function evaluatePostRebaseWorkflowGateContract(findings) {
+  const result = {
+    workflowExists: fs.existsSync(githubPipelineWorkflowPath),
+    hasRebase: false,
+    hasPostRebaseGateMarker: false,
+    hasNoBuildGateCommand: false,
+    postRebaseGateAfterRebase: false,
+    postRebaseGateBeforePush: false,
+    postRebaseGateInsidePushLoop: false,
+    postRebaseGateRefusesPushOnFailure: false,
+  };
+
+  if (!result.workflowExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-020",
+      "WORKFLOW_MISSING_FOR_POST_REBASE_GATE",
+      path.relative(root, githubPipelineWorkflowPath),
+      ".github/workflows/pipeline.yml is missing, so post-rebase gate behavior cannot be audited."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(githubPipelineWorkflowPath, "utf8").replace(/^\uFEFF/u, "");
+
+  const rebaseIndex = source.indexOf("git pull --rebase origin main");
+  const postRebaseGateIndex = source.indexOf("Re-running audit gates after rebase and before push");
+  const noBuildGateIndex = source.indexOf("npm run check:audit-gates:no-build", postRebaseGateIndex >= 0 ? postRebaseGateIndex : 0);
+  const pushIndex = source.indexOf("git push origin HEAD:main");
+  const loopIndex = source.indexOf("for ($attempt = 1; $attempt -le $maxAttempts; $attempt++)");
+  const failureMessageIndex = source.indexOf("Post-rebase audit gates failed; refusing to push.");
+
+  result.hasRebase = rebaseIndex >= 0;
+  result.hasPostRebaseGateMarker = postRebaseGateIndex >= 0;
+  result.hasNoBuildGateCommand = noBuildGateIndex >= 0;
+  result.postRebaseGateAfterRebase = rebaseIndex >= 0 && postRebaseGateIndex >= 0 && rebaseIndex < postRebaseGateIndex;
+  result.postRebaseGateBeforePush = postRebaseGateIndex >= 0 && pushIndex >= 0 && postRebaseGateIndex < pushIndex;
+  result.postRebaseGateInsidePushLoop =
+    loopIndex >= 0 &&
+    rebaseIndex >= 0 &&
+    postRebaseGateIndex >= 0 &&
+    pushIndex >= 0 &&
+    loopIndex < rebaseIndex &&
+    rebaseIndex < postRebaseGateIndex &&
+    postRebaseGateIndex < pushIndex;
+  result.postRebaseGateRefusesPushOnFailure = failureMessageIndex >= 0 && failureMessageIndex < pushIndex;
+
+  if (!result.hasRebase) {
+    addFinding(
+      findings,
+      "fail",
+      "D-020",
+      "WORKFLOW_REBASE_STEP_MISSING",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Workflow push step must explicitly rebase on origin/main or otherwise prove it is pushing a fresh tree."
+    );
+  }
+
+  if (!result.hasPostRebaseGateMarker) {
+    addFinding(
+      findings,
+      "fail",
+      "D-020",
+      "WORKFLOW_POST_REBASE_AUDIT_GATE_MISSING",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Workflow must re-run audit gates after git pull --rebase and before git push, because rebase can change published data after the earlier gate run."
+    );
+  }
+
+  if (!result.hasNoBuildGateCommand) {
+    addFinding(
+      findings,
+      "fail",
+      "D-020",
+      "WORKFLOW_POST_REBASE_NO_BUILD_GATE_MISSING",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Workflow post-rebase gate should use npm run check:audit-gates:no-build to avoid a redundant build inside the push retry loop."
+    );
+  }
+
+  if (!result.postRebaseGateAfterRebase) {
+    addFinding(
+      findings,
+      "fail",
+      "D-020",
+      "WORKFLOW_POST_REBASE_GATE_BEFORE_REBASE",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Post-rebase audit gates must run after git pull --rebase origin main."
+    );
+  }
+
+  if (!result.postRebaseGateBeforePush) {
+    addFinding(
+      findings,
+      "fail",
+      "D-020",
+      "WORKFLOW_POST_REBASE_GATE_AFTER_PUSH",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Post-rebase audit gates must run before git push origin HEAD:main."
+    );
+  }
+
+  if (!result.postRebaseGateInsidePushLoop) {
+    addFinding(
+      findings,
+      "fail",
+      "D-020",
+      "WORKFLOW_POST_REBASE_GATE_OUTSIDE_PUSH_LOOP",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Post-rebase audit gates must run inside the push retry loop so every rebase attempt is validated before push."
+    );
+  }
+
+  if (!result.postRebaseGateRefusesPushOnFailure) {
+    addFinding(
+      findings,
+      "fail",
+      "D-020",
+      "WORKFLOW_POST_REBASE_GATE_DOES_NOT_REFUSE_PUSH",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Workflow must throw/refuse push if post-rebase audit gates fail."
+    );
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -2630,6 +2758,7 @@ function evaluate() {
   const snapshotMetadataHarmonizerContract = evaluateSnapshotMetadataHarmonizerContract(findings);
   const repoHygieneContract = evaluateRepoHygieneContract(findings);
   const publishScriptGateContract = evaluatePublishScriptGateContract(findings);
+  const postRebaseWorkflowGateContract = evaluatePostRebaseWorkflowGateContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -2652,6 +2781,7 @@ function evaluate() {
     snapshotMetadataHarmonizerContract,
     repoHygieneContract,
     publishScriptGateContract,
+    postRebaseWorkflowGateContract,
     findings,
   };
 }
@@ -2711,6 +2841,17 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Post-rebase workflow gate contract");
+  lines.push("");
+  lines.push(`Workflow exists: ${result.postRebaseWorkflowGateContract.workflowExists}`);
+  lines.push(`Has rebase step: ${result.postRebaseWorkflowGateContract.hasRebase}`);
+  lines.push(`Has post-rebase gate marker: ${result.postRebaseWorkflowGateContract.hasPostRebaseGateMarker}`);
+  lines.push(`Has no-build gate command: ${result.postRebaseWorkflowGateContract.hasNoBuildGateCommand}`);
+  lines.push(`Post-rebase gate after rebase: ${result.postRebaseWorkflowGateContract.postRebaseGateAfterRebase}`);
+  lines.push(`Post-rebase gate before push: ${result.postRebaseWorkflowGateContract.postRebaseGateBeforePush}`);
+  lines.push(`Post-rebase gate inside push loop: ${result.postRebaseWorkflowGateContract.postRebaseGateInsidePushLoop}`);
+  lines.push(`Post-rebase gate refuses push on failure: ${result.postRebaseWorkflowGateContract.postRebaseGateRefusesPushOnFailure}`);
+  lines.push("");
   lines.push("## Publish script gate contract");
   lines.push("");
   lines.push(`Publish script exists: ${result.publishScriptGateContract.publishScriptExists}`);
@@ -2889,6 +3030,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-020 Post-rebase Workflow Gate Contract: verifies GitHub Actions re-runs audit gates after rebase and before each push attempt.");
   lines.push("- D-019 Publish Script Gate Contract: verifies publish-web-data.ps1 runs central audit gates before manual commit/push paths.");
   lines.push("- D-018 Repo Hygiene Contract: verifies audit/patch scratch is ignored and permanent pipeline scripts are explicitly allowed/tracked.");
   lines.push("- D-017 Snapshot Metadata Harmonizer Contract: verifies the pipeline permanently harmonizes dataset/manifests computed_at_utc before private sync and commit.");

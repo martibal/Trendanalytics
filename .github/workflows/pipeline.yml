@@ -203,6 +203,17 @@ jobs:
               exit 0
             }
 
+            Write-Host "Re-running audit gates after rebase and before push..."
+            Push-Location ".\web-v1-app"
+            try {
+              npm run check:audit-gates:no-build
+              if ($LASTEXITCODE -ne 0) {
+                throw "Post-rebase audit gates failed; refusing to push."
+              }
+            }
+            finally {
+              Pop-Location
+            }
             git push origin HEAD:main
             if ($LASTEXITCODE -eq 0) {
               Write-Host "Push succeeded on attempt $attempt"
