@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const entitlementsPath = path.join(root, "src", "lib", "auth", "entitlements.ts");
 const webPublicPublishedRoot = path.join(root, "public", "data", "published", "v1");
 
 const CHAINS = ["bitcoin", "ethereum", "arbitrum", "base"];
@@ -3370,6 +3371,204 @@ function evaluateFileApiResponseBoundaryContract(findings) {
 
   return result;
 }
+function evaluateEntitlementMatrixContract(findings) {
+  const result = {
+    entitlementsExists: fs.existsSync(entitlementsPath),
+    hasTierUnion: false,
+    hasStatusUnion: false,
+    hasGenreUnion: false,
+    hasWindowUnion: false,
+    hasAllChains: false,
+    hasAllGenres: false,
+    basicWindowsCorrect: false,
+    proWindowsCorrect: false,
+    publicHasNoFileAccess: false,
+    basicSingleChain: false,
+    basicMaxWindow90: false,
+    basicHistoryDepth90UnlessUnlocked: false,
+    basicCustomThresholdsFalse: false,
+    proAllChains: false,
+    proMaxWindow365: false,
+    proHistoryDepth365UnlessUnlocked: false,
+    proCustomThresholdsTrue: false,
+    evaluatesPublicAsInactive: false,
+    checksInactiveBeforeAccess: false,
+    checksChainBeforeGenreWindow: false,
+    checksGenreBeforeWindow: false,
+    checksWindowBeforeDateRange: false,
+    validatesBothDateBounds: false,
+    validatesDateOrdering: false,
+    enforcesHistoryDepth: false,
+    exportsFactoryHelpers: false,
+  };
+
+  if (!result.entitlementsExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-025",
+      "ENTITLEMENTS_MODULE_MISSING",
+      path.relative(root, entitlementsPath),
+      "Entitlement matrix module is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(entitlementsPath, "utf8").replace(/^\uFEFF/u, "");
+
+  result.hasTierUnion = source.includes('export type SubscriptionTier = "public" | "basic" | "pro";');
+  result.hasStatusUnion = source.includes('export type SubscriptionStatus = "active" | "inactive";');
+  result.hasGenreUnion = source.includes('export type FileGenre = "gold" | "meta" | "derived" | "briefs";');
+  result.hasWindowUnion = source.includes('export type WindowToken = "latest" | "7d" | "30d" | "90d" | "180d" | "365d";');
+
+  result.hasAllChains = source.includes('const ALL_CHAINS: ChainId[] = ["bitcoin", "ethereum", "arbitrum", "base"];');
+  result.hasAllGenres = source.includes('const ALL_GENRES: FileGenre[] = ["gold", "meta", "derived", "briefs"];');
+  result.basicWindowsCorrect = source.includes('const BASIC_WINDOWS: WindowToken[] = ["latest", "7d", "30d", "90d"];');
+  result.proWindowsCorrect = source.includes('const PRO_WINDOWS: WindowToken[] = ["latest", "7d", "30d", "90d", "180d", "365d"];');
+
+  result.publicHasNoFileAccess =
+    source.includes('tier: "public"') &&
+    source.includes("allowedChains: []") &&
+    source.includes("allowedGenres: []") &&
+    source.includes("allowedWindows: []") &&
+    source.includes("maxWindowDays: 0") &&
+    source.includes("historyDepthDays: 0") &&
+    source.includes("fullHistory: false") &&
+    source.includes("customThresholdFeeds: false");
+
+  result.basicSingleChain =
+    source.includes("const allowedChains = input.entitledChain ? [input.entitledChain] : [];") &&
+    source.includes("allowedChains,") &&
+    source.includes('tier: "basic"');
+
+  result.basicMaxWindow90 =
+    source.includes('tier: "basic"') &&
+    source.includes("allowedWindows: cloneWindows(BASIC_WINDOWS)") &&
+    source.includes("maxWindowDays: 90");
+
+  result.basicHistoryDepth90UnlessUnlocked =
+    source.includes("historyDepthDays: input.historyUnlocked ? null : 90") &&
+    source.includes("fullHistory: input.historyUnlocked");
+
+  result.basicCustomThresholdsFalse =
+    source.includes('tier: "basic"') &&
+    source.includes("customThresholdFeeds: false");
+
+  result.proAllChains =
+    source.includes('tier: "pro"') &&
+    source.includes("allowedChains: cloneChains(ALL_CHAINS)");
+
+  result.proMaxWindow365 =
+    source.includes('tier: "pro"') &&
+    source.includes("allowedWindows: cloneWindows(PRO_WINDOWS)") &&
+    source.includes("maxWindowDays: 365");
+
+  result.proHistoryDepth365UnlessUnlocked =
+    source.includes("historyDepthDays: input.historyUnlocked ? null : 365") &&
+    source.includes("fullHistory: input.historyUnlocked");
+
+  result.proCustomThresholdsTrue =
+    source.includes('tier: "pro"') &&
+    source.includes("customThresholdFeeds: true");
+
+  const publicCheckIndex = source.indexOf('if (snapshot.tier === "public")');
+  const inactiveCheckIndex = source.indexOf('if (snapshot.status !== "active")');
+  const chainCheckIndex = source.indexOf("if (!canAccessChain(snapshot, scope.chain))");
+  const genreCheckIndex = source.indexOf("if (!canAccessGenre(snapshot, scope.genre))");
+  const windowCheckIndex = source.indexOf("if (!canAccessWindow(snapshot, scope.window))");
+  const dateRangeCheckIndex = source.indexOf("const dateRangeDecision = validateDateRangeWithinHistory(");
+
+  result.evaluatesPublicAsInactive =
+    publicCheckIndex >= 0 &&
+    source.includes("Public users do not have authenticated file-delivery access.") &&
+    source.includes('code: "inactive_subscription"');
+
+  result.checksInactiveBeforeAccess =
+    publicCheckIndex >= 0 &&
+    inactiveCheckIndex >= 0 &&
+    chainCheckIndex >= 0 &&
+    publicCheckIndex < inactiveCheckIndex &&
+    inactiveCheckIndex < chainCheckIndex;
+
+  result.checksChainBeforeGenreWindow =
+    chainCheckIndex >= 0 &&
+    genreCheckIndex >= 0 &&
+    windowCheckIndex >= 0 &&
+    chainCheckIndex < genreCheckIndex &&
+    genreCheckIndex < windowCheckIndex;
+
+  result.checksGenreBeforeWindow =
+    genreCheckIndex >= 0 &&
+    windowCheckIndex >= 0 &&
+    genreCheckIndex < windowCheckIndex;
+
+  result.checksWindowBeforeDateRange =
+    windowCheckIndex >= 0 &&
+    dateRangeCheckIndex >= 0 &&
+    windowCheckIndex < dateRangeCheckIndex;
+
+  result.validatesBothDateBounds =
+    source.includes("if (!startDate || !endDate)") &&
+    source.includes("Both startDate and endDate must be present");
+
+  result.validatesDateOrdering =
+    source.includes("if (end < start)") &&
+    source.includes("endDate must be on or after startDate.");
+
+  result.enforcesHistoryDepth =
+    source.includes("const inclusiveDays = Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;") &&
+    source.includes("inclusiveDays > snapshot.historyDepthDays") &&
+    source.includes('code: "forbidden_history_range"');
+
+  result.exportsFactoryHelpers =
+    source.includes("export function createPublicEntitlement()") &&
+    source.includes("export function createBasicEntitlement(") &&
+    source.includes("export function createProEntitlement(");
+
+  const requiredChecks = [
+    ["ENTITLEMENT_TIER_UNION_INVALID", result.hasTierUnion, "SubscriptionTier must be exactly public | basic | pro."],
+    ["ENTITLEMENT_STATUS_UNION_INVALID", result.hasStatusUnion, "SubscriptionStatus must be exactly active | inactive."],
+    ["ENTITLEMENT_GENRE_UNION_INVALID", result.hasGenreUnion, "FileGenre must include gold, meta, derived, briefs."],
+    ["ENTITLEMENT_WINDOW_UNION_INVALID", result.hasWindowUnion, "WindowToken must include latest, 7d, 30d, 90d, 180d, 365d."],
+    ["ENTITLEMENT_ALL_CHAINS_INVALID", result.hasAllChains, "ALL_CHAINS must cover bitcoin, ethereum, arbitrum, base."],
+    ["ENTITLEMENT_ALL_GENRES_INVALID", result.hasAllGenres, "ALL_GENRES must cover gold, meta, derived, briefs."],
+    ["ENTITLEMENT_BASIC_WINDOWS_INVALID", result.basicWindowsCorrect, "BASIC_WINDOWS must be latest, 7d, 30d, 90d."],
+    ["ENTITLEMENT_PRO_WINDOWS_INVALID", result.proWindowsCorrect, "PRO_WINDOWS must be latest, 7d, 30d, 90d, 180d, 365d."],
+    ["ENTITLEMENT_PUBLIC_ACCESS_NOT_EMPTY", result.publicHasNoFileAccess, "Public tier must have no subscriber file access."],
+    ["ENTITLEMENT_BASIC_SINGLE_CHAIN_INVALID", result.basicSingleChain, "Basic tier must be limited to exactly the entitled chain."],
+    ["ENTITLEMENT_BASIC_MAX_WINDOW_INVALID", result.basicMaxWindow90, "Basic tier must be capped at 90d windows."],
+    ["ENTITLEMENT_BASIC_HISTORY_DEPTH_INVALID", result.basicHistoryDepth90UnlessUnlocked, "Basic tier history depth must be 90d unless historyUnlocked."],
+    ["ENTITLEMENT_BASIC_CUSTOM_THRESHOLDS_INVALID", result.basicCustomThresholdsFalse, "Basic tier must not include customThresholdFeeds."],
+    ["ENTITLEMENT_PRO_CHAIN_ACCESS_INVALID", result.proAllChains, "Pro tier must include all chains."],
+    ["ENTITLEMENT_PRO_MAX_WINDOW_INVALID", result.proMaxWindow365, "Pro tier must include windows through 365d."],
+    ["ENTITLEMENT_PRO_HISTORY_DEPTH_INVALID", result.proHistoryDepth365UnlessUnlocked, "Pro tier history depth must be 365d unless historyUnlocked."],
+    ["ENTITLEMENT_PRO_CUSTOM_THRESHOLDS_INVALID", result.proCustomThresholdsTrue, "Pro tier must include customThresholdFeeds."],
+    ["ENTITLEMENT_PUBLIC_DECISION_INVALID", result.evaluatesPublicAsInactive, "Public file entitlement must be denied as inactive_subscription."],
+    ["ENTITLEMENT_INACTIVE_CHECK_ORDER_INVALID", result.checksInactiveBeforeAccess, "Inactive subscription must be checked before chain/genre/window access."],
+    ["ENTITLEMENT_CHAIN_GENRE_WINDOW_ORDER_INVALID", result.checksChainBeforeGenreWindow, "Entitlement evaluation must check chain before genre before window."],
+    ["ENTITLEMENT_WINDOW_DATE_ORDER_INVALID", result.checksWindowBeforeDateRange, "Window entitlement must be checked before date-range/history access."],
+    ["ENTITLEMENT_DATE_BOUNDS_VALIDATION_MISSING", result.validatesBothDateBounds, "Date-range access must require both startDate and endDate."],
+    ["ENTITLEMENT_DATE_ORDER_VALIDATION_MISSING", result.validatesDateOrdering, "Date-range access must reject endDate before startDate."],
+    ["ENTITLEMENT_HISTORY_DEPTH_ENFORCEMENT_MISSING", result.enforcesHistoryDepth, "Date-range access must enforce historyDepthDays."],
+    ["ENTITLEMENT_FACTORY_HELPERS_MISSING", result.exportsFactoryHelpers, "Entitlement factory helpers must remain exported for tests/routes."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-025",
+        code,
+        path.relative(root, entitlementsPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -3401,6 +3600,7 @@ function evaluate() {
   const syncScriptMirrorContract = evaluateSyncScriptMirrorContract(findings);
   const publicPrivateArtifactBoundaryContract = evaluatePublicPrivateArtifactBoundaryContract(findings);
   const fileApiResponseBoundaryContract = evaluateFileApiResponseBoundaryContract(findings);
+  const entitlementMatrixContract = evaluateEntitlementMatrixContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -3428,6 +3628,7 @@ function evaluate() {
     syncScriptMirrorContract,
     publicPrivateArtifactBoundaryContract,
     fileApiResponseBoundaryContract,
+    entitlementMatrixContract,
     findings,
   };
 }
@@ -3487,6 +3688,35 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Entitlement matrix contract");
+  lines.push("");
+  lines.push(`Entitlements module exists: ${result.entitlementMatrixContract.entitlementsExists}`);
+  lines.push(`Tier union valid: ${result.entitlementMatrixContract.hasTierUnion}`);
+  lines.push(`Status union valid: ${result.entitlementMatrixContract.hasStatusUnion}`);
+  lines.push(`Genre union valid: ${result.entitlementMatrixContract.hasGenreUnion}`);
+  lines.push(`Window union valid: ${result.entitlementMatrixContract.hasWindowUnion}`);
+  lines.push(`All chains valid: ${result.entitlementMatrixContract.hasAllChains}`);
+  lines.push(`All genres valid: ${result.entitlementMatrixContract.hasAllGenres}`);
+  lines.push(`Basic windows correct: ${result.entitlementMatrixContract.basicWindowsCorrect}`);
+  lines.push(`Pro windows correct: ${result.entitlementMatrixContract.proWindowsCorrect}`);
+  lines.push(`Public has no file access: ${result.entitlementMatrixContract.publicHasNoFileAccess}`);
+  lines.push(`Basic single chain: ${result.entitlementMatrixContract.basicSingleChain}`);
+  lines.push(`Basic max window 90: ${result.entitlementMatrixContract.basicMaxWindow90}`);
+  lines.push(`Basic history depth 90 unless unlocked: ${result.entitlementMatrixContract.basicHistoryDepth90UnlessUnlocked}`);
+  lines.push(`Basic custom thresholds false: ${result.entitlementMatrixContract.basicCustomThresholdsFalse}`);
+  lines.push(`Pro all chains: ${result.entitlementMatrixContract.proAllChains}`);
+  lines.push(`Pro max window 365: ${result.entitlementMatrixContract.proMaxWindow365}`);
+  lines.push(`Pro history depth 365 unless unlocked: ${result.entitlementMatrixContract.proHistoryDepth365UnlessUnlocked}`);
+  lines.push(`Pro custom thresholds true: ${result.entitlementMatrixContract.proCustomThresholdsTrue}`);
+  lines.push(`Public denied as inactive: ${result.entitlementMatrixContract.evaluatesPublicAsInactive}`);
+  lines.push(`Inactive checked before access: ${result.entitlementMatrixContract.checksInactiveBeforeAccess}`);
+  lines.push(`Chain before genre/window: ${result.entitlementMatrixContract.checksChainBeforeGenreWindow}`);
+  lines.push(`Window before date range: ${result.entitlementMatrixContract.checksWindowBeforeDateRange}`);
+  lines.push(`Date bounds validation: ${result.entitlementMatrixContract.validatesBothDateBounds}`);
+  lines.push(`Date ordering validation: ${result.entitlementMatrixContract.validatesDateOrdering}`);
+  lines.push(`History depth enforcement: ${result.entitlementMatrixContract.enforcesHistoryDepth}`);
+  lines.push(`Factory helpers exported: ${result.entitlementMatrixContract.exportsFactoryHelpers}`);
+  lines.push("");
   lines.push("## File API response boundary contract");
   lines.push("");
   lines.push(`Route exists: ${result.fileApiResponseBoundaryContract.routeExists}`);
@@ -3731,6 +3961,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-025 Entitlement Matrix Contract: verifies public/basic/pro access matrix, chain/window/history limits, and entitlement decision order.");
   lines.push("- D-024 File API Response Boundary Contract: verifies file delivery authenticates, rate-limits, entitles, sanitizes paths, and returns private no-store responses before storage read.");
   lines.push("- D-023 Public/Private Artifact Boundary Contract: verifies subscriber-bound gold/meta/derived artifacts cannot resolve from or live under web public data.");
   lines.push("- D-022 Sync Script Mirror Contract: verifies private mirror sync removes stale targets, byte-copies real files, and hard-fails on missing critical outputs.");
