@@ -98,6 +98,7 @@ if ($DryRun) {
     Write-Host "powershell -ExecutionPolicy Bypass -File `"$SyncScriptPath`" -SourceRoot `"$SourceRoot`" -TargetRoot `"$TargetRoot`""
     if (-not $SkipBuild) {
         Write-Host "cd `"$WebAppRoot`" ; npm run build"
+        Write-Host "cd `"$WebAppRoot`" ; npm run check:audit-gates:no-build"
     }
     Write-Host "cd `"$RepoRoot`" ; git add sync-published-data.ps1 web-v1-app/.private-data/published/v1"
     if (-not $SkipPush) {
@@ -127,6 +128,13 @@ else {
     Write-Step "Skipping build because -SkipBuild was provided"
 }
 
+if (-not $SkipPush) {
+    Write-Step "Running audit gates before commit/push"
+    Invoke-Native -WorkingDirectory $WebAppRoot -FilePath "npm" -Arguments @("run", "check:audit-gates:no-build")
+}
+else {
+    Write-Step "Skipping audit gates inside publish-web-data because -SkipPush was provided"
+}
 Write-Step "Staging sync script and published data"
 Invoke-Native -WorkingDirectory $RepoRoot -FilePath "git" -Arguments @("add", "sync-published-data.ps1")
 Invoke-Native -WorkingDirectory $RepoRoot -FilePath "git" -Arguments @("add", "web-v1-app/.private-data/published/v1")

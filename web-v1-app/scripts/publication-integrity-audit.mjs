@@ -69,6 +69,7 @@ const localStoragePath = path.join(root, "src", "lib", "storage", "localDev.ts")
 const s3StoragePath = path.join(root, "src", "lib", "storage", "s3.ts");
 const runDailyPipelinePath = path.join(root, "..", "run-daily-pipeline.ps1");
 const snapshotMetadataHarmonizerPath = path.join(root, "..", "harmonize-published-snapshot-metadata.ps1");
+const publishWebDataPath = path.join(root, "..", "publish-web-data.ps1");
 const githubPipelineWorkflowPath = path.join(root, "..", ".github", "workflows", "pipeline.yml");
 
 function ensureReportDir() {
@@ -2496,6 +2497,113 @@ function evaluateRepoHygieneContract(findings) {
 
   return result;
 }
+function evaluatePublishScriptGateContract(findings) {
+  const result = {
+    publishScriptExists: fs.existsSync(publishWebDataPath),
+    hasAuditGateCommand: false,
+    hasNoBuildGateRunner: false,
+    auditGateBeforeStaging: false,
+    auditGateBeforeCommit: false,
+    auditGateBeforePush: false,
+    skipPushSkipsInternalGate: false,
+  };
+
+  if (!result.publishScriptExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-019",
+      "PUBLISH_WEB_DATA_SCRIPT_MISSING",
+      path.relative(root, publishWebDataPath),
+      "publish-web-data.ps1 is missing, so the manual publish path cannot be audited."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(publishWebDataPath, "utf8").replace(/^\uFEFF/u, "");
+
+  const auditGateTextIndex = source.indexOf("check:audit-gates:no-build");
+  const stagingIndex = source.indexOf('Write-Step "Staging sync script and published data"');
+  const commitIndex = source.indexOf('Write-Step "Creating commit"');
+  const pushIndex = source.indexOf('Write-Step "Pushing to origin/$Branch"');
+  const skipPushSkipIndex = source.indexOf('Skipping audit gates inside publish-web-data because -SkipPush was provided');
+
+  result.hasAuditGateCommand = auditGateTextIndex >= 0;
+  result.hasNoBuildGateRunner = source.includes("check:audit-gates:no-build");
+  result.auditGateBeforeStaging = auditGateTextIndex >= 0 && stagingIndex >= 0 && auditGateTextIndex < stagingIndex;
+  result.auditGateBeforeCommit = auditGateTextIndex >= 0 && commitIndex >= 0 && auditGateTextIndex < commitIndex;
+  result.auditGateBeforePush = auditGateTextIndex >= 0 && pushIndex >= 0 && auditGateTextIndex < pushIndex;
+  result.skipPushSkipsInternalGate = skipPushSkipIndex >= 0 && source.includes("if (-not $SkipPush)");
+
+  if (!result.hasAuditGateCommand) {
+    addFinding(
+      findings,
+      "fail",
+      "D-019",
+      "PUBLISH_SCRIPT_AUDIT_GATES_MISSING",
+      path.relative(root, publishWebDataPath),
+      "publish-web-data.ps1 must run the central audit gate runner before it can commit or push."
+    );
+  }
+
+  if (!result.hasNoBuildGateRunner) {
+    addFinding(
+      findings,
+      "fail",
+      "D-019",
+      "PUBLISH_SCRIPT_NO_BUILD_GATE_RUNNER_MISSING",
+      path.relative(root, publishWebDataPath),
+      "publish-web-data.ps1 should use npm run check:audit-gates:no-build because build is handled separately in the script."
+    );
+  }
+
+  if (!result.auditGateBeforeStaging) {
+    addFinding(
+      findings,
+      "fail",
+      "D-019",
+      "PUBLISH_SCRIPT_AUDIT_GATES_AFTER_STAGING",
+      path.relative(root, publishWebDataPath),
+      "publish-web-data.ps1 must run audit gates before staging sync/published-data changes."
+    );
+  }
+
+  if (!result.auditGateBeforeCommit) {
+    addFinding(
+      findings,
+      "fail",
+      "D-019",
+      "PUBLISH_SCRIPT_AUDIT_GATES_AFTER_COMMIT",
+      path.relative(root, publishWebDataPath),
+      "publish-web-data.ps1 must run audit gates before creating a commit."
+    );
+  }
+
+  if (!result.auditGateBeforePush) {
+    addFinding(
+      findings,
+      "fail",
+      "D-019",
+      "PUBLISH_SCRIPT_AUDIT_GATES_AFTER_PUSH",
+      path.relative(root, publishWebDataPath),
+      "publish-web-data.ps1 must run audit gates before pushing to origin."
+    );
+  }
+
+  if (!result.skipPushSkipsInternalGate) {
+    addFinding(
+      findings,
+      "fail",
+      "D-019",
+      "PUBLISH_SCRIPT_SKIP_PUSH_GATE_BEHAVIOR_MISSING",
+      path.relative(root, publishWebDataPath),
+      "-SkipPush local sync mode should skip the internal publish-script gate and rely on the caller's subsequent gate-runner invocation."
+    );
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -2521,6 +2629,7 @@ function evaluate() {
   const historicalDerivedCoverageContract = evaluateHistoricalDerivedCoverageContract(findings, inventory);
   const snapshotMetadataHarmonizerContract = evaluateSnapshotMetadataHarmonizerContract(findings);
   const repoHygieneContract = evaluateRepoHygieneContract(findings);
+  const publishScriptGateContract = evaluatePublishScriptGateContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -2542,6 +2651,7 @@ function evaluate() {
     historicalDerivedCoverageContract,
     snapshotMetadataHarmonizerContract,
     repoHygieneContract,
+    publishScriptGateContract,
     findings,
   };
 }
@@ -2601,6 +2711,16 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Publish script gate contract");
+  lines.push("");
+  lines.push(`Publish script exists: ${result.publishScriptGateContract.publishScriptExists}`);
+  lines.push(`Has audit gate command: ${result.publishScriptGateContract.hasAuditGateCommand}`);
+  lines.push(`Uses no-build gate runner: ${result.publishScriptGateContract.hasNoBuildGateRunner}`);
+  lines.push(`Audit gates before staging: ${result.publishScriptGateContract.auditGateBeforeStaging}`);
+  lines.push(`Audit gates before commit: ${result.publishScriptGateContract.auditGateBeforeCommit}`);
+  lines.push(`Audit gates before push: ${result.publishScriptGateContract.auditGateBeforePush}`);
+  lines.push(`SkipPush skips internal gate: ${result.publishScriptGateContract.skipPushSkipsInternalGate}`);
+  lines.push("");
   lines.push("## Repo hygiene contract");
   lines.push("");
   lines.push(`.gitignore exists: ${result.repoHygieneContract.gitignoreExists}`);
@@ -2769,6 +2889,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-019 Publish Script Gate Contract: verifies publish-web-data.ps1 runs central audit gates before manual commit/push paths.");
   lines.push("- D-018 Repo Hygiene Contract: verifies audit/patch scratch is ignored and permanent pipeline scripts are explicitly allowed/tracked.");
   lines.push("- D-017 Snapshot Metadata Harmonizer Contract: verifies the pipeline permanently harmonizes dataset/manifests computed_at_utc before private sync and commit.");
   lines.push("- D-016 Historical Derived Coverage Contract: verifies derived day-files/manifests/dataset asof align exactly with gold per chain.");
