@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const auditLogModulePath = path.join(root, "src", "lib", "auditLog.ts");
 const preAuthRateLimitPath = path.join(root, "src", "lib", "security", "preAuthRateLimit.ts");
 const originSecurityPath = path.join(root, "src", "lib", "security", "origin.ts");
 const accountAuthModulePath = path.join(root, "src", "lib", "auth", "account.ts");
@@ -6754,8 +6755,19 @@ function evaluateAccountViewEntitlementProjectionContract(findings) {
   const source = fs.readFileSync(accountAuthModulePath, "utf8").replace(/^\uFEFF/u, "");
   const normalized = source.replace(/\r\n/gu, "\n");
 
+  const serverOnlyIndex = normalized.indexOf('import "server-only";');
+  const firstRuntimeImportIndex = Math.min(
+    ...[
+      normalized.indexOf('import { randomUUID } from "crypto";'),
+      normalized.indexOf('import { promises as fs } from "fs";'),
+      normalized.indexOf('import path from "path";'),
+    ].filter((index) => index >= 0)
+  );
+
   result.serverOnlyImport =
-    normalized.startsWith('import "server-only";');
+    serverOnlyIndex >= 0 &&
+    firstRuntimeImportIndex >= 0 &&
+    serverOnlyIndex < firstRuntimeImportIndex;
 
   result.importsClerkAuthAndCookies =
     normalized.includes('import { cookies } from "next/headers";') &&
@@ -7325,6 +7337,237 @@ function evaluateRequestSecurityHelpersContract(findings) {
 
   return result;
 }
+function evaluateAuditLogRequestIdContract(findings) {
+  const result = {
+    moduleExists: fs.existsSync(auditLogModulePath),
+
+    serverOnlyImport: false,
+    importsRandomUuidAndFs: false,
+    eventTypesComplete: false,
+    latencyBucketsComplete: false,
+    auditEntryShapeSafe: false,
+    logDirEnvAndDefaultValid: false,
+    requestIdGenerationValid: false,
+    safeRequestIdValidationValid: false,
+    getOrCreateRequestIdValid: false,
+    latencyBucketThresholdsValid: false,
+    sanitizeFieldValid: false,
+    appendJsonlValid: false,
+    consoleFallbackValid: false,
+    writeAuditLogNonThrowing: false,
+    inputTypeSafe: false,
+    logApiEventBuildsSanitizedEntry: false,
+    logApiEventWritesEntry: false,
+    noSecretFieldsInEntry: false,
+  };
+
+  if (!result.moduleExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-042",
+      "AUDIT_LOG_MODULE_MISSING",
+      path.relative(root, auditLogModulePath),
+      "src/lib/auditLog.ts is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(auditLogModulePath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  const serverOnlyIndex = normalized.indexOf('import "server-only";');
+  const firstRuntimeImportIndex = Math.min(
+    ...[
+      normalized.indexOf('import { randomUUID } from "crypto";'),
+      normalized.indexOf('import { promises as fs } from "fs";'),
+      normalized.indexOf('import path from "path";'),
+    ].filter((index) => index >= 0)
+  );
+
+  result.serverOnlyImport =
+    serverOnlyIndex >= 0 &&
+    firstRuntimeImportIndex >= 0 &&
+    serverOnlyIndex < firstRuntimeImportIndex;
+
+  result.importsRandomUuidAndFs =
+    normalized.includes('import { randomUUID } from "crypto";') &&
+    normalized.includes('import { promises as fs } from "fs";') &&
+    normalized.includes('import path from "path";');
+
+  result.eventTypesComplete =
+    normalized.includes('export type AuditEventType =') &&
+    normalized.includes('"entitlement_forbidden"') &&
+    normalized.includes('"auth_failed"') &&
+    normalized.includes('"rate_limited"') &&
+    normalized.includes('"file_served"') &&
+    normalized.includes('"server_error"') &&
+    normalized.includes('"api_key_created"') &&
+    normalized.includes('"api_key_revoked"');
+
+  result.latencyBucketsComplete =
+    normalized.includes('export type LatencyBucket =') &&
+    normalized.includes('"lt_50ms"') &&
+    normalized.includes('"50_200ms"') &&
+    normalized.includes('"200_1000ms"') &&
+    normalized.includes('"gte_1000ms"');
+
+  result.auditEntryShapeSafe =
+    normalized.includes("export type AuditLogEntry = {") &&
+    normalized.includes("ts_utc: string;") &&
+    normalized.includes("request_id: string;") &&
+    normalized.includes("event_type: AuditEventType;") &&
+    normalized.includes("path: string;") &&
+    normalized.includes("method: string;") &&
+    normalized.includes("status_code: number;") &&
+    normalized.includes("latency_bucket: LatencyBucket;") &&
+    normalized.includes("account_id: string | null;") &&
+    normalized.includes("key_id: string | null;") &&
+    normalized.includes("detail: string | null;") &&
+    normalized.includes("chain: string | null;") &&
+    normalized.includes("genre: string | null;") &&
+    normalized.includes("window: string | null;");
+
+  result.logDirEnvAndDefaultValid =
+    normalized.includes('const AUDIT_LOG_DIR_ENV = "AUDIT_LOG_DIR";') &&
+    normalized.includes('const DEFAULT_AUDIT_LOG_DIR = path.join(process.cwd(), ".runtime-logs");') &&
+    normalized.includes('const DEFAULT_AUDIT_LOG_FILE = "audit.log";') &&
+    normalized.includes("function getAuditLogDir(): string") &&
+    normalized.includes("const configured = process.env[AUDIT_LOG_DIR_ENV]?.trim();") &&
+    normalized.includes("return DEFAULT_AUDIT_LOG_DIR;");
+
+  result.requestIdGenerationValid =
+    normalized.includes("export function createRequestId(): string") &&
+    normalized.includes("return randomUUID();");
+
+  result.safeRequestIdValidationValid =
+    normalized.includes("function isSafeRequestId(value: string): boolean") &&
+    normalized.includes("return /^[A-Za-z0-9._:-]{1,128}$/.test(value);");
+
+  result.getOrCreateRequestIdValid =
+    normalized.includes("export function getOrCreateRequestId(headers: Headers): string") &&
+    normalized.includes('headers.get("x-request-id")?.trim()') &&
+    normalized.includes('headers.get("x-correlation-id")?.trim()') &&
+    normalized.includes("if (headerValue && isSafeRequestId(headerValue))") &&
+    normalized.includes("return headerValue;") &&
+    normalized.includes("return createRequestId();");
+
+  result.latencyBucketThresholdsValid =
+    normalized.includes("export function getLatencyBucket(startedAtMs: number, endedAtMs = Date.now()): LatencyBucket") &&
+    normalized.includes("const duration = Math.max(0, endedAtMs - startedAtMs);") &&
+    normalized.includes('if (duration < 50) return "lt_50ms";') &&
+    normalized.includes('if (duration < 200) return "50_200ms";') &&
+    normalized.includes('if (duration < 1000) return "200_1000ms";') &&
+    normalized.includes('return "gte_1000ms";');
+
+  result.sanitizeFieldValid =
+    normalized.includes("function sanitizeField(value: string | null | undefined): string | null") &&
+    normalized.includes("if (!value) return null;") &&
+    normalized.includes("const trimmed = value.trim();") &&
+    normalized.includes("if (!trimmed) return null;") &&
+    normalized.includes("return trimmed.slice(0, 256);");
+
+  result.appendJsonlValid =
+    normalized.includes("async function appendAuditLine(entry: AuditLogEntry): Promise<void>") &&
+    normalized.includes('const line = JSON.stringify(entry) + "\\n";') &&
+    normalized.includes("const dir = getAuditLogDir();") &&
+    normalized.includes("const filePath = path.join(dir, DEFAULT_AUDIT_LOG_FILE);") &&
+    normalized.includes("await fs.mkdir(dir, { recursive: true });") &&
+    normalized.includes('await fs.appendFile(filePath, line, "utf8");');
+
+  result.consoleFallbackValid =
+    normalized.includes("function emitAuditConsole(entry: AuditLogEntry): void") &&
+    normalized.includes('console.info("[AUDIT]", JSON.stringify(entry));');
+
+  result.writeAuditLogNonThrowing =
+    normalized.includes("export async function writeAuditLog(entry: AuditLogEntry): Promise<void>") &&
+    normalized.includes("emitAuditConsole(entry);") &&
+    normalized.includes("try {") &&
+    normalized.includes("await appendAuditLine(entry);") &&
+    normalized.includes("} catch {") &&
+    normalized.includes("Intentionally do not throw from audit logging.") &&
+    normalized.includes("Console output above remains the minimum fallback in serverless/runtime environments.");
+
+  result.inputTypeSafe =
+    normalized.includes("export type AuditLogInput = {") &&
+    normalized.includes("requestId: string;") &&
+    normalized.includes("eventType: AuditEventType;") &&
+    normalized.includes("statusCode: number;") &&
+    normalized.includes("startedAtMs: number;") &&
+    normalized.includes("endedAtMs?: number;") &&
+    normalized.includes("accountId?: string | null;") &&
+    normalized.includes("keyId?: string | null;") &&
+    normalized.includes("detail?: string | null;") &&
+    normalized.includes("chain?: string | null;") &&
+    normalized.includes("genre?: string | null;") &&
+    normalized.includes("window?: string | null;");
+
+  result.logApiEventBuildsSanitizedEntry =
+    normalized.includes("export async function logApiEvent(input: AuditLogInput): Promise<void>") &&
+    normalized.includes("const entry: AuditLogEntry = {") &&
+    normalized.includes("ts_utc: nowUtcIso(),") &&
+    normalized.includes("request_id: input.requestId,") &&
+    normalized.includes("event_type: input.eventType,") &&
+    normalized.includes('path: sanitizeField(input.path) ?? "/",') &&
+    normalized.includes('method: sanitizeField(input.method) ?? "GET",') &&
+    normalized.includes("status_code: input.statusCode,") &&
+    normalized.includes("latency_bucket: getLatencyBucket(input.startedAtMs, input.endedAtMs),") &&
+    normalized.includes("account_id: sanitizeField(input.accountId),") &&
+    normalized.includes("key_id: sanitizeField(input.keyId),") &&
+    normalized.includes("detail: sanitizeField(input.detail),") &&
+    normalized.includes("chain: sanitizeField(input.chain),") &&
+    normalized.includes("genre: sanitizeField(input.genre),") &&
+    normalized.includes("window: sanitizeField(input.window),");
+
+  result.logApiEventWritesEntry =
+    normalized.includes("await writeAuditLog(entry);");
+
+  result.noSecretFieldsInEntry =
+    !/secret|token|password|keyHash|key_hash|apiKeySecret|rawKey/u.test(
+      normalized
+        .replace(/api_key_created/gu, "")
+        .replace(/api_key_revoked/gu, "")
+        .replace(/key_id/gu, "")
+        .replace(/keyId/gu, "")
+    );
+
+  const requiredChecks = [
+    ["AUDIT_LOG_SERVER_ONLY_MISSING", result.serverOnlyImport, "Audit log module must be server-only."],
+    ["AUDIT_LOG_IMPORTS_INVALID", result.importsRandomUuidAndFs, "Audit log module must import randomUUID, fs promises, and path."],
+    ["AUDIT_LOG_EVENT_TYPES_INVALID", result.eventTypesComplete, "Audit event types must include entitlement/auth/rate/file/server/API-key lifecycle events."],
+    ["AUDIT_LOG_LATENCY_BUCKETS_INVALID", result.latencyBucketsComplete, "Latency buckets must include lt_50ms, 50_200ms, 200_1000ms, gte_1000ms."],
+    ["AUDIT_LOG_ENTRY_SHAPE_INVALID", result.auditEntryShapeSafe, "Audit entry shape must stay bounded to request/event/path/method/status/latency/account/key/detail/chain/genre/window fields."],
+    ["AUDIT_LOG_DIR_CONTRACT_INVALID", result.logDirEnvAndDefaultValid, "Audit log directory must use AUDIT_LOG_DIR or .runtime-logs/audit.log default."],
+    ["AUDIT_LOG_REQUEST_ID_GENERATION_INVALID", result.requestIdGenerationValid, "Request IDs must be generated with randomUUID."],
+    ["AUDIT_LOG_REQUEST_ID_VALIDATION_INVALID", result.safeRequestIdValidationValid, "Incoming request IDs must be bounded to safe characters and max length 128."],
+    ["AUDIT_LOG_GET_OR_CREATE_REQUEST_ID_INVALID", result.getOrCreateRequestIdValid, "Request ID helper must accept safe x-request-id/x-correlation-id or generate a new UUID."],
+    ["AUDIT_LOG_LATENCY_BUCKET_THRESHOLDS_INVALID", result.latencyBucketThresholdsValid, "Latency bucket thresholds must remain stable."],
+    ["AUDIT_LOG_SANITIZE_FIELD_INVALID", result.sanitizeFieldValid, "Audit fields must be trimmed, empty-to-null, and capped at 256 chars."],
+    ["AUDIT_LOG_APPEND_JSONL_INVALID", result.appendJsonlValid, "Audit log file writer must append JSONL to configured audit.log and create directory recursively."],
+    ["AUDIT_LOG_CONSOLE_FALLBACK_INVALID", result.consoleFallbackValid, "Audit log must emit console fallback."],
+    ["AUDIT_LOG_WRITE_MUST_NOT_THROW", result.writeAuditLogNonThrowing, "Audit logging must not throw if file append fails."],
+    ["AUDIT_LOG_INPUT_TYPE_INVALID", result.inputTypeSafe, "Audit input type must expose only safe optional fields."],
+    ["AUDIT_LOG_SANITIZED_ENTRY_INVALID", result.logApiEventBuildsSanitizedEntry, "logApiEvent must build sanitized AuditLogEntry with latency bucket."],
+    ["AUDIT_LOG_WRITE_ENTRY_MISSING", result.logApiEventWritesEntry, "logApiEvent must call writeAuditLog."],
+    ["AUDIT_LOG_SECRET_FIELD_RISK", result.noSecretFieldsInEntry, "Audit log module must not introduce secret/token/password/keyHash/raw-key fields."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-042",
+        code,
+        path.relative(root, auditLogModulePath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -7373,6 +7616,7 @@ function evaluate() {
   const checkoutBillingRouteContract = evaluateCheckoutBillingRouteContract(findings);
   const accountViewEntitlementProjectionContract = evaluateAccountViewEntitlementProjectionContract(findings);
   const requestSecurityHelpersContract = evaluateRequestSecurityHelpersContract(findings);
+  const auditLogRequestIdContract = evaluateAuditLogRequestIdContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -7417,6 +7661,7 @@ function evaluate() {
     checkoutBillingRouteContract,
     accountViewEntitlementProjectionContract,
     requestSecurityHelpersContract,
+    auditLogRequestIdContract,
     findings,
   };
 }
@@ -7476,6 +7721,29 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Audit log request-id contract");
+  lines.push("");
+  lines.push(`Module exists: ${result.auditLogRequestIdContract.moduleExists}`);
+  lines.push(`Server-only import: ${result.auditLogRequestIdContract.serverOnlyImport}`);
+  lines.push('D-042 server-only note: audit allows harmless file header comments before import "server-only"; it requires server-only before runtime imports.');
+  lines.push(`Imports randomUUID/fs/path: ${result.auditLogRequestIdContract.importsRandomUuidAndFs}`);
+  lines.push(`Event types complete: ${result.auditLogRequestIdContract.eventTypesComplete}`);
+  lines.push(`Latency buckets complete: ${result.auditLogRequestIdContract.latencyBucketsComplete}`);
+  lines.push(`Audit entry shape safe: ${result.auditLogRequestIdContract.auditEntryShapeSafe}`);
+  lines.push(`Log dir env/default valid: ${result.auditLogRequestIdContract.logDirEnvAndDefaultValid}`);
+  lines.push(`Request ID generation valid: ${result.auditLogRequestIdContract.requestIdGenerationValid}`);
+  lines.push(`Safe request ID validation valid: ${result.auditLogRequestIdContract.safeRequestIdValidationValid}`);
+  lines.push(`getOrCreateRequestId valid: ${result.auditLogRequestIdContract.getOrCreateRequestIdValid}`);
+  lines.push(`Latency thresholds valid: ${result.auditLogRequestIdContract.latencyBucketThresholdsValid}`);
+  lines.push(`Field sanitization valid: ${result.auditLogRequestIdContract.sanitizeFieldValid}`);
+  lines.push(`Append JSONL valid: ${result.auditLogRequestIdContract.appendJsonlValid}`);
+  lines.push(`Console fallback valid: ${result.auditLogRequestIdContract.consoleFallbackValid}`);
+  lines.push(`writeAuditLog non-throwing: ${result.auditLogRequestIdContract.writeAuditLogNonThrowing}`);
+  lines.push(`Input type safe: ${result.auditLogRequestIdContract.inputTypeSafe}`);
+  lines.push(`logApiEvent builds sanitized entry: ${result.auditLogRequestIdContract.logApiEventBuildsSanitizedEntry}`);
+  lines.push(`logApiEvent writes entry: ${result.auditLogRequestIdContract.logApiEventWritesEntry}`);
+  lines.push(`No secret fields in entry: ${result.auditLogRequestIdContract.noSecretFieldsInEntry}`);
+  lines.push("");
   lines.push("## Request security helpers contract");
   lines.push("");
   lines.push(`Origin module exists: ${result.requestSecurityHelpersContract.originModuleExists}`);
@@ -8149,6 +8417,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-042 Audit Log Request ID Contract: verifies server-only audit logging, safe request-id generation/acceptance, latency buckets, sanitized bounded JSONL entries, console fallback, non-throwing file append, and no secret/raw-key fields.");
   lines.push("- D-041 Request Security Helpers Contract: verifies same-origin guard and pre-auth rate-limit helper implementations, including server-only boundary, origin/referer validation, no-store redacted errors, Upstash envs, scope defaults, production fail-closed behavior, and non-production memory fallback.");
   lines.push("- D-040 Account View Entitlement Projection Contract: verifies server-only account view projection from Clerk/account/subscription rows into entitlement snapshots, safe API-key views, terms-gated account creation, and production-redacted logging.");
   lines.push("- D-039 Checkout Billing Route Contract: verifies Stripe Checkout and Customer Portal routes, same-origin/pre-auth gating, Clerk/account binding, production live-key guard, session metadata, no-store redirects, and customer-id scoped portal access.");
