@@ -7,6 +7,8 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const preAuthRateLimitPath = path.join(root, "src", "lib", "security", "preAuthRateLimit.ts");
+const originSecurityPath = path.join(root, "src", "lib", "security", "origin.ts");
 const accountAuthModulePath = path.join(root, "src", "lib", "auth", "account.ts");
 const checkoutPortalRoutePath = path.join(root, "src", "app", "api", "v1", "checkout", "portal", "route.ts");
 const checkoutRoutePath = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
@@ -7027,6 +7029,302 @@ function evaluateAccountViewEntitlementProjectionContract(findings) {
 
   return result;
 }
+function evaluateRequestSecurityHelpersContract(findings) {
+  const result = {
+    originModuleExists: fs.existsSync(originSecurityPath),
+    preAuthRateLimitModuleExists: fs.existsSync(preAuthRateLimitPath),
+
+    originServerOnly: false,
+    originUsesNextResponse: false,
+    originStateChangingMethodsValid: false,
+    originNormalizationValid: false,
+    originConfiguredOriginsValid: false,
+    originProductionRuntimeCheckValid: false,
+    originAllowedOriginsValid: false,
+    originErrorRedactsAndNoStore: false,
+    originAllowsSafeMethods: false,
+    originChecksOriginBeforeReferer: false,
+    originRejectsMissingTrustedHeaders: false,
+
+    rateLimitServerOnly: false,
+    rateLimitUsesUpstashAndNextResponse: false,
+    rateLimitDecisionTypesValid: false,
+    rateLimitScopeDefaultsValid: false,
+    rateLimitEnvOverrideValid: false,
+    rateLimitRedisEnvValid: false,
+    rateLimitUpstashSlidingWindowValid: false,
+    rateLimitClientIpExtractionValid: false,
+    rateLimitHeadersNoStoreValid: false,
+    rateLimit429ResponseValid: false,
+    rateLimitFailClosedDecisionValid: false,
+    rateLimitMemoryFallbackValid: false,
+    rateLimitProductionMissingBackendFailsClosed: false,
+    rateLimitBackendFailureFallbackValid: false,
+    rateLimitSuccessReturnValid: false,
+  };
+
+  if (!result.originModuleExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-041",
+      "ORIGIN_SECURITY_MODULE_MISSING",
+      path.relative(root, originSecurityPath),
+      "src/lib/security/origin.ts is missing."
+    );
+  }
+
+  if (!result.preAuthRateLimitModuleExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-041",
+      "PREAUTH_RATE_LIMIT_MODULE_MISSING",
+      path.relative(root, preAuthRateLimitPath),
+      "src/lib/security/preAuthRateLimit.ts is missing."
+    );
+  }
+
+  const origin = result.originModuleExists
+    ? fs.readFileSync(originSecurityPath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const rateLimit = result.preAuthRateLimitModuleExists
+    ? fs.readFileSync(preAuthRateLimitPath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const originSource = origin.replace(/\r\n/gu, "\n");
+  const rateLimitSource = rateLimit.replace(/\r\n/gu, "\n");
+
+  if (originSource) {
+    result.originServerOnly =
+      originSource.startsWith('import "server-only";');
+
+    result.originUsesNextResponse =
+      originSource.includes('import { NextResponse } from "next/server";');
+
+    result.originStateChangingMethodsValid =
+      originSource.includes('const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);');
+
+    result.originNormalizationValid =
+      originSource.includes("function normalizeOrigin(value: string | null | undefined): string | null") &&
+      originSource.includes("const trimmed = value?.trim();") &&
+      originSource.includes("return new URL(trimmed).origin.toLowerCase();") &&
+      originSource.includes("} catch {") &&
+      originSource.includes("return null;");
+
+    result.originConfiguredOriginsValid =
+      originSource.includes("function addConfiguredOrigin(origins: Set<string>, value: string | null | undefined)") &&
+      originSource.includes('const withProtocol = trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;') &&
+      originSource.includes("origins.add(origin);");
+
+    result.originProductionRuntimeCheckValid =
+      originSource.includes("function isProductionRuntime(): boolean") &&
+      originSource.includes('process.env.NODE_ENV === "production"') &&
+      originSource.includes('process.env.VERCEL_ENV === "production"');
+
+    result.originAllowedOriginsValid =
+      originSource.includes("function getAllowedOrigins(request: Request): Set<string>") &&
+      originSource.includes("if (!isProductionRuntime())") &&
+      originSource.includes("const requestOrigin = normalizeOrigin(request.url);") &&
+      originSource.includes("addConfiguredOrigin(origins, process.env.NEXT_PUBLIC_APP_URL);") &&
+      originSource.includes("addConfiguredOrigin(origins, process.env.APP_URL);") &&
+      originSource.includes("addConfiguredOrigin(origins, process.env.VERCEL_PROJECT_PRODUCTION_URL);") &&
+      originSource.includes("addConfiguredOrigin(origins, process.env.VERCEL_URL);") &&
+      originSource.includes('origins.add("https://urdatlas.com");') &&
+      originSource.includes('origins.add("https://www.urdatlas.com");');
+
+    result.originErrorRedactsAndNoStore =
+      originSource.includes("function publicOriginGuardDetail(detail: string): string") &&
+      originSource.includes('return "origin_not_allowed";') &&
+      originSource.includes("function originGuardError(detail: string)") &&
+      originSource.includes('code: "origin_not_allowed"') &&
+      originSource.includes('message: "Request origin is not allowed."') &&
+      originSource.includes("status: 403") &&
+      originSource.includes('"Cache-Control": "no-store"');
+
+    const validateIndex = originSource.indexOf("export function validateSameOriginRequest(request: Request): OriginGuardResult");
+    const validateSource = validateIndex >= 0 ? originSource.slice(validateIndex) : "";
+
+    result.originAllowsSafeMethods =
+      validateSource.includes("const method = request.method.toUpperCase();") &&
+      validateSource.includes("if (!STATE_CHANGING_METHODS.has(method))") &&
+      validateSource.includes("return { ok: true };");
+
+    result.originChecksOriginBeforeReferer =
+      validateSource.includes('const origin = normalizeOrigin(request.headers.get("origin"));') &&
+      validateSource.includes('const refererOrigin = normalizeOrigin(request.headers.get("referer"));') &&
+      validateSource.indexOf('request.headers.get("origin")') < validateSource.indexOf('request.headers.get("referer")') &&
+      validateSource.includes("if (allowedOrigins.has(origin))") &&
+      validateSource.includes("if (refererOrigin && allowedOrigins.has(refererOrigin))");
+
+    result.originRejectsMissingTrustedHeaders =
+      validateSource.includes("Missing trusted Origin/Referer for ${method}.") &&
+      validateSource.includes("ok: false") &&
+      validateSource.includes("response: originGuardError");
+  }
+
+  if (rateLimitSource) {
+    result.rateLimitServerOnly =
+      rateLimitSource.startsWith('import "server-only";');
+
+    result.rateLimitUsesUpstashAndNextResponse =
+      rateLimitSource.includes('import { Ratelimit } from "@upstash/ratelimit";') &&
+      rateLimitSource.includes('import { Redis } from "@upstash/redis";') &&
+      rateLimitSource.includes('import { NextResponse } from "next/server";');
+
+    result.rateLimitDecisionTypesValid =
+      rateLimitSource.includes('type PreAuthRateLimitSource = "upstash" | "memory" | "fail_closed";') &&
+      rateLimitSource.includes("export type PreAuthRateLimitDecision = PreAuthRateLimitSuccess | PreAuthRateLimitFailure;") &&
+      rateLimitSource.includes("response: NextResponse;");
+
+    result.rateLimitScopeDefaultsValid =
+      rateLimitSource.includes("const WINDOW_MS = 60_000;") &&
+      rateLimitSource.includes("const DEFAULT_PREAUTH_LIMIT_PER_MINUTE = 600;") &&
+      rateLimitSource.includes('"checkout-api": 30') &&
+      rateLimitSource.includes('"portal-api": 30') &&
+      rateLimitSource.includes('"keys-api": 30') &&
+      rateLimitSource.includes('"stripe-webhook": 120') &&
+      rateLimitSource.includes('"public-read-api": 120') &&
+      rateLimitSource.includes('"file-api": 300') &&
+      rateLimitSource.includes("const FAIL_CLOSED_RETRY_AFTER_SECONDS = 60;");
+
+    result.rateLimitEnvOverrideValid =
+      rateLimitSource.includes("function envKeyForScope(scope: string): string") &&
+      rateLimitSource.includes(".replace(/[^A-Z0-9]+/g, \"_\")") &&
+      rateLimitSource.includes('return normalized ? `PREAUTH_RATE_LIMIT_${normalized}_PER_MINUTE` : "PREAUTH_RATE_LIMIT_PER_MINUTE";') &&
+      rateLimitSource.includes("function parsePositiveInteger(value: string | undefined, fallback: number): number") &&
+      rateLimitSource.includes("if (!Number.isFinite(parsed) || parsed < 1)") &&
+      rateLimitSource.includes("function getLimit(scope: string): number") &&
+      rateLimitSource.includes("process.env[envKeyForScope(scope)]?.trim()") &&
+      rateLimitSource.includes("process.env.PREAUTH_RATE_LIMIT_PER_MINUTE?.trim()");
+
+    result.rateLimitRedisEnvValid =
+      rateLimitSource.includes("function getRedisClient(): Redis | null") &&
+      rateLimitSource.includes("const url = process.env.UPSTASH_REDIS_REST_URL;") &&
+      rateLimitSource.includes("const token = process.env.UPSTASH_REDIS_REST_TOKEN;") &&
+      rateLimitSource.includes("if (!url || !token)") &&
+      rateLimitSource.includes("return new Redis({") &&
+      rateLimitSource.includes("url,") &&
+      rateLimitSource.includes("token,");
+
+    result.rateLimitUpstashSlidingWindowValid =
+      rateLimitSource.includes("function getRatelimiter(scope: string, limit: number): Ratelimit | null") &&
+      rateLimitSource.includes("limiter: Ratelimit.slidingWindow(limit, \"60 s\")") &&
+      rateLimitSource.includes("analytics: false") &&
+      rateLimitSource.includes("prefix: `ta:rl:preauth:${scope}`");
+
+    result.rateLimitClientIpExtractionValid =
+      rateLimitSource.includes("function firstHeaderValue(value: string | null): string | null") &&
+      rateLimitSource.includes("value?.split(\",\")[0]?.trim()") &&
+      rateLimitSource.includes("function getClientIp(request: Request): string") &&
+      rateLimitSource.includes('request.headers.get("x-forwarded-for")') &&
+      rateLimitSource.includes('request.headers.get("x-real-ip")') &&
+      rateLimitSource.includes('request.headers.get("cf-connecting-ip")') &&
+      rateLimitSource.includes('"unknown"');
+
+    result.rateLimitHeadersNoStoreValid =
+      rateLimitSource.includes("function buildHeaders(params: {") &&
+      rateLimitSource.includes('"X-Request-Id": params.requestId') &&
+      rateLimitSource.includes('"X-RateLimit-Limit": String(params.limit)') &&
+      rateLimitSource.includes('"X-RateLimit-Remaining": String(params.remaining)') &&
+      rateLimitSource.includes('"X-RateLimit-Reset": String(Math.floor(params.reset / 1000))') &&
+      rateLimitSource.includes('"Retry-After": String(params.retryAfter)') &&
+      rateLimitSource.includes('"Cache-Control": "no-store"');
+
+    result.rateLimit429ResponseValid =
+      rateLimitSource.includes("function buildRateLimitedResponse(params: {") &&
+      rateLimitSource.includes('code: "rate_limited"') &&
+      rateLimitSource.includes('message: "Too many API requests."') &&
+      rateLimitSource.includes("status: 429") &&
+      rateLimitSource.includes("headers: buildHeaders({") &&
+      rateLimitSource.includes("remaining: 0");
+
+    result.rateLimitFailClosedDecisionValid =
+      rateLimitSource.includes("function buildFailClosedDecision(scope: string, requestId?: string | null): PreAuthRateLimitFailure") &&
+      rateLimitSource.includes("source: \"fail_closed\"") &&
+      rateLimitSource.includes("limit: 0") &&
+      rateLimitSource.includes("retryAfter: FAIL_CLOSED_RETRY_AFTER_SECONDS") &&
+      rateLimitSource.includes("Pre-auth rate-limit backend is not configured for scope '${scope}'") &&
+      rateLimitSource.includes("response: buildRateLimitedResponse({");
+
+    result.rateLimitMemoryFallbackValid =
+      rateLimitSource.includes("function cleanupMemoryStore(now: number)") &&
+      rateLimitSource.includes("function applyMemoryRateLimit(") &&
+      rateLimitSource.includes("const memoryKey = `${scope}:${key}`;") &&
+      rateLimitSource.includes("if (!existing || existing.resetAt <= now)") &&
+      rateLimitSource.includes("source: \"memory\"") &&
+      rateLimitSource.includes("if (existing.count >= limit)") &&
+      rateLimitSource.includes("existing.count += 1");
+
+    result.rateLimitProductionMissingBackendFailsClosed =
+      rateLimitSource.includes("if (!ratelimit)") &&
+      rateLimitSource.includes("if (isProductionRuntime())") &&
+      rateLimitSource.includes("production pre-auth rate-limit backend missing; failing closed") &&
+      rateLimitSource.includes("return buildFailClosedDecision(scope, requestId);") &&
+      rateLimitSource.includes("return applyMemoryRateLimit(key, scope, limit, requestId);");
+
+    result.rateLimitBackendFailureFallbackValid =
+      rateLimitSource.includes("} catch (error) {") &&
+      rateLimitSource.includes("[preAuthRateLimit] backend failed") &&
+      rateLimitSource.includes("if (isProductionRuntime())") &&
+      rateLimitSource.includes("return buildFailClosedDecision(scope, requestId);") &&
+      rateLimitSource.includes("return applyMemoryRateLimit(key, scope, limit, requestId);");
+
+    result.rateLimitSuccessReturnValid =
+      rateLimitSource.includes("const result = await ratelimit.limit(key);") &&
+      rateLimitSource.includes("if (!result.success)") &&
+      rateLimitSource.includes("source: \"upstash\"") &&
+      rateLimitSource.includes("limit: result.limit") &&
+      rateLimitSource.includes("remaining: result.remaining") &&
+      rateLimitSource.includes("reset,");
+  }
+
+  const requiredChecks = [
+    ["ORIGIN_SERVER_ONLY_MISSING", result.originServerOnly, originSecurityPath, "Origin guard helper must be server-only."],
+    ["ORIGIN_NEXT_RESPONSE_IMPORT_MISSING", result.originUsesNextResponse, originSecurityPath, "Origin guard helper must use NextResponse."],
+    ["ORIGIN_STATE_CHANGING_METHODS_INVALID", result.originStateChangingMethodsValid, originSecurityPath, "Origin guard must apply to POST/PUT/PATCH/DELETE."],
+    ["ORIGIN_NORMALIZATION_INVALID", result.originNormalizationValid, originSecurityPath, "Origin guard must normalize origins by URL.origin lowercase and reject invalid values."],
+    ["ORIGIN_CONFIGURED_ORIGINS_INVALID", result.originConfiguredOriginsValid, originSecurityPath, "Origin guard must normalize configured origins and add https:// when missing."],
+    ["ORIGIN_PRODUCTION_RUNTIME_CHECK_INVALID", result.originProductionRuntimeCheckValid, originSecurityPath, "Origin guard must use NODE_ENV/VERCEL_ENV production check."],
+    ["ORIGIN_ALLOWED_ORIGINS_INVALID", result.originAllowedOriginsValid, originSecurityPath, "Origin guard must allow configured app/Vercel origins and canonical urdatlas hosts."],
+    ["ORIGIN_ERROR_REDACTION_INVALID", result.originErrorRedactsAndNoStore, originSecurityPath, "Origin guard errors must be 403 no-store and redact details in production."],
+    ["ORIGIN_SAFE_METHODS_INVALID", result.originAllowsSafeMethods, originSecurityPath, "Origin guard must allow non-state-changing methods."],
+    ["ORIGIN_HEADER_ORDER_INVALID", result.originChecksOriginBeforeReferer, originSecurityPath, "Origin guard must check Origin before Referer fallback."],
+    ["ORIGIN_MISSING_TRUSTED_HEADER_INVALID", result.originRejectsMissingTrustedHeaders, originSecurityPath, "Origin guard must reject state-changing requests without trusted Origin/Referer."],
+
+    ["PREAUTH_SERVER_ONLY_MISSING", result.rateLimitServerOnly, preAuthRateLimitPath, "Pre-auth rate-limit helper must be server-only."],
+    ["PREAUTH_UPSTASH_IMPORTS_INVALID", result.rateLimitUsesUpstashAndNextResponse, preAuthRateLimitPath, "Pre-auth rate-limit helper must use Upstash Redis/Ratelimit and NextResponse."],
+    ["PREAUTH_DECISION_TYPES_INVALID", result.rateLimitDecisionTypesValid, preAuthRateLimitPath, "Pre-auth rate-limit decisions must include success/failure and response on failure."],
+    ["PREAUTH_SCOPE_DEFAULTS_INVALID", result.rateLimitScopeDefaultsValid, preAuthRateLimitPath, "Pre-auth rate-limit defaults must cover checkout, portal, keys, webhook, public-read, and file API scopes."],
+    ["PREAUTH_ENV_OVERRIDE_INVALID", result.rateLimitEnvOverrideValid, preAuthRateLimitPath, "Pre-auth rate-limit must support scoped/global positive integer env overrides."],
+    ["PREAUTH_REDIS_ENV_INVALID", result.rateLimitRedisEnvValid, preAuthRateLimitPath, "Pre-auth rate-limit must read UPSTASH_REDIS_REST_URL/TOKEN."],
+    ["PREAUTH_UPSTASH_WINDOW_INVALID", result.rateLimitUpstashSlidingWindowValid, preAuthRateLimitPath, "Pre-auth rate-limit must use Upstash 60-second sliding window with stable prefix."],
+    ["PREAUTH_CLIENT_IP_INVALID", result.rateLimitClientIpExtractionValid, preAuthRateLimitPath, "Pre-auth rate-limit must derive client IP from forwarded/real/cf headers with unknown fallback."],
+    ["PREAUTH_HEADERS_INVALID", result.rateLimitHeadersNoStoreValid, preAuthRateLimitPath, "Pre-auth rate-limit responses must include rate-limit headers and no-store."],
+    ["PREAUTH_429_RESPONSE_INVALID", result.rateLimit429ResponseValid, preAuthRateLimitPath, "Pre-auth rate-limit failures must return 429 rate_limited."],
+    ["PREAUTH_FAIL_CLOSED_DECISION_INVALID", result.rateLimitFailClosedDecisionValid, preAuthRateLimitPath, "Pre-auth rate-limit fail-closed decision must produce 60-second retry-after and response."],
+    ["PREAUTH_MEMORY_FALLBACK_INVALID", result.rateLimitMemoryFallbackValid, preAuthRateLimitPath, "Pre-auth rate-limit must retain non-production memory fallback."],
+    ["PREAUTH_PRODUCTION_MISSING_BACKEND_NOT_FAIL_CLOSED", result.rateLimitProductionMissingBackendFailsClosed, preAuthRateLimitPath, "Production missing rate-limit backend must fail closed, not fall back to memory."],
+    ["PREAUTH_BACKEND_FAILURE_INVALID", result.rateLimitBackendFailureFallbackValid, preAuthRateLimitPath, "Backend failures must fail closed in production and memory-fallback outside production."],
+    ["PREAUTH_SUCCESS_RETURN_INVALID", result.rateLimitSuccessReturnValid, preAuthRateLimitPath, "Successful Upstash decisions must return source/limit/remaining/reset."]
+  ];
+
+  for (const [code, ok, targetPath, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-041",
+        code,
+        path.relative(root, targetPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -7074,6 +7372,7 @@ function evaluate() {
   const apiKeyRouteContract = evaluateApiKeyRouteContract(findings);
   const checkoutBillingRouteContract = evaluateCheckoutBillingRouteContract(findings);
   const accountViewEntitlementProjectionContract = evaluateAccountViewEntitlementProjectionContract(findings);
+  const requestSecurityHelpersContract = evaluateRequestSecurityHelpersContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -7117,6 +7416,7 @@ function evaluate() {
     apiKeyRouteContract,
     checkoutBillingRouteContract,
     accountViewEntitlementProjectionContract,
+    requestSecurityHelpersContract,
     findings,
   };
 }
@@ -7176,6 +7476,37 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Request security helpers contract");
+  lines.push("");
+  lines.push(`Origin module exists: ${result.requestSecurityHelpersContract.originModuleExists}`);
+  lines.push(`Pre-auth rate-limit module exists: ${result.requestSecurityHelpersContract.preAuthRateLimitModuleExists}`);
+  lines.push(`Origin server-only: ${result.requestSecurityHelpersContract.originServerOnly}`);
+  lines.push(`Origin uses NextResponse: ${result.requestSecurityHelpersContract.originUsesNextResponse}`);
+  lines.push(`Origin state-changing methods valid: ${result.requestSecurityHelpersContract.originStateChangingMethodsValid}`);
+  lines.push(`Origin normalization valid: ${result.requestSecurityHelpersContract.originNormalizationValid}`);
+  lines.push(`Origin configured origins valid: ${result.requestSecurityHelpersContract.originConfiguredOriginsValid}`);
+  lines.push(`Origin production runtime check valid: ${result.requestSecurityHelpersContract.originProductionRuntimeCheckValid}`);
+  lines.push(`Origin allowed origins valid: ${result.requestSecurityHelpersContract.originAllowedOriginsValid}`);
+  lines.push(`Origin errors redacted/no-store: ${result.requestSecurityHelpersContract.originErrorRedactsAndNoStore}`);
+  lines.push(`Origin allows safe methods: ${result.requestSecurityHelpersContract.originAllowsSafeMethods}`);
+  lines.push(`Origin checks Origin before Referer: ${result.requestSecurityHelpersContract.originChecksOriginBeforeReferer}`);
+  lines.push(`Origin rejects missing trusted headers: ${result.requestSecurityHelpersContract.originRejectsMissingTrustedHeaders}`);
+  lines.push(`Rate-limit server-only: ${result.requestSecurityHelpersContract.rateLimitServerOnly}`);
+  lines.push(`Rate-limit uses Upstash/NextResponse: ${result.requestSecurityHelpersContract.rateLimitUsesUpstashAndNextResponse}`);
+  lines.push(`Rate-limit decision types valid: ${result.requestSecurityHelpersContract.rateLimitDecisionTypesValid}`);
+  lines.push(`Rate-limit scope defaults valid: ${result.requestSecurityHelpersContract.rateLimitScopeDefaultsValid}`);
+  lines.push(`Rate-limit env overrides valid: ${result.requestSecurityHelpersContract.rateLimitEnvOverrideValid}`);
+  lines.push(`Rate-limit Redis env valid: ${result.requestSecurityHelpersContract.rateLimitRedisEnvValid}`);
+  lines.push(`Rate-limit Upstash window valid: ${result.requestSecurityHelpersContract.rateLimitUpstashSlidingWindowValid}`);
+  lines.push(`Rate-limit client IP extraction valid: ${result.requestSecurityHelpersContract.rateLimitClientIpExtractionValid}`);
+  lines.push(`Rate-limit headers no-store valid: ${result.requestSecurityHelpersContract.rateLimitHeadersNoStoreValid}`);
+  lines.push(`Rate-limit 429 response valid: ${result.requestSecurityHelpersContract.rateLimit429ResponseValid}`);
+  lines.push(`Rate-limit fail-closed decision valid: ${result.requestSecurityHelpersContract.rateLimitFailClosedDecisionValid}`);
+  lines.push(`Rate-limit memory fallback valid: ${result.requestSecurityHelpersContract.rateLimitMemoryFallbackValid}`);
+  lines.push(`Rate-limit production missing backend fails closed: ${result.requestSecurityHelpersContract.rateLimitProductionMissingBackendFailsClosed}`);
+  lines.push(`Rate-limit backend failure fallback valid: ${result.requestSecurityHelpersContract.rateLimitBackendFailureFallbackValid}`);
+  lines.push(`Rate-limit success return valid: ${result.requestSecurityHelpersContract.rateLimitSuccessReturnValid}`);
+  lines.push("");
   lines.push("## Account view entitlement projection contract");
   lines.push("");
   lines.push(`Module exists: ${result.accountViewEntitlementProjectionContract.moduleExists}`);
@@ -7818,6 +8149,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-041 Request Security Helpers Contract: verifies same-origin guard and pre-auth rate-limit helper implementations, including server-only boundary, origin/referer validation, no-store redacted errors, Upstash envs, scope defaults, production fail-closed behavior, and non-production memory fallback.");
   lines.push("- D-040 Account View Entitlement Projection Contract: verifies server-only account view projection from Clerk/account/subscription rows into entitlement snapshots, safe API-key views, terms-gated account creation, and production-redacted logging.");
   lines.push("- D-039 Checkout Billing Route Contract: verifies Stripe Checkout and Customer Portal routes, same-origin/pre-auth gating, Clerk/account binding, production live-key guard, session metadata, no-store redirects, and customer-id scoped portal access.");
   lines.push("- D-038 API Key Route Contract: verifies /api/v1/keys same-origin/pre-auth gating, Clerk/account/subscription checks, scrypt key creation, account-scoped revoke, audit logs, no-store responses, and no keyHash exposure.");
