@@ -125,6 +125,15 @@ jobs:
             throw "Missing Regime Briefs site bundle: data/published/v1/briefs/site/latest.json"
           }
 
+      - name: Run audit gates before published-data push
+        if: success()
+        shell: pwsh
+        working-directory: .\web-v1-app
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          npm run check:audit-gates:no-build
       - name: Push local published-data commit with remote sync
         id: push_data
         if: success()

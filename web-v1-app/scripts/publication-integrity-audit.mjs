@@ -64,6 +64,8 @@ const fileApiDocsPath = path.join(root, "src", "app", "api-docs", "page.tsx");
 const storageIndexPath = path.join(root, "src", "lib", "storage", "index.ts");
 const localStoragePath = path.join(root, "src", "lib", "storage", "localDev.ts");
 const s3StoragePath = path.join(root, "src", "lib", "storage", "s3.ts");
+const runDailyPipelinePath = path.join(root, "..", "run-daily-pipeline.ps1");
+const githubPipelineWorkflowPath = path.join(root, "..", ".github", "workflows", "pipeline.yml");
 
 function ensureReportDir() {
   fs.mkdirSync(reportDir, { recursive: true });
@@ -1397,6 +1399,267 @@ function evaluateS3StorageContract(findings) {
 
   return result;
 }
+function indexOfOrMinusOne(source, pattern) {
+  return source.indexOf(pattern);
+}
+
+function firstIndexOfAny(source, patterns) {
+  const found = patterns
+    .map((pattern) => source.indexOf(pattern))
+    .filter((index) => index >= 0);
+
+  return found.length > 0 ? Math.min(...found) : -1;
+}
+
+function evaluatePipelinePublishOrderContract(findings) {
+  const result = {
+    runDailyPipelineExists: fs.existsSync(runDailyPipelinePath),
+    githubPipelineWorkflowExists: fs.existsSync(githubPipelineWorkflowPath),
+
+    runDaily: {
+      publishCallIndex: -1,
+      briefsBuilderIndex: -1,
+      metaValidationIndex: -1,
+      commitSnapshotIndex: -1,
+      briefsBeforePublish: false,
+      metaValidationBeforeCommit: false,
+      publishBeforeCommit: false,
+    },
+
+    workflow: {
+      runDailyPipelineIndex: -1,
+      auditGatesIndex: -1,
+      pushDataIndex: -1,
+      vercelDeployIndex: -1,
+      auditGatesPresent: false,
+      auditGatesAfterPipeline: false,
+      auditGatesBeforePush: false,
+      auditGatesBeforeDeploy: false,
+      usesGateRunner: false,
+    },
+  };
+
+  if (!result.runDailyPipelineExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-014",
+      "RUN_DAILY_PIPELINE_SCRIPT_MISSING",
+      path.relative(root, runDailyPipelinePath),
+      "run-daily-pipeline.ps1 is missing, so publish order cannot be audited."
+    );
+  } else {
+    const source = fs.readFileSync(runDailyPipelinePath, "utf8").replace(/^\uFEFF/u, "");
+
+    result.runDaily.publishCallIndex = indexOfOrMinusOne(source, 'Write-Log "STEP 3: Publish web data"');
+    result.runDaily.briefsBuilderIndex = indexOfOrMinusOne(source, "Invoke-WebBriefsBuilderIfPresent -RepoRoot $RootDir");
+    result.runDaily.metaValidationIndex = indexOfOrMinusOne(source, "Validate-WebPublishedMetaIfPresent -RepoRoot $RootDir");
+    result.runDaily.commitSnapshotIndex = indexOfOrMinusOne(source, "Commit-PublishedSnapshotIfNeeded -RepoRoot $RootDir");
+
+    result.runDaily.briefsBeforePublish =
+      result.runDaily.briefsBuilderIndex >= 0 &&
+      result.runDaily.publishCallIndex >= 0 &&
+      result.runDaily.briefsBuilderIndex < result.runDaily.publishCallIndex;
+
+    result.runDaily.metaValidationBeforeCommit =
+      result.runDaily.metaValidationIndex >= 0 &&
+      result.runDaily.commitSnapshotIndex >= 0 &&
+      result.runDaily.metaValidationIndex < result.runDaily.commitSnapshotIndex;
+
+    result.runDaily.publishBeforeCommit =
+      result.runDaily.publishCallIndex >= 0 &&
+      result.runDaily.commitSnapshotIndex >= 0 &&
+      result.runDaily.publishCallIndex < result.runDaily.commitSnapshotIndex;
+
+    if (result.runDaily.publishCallIndex < 0) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "RUN_DAILY_PUBLISH_STEP_MISSING",
+        path.relative(root, runDailyPipelinePath),
+        "run-daily-pipeline.ps1 does not contain the expected publish-web-data step marker."
+      );
+    }
+
+    if (result.runDaily.briefsBuilderIndex < 0) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "RUN_DAILY_BRIEFS_BUILDER_CALL_MISSING",
+        path.relative(root, runDailyPipelinePath),
+        "run-daily-pipeline.ps1 does not call Invoke-WebBriefsBuilderIfPresent."
+      );
+    }
+
+    if (!result.runDaily.briefsBeforePublish) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "RUN_DAILY_BRIEFS_BUILT_AFTER_PRIVATE_SYNC",
+        path.relative(root, runDailyPipelinePath),
+        "Regime Briefs must be rebuilt before publish-web-data syncs data/published/v1 into web-v1-app/.private-data. Otherwise canonical briefs and private mirror briefs can diverge."
+      );
+    }
+
+    if (result.runDaily.metaValidationIndex < 0) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "RUN_DAILY_META_VALIDATION_CALL_MISSING",
+        path.relative(root, runDailyPipelinePath),
+        "run-daily-pipeline.ps1 does not call Validate-WebPublishedMetaIfPresent."
+      );
+    }
+
+    if (result.runDaily.commitSnapshotIndex >= 0 && !result.runDaily.metaValidationBeforeCommit) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "RUN_DAILY_VALIDATION_AFTER_COMMIT",
+        path.relative(root, runDailyPipelinePath),
+        "Canonical validation must happen before Commit-PublishedSnapshotIfNeeded."
+      );
+    }
+
+    if (result.runDaily.commitSnapshotIndex >= 0 && !result.runDaily.publishBeforeCommit) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "RUN_DAILY_COMMIT_BEFORE_PUBLISH",
+        path.relative(root, runDailyPipelinePath),
+        "Published snapshot commit must happen after publish-web-data has synced private data."
+      );
+    }
+  }
+
+  if (!result.githubPipelineWorkflowExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-014",
+      "GITHUB_PIPELINE_WORKFLOW_MISSING",
+      path.relative(root, githubPipelineWorkflowPath),
+      ".github/workflows/pipeline.yml is missing, so CI publish gates cannot be audited."
+    );
+  } else {
+    const source = fs.readFileSync(githubPipelineWorkflowPath, "utf8").replace(/^\uFEFF/u, "");
+
+    result.workflow.runDailyPipelineIndex = firstIndexOfAny(source, [
+      "run-daily-pipeline.ps1 -SkipPush",
+      ".\\run-daily-pipeline.ps1 -SkipPush",
+      "run-daily-pipeline.ps1",
+    ]);
+
+    result.workflow.auditGatesIndex = firstIndexOfAny(source, [
+      "npm run check:audit-gates",
+      "npm run check:audit-gates:no-build",
+      "node scripts/run-audit-gates.mjs",
+    ]);
+
+    result.workflow.pushDataIndex = firstIndexOfAny(source, [
+      "Push local published-data commit with remote sync",
+      "git push origin HEAD:main",
+      "git push",
+    ]);
+
+    result.workflow.vercelDeployIndex = firstIndexOfAny(source, [
+      "Trigger Vercel production deployment",
+      "VERCEL_DEPLOY_HOOK_URL",
+    ]);
+
+    result.workflow.auditGatesPresent = result.workflow.auditGatesIndex >= 0;
+    result.workflow.usesGateRunner = source.includes("check:audit-gates") || source.includes("run-audit-gates.mjs");
+
+    result.workflow.auditGatesAfterPipeline =
+      result.workflow.auditGatesIndex >= 0 &&
+      result.workflow.runDailyPipelineIndex >= 0 &&
+      result.workflow.runDailyPipelineIndex < result.workflow.auditGatesIndex;
+
+    result.workflow.auditGatesBeforePush =
+      result.workflow.auditGatesIndex >= 0 &&
+      result.workflow.pushDataIndex >= 0 &&
+      result.workflow.auditGatesIndex < result.workflow.pushDataIndex;
+
+    result.workflow.auditGatesBeforeDeploy =
+      result.workflow.auditGatesIndex >= 0 &&
+      result.workflow.vercelDeployIndex >= 0 &&
+      result.workflow.auditGatesIndex < result.workflow.vercelDeployIndex;
+
+    if (result.workflow.runDailyPipelineIndex < 0) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "WORKFLOW_RUN_DAILY_PIPELINE_CALL_MISSING",
+        path.relative(root, githubPipelineWorkflowPath),
+        "pipeline.yml does not appear to call run-daily-pipeline.ps1."
+      );
+    }
+
+    if (!result.workflow.auditGatesPresent) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "WORKFLOW_AUDIT_GATES_MISSING",
+        path.relative(root, githubPipelineWorkflowPath),
+        "pipeline.yml must run npm run check:audit-gates or npm run check:audit-gates:no-build after pipeline generation and before push/deploy."
+      );
+    }
+
+    if (result.workflow.auditGatesPresent && !result.workflow.auditGatesAfterPipeline) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "WORKFLOW_AUDIT_GATES_BEFORE_PIPELINE_OUTPUT",
+        path.relative(root, githubPipelineWorkflowPath),
+        "Audit gates must run after run-daily-pipeline.ps1 has generated/synced outputs."
+      );
+    }
+
+    if (result.workflow.auditGatesPresent && !result.workflow.auditGatesBeforePush) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "WORKFLOW_AUDIT_GATES_AFTER_PUSH",
+        path.relative(root, githubPipelineWorkflowPath),
+        "Audit gates must run before the workflow pushes published-data commits."
+      );
+    }
+
+    if (result.workflow.auditGatesPresent && !result.workflow.auditGatesBeforeDeploy) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "WORKFLOW_AUDIT_GATES_AFTER_DEPLOY",
+        path.relative(root, githubPipelineWorkflowPath),
+        "Audit gates must run before triggering Vercel deployment."
+      );
+    }
+
+    if (result.workflow.auditGatesPresent && !result.workflow.usesGateRunner) {
+      addFinding(
+        findings,
+        "fail",
+        "D-014",
+        "WORKFLOW_DOES_NOT_USE_GATE_RUNNER",
+        path.relative(root, githubPipelineWorkflowPath),
+        "Workflow should use the central gate runner rather than a loose list of npm commands, so the job stops at the first red gate."
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -1417,6 +1680,7 @@ function evaluate() {
   const fileApiArtifactMapping = evaluateFileApiArtifactMapping(findings);
   const localStorageResolution = evaluateLocalStorageResolution(findings);
   const s3StorageContract = evaluateS3StorageContract(findings);
+  const pipelinePublishOrderContract = evaluatePipelinePublishOrderContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -1433,6 +1697,7 @@ function evaluate() {
     fileApiArtifactMapping,
     localStorageResolution,
     s3StorageContract,
+    pipelinePublishOrderContract,
     findings,
   };
 }
@@ -1492,6 +1757,33 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Pipeline publish order contract");
+  lines.push("");
+  lines.push(`run-daily-pipeline.ps1 exists: ${result.pipelinePublishOrderContract.runDailyPipelineExists}`);
+  lines.push(`pipeline.yml exists: ${result.pipelinePublishOrderContract.githubPipelineWorkflowExists}`);
+  lines.push("");
+  lines.push("### run-daily-pipeline.ps1 order");
+  lines.push("");
+  lines.push(`Publish step index: ${result.pipelinePublishOrderContract.runDaily.publishCallIndex}`);
+  lines.push(`Briefs builder index: ${result.pipelinePublishOrderContract.runDaily.briefsBuilderIndex}`);
+  lines.push(`META validation index: ${result.pipelinePublishOrderContract.runDaily.metaValidationIndex}`);
+  lines.push(`Commit snapshot index: ${result.pipelinePublishOrderContract.runDaily.commitSnapshotIndex}`);
+  lines.push(`Briefs before private sync/publish: ${result.pipelinePublishOrderContract.runDaily.briefsBeforePublish}`);
+  lines.push(`META validation before commit: ${result.pipelinePublishOrderContract.runDaily.metaValidationBeforeCommit}`);
+  lines.push(`Publish before commit: ${result.pipelinePublishOrderContract.runDaily.publishBeforeCommit}`);
+  lines.push("");
+  lines.push("### GitHub Actions pipeline.yml order");
+  lines.push("");
+  lines.push(`run-daily-pipeline index: ${result.pipelinePublishOrderContract.workflow.runDailyPipelineIndex}`);
+  lines.push(`audit-gates index: ${result.pipelinePublishOrderContract.workflow.auditGatesIndex}`);
+  lines.push(`push-data index: ${result.pipelinePublishOrderContract.workflow.pushDataIndex}`);
+  lines.push(`Vercel deploy index: ${result.pipelinePublishOrderContract.workflow.vercelDeployIndex}`);
+  lines.push(`Audit gates present: ${result.pipelinePublishOrderContract.workflow.auditGatesPresent}`);
+  lines.push(`Audit gates after pipeline: ${result.pipelinePublishOrderContract.workflow.auditGatesAfterPipeline}`);
+  lines.push(`Audit gates before push: ${result.pipelinePublishOrderContract.workflow.auditGatesBeforePush}`);
+  lines.push(`Audit gates before deploy: ${result.pipelinePublishOrderContract.workflow.auditGatesBeforeDeploy}`);
+  lines.push(`Uses central gate runner: ${result.pipelinePublishOrderContract.workflow.usesGateRunner}`);
+  lines.push("");
   lines.push("## S3 storage contract");
   lines.push("");
   lines.push(`S3 module exists: ${result.s3StorageContract.s3ModuleExists}`);
@@ -1558,6 +1850,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-014 Pipeline Publish Order Contract: checks publish/brief/sync/commit order and requires CI audit gates before push/deploy.");
   lines.push("");
   lines.push("- D-001 Published Artifact Inventory: checks genre/chain directories and dated day-file presence.");
   lines.push("- D-002 Dataset Index Consistency: checks dataset.json supported chains/genres/windows and coverage/asof values.");

@@ -379,6 +379,9 @@ try {
 
     Invoke-SafeJsonFinalizer -RepoRoot $RootDir -LookbackDays $JsonFinalizerLookbackDays
 
+    Invoke-WebBriefsBuilderIfPresent -RepoRoot $RootDir
+    Validate-WebPublishedMetaIfPresent -RepoRoot $RootDir
+
     Write-Log "STEP 3: Publish web data"
     $publishArgs = @(
         "-NoProfile",
@@ -395,8 +398,6 @@ try {
 
     Invoke-Native -WorkingDirectory $RootDir -FilePath "powershell" -Arguments $publishArgs
 
-    Invoke-WebBriefsBuilderIfPresent -RepoRoot $RootDir
-    Validate-WebPublishedMetaIfPresent -RepoRoot $RootDir
 
     if ($SkipPush) {
         Commit-PublishedSnapshotIfNeeded -RepoRoot $RootDir
