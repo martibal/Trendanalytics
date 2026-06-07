@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const authenticatedFileRoutePath = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
 const entitlementHelperModulePath = path.join(root, "src", "lib", "auth", "entitlements.ts");
 const auditLogModulePath = path.join(root, "src", "lib", "auditLog.ts");
 const preAuthRateLimitPath = path.join(root, "src", "lib", "security", "preAuthRateLimit.ts");
@@ -7905,6 +7906,350 @@ function evaluateEntitlementSnapshotHelperContract(findings) {
 
   return result;
 }
+function evaluateAuthenticatedFileDeliveryRouteContract(findings) {
+  const result = {
+    routeExists: fs.existsSync(authenticatedFileRoutePath),
+
+    importsAuthAndApiKeyTouch: false,
+    importsEntitlementHelpers: false,
+    importsRateLimitAndQuotaHelpers: false,
+    importsStorageAndAuditAndPreAuth: false,
+    allowedGenresAndChainsValid: false,
+
+    storageTailMappingValid: false,
+    briefPathParsingValid: false,
+    standardPathParsingValid: false,
+    requestIdHeaderHelperValid: false,
+    publicErrorDetailRedactionValid: false,
+    segmentSanitizationValid: false,
+    windowInferenceValid: false,
+    storagePathPrefixValid: false,
+
+    getPreAuthBeforeApiKeyValidation: false,
+    preAuthFailureAuditAndReturnValid: false,
+    apiKeyAuthFailureAuditAndResponseValid: false,
+    authenticatedAccountTrackingValid: false,
+    tierRateLimitAndQuotaValid: false,
+    pathParsingAfterAuthValid: false,
+    invalidPath404Valid: false,
+    windowInferenceFailureForbiddenValid: false,
+    entitlementEvaluationValid: false,
+    entitlementForbiddenAuditAndResponseValid: false,
+    storageReadAfterEntitlementValid: false,
+    missingFile404Valid: false,
+    fileServedAuditValid: false,
+    lastUsedTouchAfterServedAuditValid: false,
+    successResponseHeadersValid: false,
+    serverErrorAuditAndRedactedResponseValid: false,
+  };
+
+  if (!result.routeExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-044",
+      "AUTH_FILE_ROUTE_MISSING",
+      path.relative(root, authenticatedFileRoutePath),
+      "/api/v1/files/[...path] route is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(authenticatedFileRoutePath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  result.importsAuthAndApiKeyTouch =
+    normalized.includes('import { validateRequestApiKey, buildAuthErrorResponseBody } from "@/lib/auth/validateToken";') &&
+    normalized.includes('import { touchPersistedApiKeyLastUsedAt } from "@/lib/auth/apiKeys";');
+
+  result.importsEntitlementHelpers =
+    normalized.includes("evaluateFileEntitlement") &&
+    normalized.includes("isWindowToken") &&
+    normalized.includes("type FileGenre") &&
+    normalized.includes("type WindowToken") &&
+    normalized.includes('from "@/lib/auth/entitlements"');
+
+  result.importsRateLimitAndQuotaHelpers =
+    normalized.includes("buildDailyQuotaHeaders") &&
+    normalized.includes("buildRateLimitHeaders") &&
+    normalized.includes("enforceAccountRateLimit") &&
+    normalized.includes("enforceDailyApiQuota") &&
+    normalized.includes('from "@/lib/auth/rateLimit"');
+
+  result.importsStorageAndAuditAndPreAuth =
+    normalized.includes('import { readStorageObject } from "@/lib/storage";') &&
+    normalized.includes('import type { ChainId } from "@/config/chains";') &&
+    normalized.includes('import { getOrCreateRequestId, logApiEvent } from "@/lib/auditLog";') &&
+    normalized.includes('import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";');
+
+  result.allowedGenresAndChainsValid =
+    normalized.includes('const ALLOWED_GENRES: FileGenre[] = ["gold", "meta", "derived", "briefs"];') &&
+    normalized.includes('const ALLOWED_CHAINS: ChainId[] = ["bitcoin", "ethereum", "arbitrum", "base"];') &&
+    normalized.includes("function isFileGenre(value: string): value is FileGenre") &&
+    normalized.includes("function isChainId(value: string): value is ChainId");
+
+  result.storageTailMappingValid =
+    normalized.includes("function storageTailFromWindowTail(tail: string[]): string[] | null") &&
+    normalized.includes('if (tail.length === 1 && tail[0] === "latest.json")') &&
+    normalized.includes('return ["latest.json"];') &&
+    normalized.includes("if (tail.length === 2)") &&
+    normalized.includes('const [windowRaw, filename] = tail;') &&
+    normalized.includes('if (filename === "latest.json" && isWindowToken(windowRaw) && windowRaw !== "latest")') &&
+    normalized.includes('return [`last${windowRaw}.json`];') &&
+    normalized.includes("return null;");
+
+  result.briefPathParsingValid =
+    normalized.includes('if (genreRaw === "briefs")') &&
+    normalized.includes("Briefs are published under briefs/chains/<chain>/latest.json.") &&
+    normalized.includes('segments.length !== 4 || segments[1] !== "chains"') &&
+    normalized.includes("const chainRaw = segments[2];") &&
+    normalized.includes("windowTail: segments.slice(3)") &&
+    normalized.includes("storageSegments: segments");
+
+  result.standardPathParsingValid =
+    normalized.includes("if (segments.length !== 3 && segments.length !== 4)") &&
+    normalized.includes("const chainRaw = segments[1];") &&
+    normalized.includes("const windowTail = segments.slice(2);") &&
+    normalized.includes("const storageTail = storageTailFromWindowTail(windowTail);") &&
+    normalized.includes("storageSegments: storageTail ? [genreRaw, chainRaw, ...storageTail] : segments");
+
+  result.requestIdHeaderHelperValid =
+    normalized.includes("function withRequestId(") &&
+    normalized.includes('"X-Request-Id": requestId');
+
+  result.publicErrorDetailRedactionValid =
+    normalized.includes("function publicFileErrorDetail(") &&
+    normalized.includes('process.env.NODE_ENV !== "production"') &&
+    normalized.includes('process.env.VERCEL_ENV !== "production"') &&
+    normalized.includes('return "not_found";') &&
+    normalized.includes('return "forbidden";') &&
+    normalized.includes('return "unauthenticated";') &&
+    normalized.includes('return "rate_limited";') &&
+    normalized.includes('return "server_error";') &&
+    normalized.includes("function jsonError(") &&
+    normalized.includes("detail: publicFileErrorDetail(status, code, detail)") &&
+    normalized.includes("headers: withRequestId(requestId, extraHeaders)");
+
+  result.segmentSanitizationValid =
+    normalized.includes("function sanitizeSegments(segments: string[]): string[] | null") &&
+    normalized.includes("!Array.isArray(segments) || segments.length < 3") &&
+    normalized.includes('segment.includes("..")') &&
+    normalized.includes('segment.includes("\\\\")') &&
+    normalized.includes('segment.includes("\\0")') &&
+    normalized.includes("return segments;");
+
+  result.windowInferenceValid =
+    normalized.includes("function inferWindowFromTail(tail: string[]): WindowToken | null") &&
+    normalized.includes('if (tail.length === 1 && tail[0] === "latest.json")') &&
+    normalized.includes('return "latest";') &&
+    normalized.includes("if (tail.length === 2)") &&
+    normalized.includes('if (filename === "latest.json" && isWindowToken(windowRaw) && windowRaw !== "latest")') &&
+    normalized.includes("return windowRaw;");
+
+  result.storagePathPrefixValid =
+    normalized.includes("function buildStoragePath(storageSegments: string[]): string") &&
+    normalized.includes('return path.posix.join("data", "published", "v1", ...storageSegments);');
+
+  const getIndex = normalized.indexOf("export async function GET(request: Request, context: RouteContext)");
+  const getSource = getIndex >= 0 ? normalized.slice(getIndex) : "";
+
+  if (getSource) {
+    const requestIdIndex = getSource.indexOf("const requestId = getOrCreateRequestId(request.headers);");
+    const preAuthIndex = getSource.indexOf('const preAuthRateLimit = await enforcePreAuthRateLimit(request, "file-api", requestId);');
+    const authIndex = getSource.indexOf("const authResult = await validateRequestApiKey(request);");
+    const parseIndex = getSource.indexOf("const resolved = await context.params;");
+    const entitlementIndex = getSource.indexOf("const decision = evaluateFileEntitlement(authResult.entitlement, {");
+    const storageIndex = getSource.indexOf("const storagePath = buildStoragePath(parsedPath.storageSegments);");
+    const readIndex = getSource.indexOf("const file = await readStorageObject(storagePath);");
+    const servedAuditIndex = getSource.indexOf('eventType: "file_served"');
+    const touchIndex = getSource.indexOf("await touchPersistedApiKeyLastUsedAt(authResult.keyId, authResult.record.lastUsedAt);");
+    const responseIndex = getSource.indexOf("return new NextResponse(file.body,");
+
+    result.getPreAuthBeforeApiKeyValidation =
+      requestIdIndex >= 0 &&
+      preAuthIndex >= 0 &&
+      authIndex >= 0 &&
+      requestIdIndex < preAuthIndex &&
+      preAuthIndex < authIndex;
+
+    result.preAuthFailureAuditAndReturnValid =
+      getSource.includes("if (!preAuthRateLimit.ok)") &&
+      getSource.includes('eventType: "rate_limited"') &&
+      getSource.includes("statusCode: 429") &&
+      getSource.includes("detail: preAuthRateLimit.detail") &&
+      getSource.includes("return preAuthRateLimit.response;");
+
+    result.apiKeyAuthFailureAuditAndResponseValid =
+      getSource.includes("if (!authResult.ok)") &&
+      getSource.includes('eventType: "auth_failed"') &&
+      getSource.includes("statusCode: authResult.code === \"unauthenticated\" ? 401 : 403") &&
+      getSource.includes("detail: authResult.detail") &&
+      getSource.includes("return NextResponse.json(buildAuthErrorResponseBody(authResult), {") &&
+      getSource.includes("headers: withRequestId(requestId)");
+
+    result.authenticatedAccountTrackingValid =
+      getSource.includes("accountId = authResult.accountId;") &&
+      getSource.includes("keyId = authResult.keyId;");
+
+    result.tierRateLimitAndQuotaValid =
+      getSource.includes('if (authResult.entitlement.tier === "basic" || authResult.entitlement.tier === "pro")') &&
+      getSource.includes("const rateLimitDecision = await enforceAccountRateLimit(") &&
+      getSource.includes("authResult.accountId") &&
+      getSource.includes("authResult.entitlement.tier") &&
+      getSource.includes("Object.assign(rateLimitHeaders, buildRateLimitHeaders(rateLimitDecision));") &&
+      getSource.includes("if (!rateLimitDecision.success)") &&
+      getSource.includes("const quotaDecision = await enforceDailyApiQuota(") &&
+      getSource.includes("authResult.keyId") &&
+      getSource.includes("Object.assign(rateLimitHeaders, buildDailyQuotaHeaders(quotaDecision));") &&
+      getSource.includes("if (!quotaDecision.success)");
+
+    result.pathParsingAfterAuthValid =
+      authIndex >= 0 &&
+      parseIndex >= 0 &&
+      authIndex < parseIndex &&
+      getSource.includes("const segments = sanitizeSegments(resolved.path);") &&
+      getSource.includes("const parsedPath = parseFilePathSegments(segments);");
+
+    result.invalidPath404Valid =
+      getSource.includes("if (!segments)") &&
+      getSource.includes("invalid_path_shape") &&
+      getSource.includes("if (!parsedPath)") &&
+      getSource.includes("unknown_genre_chain_or_brief_scope") &&
+      getSource.includes('"File path does not exist."');
+
+    result.windowInferenceFailureForbiddenValid =
+      getSource.includes("const inferredWindow = inferWindowFromTail(parsedPath.windowTail);") &&
+      getSource.includes("if (!inferredWindow)") &&
+      getSource.includes('eventType: "entitlement_forbidden"') &&
+      getSource.includes("detail: \"window_could_not_be_inferred\"") &&
+      getSource.includes('"Request exceeds entitlement scope."');
+
+    result.entitlementEvaluationValid =
+      entitlementIndex >= 0 &&
+      parseIndex >= 0 &&
+      parseIndex < entitlementIndex &&
+      getSource.includes('const startDate = url.searchParams.get("start");') &&
+      getSource.includes('const endDate = url.searchParams.get("end");') &&
+      getSource.includes("genre: parsedPath.genre") &&
+      getSource.includes("chain: parsedPath.chain") &&
+      getSource.includes("window: inferredWindow") &&
+      getSource.includes("startDate,") &&
+      getSource.includes("endDate,");
+
+    result.entitlementForbiddenAuditAndResponseValid =
+      getSource.includes("if (!decision.ok)") &&
+      getSource.includes('eventType: "entitlement_forbidden"') &&
+      getSource.includes("statusCode: 403") &&
+      getSource.includes("detail: decision.code") &&
+      getSource.includes("chain,") &&
+      getSource.includes("genre,") &&
+      getSource.includes("window,") &&
+      getSource.includes("decision.code");
+
+    result.storageReadAfterEntitlementValid =
+      entitlementIndex >= 0 &&
+      storageIndex >= 0 &&
+      readIndex >= 0 &&
+      entitlementIndex < storageIndex &&
+      storageIndex < readIndex;
+
+    result.missingFile404Valid =
+      getSource.includes("if (!file)") &&
+      getSource.includes("storagePath") &&
+      getSource.includes('"not_found"') &&
+      getSource.includes('"File path does not exist."');
+
+    result.fileServedAuditValid =
+      servedAuditIndex >= 0 &&
+      readIndex >= 0 &&
+      readIndex < servedAuditIndex &&
+      getSource.includes('eventType: "file_served"') &&
+      getSource.includes("statusCode: 200") &&
+      getSource.includes("accountId,") &&
+      getSource.includes("keyId,") &&
+      getSource.includes("chain,") &&
+      getSource.includes("genre,") &&
+      getSource.includes("window,");
+
+    result.lastUsedTouchAfterServedAuditValid =
+      servedAuditIndex >= 0 &&
+      touchIndex >= 0 &&
+      servedAuditIndex < touchIndex &&
+      getSource.includes("authResult.keyId") &&
+      getSource.includes("authResult.record.lastUsedAt");
+
+    result.successResponseHeadersValid =
+      responseIndex >= 0 &&
+      touchIndex >= 0 &&
+      touchIndex < responseIndex &&
+      getSource.includes("status: 200") &&
+      getSource.includes("...withRequestId(requestId, rateLimitHeaders)") &&
+      getSource.includes('"Content-Type": file.contentType') &&
+      getSource.includes('"Content-Length": String(file.contentLength)') &&
+      getSource.includes('"Cache-Control": "private, no-store"') &&
+      getSource.includes('"X-Entitlement-Tier": authResult.entitlement.tier') &&
+      getSource.includes('"X-Entitlement-Window": inferredWindow') &&
+      getSource.includes("...(file.etag ? { ETag: file.etag } : {})") &&
+      getSource.includes('...(file.lastModified ? { "Last-Modified": file.lastModified } : {})');
+
+    result.serverErrorAuditAndRedactedResponseValid =
+      getSource.includes("} catch (error) {") &&
+      getSource.includes("error instanceof Error ? error.message : \"Unhandled file delivery route error.\"") &&
+      getSource.includes('eventType: "server_error"') &&
+      getSource.includes("statusCode: 500") &&
+      getSource.includes("detail,") &&
+      getSource.includes("return jsonError(") &&
+      getSource.includes('"File delivery failed due to an internal error."');
+  }
+
+  const requiredChecks = [
+    ["AUTH_FILE_ROUTE_AUTH_IMPORTS_INVALID", result.importsAuthAndApiKeyTouch, "File route must import API-key validation and last-used touch helpers."],
+    ["AUTH_FILE_ROUTE_ENTITLEMENT_IMPORTS_INVALID", result.importsEntitlementHelpers, "File route must import entitlement evaluation and window helpers."],
+    ["AUTH_FILE_ROUTE_RATE_LIMIT_IMPORTS_INVALID", result.importsRateLimitAndQuotaHelpers, "File route must import account rate-limit and daily quota helpers."],
+    ["AUTH_FILE_ROUTE_STORAGE_AUDIT_IMPORTS_INVALID", result.importsStorageAndAuditAndPreAuth, "File route must import storage, request audit, and pre-auth rate-limit helpers."],
+    ["AUTH_FILE_ROUTE_ALLOWED_SCOPE_INVALID", result.allowedGenresAndChainsValid, "File route must define allowed genres and chains."],
+    ["AUTH_FILE_ROUTE_WINDOW_STORAGE_MAPPING_INVALID", result.storageTailMappingValid, "File route must map /<window>/latest.json to last<window>.json and latest.json to latest.json."],
+    ["AUTH_FILE_ROUTE_BRIEF_PATH_INVALID", result.briefPathParsingValid, "File route must parse briefs/chains/<chain>/latest.json only for per-chain brief scope."],
+    ["AUTH_FILE_ROUTE_STANDARD_PATH_INVALID", result.standardPathParsingValid, "File route must parse standard genre/chain/window paths and preserve mapped storage segments."],
+    ["AUTH_FILE_ROUTE_REQUEST_ID_HEADER_INVALID", result.requestIdHeaderHelperValid, "File route must attach X-Request-Id to responses."],
+    ["AUTH_FILE_ROUTE_ERROR_REDACTION_INVALID", result.publicErrorDetailRedactionValid, "File route must redact error details in production."],
+    ["AUTH_FILE_ROUTE_SEGMENT_SANITIZATION_INVALID", result.segmentSanitizationValid, "File route must reject invalid path shapes, traversal, backslashes, and null bytes."],
+    ["AUTH_FILE_ROUTE_WINDOW_INFERENCE_INVALID", result.windowInferenceValid, "File route must infer latest/window tokens from documented tails."],
+    ["AUTH_FILE_ROUTE_STORAGE_PREFIX_INVALID", result.storagePathPrefixValid, "File route must read storage under data/published/v1."],
+    ["AUTH_FILE_ROUTE_PREAUTH_ORDER_INVALID", result.getPreAuthBeforeApiKeyValidation, "GET must create request id and run pre-auth rate-limit before API-key validation."],
+    ["AUTH_FILE_ROUTE_PREAUTH_FAILURE_INVALID", result.preAuthFailureAuditAndReturnValid, "Pre-auth rate-limit failure must audit and return the rate-limit response."],
+    ["AUTH_FILE_ROUTE_API_KEY_AUTH_FAILURE_INVALID", result.apiKeyAuthFailureAuditAndResponseValid, "API-key auth failures must audit and return auth error response body."],
+    ["AUTH_FILE_ROUTE_ACCOUNT_TRACKING_INVALID", result.authenticatedAccountTrackingValid, "Authenticated accountId/keyId must be tracked for later audit events."],
+    ["AUTH_FILE_ROUTE_ACCOUNT_RATE_QUOTA_INVALID", result.tierRateLimitAndQuotaValid, "Basic/pro requests must pass account rate-limit and daily quota checks."],
+    ["AUTH_FILE_ROUTE_PATH_PARSE_ORDER_INVALID", result.pathParsingAfterAuthValid, "Path parsing must occur after successful API-key authentication."],
+    ["AUTH_FILE_ROUTE_INVALID_PATH_404_INVALID", result.invalidPath404Valid, "Invalid paths must return not_found without route-shape leakage."],
+    ["AUTH_FILE_ROUTE_WINDOW_FORBIDDEN_INVALID", result.windowInferenceFailureForbiddenValid, "Uninferable window must audit entitlement_forbidden and return 403."],
+    ["AUTH_FILE_ROUTE_ENTITLEMENT_EVALUATION_INVALID", result.entitlementEvaluationValid, "File route must evaluate entitlement with genre/chain/window/start/end."],
+    ["AUTH_FILE_ROUTE_ENTITLEMENT_FORBIDDEN_INVALID", result.entitlementForbiddenAuditAndResponseValid, "Entitlement denials must audit entitlement_forbidden and return 403."],
+    ["AUTH_FILE_ROUTE_STORAGE_READ_ORDER_INVALID", result.storageReadAfterEntitlementValid, "Storage object must not be read before entitlement approval."],
+    ["AUTH_FILE_ROUTE_MISSING_FILE_404_INVALID", result.missingFile404Valid, "Missing storage object must return not_found."],
+    ["AUTH_FILE_ROUTE_FILE_SERVED_AUDIT_INVALID", result.fileServedAuditValid, "Successful file responses must audit file_served with account/key/scope."],
+    ["AUTH_FILE_ROUTE_LAST_USED_TOUCH_INVALID", result.lastUsedTouchAfterServedAuditValid, "API key lastUsedAt touch must happen after served audit and before response."],
+    ["AUTH_FILE_ROUTE_SUCCESS_HEADERS_INVALID", result.successResponseHeadersValid, "Successful file response must include content metadata, private no-store, entitlement headers, request id, and storage validators."],
+    ["AUTH_FILE_ROUTE_SERVER_ERROR_INVALID", result.serverErrorAuditAndRedactedResponseValid, "Unhandled errors must audit server_error and return redacted 500 file delivery failure."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-044",
+        code,
+        path.relative(root, authenticatedFileRoutePath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -7955,6 +8300,7 @@ function evaluate() {
   const requestSecurityHelpersContract = evaluateRequestSecurityHelpersContract(findings);
   const auditLogRequestIdContract = evaluateAuditLogRequestIdContract(findings);
   const entitlementSnapshotHelperContract = evaluateEntitlementSnapshotHelperContract(findings);
+  const authenticatedFileDeliveryRouteContract = evaluateAuthenticatedFileDeliveryRouteContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -8001,6 +8347,7 @@ function evaluate() {
     requestSecurityHelpersContract,
     auditLogRequestIdContract,
     entitlementSnapshotHelperContract,
+    authenticatedFileDeliveryRouteContract,
     findings,
   };
 }
@@ -8060,6 +8407,39 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Authenticated file delivery route contract");
+  lines.push("");
+  lines.push(`Route exists: ${result.authenticatedFileDeliveryRouteContract.routeExists}`);
+  lines.push(`Auth/API-key touch imports valid: ${result.authenticatedFileDeliveryRouteContract.importsAuthAndApiKeyTouch}`);
+  lines.push(`Entitlement imports valid: ${result.authenticatedFileDeliveryRouteContract.importsEntitlementHelpers}`);
+  lines.push(`Rate-limit/quota imports valid: ${result.authenticatedFileDeliveryRouteContract.importsRateLimitAndQuotaHelpers}`);
+  lines.push(`Storage/audit/pre-auth imports valid: ${result.authenticatedFileDeliveryRouteContract.importsStorageAndAuditAndPreAuth}`);
+  lines.push(`Allowed genres/chains valid: ${result.authenticatedFileDeliveryRouteContract.allowedGenresAndChainsValid}`);
+  lines.push(`Window storage mapping valid: ${result.authenticatedFileDeliveryRouteContract.storageTailMappingValid}`);
+  lines.push(`Brief path parsing valid: ${result.authenticatedFileDeliveryRouteContract.briefPathParsingValid}`);
+  lines.push(`Standard path parsing valid: ${result.authenticatedFileDeliveryRouteContract.standardPathParsingValid}`);
+  lines.push(`Request id header helper valid: ${result.authenticatedFileDeliveryRouteContract.requestIdHeaderHelperValid}`);
+  lines.push(`Error detail redaction valid: ${result.authenticatedFileDeliveryRouteContract.publicErrorDetailRedactionValid}`);
+  lines.push(`Segment sanitization valid: ${result.authenticatedFileDeliveryRouteContract.segmentSanitizationValid}`);
+  lines.push(`Window inference valid: ${result.authenticatedFileDeliveryRouteContract.windowInferenceValid}`);
+  lines.push(`Storage path prefix valid: ${result.authenticatedFileDeliveryRouteContract.storagePathPrefixValid}`);
+  lines.push(`GET pre-auth before API-key validation: ${result.authenticatedFileDeliveryRouteContract.getPreAuthBeforeApiKeyValidation}`);
+  lines.push(`Pre-auth failure audit/return valid: ${result.authenticatedFileDeliveryRouteContract.preAuthFailureAuditAndReturnValid}`);
+  lines.push(`API-key auth failure valid: ${result.authenticatedFileDeliveryRouteContract.apiKeyAuthFailureAuditAndResponseValid}`);
+  lines.push(`Authenticated account tracking valid: ${result.authenticatedFileDeliveryRouteContract.authenticatedAccountTrackingValid}`);
+  lines.push(`Tier rate-limit/quota valid: ${result.authenticatedFileDeliveryRouteContract.tierRateLimitAndQuotaValid}`);
+  lines.push(`Path parsing after auth valid: ${result.authenticatedFileDeliveryRouteContract.pathParsingAfterAuthValid}`);
+  lines.push(`Invalid path 404 valid: ${result.authenticatedFileDeliveryRouteContract.invalidPath404Valid}`);
+  lines.push(`Window inference failure forbidden valid: ${result.authenticatedFileDeliveryRouteContract.windowInferenceFailureForbiddenValid}`);
+  lines.push(`Entitlement evaluation valid: ${result.authenticatedFileDeliveryRouteContract.entitlementEvaluationValid}`);
+  lines.push(`Entitlement forbidden audit/response valid: ${result.authenticatedFileDeliveryRouteContract.entitlementForbiddenAuditAndResponseValid}`);
+  lines.push(`Storage read after entitlement valid: ${result.authenticatedFileDeliveryRouteContract.storageReadAfterEntitlementValid}`);
+  lines.push(`Missing file 404 valid: ${result.authenticatedFileDeliveryRouteContract.missingFile404Valid}`);
+  lines.push(`File served audit valid: ${result.authenticatedFileDeliveryRouteContract.fileServedAuditValid}`);
+  lines.push(`Last-used touch valid: ${result.authenticatedFileDeliveryRouteContract.lastUsedTouchAfterServedAuditValid}`);
+  lines.push(`Success response headers valid: ${result.authenticatedFileDeliveryRouteContract.successResponseHeadersValid}`);
+  lines.push(`Server error audit/response valid: ${result.authenticatedFileDeliveryRouteContract.serverErrorAuditAndRedactedResponseValid}`);
+  lines.push("");
   lines.push("## Entitlement snapshot helper contract");
   lines.push("");
   lines.push(`Module exists: ${result.entitlementSnapshotHelperContract.moduleExists}`);
@@ -8789,6 +9169,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-044 Authenticated File Delivery Route Contract: verifies /api/v1/files/[...path] API-key authentication, pre-auth/account rate limits, entitlement checks before storage reads, documented window-to-artifact mapping, audit logging, last-used key touch, private no-store file responses, and redacted errors.");
   lines.push("- D-043 Entitlement Snapshot Helper Contract: verifies pure deterministic entitlement helper rules for public/basic/pro snapshots, allowed chains/genres/windows, history depth, date-range validation, file entitlement decisions, and entitlement factories.");
   lines.push("- D-042 Audit Log Request ID Contract: verifies server-only audit logging, safe request-id generation/acceptance, latency buckets, sanitized bounded JSONL entries, console fallback, non-throwing file append, and no secret/raw-key fields.");
   lines.push("- D-041 Request Security Helpers Contract: verifies same-origin guard and pre-auth rate-limit helper implementations, including server-only boundary, origin/referer validation, no-store redacted errors, Upstash envs, scope defaults, production fail-closed behavior, and non-production memory fallback.");
