@@ -250,7 +250,25 @@ function Validate-WebPublishedMetaIfPresent {
     )
 }
 
-function Invoke-Git {
+
+function Invoke-PublishedSnapshotMetadataHarmonizerIfPresent {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $harmonizer = Join-Path $RepoRoot "harmonize-published-snapshot-metadata.ps1"
+
+    if (-not (Test-Path -LiteralPath $harmonizer)) {
+        Write-Log "Published snapshot metadata harmonizer not found, skipping: $harmonizer"
+        return
+    }
+
+    Write-Log "STEP 3C: Harmonize published snapshot metadata"
+    Invoke-Native -WorkingDirectory $RepoRoot -FilePath "powershell" -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $harmonizer,
+        "-Root", $RepoRoot
+    )
+}function Invoke-Git {
     param(
         [Parameter(Mandatory = $true)][string]$WorkingDirectory,
         [Parameter(Mandatory = $true)][string[]]$Arguments,
@@ -381,6 +399,7 @@ try {
 
     Invoke-WebBriefsBuilderIfPresent -RepoRoot $RootDir
     Validate-WebPublishedMetaIfPresent -RepoRoot $RootDir
+    Invoke-PublishedSnapshotMetadataHarmonizerIfPresent -RepoRoot $RootDir
 
     Write-Log "STEP 3: Publish web data"
     $publishArgs = @(

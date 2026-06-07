@@ -65,6 +65,7 @@ const storageIndexPath = path.join(root, "src", "lib", "storage", "index.ts");
 const localStoragePath = path.join(root, "src", "lib", "storage", "localDev.ts");
 const s3StoragePath = path.join(root, "src", "lib", "storage", "s3.ts");
 const runDailyPipelinePath = path.join(root, "..", "run-daily-pipeline.ps1");
+const snapshotMetadataHarmonizerPath = path.join(root, "..", "harmonize-published-snapshot-metadata.ps1");
 const githubPipelineWorkflowPath = path.join(root, "..", ".github", "workflows", "pipeline.yml");
 
 function ensureReportDir() {
@@ -2148,6 +2149,155 @@ function evaluateHistoricalDerivedCoverageContract(findings, inventory) {
 
   return result;
 }
+function evaluateSnapshotMetadataHarmonizerContract(findings) {
+  const result = {
+    harmonizerExists: fs.existsSync(snapshotMetadataHarmonizerPath),
+    runDailyExists: fs.existsSync(runDailyPipelinePath),
+    harmonizerMentionsDatasetJson: false,
+    harmonizerMentionsManifestJson: false,
+    harmonizerWritesComputedAtUtc: false,
+    harmonizerUsesUtf8NoBomJson: false,
+    runDailyCallsHarmonizer: false,
+    harmonizerAfterValidation: false,
+    harmonizerBeforePublish: false,
+    harmonizerBeforeCommit: false,
+  };
+
+  if (!result.harmonizerExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-017",
+      "SNAPSHOT_METADATA_HARMONIZER_MISSING",
+      path.relative(root, snapshotMetadataHarmonizerPath),
+      "A permanent snapshot metadata harmonizer is required so dataset.json and manifests keep consistent computed_at_utc after all canonical artifacts are generated."
+    );
+
+    return result;
+  }
+
+  const harmonizerSource = fs.readFileSync(snapshotMetadataHarmonizerPath, "utf8").replace(/^\uFEFF/u, "");
+
+  result.harmonizerMentionsDatasetJson = harmonizerSource.includes("dataset.json");
+  result.harmonizerMentionsManifestJson = harmonizerSource.includes("manifest.json");
+  result.harmonizerWritesComputedAtUtc = harmonizerSource.includes("computed_at_utc") && harmonizerSource.includes("Get-MaxSnapshotComputedAtUtc");
+  result.harmonizerUsesUtf8NoBomJson = harmonizerSource.includes("Write-Utf8NoBomJson") && harmonizerSource.includes("ConvertTo-Json -Depth 100");
+
+  if (!result.harmonizerMentionsDatasetJson) {
+    addFinding(
+      findings,
+      "fail",
+      "D-017",
+      "SNAPSHOT_METADATA_HARMONIZER_DATASET_MISSING",
+      path.relative(root, snapshotMetadataHarmonizerPath),
+      "Snapshot metadata harmonizer must update dataset.json."
+    );
+  }
+
+  if (!result.harmonizerMentionsManifestJson) {
+    addFinding(
+      findings,
+      "fail",
+      "D-017",
+      "SNAPSHOT_METADATA_HARMONIZER_MANIFESTS_MISSING",
+      path.relative(root, snapshotMetadataHarmonizerPath),
+      "Snapshot metadata harmonizer must update genre/chain manifest.json files."
+    );
+  }
+
+  if (!result.harmonizerWritesComputedAtUtc) {
+    addFinding(
+      findings,
+      "fail",
+      "D-017",
+      "SNAPSHOT_METADATA_HARMONIZER_COMPUTED_AT_MISSING",
+      path.relative(root, snapshotMetadataHarmonizerPath),
+      "Snapshot metadata harmonizer must set computed_at_utc consistently across dataset.json and manifests."
+    );
+  }
+
+  if (!result.harmonizerUsesUtf8NoBomJson) {
+    addFinding(
+      findings,
+      "fail",
+      "D-017",
+      "SNAPSHOT_METADATA_HARMONIZER_UTF8_JSON_MISSING",
+      path.relative(root, snapshotMetadataHarmonizerPath),
+      "Snapshot metadata harmonizer must write JSON as UTF-8 without BOM using deep JSON serialization."
+    );
+  }
+
+  if (!result.runDailyExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-017",
+      "RUN_DAILY_PIPELINE_SCRIPT_MISSING_FOR_HARMONIZER",
+      path.relative(root, runDailyPipelinePath),
+      "run-daily-pipeline.ps1 is required to audit harmonizer call order."
+    );
+
+    return result;
+  }
+
+  const runDailySource = fs.readFileSync(runDailyPipelinePath, "utf8").replace(/^\uFEFF/u, "");
+
+  const validationIndex = runDailySource.indexOf("Validate-WebPublishedMetaIfPresent -RepoRoot $RootDir");
+  const harmonizerIndex = runDailySource.indexOf("Invoke-PublishedSnapshotMetadataHarmonizerIfPresent -RepoRoot $RootDir");
+  const publishIndex = runDailySource.indexOf('Write-Log "STEP 3: Publish web data"');
+  const commitIndex = runDailySource.indexOf("Commit-PublishedSnapshotIfNeeded -RepoRoot $RootDir");
+
+  result.runDailyCallsHarmonizer = harmonizerIndex >= 0;
+  result.harmonizerAfterValidation = validationIndex >= 0 && harmonizerIndex >= 0 && validationIndex < harmonizerIndex;
+  result.harmonizerBeforePublish = harmonizerIndex >= 0 && publishIndex >= 0 && harmonizerIndex < publishIndex;
+  result.harmonizerBeforeCommit = harmonizerIndex >= 0 && commitIndex >= 0 && harmonizerIndex < commitIndex;
+
+  if (!result.runDailyCallsHarmonizer) {
+    addFinding(
+      findings,
+      "fail",
+      "D-017",
+      "RUN_DAILY_HARMONIZER_CALL_MISSING",
+      path.relative(root, runDailyPipelinePath),
+      "run-daily-pipeline.ps1 must call Invoke-PublishedSnapshotMetadataHarmonizerIfPresent before publish-web-data syncs private data."
+    );
+  }
+
+  if (!result.harmonizerAfterValidation) {
+    addFinding(
+      findings,
+      "fail",
+      "D-017",
+      "RUN_DAILY_HARMONIZER_NOT_AFTER_VALIDATION",
+      path.relative(root, runDailyPipelinePath),
+      "Snapshot metadata harmonizer should run after canonical META validation."
+    );
+  }
+
+  if (!result.harmonizerBeforePublish) {
+    addFinding(
+      findings,
+      "fail",
+      "D-017",
+      "RUN_DAILY_HARMONIZER_NOT_BEFORE_PUBLISH_SYNC",
+      path.relative(root, runDailyPipelinePath),
+      "Snapshot metadata harmonizer must run before publish-web-data syncs data/published/v1 into .private-data."
+    );
+  }
+
+  if (!result.harmonizerBeforeCommit) {
+    addFinding(
+      findings,
+      "fail",
+      "D-017",
+      "RUN_DAILY_HARMONIZER_NOT_BEFORE_COMMIT",
+      path.relative(root, runDailyPipelinePath),
+      "Snapshot metadata harmonizer must run before published snapshot commits are created."
+    );
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -2171,6 +2321,7 @@ function evaluate() {
   const pipelinePublishOrderContract = evaluatePipelinePublishOrderContract(findings);
   const revisionProvenanceContract = evaluateRevisionProvenanceContract(findings, inventory);
   const historicalDerivedCoverageContract = evaluateHistoricalDerivedCoverageContract(findings, inventory);
+  const snapshotMetadataHarmonizerContract = evaluateSnapshotMetadataHarmonizerContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -2190,6 +2341,7 @@ function evaluate() {
     pipelinePublishOrderContract,
     revisionProvenanceContract,
     historicalDerivedCoverageContract,
+    snapshotMetadataHarmonizerContract,
     findings,
   };
 }
@@ -2249,6 +2401,19 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Snapshot metadata harmonizer contract");
+  lines.push("");
+  lines.push(`Harmonizer exists: ${result.snapshotMetadataHarmonizerContract.harmonizerExists}`);
+  lines.push(`run-daily-pipeline.ps1 exists: ${result.snapshotMetadataHarmonizerContract.runDailyExists}`);
+  lines.push(`Updates dataset.json: ${result.snapshotMetadataHarmonizerContract.harmonizerMentionsDatasetJson}`);
+  lines.push(`Updates manifest.json files: ${result.snapshotMetadataHarmonizerContract.harmonizerMentionsManifestJson}`);
+  lines.push(`Writes computed_at_utc: ${result.snapshotMetadataHarmonizerContract.harmonizerWritesComputedAtUtc}`);
+  lines.push(`Writes UTF-8 no-BOM JSON: ${result.snapshotMetadataHarmonizerContract.harmonizerUsesUtf8NoBomJson}`);
+  lines.push(`run-daily calls harmonizer: ${result.snapshotMetadataHarmonizerContract.runDailyCallsHarmonizer}`);
+  lines.push(`Harmonizer after validation: ${result.snapshotMetadataHarmonizerContract.harmonizerAfterValidation}`);
+  lines.push(`Harmonizer before publish sync: ${result.snapshotMetadataHarmonizerContract.harmonizerBeforePublish}`);
+  lines.push(`Harmonizer before commit: ${result.snapshotMetadataHarmonizerContract.harmonizerBeforeCommit}`);
+  lines.push("");
   lines.push("## Historical derived coverage contract");
   lines.push("");
   lines.push(`Chains checked: ${result.historicalDerivedCoverageContract.chainsChecked}`);
@@ -2381,6 +2546,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-017 Snapshot Metadata Harmonizer Contract: verifies the pipeline permanently harmonizes dataset/manifests computed_at_utc before private sync and commit.");
   lines.push("- D-016 Historical Derived Coverage Contract: verifies derived day-files/manifests/dataset asof align exactly with gold per chain.");
   lines.push("- D-015 Revision Provenance Contract: checks dataset/manifests share dataset_id, revision_id, bounded computed_at_utc skew, methodology_version, schema versions, and files/window mappings.");
   lines.push("- D-014 Pipeline Publish Order Contract: checks publish/brief/sync/commit order and requires CI audit gates before push/deploy.");
