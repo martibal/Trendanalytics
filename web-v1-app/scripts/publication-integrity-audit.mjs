@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
 const authenticatedFileRoutePath = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
 const entitlementHelperModulePath = path.join(root, "src", "lib", "auth", "entitlements.ts");
@@ -8551,6 +8552,432 @@ function evaluateAccountRateLimitDailyQuotaContract(findings) {
 
   return result;
 }
+function evaluateApiKeyPersistenceHelperContract(findings) {
+  const result = {
+    moduleExists: fs.existsSync(apiKeyPersistenceModulePath),
+
+    importsCryptoPrismaEntitlementsAndDb: false,
+    apiKeyRecordTypeValid: false,
+    devJsonRowTypeValid: false,
+    persistedCandidateTypeValid: false,
+    normalizeStateTierStatusValid: false,
+    devEntitlementNormalizationValid: false,
+    prismaMappingValid: false,
+    persistedChainNormalizationValid: false,
+    persistedEntitlementUsesLatestSubscription: false,
+    persistedCandidateMappingValid: false,
+
+    devHashingAndConstantTimeValid: false,
+    prefixAndLast4HelpersValid: false,
+    lastUsedUpdateThrottleValid: false,
+    lastUsedUpdateRevokedGuardValid: false,
+    lastUsedUpdateNonThrowing: false,
+
+    devJsonParsingValid: false,
+    devKeyLoadingValid: false,
+    devKeyLookupValid: false,
+    persistedScryptVerificationValid: false,
+    persistedLookupUsesPrefixBeforeHash: false,
+    persistedLookupIncludesAccountSubscription: false,
+    persistedLookupVerifiesHashBeforeMapping: false,
+
+    displayRowsAccountScoped: false,
+    displayRowsSelectSafeFieldsOnly: false,
+    displayRowsBuildEntitlementSnapshot: false,
+    displayRowsReturnSafeShapeOnly: false,
+    inMemoryAccountAndUserFiltersValid: false,
+    inMemoryDisplayRowsValid: false,
+    noRawSecretLeakInDisplayHelpers: false,
+  };
+
+  if (!result.moduleExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-046",
+      "API_KEY_PERSISTENCE_MODULE_MISSING",
+      path.relative(root, apiKeyPersistenceModulePath),
+      "src/lib/auth/apiKeys.ts is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(apiKeyPersistenceModulePath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  result.importsCryptoPrismaEntitlementsAndDb =
+    normalized.includes('import crypto from "crypto";') &&
+    normalized.includes('import { ApiKeyStatus, SubscriptionStatus, SubscriptionTier } from "@prisma/client";') &&
+    normalized.includes("buildEntitlementSnapshot") &&
+    normalized.includes("createBasicEntitlement") &&
+    normalized.includes("createProEntitlement") &&
+    normalized.includes("createPublicEntitlement") &&
+    normalized.includes("type EntitlementInput") &&
+    normalized.includes('import type { ChainId } from "@/config/chains";') &&
+    normalized.includes('import { db } from "@/lib/db";');
+
+  result.apiKeyRecordTypeValid =
+    normalized.includes("export type ApiKeyState = \"ACTIVE\" | \"SUSPENDED\" | \"REVOKED\";") &&
+    normalized.includes("export type ApiKeyRecord = {") &&
+    normalized.includes("keyId: string;") &&
+    normalized.includes("accountId: string;") &&
+    normalized.includes("userId: string | null;") &&
+    normalized.includes("label: string | null;") &&
+    normalized.includes("state: ApiKeyState;") &&
+    normalized.includes("prefix: string;") &&
+    normalized.includes("last4: string;") &&
+    normalized.includes("tokenHash: string;") &&
+    normalized.includes("entitlement: EntitlementInput;");
+
+  result.devJsonRowTypeValid =
+    normalized.includes("type DevApiKeyJsonRow = {") &&
+    normalized.includes("token: string;") &&
+    normalized.includes("keyId?: string;") &&
+    normalized.includes("accountId?: string;") &&
+    normalized.includes("userId?: string | null;") &&
+    normalized.includes("tier?: EntitlementSubscriptionTier | string;") &&
+    normalized.includes("status?: EntitlementSubscriptionStatus | string;") &&
+    normalized.includes("entitledChain?: ChainId | null;") &&
+    normalized.includes("historyUnlocked?: boolean;");
+
+  result.persistedCandidateTypeValid =
+    normalized.includes("type PersistedApiKeyCandidate = {") &&
+    normalized.includes("id: string;") &&
+    normalized.includes("accountId: string;") &&
+    normalized.includes("keyHash: string;") &&
+    normalized.includes("keyPrefix: string;") &&
+    normalized.includes("keyLast4: string | null;") &&
+    normalized.includes("status: ApiKeyStatus;") &&
+    normalized.includes("account: {") &&
+    normalized.includes("authProviderUserId: string;") &&
+    normalized.includes("subscriptions: Array<{") &&
+    normalized.includes("tier: SubscriptionTier;") &&
+    normalized.includes("status: SubscriptionStatus;") &&
+    normalized.includes("historyUnlocked: boolean;") &&
+    normalized.includes("updatedAt: Date;");
+
+  result.normalizeStateTierStatusValid =
+    normalized.includes("function normalizeState(value: string | undefined): ApiKeyState") &&
+    normalized.includes('if (value === "SUSPENDED") return "SUSPENDED";') &&
+    normalized.includes('if (value === "REVOKED") return "REVOKED";') &&
+    normalized.includes('return "ACTIVE";') &&
+    normalized.includes("function normalizeTier(value: string | undefined): EntitlementSubscriptionTier") &&
+    normalized.includes('if (value === "basic") return "basic";') &&
+    normalized.includes('if (value === "pro") return "pro";') &&
+    normalized.includes('return "public";') &&
+    normalized.includes("function normalizeStatus(value: string | undefined): EntitlementSubscriptionStatus") &&
+    normalized.includes('if (value === "inactive") return "inactive";') &&
+    normalized.includes('return "active";');
+
+  result.devEntitlementNormalizationValid =
+    normalized.includes("function normalizeEntitlement(row: DevApiKeyJsonRow): EntitlementInput") &&
+    normalized.includes("const tier = normalizeTier(row.tier);") &&
+    normalized.includes("const status = normalizeStatus(row.status);") &&
+    normalized.includes("const historyUnlocked = Boolean(row.historyUnlocked);") &&
+    normalized.includes('if (tier === "basic")') &&
+    normalized.includes("return createBasicEntitlement(row.entitledChain ?? null, {") &&
+    normalized.includes('if (tier === "pro")') &&
+    normalized.includes("return createProEntitlement({") &&
+    normalized.includes("return createPublicEntitlement();");
+
+  result.prismaMappingValid =
+    normalized.includes("function mapPrismaTierToEntitlementTier(") &&
+    normalized.includes("if (tier === SubscriptionTier.basic)") &&
+    normalized.includes('return "basic";') &&
+    normalized.includes('return "pro";') &&
+    normalized.includes("function mapPrismaStatusToEntitlementStatus(") &&
+    normalized.includes("if (status === SubscriptionStatus.inactive)") &&
+    normalized.includes('return "inactive";') &&
+    normalized.includes('return "active";') &&
+    normalized.includes("function mapPrismaApiKeyStatus(status: ApiKeyStatus): ApiKeyState") &&
+    normalized.includes("if (status === ApiKeyStatus.suspended)") &&
+    normalized.includes('return "SUSPENDED";') &&
+    normalized.includes("if (status === ApiKeyStatus.revoked)") &&
+    normalized.includes('return "REVOKED";') &&
+    normalized.includes('return "ACTIVE";');
+
+  result.persistedChainNormalizationValid =
+    normalized.includes("function normalizePersistedEntitledChain(value: string | null): ChainId | null") &&
+    normalized.includes('value === "bitcoin"') &&
+    normalized.includes('value === "ethereum"') &&
+    normalized.includes('value === "arbitrum"') &&
+    normalized.includes('value === "base"') &&
+    normalized.includes("return null;");
+
+  result.persistedEntitlementUsesLatestSubscription =
+    normalized.includes("function buildPersistedEntitlement(candidate: PersistedApiKeyCandidate): EntitlementInput") &&
+    normalized.includes("const latestSubscription = [...candidate.account.subscriptions].sort(") &&
+    normalized.includes("(a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()") &&
+    normalized.includes("if (!latestSubscription)") &&
+    normalized.includes("return createPublicEntitlement();") &&
+    normalized.includes("const tier = mapPrismaTierToEntitlementTier(latestSubscription.tier);") &&
+    normalized.includes("const status = mapPrismaStatusToEntitlementStatus(latestSubscription.status);") &&
+    normalized.includes("const historyUnlocked = latestSubscription.historyUnlocked;") &&
+    normalized.includes("const entitledChain = normalizePersistedEntitledChain(latestSubscription.entitledChain);") &&
+    normalized.includes('if (tier === "basic")') &&
+    normalized.includes("return createBasicEntitlement(entitledChain, {") &&
+    normalized.includes("return createProEntitlement({");
+
+  result.persistedCandidateMappingValid =
+    normalized.includes("function mapPersistedCandidateToApiKeyRecord(") &&
+    normalized.includes("keyId: candidate.id,") &&
+    normalized.includes("accountId: candidate.accountId,") &&
+    normalized.includes("userId: candidate.account.authProviderUserId,") &&
+    normalized.includes("state: mapPrismaApiKeyStatus(candidate.status),") &&
+    normalized.includes("prefix: candidate.keyPrefix,") &&
+    normalized.includes("last4: candidate.keyLast4 ?? \"\",") &&
+    normalized.includes("tokenHash: candidate.keyHash,") &&
+    normalized.includes("entitlement: buildPersistedEntitlement(candidate),");
+
+  result.devHashingAndConstantTimeValid =
+    normalized.includes("export function hashApiKey(token: string): string") &&
+    normalized.includes('return crypto.createHash("sha256").update(token, "utf8").digest("hex");') &&
+    normalized.includes("export function constantTimeHexEqual(a: string, b: string): boolean") &&
+    normalized.includes('const aBuf = Buffer.from(a, "hex");') &&
+    normalized.includes('const bBuf = Buffer.from(b, "hex");') &&
+    normalized.includes("if (aBuf.length !== bBuf.length)") &&
+    normalized.includes("return false;") &&
+    normalized.includes("return crypto.timingSafeEqual(aBuf, bBuf);");
+
+  result.prefixAndLast4HelpersValid =
+    normalized.includes("export function buildApiKeyPrefix(token: string): string") &&
+    normalized.includes("return token.slice(0, Math.min(8, token.length));") &&
+    normalized.includes("export function buildPersistedApiKeyPrefix(token: string): string") &&
+    normalized.includes("return token.slice(0, Math.min(12, token.length));") &&
+    normalized.includes("export function buildApiKeyLast4(token: string): string") &&
+    normalized.includes("return token.slice(Math.max(0, token.length - 4));");
+
+  result.lastUsedUpdateThrottleValid =
+    normalized.includes("const LAST_USED_UPDATE_INTERVAL_MS = 5 * 60 * 1000;") &&
+    normalized.includes("function shouldUpdateLastUsedAt(lastUsedAt: string | null): boolean") &&
+    normalized.includes("if (!lastUsedAt)") &&
+    normalized.includes("return true;") &&
+    normalized.includes("const parsed = new Date(lastUsedAt);") &&
+    normalized.includes("if (Number.isNaN(parsed.getTime()))") &&
+    normalized.includes("return Date.now() - parsed.getTime() >= LAST_USED_UPDATE_INTERVAL_MS;");
+
+  result.lastUsedUpdateRevokedGuardValid =
+    normalized.includes("export async function touchPersistedApiKeyLastUsedAt(") &&
+    normalized.includes("if (!keyId || !shouldUpdateLastUsedAt(lastUsedAt))") &&
+    normalized.includes("await db.apiKey.updateMany({") &&
+    normalized.includes("where: {") &&
+    normalized.includes("id: keyId,") &&
+    normalized.includes("status: {") &&
+    normalized.includes("not: ApiKeyStatus.revoked") &&
+    normalized.includes("lastUsedAt: new Date()");
+
+  result.lastUsedUpdateNonThrowing =
+    normalized.includes("} catch (error) {") &&
+    normalized.includes('console.warn("[apiKeys] failed to update lastUsedAt"') &&
+    normalized.includes("keyId,") &&
+    normalized.includes("error instanceof Error ? error.message : String(error)");
+
+  result.devJsonParsingValid =
+    normalized.includes("export function parseDevApiKeysJson(raw: string): ApiKeyRecord[]") &&
+    normalized.includes("parsed = JSON.parse(raw);") &&
+    normalized.includes("} catch {") &&
+    normalized.includes("return [];") &&
+    normalized.includes("if (!Array.isArray(parsed))") &&
+    normalized.includes("return [];") &&
+    normalized.includes("const token = typeof row.token === \"string\" ? row.token.trim() : \"\";") &&
+    normalized.includes("if (!token)") &&
+    normalized.includes("return null;") &&
+    normalized.includes("prefix: buildApiKeyPrefix(token),") &&
+    normalized.includes("last4: buildApiKeyLast4(token),") &&
+    normalized.includes("tokenHash: hashApiKey(token),") &&
+    normalized.includes("filter((row): row is ApiKeyRecord => row !== null)");
+
+  result.devKeyLoadingValid =
+    normalized.includes("export function loadDevelopmentApiKeys(): ApiKeyRecord[]") &&
+    normalized.includes("const raw = process.env.DEV_API_KEYS_JSON;") &&
+    normalized.includes("if (!raw)") &&
+    normalized.includes("return [];") &&
+    normalized.includes("return parseDevApiKeysJson(raw);");
+
+  result.devKeyLookupValid =
+    normalized.includes("export function findApiKeyRecord(token: string, records: ApiKeyRecord[]): ApiKeyRecord | null") &&
+    normalized.includes("const tokenHash = hashApiKey(token);") &&
+    normalized.includes("for (const record of records)") &&
+    normalized.includes("if (constantTimeHexEqual(record.tokenHash, tokenHash))") &&
+    normalized.includes("return record;") &&
+    normalized.includes("return null;");
+
+  result.persistedScryptVerificationValid =
+    normalized.includes("export function verifyPersistedApiKeyHash(token: string, storedHash: string): boolean") &&
+    normalized.includes("const trimmedToken = token.trim();") &&
+    normalized.includes('if (!trimmedToken || !storedHash.startsWith("scrypt:"))') &&
+    normalized.includes("const parts = storedHash.split(\":\");") &&
+    normalized.includes("if (parts.length !== 3)") &&
+    normalized.includes("const [, salt, expectedDerived] = parts;") &&
+    normalized.includes("if (!salt || !expectedDerived)") &&
+    normalized.includes("actualDerived = crypto.scryptSync(trimmedToken, salt, 64).toString(\"hex\");") &&
+    normalized.includes("return constantTimeHexEqual(actualDerived, expectedDerived);");
+
+  result.persistedLookupUsesPrefixBeforeHash =
+    normalized.includes("export async function findPersistedApiKeyRecord(") &&
+    normalized.includes("const normalized = token.trim();") &&
+    normalized.includes("if (!normalized)") &&
+    normalized.includes("const keyPrefix = buildPersistedApiKeyPrefix(normalized);") &&
+    normalized.includes("const candidates = await db.apiKey.findMany({") &&
+    normalized.includes("where: {") &&
+    normalized.includes("keyPrefix,") &&
+    normalized.indexOf("const keyPrefix = buildPersistedApiKeyPrefix(normalized);") <
+      normalized.indexOf("const candidates = await db.apiKey.findMany({");
+
+  result.persistedLookupIncludesAccountSubscription =
+    normalized.includes("include: {") &&
+    normalized.includes("account: {") &&
+    normalized.includes("select: {") &&
+    normalized.includes("authProviderUserId: true,") &&
+    normalized.includes("subscriptions: {") &&
+    normalized.includes("orderBy: {") &&
+    normalized.includes("updatedAt: \"desc\",") &&
+    normalized.includes("take: 1") &&
+    normalized.includes("tier: true") &&
+    normalized.includes("status: true") &&
+    normalized.includes("entitledChain: true") &&
+    normalized.includes("historyUnlocked: true") &&
+    normalized.includes("orderBy: {") &&
+    normalized.includes("createdAt: \"desc\"");
+
+  result.persistedLookupVerifiesHashBeforeMapping =
+    normalized.includes("for (const candidate of candidates)") &&
+    normalized.includes("if (!verifyPersistedApiKeyHash(normalized, candidate.keyHash))") &&
+    normalized.includes("continue;") &&
+    normalized.includes("return mapPersistedCandidateToApiKeyRecord(candidate);") &&
+    normalized.indexOf("if (!verifyPersistedApiKeyHash(normalized, candidate.keyHash))") <
+      normalized.indexOf("return mapPersistedCandidateToApiKeyRecord(candidate);");
+
+  result.displayRowsAccountScoped =
+    normalized.includes("export async function getPersistedApiKeyDisplayRows(accountId: string | null)") &&
+    normalized.includes("if (!accountId)") &&
+    normalized.includes("return [];") &&
+    normalized.includes("const records = await db.apiKey.findMany({") &&
+    normalized.includes("where: {") &&
+    normalized.includes("accountId,") &&
+    normalized.includes("orderBy: {") &&
+    normalized.includes("createdAt: \"desc\"");
+
+  const displayFunctionIndex = normalized.indexOf("export async function getPersistedApiKeyDisplayRows");
+  const displaySource = displayFunctionIndex >= 0
+    ? normalized.slice(displayFunctionIndex, normalized.indexOf("\n}\n\nexport function getApiKeysForAccount", displayFunctionIndex))
+    : "";
+
+  result.displayRowsSelectSafeFieldsOnly =
+    displaySource.includes("select: {") &&
+    displaySource.includes("id: true,") &&
+    displaySource.includes("label: true,") &&
+    displaySource.includes("keyPrefix: true,") &&
+    displaySource.includes("keyLast4: true,") &&
+    displaySource.includes("status: true,") &&
+    displaySource.includes("createdAt: true,") &&
+    displaySource.includes("lastUsedAt: true,") &&
+    !displaySource.includes("keyHash: true") &&
+    !displaySource.includes("keyHash,") &&
+    !displaySource.includes("tokenHash");
+
+  result.displayRowsBuildEntitlementSnapshot =
+    displaySource.includes("const latestSubscription = record.account.subscriptions[0];") &&
+    displaySource.includes("const entitlement = latestSubscription") &&
+    displaySource.includes("buildPersistedEntitlement({") &&
+    displaySource.includes("keyHash: \"\",") &&
+    displaySource.includes("authProviderUserId: \"\",") &&
+    displaySource.includes(": createPublicEntitlement();") &&
+    displaySource.includes("const snapshot = buildEntitlementSnapshot(entitlement);");
+
+  const displayReturnIndex = displaySource.lastIndexOf("return {");
+  const displayReturnSource = displayReturnIndex >= 0 ? displaySource.slice(displayReturnIndex) : "";
+
+  result.displayRowsReturnSafeShapeOnly =
+    displayReturnSource.includes("id: record.id,") &&
+    displayReturnSource.includes("label: record.label,") &&
+    displayReturnSource.includes("prefix: record.keyPrefix,") &&
+    displayReturnSource.includes("last4: record.keyLast4 ?? \"\",") &&
+    displayReturnSource.includes("record.status === ApiKeyStatus.active") &&
+    displayReturnSource.includes("? \"active\"") &&
+    displayReturnSource.includes(": record.status === ApiKeyStatus.suspended") &&
+    displayReturnSource.includes("? \"suspended\"") &&
+    displayReturnSource.includes(": \"revoked\"") &&
+    displayReturnSource.includes("createdAt: record.createdAt.toISOString(),") &&
+    displayReturnSource.includes("lastUsedAt: record.lastUsedAt?.toISOString() ?? null,") &&
+    displayReturnSource.includes("tier: snapshot.tier,") &&
+    displayReturnSource.includes("entitledChain: snapshot.entitledChain,") &&
+    displayReturnSource.includes("maxWindowDays: snapshot.maxWindowDays,") &&
+    !displayReturnSource.includes("keyHash") &&
+    !displayReturnSource.includes("tokenHash");
+
+  result.inMemoryAccountAndUserFiltersValid =
+    normalized.includes("export function getApiKeysForAccount(") &&
+    normalized.includes("if (!accountId)") &&
+    normalized.includes("const source = records ?? loadDevelopmentApiKeys();") &&
+    normalized.includes("return source.filter((record) => record.accountId === accountId);") &&
+    normalized.includes("export function getApiKeysForUser(") &&
+    normalized.includes("if (!userId)") &&
+    normalized.includes("return source.filter((record) => record.userId === userId);");
+
+  result.inMemoryDisplayRowsValid =
+    normalized.includes("export function getApiKeyDisplayRows(accountId: string | null)") &&
+    normalized.includes("return getApiKeysForAccount(accountId).map((record) => {") &&
+    normalized.includes("const snapshot = buildEntitlementSnapshot(record.entitlement);") &&
+    normalized.includes("id: record.keyId,") &&
+    normalized.includes("prefix: record.prefix,") &&
+    normalized.includes("last4: record.last4,") &&
+    normalized.includes("record.state === \"ACTIVE\"") &&
+    normalized.includes("record.state === \"SUSPENDED\"") &&
+    normalized.includes("tier: snapshot.tier,") &&
+    normalized.includes("maxWindowDays: snapshot.maxWindowDays,");
+
+  result.noRawSecretLeakInDisplayHelpers =
+    !/secret|password|rawKey|apiKeySecret/u.test(displaySource);
+
+  const requiredChecks = [
+    ["API_KEY_PERSISTENCE_IMPORTS_INVALID", result.importsCryptoPrismaEntitlementsAndDb, "API-key helper must import crypto, Prisma enums, entitlement helpers, ChainId, and db."],
+    ["API_KEY_RECORD_TYPE_INVALID", result.apiKeyRecordTypeValid, "ApiKeyRecord must preserve account/user/label/state/prefix/last4/tokenHash/entitlement fields."],
+    ["API_KEY_DEV_JSON_ROW_TYPE_INVALID", result.devJsonRowTypeValid, "Development API-key JSON row type must preserve dev token and entitlement fields."],
+    ["API_KEY_PERSISTED_CANDIDATE_TYPE_INVALID", result.persistedCandidateTypeValid, "Persisted candidate type must include key hash/prefix/last4 and account subscription projection fields."],
+    ["API_KEY_NORMALIZE_STATE_TIER_STATUS_INVALID", result.normalizeStateTierStatusValid, "State/tier/status normalizers must default safely."],
+    ["API_KEY_DEV_ENTITLEMENT_NORMALIZATION_INVALID", result.devEntitlementNormalizationValid, "Development entitlement normalization must build public/basic/pro entitlement inputs."],
+    ["API_KEY_PRISMA_MAPPING_INVALID", result.prismaMappingValid, "Prisma tier/status/key status mapping must preserve expected public API states."],
+    ["API_KEY_PERSISTED_CHAIN_NORMALIZATION_INVALID", result.persistedChainNormalizationValid, "Persisted entitled chain normalization must allow only supported chains."],
+    ["API_KEY_PERSISTED_ENTITLEMENT_INVALID", result.persistedEntitlementUsesLatestSubscription, "Persisted entitlement must use latest subscription by updatedAt and fallback to public."],
+    ["API_KEY_PERSISTED_CANDIDATE_MAPPING_INVALID", result.persistedCandidateMappingValid, "Persisted candidate mapping must include account/user state and build entitlement."],
+    ["API_KEY_DEV_HASHING_INVALID", result.devHashingAndConstantTimeValid, "Development API-key lookup must use SHA-256 hash and timingSafeEqual."],
+    ["API_KEY_PREFIX_LAST4_INVALID", result.prefixAndLast4HelpersValid, "API-key prefix/last4 helper lengths must remain stable."],
+    ["API_KEY_LAST_USED_THROTTLE_INVALID", result.lastUsedUpdateThrottleValid, "lastUsedAt update throttle must be 5 minutes and update missing/invalid timestamps."],
+    ["API_KEY_LAST_USED_REVOKED_GUARD_INVALID", result.lastUsedUpdateRevokedGuardValid, "lastUsedAt update must use updateMany with revoked-key guard."],
+    ["API_KEY_LAST_USED_NON_THROWING_INVALID", result.lastUsedUpdateNonThrowing, "lastUsedAt update failures must warn and not throw."],
+    ["API_KEY_DEV_JSON_PARSE_INVALID", result.devJsonParsingValid, "DEV_API_KEYS_JSON parser must ignore invalid JSON/non-array/missing-token rows and hash tokens."],
+    ["API_KEY_DEV_LOADING_INVALID", result.devKeyLoadingValid, "Development API keys must load from DEV_API_KEYS_JSON and default to empty."],
+    ["API_KEY_DEV_LOOKUP_INVALID", result.devKeyLookupValid, "Development API-key lookup must compare token hashes in constant time."],
+    ["API_KEY_PERSISTED_SCRYPT_VERIFY_INVALID", result.persistedScryptVerificationValid, "Persisted API-key verification must require scrypt:salt:derived and timing-safe comparison."],
+    ["API_KEY_PERSISTED_PREFIX_LOOKUP_INVALID", result.persistedLookupUsesPrefixBeforeHash, "Persisted lookup must query by keyPrefix before hash verification."],
+    ["API_KEY_PERSISTED_INCLUDE_INVALID", result.persistedLookupIncludesAccountSubscription, "Persisted lookup must include account authProviderUserId and latest subscription fields."],
+    ["API_KEY_PERSISTED_HASH_VERIFY_ORDER_INVALID", result.persistedLookupVerifiesHashBeforeMapping, "Persisted lookup must verify scrypt hash before mapping candidate to record."],
+    ["API_KEY_DISPLAY_ROWS_ACCOUNT_SCOPE_INVALID", result.displayRowsAccountScoped, "Persisted display rows must be account-scoped and ordered by createdAt desc."],
+    ["API_KEY_DISPLAY_ROWS_SELECT_UNSAFE", result.displayRowsSelectSafeFieldsOnly, "Persisted display rows must select only safe fields and never select keyHash/tokenHash."],
+    ["API_KEY_DISPLAY_ROWS_ENTITLEMENT_INVALID", result.displayRowsBuildEntitlementSnapshot, "Persisted display rows must derive entitlement snapshot from latest subscription without exposing keyHash/user id."],
+    ["API_KEY_DISPLAY_ROWS_SHAPE_INVALID", result.displayRowsReturnSafeShapeOnly, "Persisted display row return object must contain only safe id/label/prefix/last4/status/timestamps/entitlement summary; dummy keyHash values may exist only inside internal entitlement projection scaffolding."],
+    ["API_KEY_IN_MEMORY_FILTERS_INVALID", result.inMemoryAccountAndUserFiltersValid, "In-memory dev helpers must filter by accountId/userId and default to DEV_API_KEYS_JSON records."],
+    ["API_KEY_IN_MEMORY_DISPLAY_ROWS_INVALID", result.inMemoryDisplayRowsValid, "In-memory display rows must return safe fields and entitlement snapshot summary."],
+    ["API_KEY_DISPLAY_SECRET_LEAK_RISK", result.noRawSecretLeakInDisplayHelpers, "Display helpers must not reference raw secret/password/raw-key fields."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-046",
+        code,
+        path.relative(root, apiKeyPersistenceModulePath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -8603,6 +9030,7 @@ function evaluate() {
   const entitlementSnapshotHelperContract = evaluateEntitlementSnapshotHelperContract(findings);
   const authenticatedFileDeliveryRouteContract = evaluateAuthenticatedFileDeliveryRouteContract(findings);
   const accountRateLimitDailyQuotaContract = evaluateAccountRateLimitDailyQuotaContract(findings);
+  const apiKeyPersistenceHelperContract = evaluateApiKeyPersistenceHelperContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -8651,6 +9079,7 @@ function evaluate() {
     entitlementSnapshotHelperContract,
     authenticatedFileDeliveryRouteContract,
     accountRateLimitDailyQuotaContract,
+    apiKeyPersistenceHelperContract,
     findings,
   };
 }
@@ -8710,6 +9139,40 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## API key persistence helper contract");
+  lines.push("");
+  lines.push(`Module exists: ${result.apiKeyPersistenceHelperContract.moduleExists}`);
+  lines.push(`Imports crypto/Prisma/entitlements/db: ${result.apiKeyPersistenceHelperContract.importsCryptoPrismaEntitlementsAndDb}`);
+  lines.push(`ApiKeyRecord type valid: ${result.apiKeyPersistenceHelperContract.apiKeyRecordTypeValid}`);
+  lines.push(`Dev JSON row type valid: ${result.apiKeyPersistenceHelperContract.devJsonRowTypeValid}`);
+  lines.push(`Persisted candidate type valid: ${result.apiKeyPersistenceHelperContract.persistedCandidateTypeValid}`);
+  lines.push(`Normalize state/tier/status valid: ${result.apiKeyPersistenceHelperContract.normalizeStateTierStatusValid}`);
+  lines.push(`Dev entitlement normalization valid: ${result.apiKeyPersistenceHelperContract.devEntitlementNormalizationValid}`);
+  lines.push(`Prisma mapping valid: ${result.apiKeyPersistenceHelperContract.prismaMappingValid}`);
+  lines.push(`Persisted chain normalization valid: ${result.apiKeyPersistenceHelperContract.persistedChainNormalizationValid}`);
+  lines.push(`Persisted entitlement uses latest subscription: ${result.apiKeyPersistenceHelperContract.persistedEntitlementUsesLatestSubscription}`);
+  lines.push(`Persisted candidate mapping valid: ${result.apiKeyPersistenceHelperContract.persistedCandidateMappingValid}`);
+  lines.push(`Dev hashing/constant-time valid: ${result.apiKeyPersistenceHelperContract.devHashingAndConstantTimeValid}`);
+  lines.push(`Prefix/last4 helpers valid: ${result.apiKeyPersistenceHelperContract.prefixAndLast4HelpersValid}`);
+  lines.push(`lastUsedAt throttle valid: ${result.apiKeyPersistenceHelperContract.lastUsedUpdateThrottleValid}`);
+  lines.push(`lastUsedAt revoked guard valid: ${result.apiKeyPersistenceHelperContract.lastUsedUpdateRevokedGuardValid}`);
+  lines.push(`lastUsedAt non-throwing: ${result.apiKeyPersistenceHelperContract.lastUsedUpdateNonThrowing}`);
+  lines.push(`Dev JSON parsing valid: ${result.apiKeyPersistenceHelperContract.devJsonParsingValid}`);
+  lines.push(`Dev key loading valid: ${result.apiKeyPersistenceHelperContract.devKeyLoadingValid}`);
+  lines.push(`Dev key lookup valid: ${result.apiKeyPersistenceHelperContract.devKeyLookupValid}`);
+  lines.push(`Persisted scrypt verification valid: ${result.apiKeyPersistenceHelperContract.persistedScryptVerificationValid}`);
+  lines.push(`Persisted lookup uses prefix before hash: ${result.apiKeyPersistenceHelperContract.persistedLookupUsesPrefixBeforeHash}`);
+  lines.push(`Persisted lookup includes account subscription: ${result.apiKeyPersistenceHelperContract.persistedLookupIncludesAccountSubscription}`);
+  lines.push(`Persisted lookup verifies hash before mapping: ${result.apiKeyPersistenceHelperContract.persistedLookupVerifiesHashBeforeMapping}`);
+  lines.push(`Display rows account-scoped: ${result.apiKeyPersistenceHelperContract.displayRowsAccountScoped}`);
+  lines.push(`Display rows select safe fields only: ${result.apiKeyPersistenceHelperContract.displayRowsSelectSafeFieldsOnly}`);
+  lines.push(`Display rows build entitlement snapshot: ${result.apiKeyPersistenceHelperContract.displayRowsBuildEntitlementSnapshot}`);
+  lines.push(`Display rows return safe shape only: ${result.apiKeyPersistenceHelperContract.displayRowsReturnSafeShapeOnly}`);
+  lines.push("D-046 display-row note: audit checks the returned dashboard row object separately from internal dummy keyHash scaffolding used only to build entitlement snapshots.");
+  lines.push(`In-memory account/user filters valid: ${result.apiKeyPersistenceHelperContract.inMemoryAccountAndUserFiltersValid}`);
+  lines.push(`In-memory display rows valid: ${result.apiKeyPersistenceHelperContract.inMemoryDisplayRowsValid}`);
+  lines.push(`No raw secret leakage in display helpers: ${result.apiKeyPersistenceHelperContract.noRawSecretLeakInDisplayHelpers}`);
+  lines.push("");
   lines.push("## Account rate-limit daily quota contract");
   lines.push("");
   lines.push(`Module exists: ${result.accountRateLimitDailyQuotaContract.moduleExists}`);
@@ -9501,6 +9964,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-046 API Key Persistence Helper Contract: verifies development and persisted API-key helpers, prefix-before-hash lookup, scrypt verification, latest-subscription entitlement projection, revoked-key lastUsedAt guard, safe display rows, and no raw secret exposure in dashboard-facing helpers.");
   lines.push("- D-045 Account Rate Limit Daily Quota Contract: verifies tier-based authenticated rate limits, daily API quotas, Upstash/env configuration, UTC-day quota reset, production fail-closed behavior, non-production memory fallback, and rate/quota headers.");
   lines.push("- D-044 Authenticated File Delivery Route Contract: verifies /api/v1/files/[...path] API-key authentication, pre-auth/account rate limits, entitlement checks before storage reads, documented window-to-artifact mapping, audit logging, last-used key touch, private no-store file responses, and redacted errors.");
   lines.push("- D-043 Entitlement Snapshot Helper Contract: verifies pure deterministic entitlement helper rules for public/basic/pro snapshots, allowed chains/genres/windows, history depth, date-range validation, file entitlement decisions, and entitlement factories.");
