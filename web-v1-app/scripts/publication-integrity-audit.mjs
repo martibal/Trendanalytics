@@ -7,6 +7,8 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const apiKeysPath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
+const validateTokenPath = path.join(root, "src", "lib", "auth", "validateToken.ts");
 const rateLimitPath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
 const entitlementsPath = path.join(root, "src", "lib", "auth", "entitlements.ts");
 const webPublicPublishedRoot = path.join(root, "public", "data", "published", "v1");
@@ -3734,6 +3736,275 @@ function evaluateRateLimitQuotaContract(findings) {
 
   return result;
 }
+function evaluateApiKeyAuthContract(findings) {
+  const result = {
+    validateTokenExists: fs.existsSync(validateTokenPath),
+    apiKeysExists: fs.existsSync(apiKeysPath),
+
+    headerOnlyXApiKey: false,
+    productionLiveTokenShape: false,
+    nonProductionLengthCap: false,
+    productionRejectsDevKeys: false,
+    tokenTrimmedBeforeValidation: false,
+    invalidShapeBeforeLookup: false,
+    persistedLookupBeforeDevLookup: false,
+    missingTokenUnauthenticated: false,
+    invalidTokenUnauthenticated: false,
+    revokedUnauthenticated: false,
+    suspendedForbidden: false,
+    inactiveSubscriptionForbidden: false,
+    successReturnsEntitlementSnapshotAndRecord: false,
+    productionAuthDetailsRedacted: false,
+
+    devHashUsesSha256: false,
+    constantTimeHexCompare: false,
+    persistedHashUsesScrypt: false,
+    persistedHashRequiresScryptPrefix: false,
+    persistedLookupByPrefix: false,
+    persistedPrefixLength12: false,
+    persistedSubscriptionLatestOnly: false,
+    persistedHashVerifiedBeforeMapping: false,
+    prismaStatusMapping: false,
+    persistedEntitlementMapping: false,
+    lastUsedThrottledFiveMinutes: false,
+    lastUsedDoesNotUpdateRevoked: false,
+    devKeysLoadedOnlyFromEnvJson: false,
+  };
+
+  if (!result.validateTokenExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-027",
+      "VALIDATE_TOKEN_MODULE_MISSING",
+      path.relative(root, validateTokenPath),
+      "validateToken.ts is missing."
+    );
+  }
+
+  if (!result.apiKeysExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-027",
+      "API_KEYS_MODULE_MISSING",
+      path.relative(root, apiKeysPath),
+      "apiKeys.ts is missing."
+    );
+  }
+
+  const validateSource = result.validateTokenExists
+    ? fs.readFileSync(validateTokenPath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const apiKeysSource = result.apiKeysExists
+    ? fs.readFileSync(apiKeysPath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  if (validateSource) {
+    const normalizedValidateSource = validateSource.replace(/\r\n/gu, "\n");
+    const shapeIndex = normalizedValidateSource.indexOf("if (!isAllowedApiKeyShape(normalized))");
+    const lookupIndex = normalizedValidateSource.indexOf("const record = await resolveApiKeyRecord(normalized);");
+    const persistedLookupIndex = normalizedValidateSource.indexOf("const persistedRecord = await findPersistedApiKeyRecord(token);");
+    const devKeysAllowedIndex = normalizedValidateSource.indexOf("if (!canUseDevelopmentApiKeys())");
+    const revokedIndex = normalizedValidateSource.indexOf('if (record.state === "REVOKED")');
+    const suspendedIndex = normalizedValidateSource.indexOf('if (record.state === "SUSPENDED")');
+    const snapshotIndex = normalizedValidateSource.indexOf("const snapshot = buildEntitlementSnapshot(record.entitlement);");
+    const inactiveIndex = normalizedValidateSource.indexOf('if (record.entitlement.status !== "active")');
+
+    result.headerOnlyXApiKey =
+      validateSource.includes('const API_KEY_HEADER = "x-api-key";') &&
+      validateSource.includes("headers.get(API_KEY_HEADER)?.trim()") &&
+      !validateSource.includes("authorization") &&
+      !validateSource.includes("Bearer ");
+
+    result.productionLiveTokenShape =
+      validateSource.includes("const PERSISTED_API_KEY_PATTERN = /^ta_live_[a-f0-9]{48}$/;") &&
+      validateSource.includes("return isPersistedApiKeyShape(token);");
+
+    result.nonProductionLengthCap =
+      validateSource.includes("const MAX_NON_PRODUCTION_API_KEY_LENGTH = 512;") &&
+      validateSource.includes("return token.length <= MAX_NON_PRODUCTION_API_KEY_LENGTH;");
+
+    result.productionRejectsDevKeys =
+      validateSource.includes('process.env.NODE_ENV === "production"') &&
+      validateSource.includes('process.env.VERCEL_ENV === "production"') &&
+      validateSource.includes("return false;") &&
+      validateSource.includes("DEV_API_KEYS_JSON");
+
+    result.tokenTrimmedBeforeValidation =
+      validateSource.includes("const normalized = token.trim();") &&
+      validateSource.includes("if (!normalized)");
+
+    result.invalidShapeBeforeLookup =
+      shapeIndex >= 0 &&
+      lookupIndex >= 0 &&
+      shapeIndex < lookupIndex;
+
+    result.persistedLookupBeforeDevLookup =
+      persistedLookupIndex >= 0 &&
+      devKeysAllowedIndex >= 0 &&
+      persistedLookupIndex < devKeysAllowedIndex;
+
+    result.missingTokenUnauthenticated =
+      validateSource.includes('message: "Missing API key."') &&
+      validateSource.includes('detail: "Provide X-API-Key header."') &&
+      validateSource.includes('code: "unauthenticated"');
+
+    result.invalidTokenUnauthenticated =
+      validateSource.includes('message: "Invalid API key."') &&
+      validateSource.includes('detail: "invalid_key_shape"') &&
+      validateSource.includes("Token hash did not match any configured key.");
+
+    result.revokedUnauthenticated =
+      revokedIndex >= 0 &&
+      validateSource.includes('message: "API key is revoked."') &&
+      validateSource.includes('detail: "revoked_key"') &&
+      validateSource.includes('code: "unauthenticated"');
+
+    result.suspendedForbidden =
+      suspendedIndex >= 0 &&
+      validateSource.includes('message: "API key is suspended."') &&
+      validateSource.includes('detail: "suspended_key"') &&
+      validateSource.includes('code: "forbidden"');
+
+    result.inactiveSubscriptionForbidden =
+      inactiveIndex >= 0 &&
+      snapshotIndex >= 0 &&
+      validateSource.includes('message: "Subscription is inactive."') &&
+      validateSource.includes('detail: "inactive_subscription"') &&
+      validateSource.includes('code: "forbidden"');
+    result.successReturnsEntitlementSnapshotAndRecord =
+      snapshotIndex >= 0 &&
+      inactiveIndex >= 0 &&
+      snapshotIndex < inactiveIndex &&
+      /return\s*\{\s*ok:\s*true,[\s\S]*?accountId:\s*record\.accountId[\s\S]*?userId:\s*record\.userId[\s\S]*?keyId:\s*record\.keyId[\s\S]*?entitlement:\s*record\.entitlement[\s\S]*?snapshot\s*,[\s\S]*?record\s*,[\s\S]*?\};/u.test(normalizedValidateSource);
+
+    result.productionAuthDetailsRedacted =
+      validateSource.includes("function publicAuthErrorDetail(") &&
+      validateSource.includes('process.env.NODE_ENV !== "production"') &&
+      validateSource.includes('process.env.VERCEL_ENV !== "production"') &&
+      validateSource.includes('return result.code === "unauthenticated" ? "authentication_failed" : "request_forbidden";');
+  }
+
+  if (apiKeysSource) {
+    const normalizedApiKeysSource = apiKeysSource.replace(/\r\n/gu, "\n");
+    const persistedCandidateLoopIndex = normalizedApiKeysSource.indexOf("for (const candidate of candidates)");
+    const persistedHashVerifyIndex = normalizedApiKeysSource.indexOf("verifyPersistedApiKeyHash(normalized, candidate.keyHash)");
+    const mapCandidateIndex = normalizedApiKeysSource.indexOf("return mapPersistedCandidateToApiKeyRecord(candidate);");
+
+    result.devHashUsesSha256 =
+      apiKeysSource.includes('crypto.createHash("sha256").update(token, "utf8").digest("hex")');
+
+    result.constantTimeHexCompare =
+      apiKeysSource.includes("crypto.timingSafeEqual(aBuf, bBuf)") &&
+      apiKeysSource.includes("if (aBuf.length !== bBuf.length)") &&
+      apiKeysSource.includes("return false;");
+
+    result.persistedHashUsesScrypt =
+      apiKeysSource.includes("crypto.scryptSync(trimmedToken, salt, 64).toString(\"hex\")") &&
+      apiKeysSource.includes("constantTimeHexEqual(actualDerived, expectedDerived)");
+
+    result.persistedHashRequiresScryptPrefix =
+      apiKeysSource.includes('!storedHash.startsWith("scrypt:")') &&
+      apiKeysSource.includes("const parts = storedHash.split(\":\");") &&
+      apiKeysSource.includes("if (parts.length !== 3)");
+
+    result.persistedLookupByPrefix =
+      apiKeysSource.includes("const keyPrefix = buildPersistedApiKeyPrefix(normalized);") &&
+      /where:\s*\{\s*keyPrefix\s*,/u.test(normalizedApiKeysSource) &&
+      apiKeysSource.includes("db.apiKey.findMany");
+
+    result.persistedPrefixLength12 =
+      apiKeysSource.includes("export function buildPersistedApiKeyPrefix(token: string): string") &&
+      apiKeysSource.includes("return token.slice(0, Math.min(12, token.length));");
+
+    result.persistedSubscriptionLatestOnly =
+      apiKeysSource.includes("subscriptions: {") &&
+      apiKeysSource.includes('updatedAt: "desc"') &&
+      apiKeysSource.includes("take: 1") &&
+      /const latestSubscription = \[\.\.\.candidate\.account\.subscriptions\]\.sort\(/u.test(normalizedApiKeysSource);
+
+    result.persistedHashVerifiedBeforeMapping =
+      persistedCandidateLoopIndex >= 0 &&
+      persistedHashVerifyIndex >= 0 &&
+      mapCandidateIndex >= 0 &&
+      persistedCandidateLoopIndex < persistedHashVerifyIndex &&
+      persistedHashVerifyIndex < mapCandidateIndex;
+
+    result.prismaStatusMapping =
+      apiKeysSource.includes("function mapPrismaApiKeyStatus(status: ApiKeyStatus): ApiKeyState") &&
+      apiKeysSource.includes("ApiKeyStatus.suspended") &&
+      apiKeysSource.includes("ApiKeyStatus.revoked") &&
+      apiKeysSource.includes('return "ACTIVE";');
+
+    result.persistedEntitlementMapping =
+      apiKeysSource.includes("function buildPersistedEntitlement(candidate: PersistedApiKeyCandidate): EntitlementInput") &&
+      apiKeysSource.includes("createPublicEntitlement()") &&
+      apiKeysSource.includes("createBasicEntitlement(entitledChain") &&
+      apiKeysSource.includes("createProEntitlement({") &&
+      apiKeysSource.includes("normalizePersistedEntitledChain");
+
+    result.lastUsedThrottledFiveMinutes =
+      apiKeysSource.includes("const LAST_USED_UPDATE_INTERVAL_MS = 5 * 60 * 1000;") &&
+      apiKeysSource.includes("Date.now() - parsed.getTime() >= LAST_USED_UPDATE_INTERVAL_MS");
+
+    result.lastUsedDoesNotUpdateRevoked =
+      apiKeysSource.includes("await db.apiKey.updateMany({") &&
+      /status:\s*\{\s*not:\s*ApiKeyStatus\.revoked/u.test(normalizedApiKeysSource) &&
+      apiKeysSource.includes("lastUsedAt: new Date()");
+
+    result.devKeysLoadedOnlyFromEnvJson =
+      apiKeysSource.includes("process.env.DEV_API_KEYS_JSON") &&
+      apiKeysSource.includes("parseDevApiKeysJson(raw)") &&
+      apiKeysSource.includes("return [];");
+  }
+
+  const requiredChecks = [
+    ["API_AUTH_HEADER_CONTRACT_INVALID", result.headerOnlyXApiKey, "API key auth must use X-API-Key header only, not Authorization/Bearer."],
+    ["API_AUTH_PRODUCTION_TOKEN_SHAPE_INVALID", result.productionLiveTokenShape, "Production API keys must match ta_live_[48 lowercase hex] shape."],
+    ["API_AUTH_NON_PROD_LENGTH_CAP_MISSING", result.nonProductionLengthCap, "Non-production dev key shape must retain a finite max length cap."],
+    ["API_AUTH_DEV_KEYS_ALLOWED_IN_PRODUCTION", result.productionRejectsDevKeys, "Development API keys must be disabled in production."],
+    ["API_AUTH_TOKEN_TRIM_MISSING", result.tokenTrimmedBeforeValidation, "API keys must be trimmed and empty normalized tokens rejected."],
+    ["API_AUTH_LOOKUP_BEFORE_SHAPE_CHECK", result.invalidShapeBeforeLookup, "Token shape must be validated before DB/dev lookup."],
+    ["API_AUTH_DEV_LOOKUP_BEFORE_PERSISTED_LOOKUP", result.persistedLookupBeforeDevLookup, "Persisted key lookup must run before dev key lookup."],
+    ["API_AUTH_MISSING_TOKEN_RESPONSE_INVALID", result.missingTokenUnauthenticated, "Missing token must return unauthenticated with X-API-Key guidance."],
+    ["API_AUTH_INVALID_TOKEN_RESPONSE_INVALID", result.invalidTokenUnauthenticated, "Invalid token/shape must return unauthenticated."],
+    ["API_AUTH_REVOKED_KEY_RESPONSE_INVALID", result.revokedUnauthenticated, "Revoked keys must be unauthenticated."],
+    ["API_AUTH_SUSPENDED_KEY_RESPONSE_INVALID", result.suspendedForbidden, "Suspended keys must be forbidden."],
+    ["API_AUTH_INACTIVE_SUBSCRIPTION_RESPONSE_INVALID", result.inactiveSubscriptionForbidden, "Inactive subscriptions must be forbidden."],
+    ["API_AUTH_SUCCESS_PAYLOAD_INCOMPLETE", result.successReturnsEntitlementSnapshotAndRecord, "Successful validation must return entitlement snapshot and source record."],
+    ["API_AUTH_PRODUCTION_DETAIL_REDACTION_MISSING", result.productionAuthDetailsRedacted, "Production auth errors must redact internal detail."],
+    ["API_KEYS_DEV_HASH_INVALID", result.devHashUsesSha256, "Development key records must hash tokens with SHA-256."],
+    ["API_KEYS_CONSTANT_TIME_COMPARE_MISSING", result.constantTimeHexCompare, "Hash comparison must use timingSafeEqual with length guard."],
+    ["API_KEYS_PERSISTED_HASH_INVALID", result.persistedHashUsesScrypt, "Persisted API keys must verify scrypt-derived hashes."],
+    ["API_KEYS_PERSISTED_HASH_PREFIX_GUARD_MISSING", result.persistedHashRequiresScryptPrefix, "Persisted hashes must require scrypt: prefix and expected parts."],
+    ["API_KEYS_PERSISTED_PREFIX_LOOKUP_MISSING", result.persistedLookupByPrefix, "Persisted lookup must query by keyPrefix before hash verification."],
+    ["API_KEYS_PERSISTED_PREFIX_LENGTH_INVALID", result.persistedPrefixLength12, "Persisted API key prefix must use first 12 chars."],
+    ["API_KEYS_SUBSCRIPTION_LATEST_ONLY_INVALID", result.persistedSubscriptionLatestOnly, "Persisted entitlement must use latest subscription by updatedAt desc."],
+    ["API_KEYS_HASH_VERIFY_BEFORE_MAPPING_INVALID", result.persistedHashVerifiedBeforeMapping, "Persisted candidate hash must be verified before mapping/returning a record."],
+    ["API_KEYS_PRISMA_STATUS_MAPPING_INVALID", result.prismaStatusMapping, "Prisma API key statuses must map active/suspended/revoked correctly."],
+    ["API_KEYS_PERSISTED_ENTITLEMENT_MAPPING_INVALID", result.persistedEntitlementMapping, "Persisted account subscription must map to public/basic/pro entitlement correctly."],
+    ["API_KEYS_LAST_USED_THROTTLE_INVALID", result.lastUsedThrottledFiveMinutes, "lastUsedAt updates must be throttled to a 5-minute interval."],
+    ["API_KEYS_LAST_USED_REVOKED_GUARD_MISSING", result.lastUsedDoesNotUpdateRevoked, "lastUsedAt update must not update revoked keys."],
+    ["API_KEYS_DEV_ENV_JSON_CONTRACT_INVALID", result.devKeysLoadedOnlyFromEnvJson, "Development keys must load only from DEV_API_KEYS_JSON and invalid JSON must produce no keys."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-027",
+        code,
+        code.startsWith("API_KEYS_") ? path.relative(root, apiKeysPath) : path.relative(root, validateTokenPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -3767,6 +4038,7 @@ function evaluate() {
   const fileApiResponseBoundaryContract = evaluateFileApiResponseBoundaryContract(findings);
   const entitlementMatrixContract = evaluateEntitlementMatrixContract(findings);
   const rateLimitQuotaContract = evaluateRateLimitQuotaContract(findings);
+  const apiKeyAuthContract = evaluateApiKeyAuthContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -3796,6 +4068,7 @@ function evaluate() {
     fileApiResponseBoundaryContract,
     entitlementMatrixContract,
     rateLimitQuotaContract,
+    apiKeyAuthContract,
     findings,
   };
 }
@@ -3855,6 +4128,38 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## API key auth contract");
+  lines.push("");
+  lines.push(`validateToken.ts exists: ${result.apiKeyAuthContract.validateTokenExists}`);
+  lines.push(`apiKeys.ts exists: ${result.apiKeyAuthContract.apiKeysExists}`);
+  lines.push(`X-API-Key header only: ${result.apiKeyAuthContract.headerOnlyXApiKey}`);
+  lines.push(`Production live token shape: ${result.apiKeyAuthContract.productionLiveTokenShape}`);
+  lines.push(`Non-production length cap: ${result.apiKeyAuthContract.nonProductionLengthCap}`);
+  lines.push(`Development keys disabled in production: ${result.apiKeyAuthContract.productionRejectsDevKeys}`);
+  lines.push(`Token trimmed before validation: ${result.apiKeyAuthContract.tokenTrimmedBeforeValidation}`);
+  lines.push(`Invalid shape before lookup: ${result.apiKeyAuthContract.invalidShapeBeforeLookup}`);
+  lines.push(`Persisted lookup before dev lookup: ${result.apiKeyAuthContract.persistedLookupBeforeDevLookup}`);
+  lines.push(`Missing token unauthenticated: ${result.apiKeyAuthContract.missingTokenUnauthenticated}`);
+  lines.push(`Invalid token unauthenticated: ${result.apiKeyAuthContract.invalidTokenUnauthenticated}`);
+  lines.push(`Revoked unauthenticated: ${result.apiKeyAuthContract.revokedUnauthenticated}`);
+  lines.push(`Suspended forbidden: ${result.apiKeyAuthContract.suspendedForbidden}`);
+  lines.push(`Inactive subscription forbidden: ${result.apiKeyAuthContract.inactiveSubscriptionForbidden}`);
+  lines.push(`Success returns entitlement snapshot and record: ${result.apiKeyAuthContract.successReturnsEntitlementSnapshotAndRecord}`);
+  lines.push(`Production auth details redacted: ${result.apiKeyAuthContract.productionAuthDetailsRedacted}`);
+  lines.push(`Dev hash uses SHA-256: ${result.apiKeyAuthContract.devHashUsesSha256}`);
+  lines.push(`Constant-time hash compare: ${result.apiKeyAuthContract.constantTimeHexCompare}`);
+  lines.push(`Persisted hash uses scrypt: ${result.apiKeyAuthContract.persistedHashUsesScrypt}`);
+  lines.push(`Persisted hash requires scrypt prefix: ${result.apiKeyAuthContract.persistedHashRequiresScryptPrefix}`);
+  lines.push(`Persisted lookup by prefix: ${result.apiKeyAuthContract.persistedLookupByPrefix}`);
+  lines.push(`Persisted prefix length 12: ${result.apiKeyAuthContract.persistedPrefixLength12}`);
+  lines.push(`Latest subscription only: ${result.apiKeyAuthContract.persistedSubscriptionLatestOnly}`);
+  lines.push(`Hash verified before mapping: ${result.apiKeyAuthContract.persistedHashVerifiedBeforeMapping}`);
+  lines.push(`Prisma status mapping: ${result.apiKeyAuthContract.prismaStatusMapping}`);
+  lines.push(`Persisted entitlement mapping: ${result.apiKeyAuthContract.persistedEntitlementMapping}`);
+  lines.push(`lastUsedAt throttled 5 minutes: ${result.apiKeyAuthContract.lastUsedThrottledFiveMinutes}`);
+  lines.push(`lastUsedAt does not update revoked keys: ${result.apiKeyAuthContract.lastUsedDoesNotUpdateRevoked}`);
+  lines.push(`Dev keys loaded from env JSON only: ${result.apiKeyAuthContract.devKeysLoadedOnlyFromEnvJson}`);
+  lines.push("");
   lines.push("## Rate limit quota contract");
   lines.push("");
   lines.push(`Rate-limit module exists: ${result.rateLimitQuotaContract.rateLimitModuleExists}`);
@@ -4153,6 +4458,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-027 API Key Auth Contract: verifies X-API-Key validation, production key shape, dev-key isolation, persisted scrypt verification, status handling, and auth error redaction.");
   lines.push("- D-026 Rate Limit Quota Contract: verifies per-minute limits, daily quotas, headers, Upstash config, memory fallback, and production fail-closed behavior.");
   lines.push("- D-025 Entitlement Matrix Contract: verifies public/basic/pro access matrix, chain/window/history limits, and entitlement decision order.");
   lines.push("- D-024 File API Response Boundary Contract: verifies file delivery authenticates, rate-limits, entitles, sanitizes paths, and returns private no-store responses before storage read.");
