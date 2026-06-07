@@ -43,7 +43,7 @@ function getCandidateDataRoots(): string[] {
     path.join(appRoot, "..", "data", "published", "v1"),
     path.join(appRoot, "data", "published", "v1"),
     path.join(appRoot, ".private-data", "published", "v1"),
-    path.join(appRoot, "public", "data", "published", "v1"),
+
   ];
 }
 

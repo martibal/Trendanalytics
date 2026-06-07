@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const webPublicPublishedRoot = path.join(root, "public", "data", "published", "v1");
 
 const CHAINS = ["bitcoin", "ethereum", "arbitrum", "base"];
 const GENRES = ["gold", "meta", "derived"];
@@ -3025,6 +3026,92 @@ function evaluateSyncScriptMirrorContract(findings) {
 
   return result;
 }
+function countJsonFilesUnder(dir) {
+  if (!fs.existsSync(dir)) {
+    return 0;
+  }
+
+  return listFilesRecursive(dir).filter((file) => file.endsWith(".json")).length;
+}
+function evaluatePublicPrivateArtifactBoundaryContract(findings) {
+  const result = {
+    localStorageExists: fs.existsSync(localStoragePath),
+    localStorageHasPublicFallback: false,
+    publicPublishedRootExists: fs.existsSync(webPublicPublishedRoot),
+    publicGoldJsonFiles: 0,
+    publicMetaJsonFiles: 0,
+    publicDerivedJsonFiles: 0,
+    publicSubscriberJsonFiles: 0,
+    gitignoreBlocksPublicPublishedRoot: false,
+  };
+
+  if (!result.localStorageExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-023",
+      "LOCAL_STORAGE_MODULE_MISSING_FOR_BOUNDARY",
+      path.relative(root, localStoragePath),
+      "localDev.ts is missing, so local public/private storage resolution cannot be audited."
+    );
+  } else {
+    const source = fs.readFileSync(localStoragePath, "utf8").replace(/^\uFEFF/u, "");
+
+    result.localStorageHasPublicFallback =
+      /path\.join\(\s*appRoot\s*,\s*["']public["']\s*,\s*["']data["']\s*,\s*["']published["']\s*,\s*["']v1["']\s*\)/u.test(source);
+
+    if (result.localStorageHasPublicFallback) {
+      addFinding(
+        findings,
+        "fail",
+        "D-023",
+        "LOCAL_STORAGE_PUBLIC_PUBLISHED_FALLBACK_PRESENT",
+        path.relative(root, localStoragePath),
+        "localDev storage must not resolve subscriber-bound published artifacts from web-v1-app/public/data/published/v1. Use canonical data/published/v1 or .private-data only."
+      );
+    }
+  }
+
+  const publicGoldRoot = path.join(webPublicPublishedRoot, "gold");
+  const publicMetaRoot = path.join(webPublicPublishedRoot, "meta");
+  const publicDerivedRoot = path.join(webPublicPublishedRoot, "derived");
+
+  result.publicGoldJsonFiles = countJsonFilesUnder(publicGoldRoot);
+  result.publicMetaJsonFiles = countJsonFilesUnder(publicMetaRoot);
+  result.publicDerivedJsonFiles = countJsonFilesUnder(publicDerivedRoot);
+  result.publicSubscriberJsonFiles =
+    result.publicGoldJsonFiles + result.publicMetaJsonFiles + result.publicDerivedJsonFiles;
+
+  if (result.publicSubscriberJsonFiles > 0) {
+    addFinding(
+      findings,
+      "fail",
+      "D-023",
+      "SUBSCRIBER_ARTIFACTS_PRESENT_UNDER_PUBLIC",
+      path.relative(root, webPublicPublishedRoot),
+      `Subscriber-bound gold/meta/derived JSON files must not exist under public/. Counts: gold=${result.publicGoldJsonFiles}, meta=${result.publicMetaJsonFiles}, derived=${result.publicDerivedJsonFiles}.`
+    );
+  }
+
+  if (fs.existsSync(gitignorePath)) {
+    const gitignore = fs.readFileSync(gitignorePath, "utf8").replace(/^\uFEFF/u, "");
+    result.gitignoreBlocksPublicPublishedRoot =
+      gitignore.split(/\r?\n/u).map((line) => line.trim()).includes("web-v1-app/public/data/published/v1/");
+  }
+
+  if (!result.gitignoreBlocksPublicPublishedRoot) {
+    addFinding(
+      findings,
+      "fail",
+      "D-023",
+      "GITIGNORE_PUBLIC_PUBLISHED_ROOT_RULE_MISSING",
+      path.relative(root, gitignorePath),
+      ".gitignore must block web-v1-app/public/data/published/v1/ so subscriber-bound artifacts cannot be committed under public."
+    );
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -3054,6 +3141,7 @@ function evaluate() {
   const postRebaseWorkflowGateContract = evaluatePostRebaseWorkflowGateContract(findings);
   const workflowDeployContract = evaluateWorkflowDeployContract(findings);
   const syncScriptMirrorContract = evaluateSyncScriptMirrorContract(findings);
+  const publicPrivateArtifactBoundaryContract = evaluatePublicPrivateArtifactBoundaryContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -3079,6 +3167,7 @@ function evaluate() {
     postRebaseWorkflowGateContract,
     workflowDeployContract,
     syncScriptMirrorContract,
+    publicPrivateArtifactBoundaryContract,
     findings,
   };
 }
@@ -3138,6 +3227,17 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Public/private artifact boundary contract");
+  lines.push("");
+  lines.push(`localDev.ts exists: ${result.publicPrivateArtifactBoundaryContract.localStorageExists}`);
+  lines.push(`Local storage has public fallback: ${result.publicPrivateArtifactBoundaryContract.localStorageHasPublicFallback}`);
+  lines.push(`Public published root exists: ${result.publicPrivateArtifactBoundaryContract.publicPublishedRootExists}`);
+  lines.push(`Public gold JSON files: ${result.publicPrivateArtifactBoundaryContract.publicGoldJsonFiles}`);
+  lines.push(`Public meta JSON files: ${result.publicPrivateArtifactBoundaryContract.publicMetaJsonFiles}`);
+  lines.push(`Public derived JSON files: ${result.publicPrivateArtifactBoundaryContract.publicDerivedJsonFiles}`);
+  lines.push(`Public subscriber JSON files: ${result.publicPrivateArtifactBoundaryContract.publicSubscriberJsonFiles}`);
+  lines.push(`.gitignore blocks public published root: ${result.publicPrivateArtifactBoundaryContract.gitignoreBlocksPublicPublishedRoot}`);
+  lines.push("");
   lines.push("## Sync script mirror contract");
   lines.push("");
   lines.push(`Sync script exists: ${result.syncScriptMirrorContract.syncScriptExists}`);
@@ -3352,6 +3452,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-023 Public/Private Artifact Boundary Contract: verifies subscriber-bound gold/meta/derived artifacts cannot resolve from or live under web public data.");
   lines.push("- D-022 Sync Script Mirror Contract: verifies private mirror sync removes stale targets, byte-copies real files, and hard-fails on missing critical outputs.");
   lines.push("- D-021 Workflow Deploy Contract: verifies Vercel deployment only happens after validated push and uses the deploy-hook secret safely.");
   lines.push("- D-020 Post-rebase Workflow Gate Contract: verifies GitHub Actions re-runs audit gates after rebase and before each push attempt.");
