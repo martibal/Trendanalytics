@@ -4559,6 +4559,190 @@ function evaluateAuditGateRunnerContract(findings) {
 
   return result;
 }
+function evaluateBuildPrismaGenerationContract(findings) {
+  const result = {
+    packageJsonExists: fs.existsSync(packageJsonPath),
+    prismaSchemaExists: fs.existsSync(prismaSchemaPath),
+    auditGateRunnerExists: fs.existsSync(auditGateRunnerPath),
+
+    packageJsonParseable: false,
+    buildScriptRunsPrismaGenerate: false,
+    buildScriptRunsPrismaBeforeNextBuild: false,
+    buildScriptUsesWebpack: false,
+    postinstallRunsPrismaGenerate: false,
+    prismaDependenciesPresent: false,
+    prismaVersionsAligned: false,
+
+    prismaGeneratorClientValid: false,
+    prismaDatasourcePostgresValid: false,
+
+    auditGateRunnerIncludesBuild: false,
+    auditGateRunnerBuildAfterPublication: false,
+    auditGateRunnerSkipBuildCanOmitBuild: false,
+    auditGateRunnerNoBuildScriptPresent: false,
+  };
+
+  let packageJson = null;
+
+  if (!result.packageJsonExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-031",
+      "BUILD_PACKAGE_JSON_MISSING",
+      path.relative(root, packageJsonPath),
+      "package.json is missing, so build/Prisma generation contract cannot be checked."
+    );
+  } else {
+    try {
+      packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8").replace(/^\uFEFF/u, ""));
+      result.packageJsonParseable = true;
+    } catch (error) {
+      addFinding(
+        findings,
+        "fail",
+        "D-031",
+        "BUILD_PACKAGE_JSON_PARSE_FAILED",
+        path.relative(root, packageJsonPath),
+        `package.json could not be parsed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  if (!result.prismaSchemaExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-031",
+      "BUILD_PRISMA_SCHEMA_MISSING",
+      path.relative(root, prismaSchemaPath),
+      "prisma/schema.prisma is missing."
+    );
+  }
+
+  if (!result.auditGateRunnerExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-031",
+      "BUILD_AUDIT_GATE_RUNNER_MISSING",
+      path.relative(root, auditGateRunnerPath),
+      "scripts/run-audit-gates.mjs is missing."
+    );
+  }
+
+  if (packageJson) {
+    const scripts = packageJson.scripts ?? {};
+    const dependencies = packageJson.dependencies ?? {};
+    const devDependencies = packageJson.devDependencies ?? {};
+    const buildScript = String(scripts.build ?? "");
+    const postinstallScript = String(scripts.postinstall ?? "");
+
+    const prismaGenerateIndex = buildScript.indexOf("prisma generate");
+    const nextBuildIndex = buildScript.indexOf("next build");
+
+    result.buildScriptRunsPrismaGenerate = prismaGenerateIndex >= 0;
+    result.buildScriptRunsPrismaBeforeNextBuild =
+      prismaGenerateIndex >= 0 &&
+      nextBuildIndex >= 0 &&
+      prismaGenerateIndex < nextBuildIndex;
+
+    result.buildScriptUsesWebpack =
+      buildScript.includes("next build --webpack");
+
+    result.postinstallRunsPrismaGenerate =
+      postinstallScript.trim() === "prisma generate";
+
+    result.prismaDependenciesPresent =
+      typeof dependencies["@prisma/client"] === "string" &&
+      typeof dependencies.prisma === "string";
+
+    result.prismaVersionsAligned =
+      dependencies["@prisma/client"] === dependencies.prisma ||
+      (
+        typeof dependencies["@prisma/client"] === "string" &&
+        typeof dependencies.prisma === "string" &&
+        dependencies["@prisma/client"].replace(/^[~^]/u, "") === dependencies.prisma.replace(/^[~^]/u, "")
+      );
+  }
+
+  if (result.prismaSchemaExists) {
+    const schema = fs.readFileSync(prismaSchemaPath, "utf8").replace(/^\uFEFF/u, "");
+
+    result.prismaGeneratorClientValid =
+      /generator\s+client\s*\{[\s\S]*?provider\s*=\s*"prisma-client-js"[\s\S]*?\}/u.test(schema);
+
+    result.prismaDatasourcePostgresValid =
+      /datasource\s+db\s*\{[\s\S]*?provider\s*=\s*"postgresql"[\s\S]*?url\s*=\s*env\("DATABASE_URL"\)[\s\S]*?directUrl\s*=\s*env\("DIRECT_URL"\)[\s\S]*?\}/u.test(schema);
+  }
+
+  if (result.auditGateRunnerExists) {
+    const source = fs.readFileSync(auditGateRunnerPath, "utf8").replace(/^\uFEFF/u, "");
+    const normalized = source.replace(/\r\n/gu, "\n");
+
+    const publicationIndex = normalized.indexOf('args: ["run", "check:publication-integrity"]');
+    const buildIndex = normalized.indexOf('args: ["run", "build"]');
+
+    result.auditGateRunnerIncludesBuild =
+      normalized.includes('name: "Production build"') &&
+      buildIndex >= 0;
+
+    result.auditGateRunnerBuildAfterPublication =
+      publicationIndex >= 0 &&
+      buildIndex >= 0 &&
+      publicationIndex < buildIndex;
+
+    result.auditGateRunnerSkipBuildCanOmitBuild =
+      normalized.includes("...(skipBuild") &&
+      normalized.includes("? []") &&
+      normalized.includes('const skipBuild = args.has("--skip-build");');
+
+    result.auditGateRunnerNoBuildScriptPresent =
+      packageJson !== null &&
+      packageJson.scripts?.["check:audit-gates:no-build"] === "node scripts/run-audit-gates.mjs --skip-build";
+  }
+
+  const requiredChecks = [
+    ["BUILD_PACKAGE_JSON_NOT_PARSEABLE", result.packageJsonParseable, "package.json must be parseable JSON."],
+    ["BUILD_SCRIPT_PRISMA_GENERATE_MISSING", result.buildScriptRunsPrismaGenerate, "build script must run prisma generate."],
+    ["BUILD_SCRIPT_PRISMA_AFTER_NEXT_BUILD", result.buildScriptRunsPrismaBeforeNextBuild, "build script must run prisma generate before next build."],
+    ["BUILD_SCRIPT_NEXT_WEBPACK_MISSING", result.buildScriptUsesWebpack, "build script must use next build --webpack for the current app configuration."],
+    ["BUILD_POSTINSTALL_PRISMA_GENERATE_MISSING", result.postinstallRunsPrismaGenerate, "postinstall must run prisma generate so Prisma Client exists after install."],
+    ["BUILD_PRISMA_DEPENDENCIES_MISSING", result.prismaDependenciesPresent, "package.json must include prisma and @prisma/client dependencies."],
+    ["BUILD_PRISMA_VERSIONS_NOT_ALIGNED", result.prismaVersionsAligned, "prisma and @prisma/client versions should stay aligned."],
+    ["BUILD_PRISMA_GENERATOR_INVALID", result.prismaGeneratorClientValid, "schema.prisma must generate prisma-client-js."],
+    ["BUILD_PRISMA_DATASOURCE_INVALID", result.prismaDatasourcePostgresValid, "schema.prisma datasource must be PostgreSQL with DATABASE_URL and DIRECT_URL."],
+    ["BUILD_AUDIT_RUNNER_BUILD_MISSING", result.auditGateRunnerIncludesBuild, "check:audit-gates must include a production build step."],
+    ["BUILD_AUDIT_RUNNER_BUILD_ORDER_INVALID", result.auditGateRunnerBuildAfterPublication, "production build must run after publication-integrity audit."],
+    ["BUILD_AUDIT_RUNNER_SKIP_BUILD_INVALID", result.auditGateRunnerSkipBuildCanOmitBuild, "audit gate runner must support --skip-build for post-build contexts."],
+    ["BUILD_AUDIT_RUNNER_NO_BUILD_SCRIPT_INVALID", result.auditGateRunnerNoBuildScriptPresent, "package.json must expose check:audit-gates:no-build as run-audit-gates --skip-build."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      let targetPath = packageJsonPath;
+
+      if (code.includes("PRISMA_GENERATOR") || code.includes("PRISMA_DATASOURCE")) {
+        targetPath = prismaSchemaPath;
+      }
+
+      if (code.includes("AUDIT_RUNNER_BUILD") || code.includes("AUDIT_RUNNER_SKIP")) {
+        targetPath = auditGateRunnerPath;
+      }
+
+      addFinding(
+        findings,
+        "fail",
+        "D-031",
+        code,
+        path.relative(root, targetPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -4596,6 +4780,7 @@ function evaluate() {
   const databaseAuthSchemaContract = evaluateDatabaseAuthSchemaContract(findings);
   const storageAdapterContract = evaluateStorageAdapterContract(findings);
   const auditGateRunnerContract = evaluateAuditGateRunnerContract(findings);
+  const buildPrismaGenerationContract = evaluateBuildPrismaGenerationContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -4629,6 +4814,7 @@ function evaluate() {
     databaseAuthSchemaContract,
     storageAdapterContract,
     auditGateRunnerContract,
+    buildPrismaGenerationContract,
     findings,
   };
 }
@@ -4688,6 +4874,25 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Build Prisma generation contract");
+  lines.push("");
+  lines.push(`package.json exists: ${result.buildPrismaGenerationContract.packageJsonExists}`);
+  lines.push(`Prisma schema exists: ${result.buildPrismaGenerationContract.prismaSchemaExists}`);
+  lines.push(`Audit gate runner exists: ${result.buildPrismaGenerationContract.auditGateRunnerExists}`);
+  lines.push(`package.json parseable: ${result.buildPrismaGenerationContract.packageJsonParseable}`);
+  lines.push(`Build runs prisma generate: ${result.buildPrismaGenerationContract.buildScriptRunsPrismaGenerate}`);
+  lines.push(`Build runs Prisma before Next build: ${result.buildPrismaGenerationContract.buildScriptRunsPrismaBeforeNextBuild}`);
+  lines.push(`Build uses next build --webpack: ${result.buildPrismaGenerationContract.buildScriptUsesWebpack}`);
+  lines.push(`postinstall runs prisma generate: ${result.buildPrismaGenerationContract.postinstallRunsPrismaGenerate}`);
+  lines.push(`Prisma dependencies present: ${result.buildPrismaGenerationContract.prismaDependenciesPresent}`);
+  lines.push(`Prisma versions aligned: ${result.buildPrismaGenerationContract.prismaVersionsAligned}`);
+  lines.push(`Prisma generator client valid: ${result.buildPrismaGenerationContract.prismaGeneratorClientValid}`);
+  lines.push(`Prisma datasource valid: ${result.buildPrismaGenerationContract.prismaDatasourcePostgresValid}`);
+  lines.push(`Audit runner includes build: ${result.buildPrismaGenerationContract.auditGateRunnerIncludesBuild}`);
+  lines.push(`Audit runner build after publication audit: ${result.buildPrismaGenerationContract.auditGateRunnerBuildAfterPublication}`);
+  lines.push(`Audit runner skip-build can omit build: ${result.buildPrismaGenerationContract.auditGateRunnerSkipBuildCanOmitBuild}`);
+  lines.push(`No-build gate script present: ${result.buildPrismaGenerationContract.auditGateRunnerNoBuildScriptPresent}`);
+  lines.push("");
   lines.push("## Audit gate runner contract");
   lines.push("");
   lines.push(`package.json exists: ${result.auditGateRunnerContract.packageJsonExists}`);
@@ -5078,6 +5283,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-031 Build Prisma Generation Contract: verifies Prisma generation, build script order, Prisma dependency alignment, schema generator/datasource, and build inclusion in audit gates.");
   lines.push("- D-030 Audit Gate Runner Contract: verifies package scripts and run-audit-gates order/skip-build/fail-fast behavior.");
   lines.push("- D-029 Storage Adapter Contract: verifies local/S3 storage path normalization, source selection, private-data roots, S3 env contract, content metadata, not-found behavior, and public fallback exclusion.");
   lines.push("- D-028 Database Auth Schema Contract: verifies Prisma auth/subscription/API-key/custom-output schema, indexes, and storage-critical fields.");
