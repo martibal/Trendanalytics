@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const accountAuthModulePath = path.join(root, "src", "lib", "auth", "account.ts");
 const checkoutPortalRoutePath = path.join(root, "src", "app", "api", "v1", "checkout", "portal", "route.ts");
 const checkoutRoutePath = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
 const apiKeysRoutePath = path.join(root, "src", "app", "api", "v1", "keys", "route.ts");
@@ -6695,6 +6696,337 @@ function evaluateCheckoutBillingRouteContract(findings) {
 
   return result;
 }
+function evaluateAccountViewEntitlementProjectionContract(findings) {
+  const result = {
+    moduleExists: fs.existsSync(accountAuthModulePath),
+
+    serverOnlyImport: false,
+    importsClerkAuthAndCookies: false,
+    importsPrismaEnums: false,
+    importsEntitlementHelpers: false,
+    importsDb: false,
+
+    termsVersionAndCookiePinned: false,
+    productionSafeLogging: false,
+    accountIncludeLatestSubscriptionAndApiKeys: false,
+
+    publicTypesExposeOnlySafeFields: false,
+    authConfiguredRequiresBothClerkKeys: false,
+    apiKeyStatusMappingValid: false,
+    subscriptionTierMappingValid: false,
+    subscriptionStatusMappingValid: false,
+    entitledChainNormalizationValid: false,
+    entitlementInputBuildsNormalizedChain: false,
+
+    publicSnapshotUsesEntitlementSnapshot: false,
+    apiKeyViewsDoNotExposeHashOrLast4: false,
+    snapshotLabelsUseEntitlementHelpers: false,
+    accountRecordIncludesSubscriptionStripeFields: false,
+
+    pendingTermsParsingValid: false,
+    accountLoadByAuthProviderUserId: false,
+    unauthConfiguredReturnsPublicSnapshot: false,
+    clerkMiddlewareFallbackReturnsPublicSnapshot: false,
+    unauthenticatedReturnsPublicSnapshot: false,
+    missingTermsBlocksNewAccountCreation: false,
+    accountCreationUsesPendingTermsOnly: false,
+    subscriptionProjectionUsesLatestSubscription: false,
+    finalSnapshotUsesEntitlementSnapshot: false,
+    finalReturnIncludesSafeViewLabelsAndApiKeys: false,
+    failureLoggingRedactsInProduction: false,
+  };
+
+  if (!result.moduleExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-040",
+      "ACCOUNT_VIEW_MODULE_MISSING",
+      path.relative(root, accountAuthModulePath),
+      "src/lib/auth/account.ts is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(accountAuthModulePath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  result.serverOnlyImport =
+    normalized.startsWith('import "server-only";');
+
+  result.importsClerkAuthAndCookies =
+    normalized.includes('import { cookies } from "next/headers";') &&
+    normalized.includes('import { auth } from "@clerk/nextjs/server";');
+
+  result.importsPrismaEnums =
+    normalized.includes('import { ApiKeyStatus, SubscriptionStatus, SubscriptionTier } from "@prisma/client";');
+
+  result.importsEntitlementHelpers =
+    normalized.includes("buildEntitlementSnapshot") &&
+    normalized.includes("getEntitledChainLabel") &&
+    normalized.includes("getHistoryDepthLabel") &&
+    normalized.includes("type EntitlementInput");
+
+  result.importsDb =
+    normalized.includes('import { db } from "@/lib/db";');
+
+  result.termsVersionAndCookiePinned =
+    /const TERMS_VERSION = "\d{4}-\d{2}-\d{2}";/u.test(normalized) &&
+    normalized.includes('const TERMS_ACCEPTANCE_COOKIE = "ua_terms_acceptance_pending";');
+
+  result.productionSafeLogging =
+    normalized.includes("function shouldLogAccountDebug(): boolean") &&
+    normalized.includes('process.env.NODE_ENV !== "production"') &&
+    normalized.includes('process.env.VERCEL_ENV !== "production"') &&
+    normalized.includes("function logAccountError(") &&
+    normalized.includes("hasUserId: Boolean(data?.userId)") &&
+    normalized.includes("hasEmail: Boolean(data?.email)") &&
+    normalized.includes("expectedTermsVersion: data?.expectedTermsVersion ?? null") &&
+    normalized.includes("error && typeof error === \"object\" && \"name\" in error");
+
+  result.accountIncludeLatestSubscriptionAndApiKeys =
+    normalized.includes("const ACCOUNT_INCLUDE = {") &&
+    normalized.includes("subscriptions: {") &&
+    normalized.includes('updatedAt: "desc" as const') &&
+    normalized.includes("take: 1") &&
+    normalized.includes("apiKeys: {") &&
+    normalized.includes('createdAt: "desc" as const');
+
+  result.publicTypesExposeOnlySafeFields =
+    normalized.includes("export type AccountApiKeyView = {") &&
+    normalized.includes("keyPrefix: string;") &&
+    normalized.includes('status: "active" | "suspended" | "revoked";') &&
+    normalized.includes("lastUsedAt: string | null;") &&
+    normalized.includes("export type AccountRecordView = {") &&
+    normalized.includes('tier: "public" | "basic" | "pro";') &&
+    normalized.includes('status: "active" | "inactive";') &&
+    normalized.includes("export type AccountSnapshotView = {") &&
+    normalized.includes("allowedChains: string[];") &&
+    !normalized.includes("keyHash:") &&
+    !normalized.includes("keyLast4:");
+
+  result.authConfiguredRequiresBothClerkKeys =
+    normalized.includes("function isAuthConfigured(): boolean") &&
+    normalized.includes("process.env.CLERK_SECRET_KEY?.trim()") &&
+    normalized.includes("process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()");
+
+  result.apiKeyStatusMappingValid =
+    normalized.includes("function mapApiKeyStatus(status: ApiKeyStatus): AccountApiKeyView[\"status\"]") &&
+    normalized.includes("case ApiKeyStatus.active:") &&
+    normalized.includes('return "active";') &&
+    normalized.includes("case ApiKeyStatus.suspended:") &&
+    normalized.includes('return "suspended";') &&
+    normalized.includes("case ApiKeyStatus.revoked:") &&
+    normalized.includes('return "revoked";') &&
+    normalized.includes("default:") &&
+    normalized.includes('return "revoked";');
+
+  result.subscriptionTierMappingValid =
+    normalized.includes("function mapSubscriptionTier(tier: SubscriptionTier): AccountRecordView[\"tier\"]") &&
+    normalized.includes("case SubscriptionTier.basic:") &&
+    normalized.includes('return "basic";') &&
+    normalized.includes("case SubscriptionTier.pro:") &&
+    normalized.includes('return "pro";') &&
+    normalized.includes("default:") &&
+    normalized.includes('return "public";');
+
+  result.subscriptionStatusMappingValid =
+    normalized.includes("function mapSubscriptionStatus(status: SubscriptionStatus): AccountRecordView[\"status\"]") &&
+    normalized.includes("case SubscriptionStatus.active:") &&
+    normalized.includes('return "active";') &&
+    normalized.includes("case SubscriptionStatus.inactive:") &&
+    normalized.includes('return "inactive";') &&
+    normalized.includes("default:") &&
+    normalized.includes('return "inactive";');
+
+  result.entitledChainNormalizationValid =
+    normalized.includes("function normalizeEntitledChain(value: string | null): ChainId | null") &&
+    normalized.includes('value === "bitcoin"') &&
+    normalized.includes('value === "ethereum"') &&
+    normalized.includes('value === "arbitrum"') &&
+    normalized.includes('value === "base"') &&
+    normalized.includes("return null;");
+
+  result.entitlementInputBuildsNormalizedChain =
+    normalized.includes("function buildEntitlementInput(params: {") &&
+    normalized.includes("tier: params.tier") &&
+    normalized.includes("status: params.status") &&
+    normalized.includes("entitledChain: normalizeEntitledChain(params.entitledChain)") &&
+    normalized.includes("historyUnlocked: params.historyUnlocked");
+
+  result.publicSnapshotUsesEntitlementSnapshot =
+    normalized.includes("function buildPublicSnapshot(): AccountSnapshotView") &&
+    normalized.includes("const snapshot = buildEntitlementSnapshot({") &&
+    normalized.includes('tier: "public"') &&
+    normalized.includes('status: "inactive"') &&
+    normalized.includes("entitledChain: null") &&
+    normalized.includes("historyUnlocked: false") &&
+    normalized.includes("allowedChains: snapshot.allowedChains");
+
+  result.apiKeyViewsDoNotExposeHashOrLast4 =
+    normalized.includes("function buildApiKeyViews(") &&
+    normalized.includes("keyPrefix: key.keyPrefix") &&
+    normalized.includes("status: mapApiKeyStatus(key.status)") &&
+    normalized.includes("lastUsedAt: key.lastUsedAt?.toISOString() ?? null") &&
+    !/function buildApiKeyViews\([\s\S]*?keyHash/u.test(normalized) &&
+    !/function buildApiKeyViews\([\s\S]*?keyLast4/u.test(normalized);
+
+  result.snapshotLabelsUseEntitlementHelpers =
+    normalized.includes("function snapshotLabels(snapshot: AccountSnapshotView)") &&
+    normalized.includes("const entitlementSnapshot = buildEntitlementSnapshot({") &&
+    normalized.includes("getEntitledChainLabel(entitlementSnapshot)") &&
+    normalized.includes("getHistoryDepthLabel(entitlementSnapshot)");
+
+  result.accountRecordIncludesSubscriptionStripeFields =
+    normalized.includes("function buildAccountRecordView(params: {") &&
+    normalized.includes("stripeCustomerId: params.stripeCustomerId") &&
+    normalized.includes("stripeSubscriptionId: params.stripeSubscriptionId") &&
+    normalized.includes("currentPeriodEnd: params.currentPeriodEnd?.toISOString() ?? null") &&
+    normalized.includes("createdAt: params.createdAt.toISOString()");
+
+  result.pendingTermsParsingValid =
+    normalized.includes("function parsePendingTermsAcceptance(raw: string | null): PendingTermsAcceptance | null") &&
+    normalized.includes('const parts = raw.split("|");') &&
+    normalized.includes("if (parts.length !== 2)") &&
+    normalized.includes("if (termsVersion !== TERMS_VERSION)") &&
+    normalized.includes("const termsAcceptedAt = new Date(acceptedAtRaw);") &&
+    normalized.includes("Number.isNaN(termsAcceptedAt.getTime())");
+
+  result.accountLoadByAuthProviderUserId =
+    normalized.includes("async function loadAccountWithRelations(authProviderUserId: string)") &&
+    normalized.includes("return db.account.findUnique({") &&
+    normalized.includes("authProviderUserId,") &&
+    normalized.includes("include: ACCOUNT_INCLUDE");
+
+  const getViewIndex = normalized.indexOf("export async function getCurrentAccountView()");
+  const getViewSource = getViewIndex >= 0 ? normalized.slice(getViewIndex) : "";
+
+  if (getViewSource) {
+    result.unauthConfiguredReturnsPublicSnapshot =
+      getViewSource.includes("const authConfigured = isAuthConfigured();") &&
+      getViewSource.includes("if (!authConfigured)") &&
+      getViewSource.includes("const snapshot = buildPublicSnapshot();") &&
+      getViewSource.includes("authConfigured: false") &&
+      getViewSource.includes("isAuthenticated: false") &&
+      getViewSource.includes("account: null") &&
+      getViewSource.includes("apiKeys: []");
+
+    result.clerkMiddlewareFallbackReturnsPublicSnapshot =
+      getViewSource.includes("message.includes(\"clerkMiddleware\")") &&
+      getViewSource.includes("message.includes(\"auth() was called but Clerk can't detect usage\")") &&
+      getViewSource.includes("falling back to public snapshot") &&
+      getViewSource.includes("authConfigured: true") &&
+      getViewSource.includes("isAuthenticated: false");
+
+    result.unauthenticatedReturnsPublicSnapshot =
+      getViewSource.includes("const authProviderUserId = authState.userId ?? null;") &&
+      getViewSource.includes("if (!authProviderUserId)") &&
+      getViewSource.includes("authConfigured: true") &&
+      getViewSource.includes("isAuthenticated: false") &&
+      getViewSource.includes("account: null") &&
+      getViewSource.includes("apiKeys: []");
+
+    result.missingTermsBlocksNewAccountCreation =
+      getViewSource.includes("const pendingTermsAcceptance = parsePendingTermsAcceptance(") &&
+      getViewSource.includes("if (!pendingTermsAcceptance)") &&
+      getViewSource.includes("missing_current_terms_acceptance") &&
+      getViewSource.includes('throw new Error("missing_current_terms_acceptance");');
+
+    result.accountCreationUsesPendingTermsOnly =
+      getViewSource.includes("await db.account.create({") &&
+      getViewSource.includes("authProviderUserId,") &&
+      getViewSource.includes("termsAcceptedAt: pendingTermsAcceptance.termsAcceptedAt") &&
+      getViewSource.includes("termsVersion: pendingTermsAcceptance.termsVersion") &&
+      getViewSource.includes("account = await loadAccountWithRelations(authProviderUserId);") &&
+      getViewSource.includes('throw new Error("account_created_but_not_reloadable");');
+
+    result.subscriptionProjectionUsesLatestSubscription =
+      getViewSource.includes("const subscription = account.subscriptions[0] ?? null;") &&
+      getViewSource.includes('const tier = subscription ? mapSubscriptionTier(subscription.tier) : "public";') &&
+      getViewSource.includes('const status = subscription ? mapSubscriptionStatus(subscription.status) : "inactive";') &&
+      getViewSource.includes("const entitledChain = subscription?.entitledChain ?? null;") &&
+      getViewSource.includes("const historyUnlocked = subscription?.historyUnlocked ?? false;");
+
+    result.finalSnapshotUsesEntitlementSnapshot =
+      getViewSource.includes("const entitlementInput = buildEntitlementInput({") &&
+      getViewSource.includes("const entitlementSnapshot = buildEntitlementSnapshot(entitlementInput);") &&
+      getViewSource.includes("const snapshot: AccountSnapshotView = {") &&
+      getViewSource.includes("maxWindowDays: entitlementSnapshot.maxWindowDays") &&
+      getViewSource.includes("allowedChains: entitlementSnapshot.allowedChains");
+
+    result.finalReturnIncludesSafeViewLabelsAndApiKeys =
+      getViewSource.includes("const accountView = buildAccountRecordView({") &&
+      getViewSource.includes("stripeCustomerId: subscription?.stripeCustomerId ?? null") &&
+      getViewSource.includes("stripeSubscriptionId: subscription?.stripeSubscriptionId ?? null") &&
+      getViewSource.includes("authConfigured: true") &&
+      getViewSource.includes("isAuthenticated: true") &&
+      getViewSource.includes("account: accountView") &&
+      getViewSource.includes("apiKeys: buildApiKeyViews(account.apiKeys)") &&
+      getViewSource.includes("tierLabel: tierLabelForTier(snapshot.tier)") &&
+      getViewSource.includes("entitledChainLabel: getEntitledChainLabel(entitlementSnapshot)") &&
+      getViewSource.includes("historyDepthLabel: getHistoryDepthLabel(entitlementSnapshot)");
+  }
+
+  result.failureLoggingRedactsInProduction =
+    normalized.includes("logAccountError(\"[account] getCurrentAccountView failed\"") &&
+    normalized.includes("code: \"get_current_account_view_failed\"") &&
+    normalized.includes("userId: authProviderUserId") &&
+    normalized.includes("error instanceof Error") &&
+    normalized.includes("name: error.name") &&
+    normalized.includes("message: error.message") &&
+    normalized.includes("stack: error.stack") &&
+    normalized.includes("function logAccountError(") &&
+    normalized.includes("if (shouldLogAccountDebug())");
+
+  const requiredChecks = [
+    ["ACCOUNT_VIEW_SERVER_ONLY_MISSING", result.serverOnlyImport, "Account view module must be server-only."],
+    ["ACCOUNT_VIEW_AUTH_IMPORTS_INVALID", result.importsClerkAuthAndCookies, "Account view must import Clerk auth and next/headers cookies."],
+    ["ACCOUNT_VIEW_PRISMA_ENUM_IMPORTS_INVALID", result.importsPrismaEnums, "Account view must import Prisma subscription/API-key enums."],
+    ["ACCOUNT_VIEW_ENTITLEMENT_IMPORTS_INVALID", result.importsEntitlementHelpers, "Account view must import entitlement snapshot and label helpers."],
+    ["ACCOUNT_VIEW_DB_IMPORT_INVALID", result.importsDb, "Account view must import db."],
+    ["ACCOUNT_VIEW_TERMS_PIN_INVALID", result.termsVersionAndCookiePinned, "Account view must pin TERMS_VERSION and terms cookie name."],
+    ["ACCOUNT_VIEW_PRODUCTION_LOGGING_INVALID", result.productionSafeLogging, "Account view logging must avoid leaking raw user/email/error details in production."],
+    ["ACCOUNT_VIEW_INCLUDE_INVALID", result.accountIncludeLatestSubscriptionAndApiKeys, "Account view must include latest subscription and API keys."],
+    ["ACCOUNT_VIEW_TYPES_UNSAFE", result.publicTypesExposeOnlySafeFields, "Account view exported types must only expose safe fields and never keyHash/keyLast4."],
+    ["ACCOUNT_VIEW_AUTH_CONFIG_INVALID", result.authConfiguredRequiresBothClerkKeys, "Auth configured must require both CLERK_SECRET_KEY and NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY."],
+    ["ACCOUNT_VIEW_API_KEY_STATUS_MAPPING_INVALID", result.apiKeyStatusMappingValid, "API-key status mapping must map active/suspended/revoked and default to revoked."],
+    ["ACCOUNT_VIEW_SUBSCRIPTION_TIER_MAPPING_INVALID", result.subscriptionTierMappingValid, "Subscription tier mapping must map basic/pro and default to public."],
+    ["ACCOUNT_VIEW_SUBSCRIPTION_STATUS_MAPPING_INVALID", result.subscriptionStatusMappingValid, "Subscription status mapping must map active/inactive and default to inactive."],
+    ["ACCOUNT_VIEW_ENTITLED_CHAIN_NORMALIZATION_INVALID", result.entitledChainNormalizationValid, "Entitled chain normalization must allow only supported chain ids."],
+    ["ACCOUNT_VIEW_ENTITLEMENT_INPUT_INVALID", result.entitlementInputBuildsNormalizedChain, "Entitlement input must use normalized chain and historyUnlocked."],
+    ["ACCOUNT_VIEW_PUBLIC_SNAPSHOT_INVALID", result.publicSnapshotUsesEntitlementSnapshot, "Public snapshot must be built via buildEntitlementSnapshot(public/inactive)."],
+    ["ACCOUNT_VIEW_API_KEY_SAFE_VIEW_INVALID", result.apiKeyViewsDoNotExposeHashOrLast4, "API-key views must expose keyPrefix/status/timestamps only, never keyHash/keyLast4."],
+    ["ACCOUNT_VIEW_SNAPSHOT_LABELS_INVALID", result.snapshotLabelsUseEntitlementHelpers, "Snapshot labels must use entitlement helper functions."],
+    ["ACCOUNT_VIEW_RECORD_STRIPE_FIELDS_INVALID", result.accountRecordIncludesSubscriptionStripeFields, "Account record view must include subscription Stripe ids and current period end."],
+    ["ACCOUNT_VIEW_PENDING_TERMS_PARSE_INVALID", result.pendingTermsParsingValid, "Pending terms parsing must require current TERMS_VERSION and valid timestamp."],
+    ["ACCOUNT_VIEW_LOAD_BY_AUTH_PROVIDER_INVALID", result.accountLoadByAuthProviderUserId, "Account load must use authProviderUserId and ACCOUNT_INCLUDE."],
+    ["ACCOUNT_VIEW_AUTH_UNCONFIGURED_PUBLIC_INVALID", result.unauthConfiguredReturnsPublicSnapshot, "Auth-unconfigured state must return public inactive snapshot."],
+    ["ACCOUNT_VIEW_CLERK_MIDDLEWARE_FALLBACK_INVALID", result.clerkMiddlewareFallbackReturnsPublicSnapshot, "Clerk middleware-unavailable fallback must return public inactive snapshot."],
+    ["ACCOUNT_VIEW_UNAUTHENTICATED_PUBLIC_INVALID", result.unauthenticatedReturnsPublicSnapshot, "Unauthenticated state must return public inactive snapshot."],
+    ["ACCOUNT_VIEW_MISSING_TERMS_NOT_BLOCKED", result.missingTermsBlocksNewAccountCreation, "New account creation must be blocked without current pending terms acceptance."],
+    ["ACCOUNT_VIEW_ACCOUNT_CREATION_TERMS_INVALID", result.accountCreationUsesPendingTermsOnly, "Account creation must use pending terms acceptance and reload the account row."],
+    ["ACCOUNT_VIEW_SUBSCRIPTION_PROJECTION_INVALID", result.subscriptionProjectionUsesLatestSubscription, "Account view must project tier/status/chain/history from latest subscription."],
+    ["ACCOUNT_VIEW_FINAL_SNAPSHOT_INVALID", result.finalSnapshotUsesEntitlementSnapshot, "Final account snapshot must come from buildEntitlementSnapshot."],
+    ["ACCOUNT_VIEW_FINAL_RETURN_INVALID", result.finalReturnIncludesSafeViewLabelsAndApiKeys, "Final account view must return safe account view, snapshot, labels, and API-key views."],
+    ["ACCOUNT_VIEW_FAILURE_LOGGING_INVALID", result.failureLoggingRedactsInProduction, "Failure logging must preserve debug detail only outside production."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-040",
+        code,
+        path.relative(root, accountAuthModulePath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -6741,6 +7073,7 @@ function evaluate() {
   const dashboardAccountSurfaceContract = evaluateDashboardAccountSurfaceContract(findings);
   const apiKeyRouteContract = evaluateApiKeyRouteContract(findings);
   const checkoutBillingRouteContract = evaluateCheckoutBillingRouteContract(findings);
+  const accountViewEntitlementProjectionContract = evaluateAccountViewEntitlementProjectionContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -6783,6 +7116,7 @@ function evaluate() {
     dashboardAccountSurfaceContract,
     apiKeyRouteContract,
     checkoutBillingRouteContract,
+    accountViewEntitlementProjectionContract,
     findings,
   };
 }
@@ -6842,6 +7176,40 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Account view entitlement projection contract");
+  lines.push("");
+  lines.push(`Module exists: ${result.accountViewEntitlementProjectionContract.moduleExists}`);
+  lines.push(`Server-only import: ${result.accountViewEntitlementProjectionContract.serverOnlyImport}`);
+  lines.push(`Imports Clerk auth/cookies: ${result.accountViewEntitlementProjectionContract.importsClerkAuthAndCookies}`);
+  lines.push(`Imports Prisma enums: ${result.accountViewEntitlementProjectionContract.importsPrismaEnums}`);
+  lines.push(`Imports entitlement helpers: ${result.accountViewEntitlementProjectionContract.importsEntitlementHelpers}`);
+  lines.push(`Imports db: ${result.accountViewEntitlementProjectionContract.importsDb}`);
+  lines.push(`Terms version/cookie pinned: ${result.accountViewEntitlementProjectionContract.termsVersionAndCookiePinned}`);
+  lines.push(`Production-safe logging: ${result.accountViewEntitlementProjectionContract.productionSafeLogging}`);
+  lines.push(`Includes latest subscription/API keys: ${result.accountViewEntitlementProjectionContract.accountIncludeLatestSubscriptionAndApiKeys}`);
+  lines.push(`Public types expose only safe fields: ${result.accountViewEntitlementProjectionContract.publicTypesExposeOnlySafeFields}`);
+  lines.push(`Auth configured requires both Clerk keys: ${result.accountViewEntitlementProjectionContract.authConfiguredRequiresBothClerkKeys}`);
+  lines.push(`API-key status mapping valid: ${result.accountViewEntitlementProjectionContract.apiKeyStatusMappingValid}`);
+  lines.push(`Subscription tier mapping valid: ${result.accountViewEntitlementProjectionContract.subscriptionTierMappingValid}`);
+  lines.push(`Subscription status mapping valid: ${result.accountViewEntitlementProjectionContract.subscriptionStatusMappingValid}`);
+  lines.push(`Entitled chain normalization valid: ${result.accountViewEntitlementProjectionContract.entitledChainNormalizationValid}`);
+  lines.push(`Entitlement input normalized: ${result.accountViewEntitlementProjectionContract.entitlementInputBuildsNormalizedChain}`);
+  lines.push(`Public snapshot via entitlement snapshot: ${result.accountViewEntitlementProjectionContract.publicSnapshotUsesEntitlementSnapshot}`);
+  lines.push(`API-key views safe: ${result.accountViewEntitlementProjectionContract.apiKeyViewsDoNotExposeHashOrLast4}`);
+  lines.push(`Snapshot labels via helpers: ${result.accountViewEntitlementProjectionContract.snapshotLabelsUseEntitlementHelpers}`);
+  lines.push(`Account record Stripe fields: ${result.accountViewEntitlementProjectionContract.accountRecordIncludesSubscriptionStripeFields}`);
+  lines.push(`Pending terms parsing valid: ${result.accountViewEntitlementProjectionContract.pendingTermsParsingValid}`);
+  lines.push(`Account load by auth provider id: ${result.accountViewEntitlementProjectionContract.accountLoadByAuthProviderUserId}`);
+  lines.push(`Auth-unconfigured returns public snapshot: ${result.accountViewEntitlementProjectionContract.unauthConfiguredReturnsPublicSnapshot}`);
+  lines.push(`Clerk middleware fallback returns public snapshot: ${result.accountViewEntitlementProjectionContract.clerkMiddlewareFallbackReturnsPublicSnapshot}`);
+  lines.push(`Unauthenticated returns public snapshot: ${result.accountViewEntitlementProjectionContract.unauthenticatedReturnsPublicSnapshot}`);
+  lines.push(`Missing terms blocks new account: ${result.accountViewEntitlementProjectionContract.missingTermsBlocksNewAccountCreation}`);
+  lines.push(`Account creation uses pending terms: ${result.accountViewEntitlementProjectionContract.accountCreationUsesPendingTermsOnly}`);
+  lines.push(`Subscription projection uses latest subscription: ${result.accountViewEntitlementProjectionContract.subscriptionProjectionUsesLatestSubscription}`);
+  lines.push(`Final snapshot via entitlement snapshot: ${result.accountViewEntitlementProjectionContract.finalSnapshotUsesEntitlementSnapshot}`);
+  lines.push(`Final return safe view/labels/API keys: ${result.accountViewEntitlementProjectionContract.finalReturnIncludesSafeViewLabelsAndApiKeys}`);
+  lines.push(`Failure logging redacts in production: ${result.accountViewEntitlementProjectionContract.failureLoggingRedactsInProduction}`);
+  lines.push("");
   lines.push("## Checkout billing route contract");
   lines.push("");
   lines.push(`Checkout route exists: ${result.checkoutBillingRouteContract.checkoutRouteExists}`);
@@ -7450,6 +7818,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-040 Account View Entitlement Projection Contract: verifies server-only account view projection from Clerk/account/subscription rows into entitlement snapshots, safe API-key views, terms-gated account creation, and production-redacted logging.");
   lines.push("- D-039 Checkout Billing Route Contract: verifies Stripe Checkout and Customer Portal routes, same-origin/pre-auth gating, Clerk/account binding, production live-key guard, session metadata, no-store redirects, and customer-id scoped portal access.");
   lines.push("- D-038 API Key Route Contract: verifies /api/v1/keys same-origin/pre-auth gating, Clerk/account/subscription checks, scrypt key creation, account-scoped revoke, audit logs, no-store responses, and no keyHash exposure.");
   lines.push("- D-037 Dashboard Account Surface Contract: verifies dashboard/account state, entitlement display, API-key manager mutation gating, Stripe portal gating, secret-once behavior, and endpoint-boundary copy.");
