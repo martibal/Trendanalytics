@@ -7,6 +7,9 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const signUpPagePath = path.join(root, "src", "app", "sign-up", "[[...sign-up]]", "page.tsx");
+const signInPagePath = path.join(root, "src", "app", "sign-in", "[[...sign-in]]", "page.tsx");
+const rootLayoutPath = path.join(root, "src", "app", "layout.tsx");
 const nextConfigPath = path.join(root, "next.config.js");
 const publicRoot = path.join(root, "public");
 const docsRoot = path.join(root, "docs");
@@ -5559,6 +5562,213 @@ function evaluateSecurityHeadersRuntimeContract(findings) {
 
   return result;
 }
+function evaluateClerkAuthSurfaceContract(findings) {
+  const result = {
+    rootLayoutExists: fs.existsSync(rootLayoutPath),
+    signInPageExists: fs.existsSync(signInPagePath),
+    signUpPageExists: fs.existsSync(signUpPagePath),
+
+    layoutImportsClerkProvider: false,
+    layoutUsesPublishableKeyOnly: false,
+    layoutGracefullySkipsProviderWhenMissing: false,
+    layoutWrapsChildrenInAuthProvider: false,
+    layoutDoesNotUseClerkSecret: false,
+
+    signInImportsSignIn: false,
+    signInRequiresPublishableAndSecret: false,
+    signInDoesNotRenderWhenUnconfigured: false,
+    signInShowsSafeWarningWhenUnconfigured: false,
+    signInUsesPathRoutingAndDashboardRedirect: false,
+    signInKeepsProductBoundaryCopy: false,
+
+    signUpImportsSignUpAndCookies: false,
+    signUpRequiresPublishableAndSecret: false,
+    signUpTermsVersionPinned: false,
+    signUpTermsCookieHttpOnlyLaxSecureInProd: false,
+    signUpRequiresTermsBeforeRenderingClerk: false,
+    signUpCanClearTermsSession: false,
+    signUpUsesPathRoutingAndDashboardRedirect: false,
+    signUpKeepsProductBoundaryCopy: false,
+  };
+
+  const layout = result.rootLayoutExists
+    ? fs.readFileSync(rootLayoutPath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const signIn = result.signInPageExists
+    ? fs.readFileSync(signInPagePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const signUp = result.signUpPageExists
+    ? fs.readFileSync(signUpPagePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  if (layout) {
+    result.layoutImportsClerkProvider =
+      layout.includes('import { ClerkProvider } from "@clerk/nextjs";');
+
+    result.layoutUsesPublishableKeyOnly =
+      layout.includes("const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;") &&
+      layout.includes("<ClerkProvider publishableKey={publishableKey}>") &&
+      !layout.includes("process.env.CLERK_SECRET_KEY");
+
+    result.layoutGracefullySkipsProviderWhenMissing =
+      layout.includes("if (!publishableKey)") &&
+      layout.includes("return <Fragment>{children}</Fragment>;");
+
+    result.layoutWrapsChildrenInAuthProvider =
+      layout.includes("<AuthProvider>") &&
+      layout.includes("</AuthProvider>") &&
+      layout.includes("<ThemeProvider>");
+
+    result.layoutDoesNotUseClerkSecret =
+      !layout.includes("CLERK_SECRET_KEY");
+  }
+
+  if (signIn) {
+    const configuredCheckIndex = signIn.indexOf("const clerkConfigured = isClerkConfigured();");
+    const signInRenderIndex = signIn.indexOf("<SignIn");
+    const warningIndex = signIn.indexOf("Clerk is not configured in this environment.");
+
+    result.signInImportsSignIn =
+      signIn.includes('import { SignIn } from "@clerk/nextjs";');
+
+    result.signInRequiresPublishableAndSecret =
+      signIn.includes("const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;") &&
+      signIn.includes("const secretKey = process.env.CLERK_SECRET_KEY;") &&
+      signIn.includes("publishableKey.trim().length > 0") &&
+      signIn.includes("secretKey.trim().length > 0");
+
+    result.signInDoesNotRenderWhenUnconfigured =
+      configuredCheckIndex >= 0 &&
+      warningIndex >= 0 &&
+      signInRenderIndex >= 0 &&
+      configuredCheckIndex < signInRenderIndex &&
+      signInRenderIndex < warningIndex &&
+      signIn.includes("clerkConfigured ? (") &&
+      signIn.includes(") : (") &&
+      signIn.includes("<SignIn") &&
+      signIn.includes("Clerk is not configured in this environment.");
+
+    result.signInShowsSafeWarningWhenUnconfigured =
+      signIn.includes("The sign-in route is available, but the identity provider is not fully wired in this") &&
+      signIn.includes("Required keys:") &&
+      signIn.includes("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") &&
+      signIn.includes("CLERK_SECRET_KEY");
+
+    result.signInUsesPathRoutingAndDashboardRedirect =
+      signIn.includes('routing="path"') &&
+      signIn.includes('path="/sign-in"') &&
+      signIn.includes('signUpUrl="/sign-up"') &&
+      signIn.includes('fallbackRedirectUrl="/dashboard"');
+
+    result.signInKeepsProductBoundaryCopy =
+      signIn.includes("Signing in does not unlock advice, forecasts, or price targets.") &&
+      signIn.includes("descriptive product");
+  }
+
+  if (signUp) {
+    const notConfiguredIndex = signUp.indexOf("!clerkConfigured ? (");
+    const termsAcceptedIndex = signUp.indexOf(") : hasAcceptedCurrentTerms ? (");
+    const signUpRenderIndex = signUp.indexOf("<SignUp");
+    const termsFormIndex = signUp.indexOf("Review and accept legal terms before sign-up");
+
+    result.signUpImportsSignUpAndCookies =
+      signUp.includes('import { SignUp } from "@clerk/nextjs";') &&
+      signUp.includes('import { cookies } from "next/headers";');
+
+    result.signUpRequiresPublishableAndSecret =
+      signUp.includes("const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;") &&
+      signUp.includes("const secretKey = process.env.CLERK_SECRET_KEY;") &&
+      signUp.includes("publishableKey.trim().length > 0") &&
+      signUp.includes("secretKey.trim().length > 0");
+
+    result.signUpTermsVersionPinned =
+      /const TERMS_VERSION = "\d{4}-\d{2}-\d{2}";/u.test(signUp) &&
+      signUp.includes('const TERMS_ACCEPTANCE_COOKIE = "ua_terms_acceptance_pending";') &&
+      signUp.includes("pendingTermsAcceptance.startsWith(`${TERMS_VERSION}|`)");
+
+    result.signUpTermsCookieHttpOnlyLaxSecureInProd =
+      signUp.includes('"use server";') &&
+      signUp.includes("cookieStore.set(TERMS_ACCEPTANCE_COOKIE") &&
+      signUp.includes("httpOnly: true") &&
+      signUp.includes('sameSite: "lax"') &&
+      signUp.includes('secure: process.env.NODE_ENV === "production"') &&
+      signUp.includes("maxAge: 60 * 60 * 6");
+
+    result.signUpRequiresTermsBeforeRenderingClerk =
+      notConfiguredIndex >= 0 &&
+      termsAcceptedIndex >= 0 &&
+      signUpRenderIndex >= 0 &&
+      termsFormIndex >= 0 &&
+      notConfiguredIndex < termsAcceptedIndex &&
+      termsAcceptedIndex < signUpRenderIndex &&
+      signUpRenderIndex < termsFormIndex &&
+      signUp.includes("hasAcceptedCurrentTerms ? (") &&
+      signUp.includes("You must explicitly accept the current") &&
+      signUp.includes("Review and accept legal terms before sign-up");
+
+    result.signUpCanClearTermsSession =
+      signUp.includes("async function clearTermsForSignUp()") &&
+      signUp.includes('"use server";') &&
+      signUp.includes("cookieStore.delete(TERMS_ACCEPTANCE_COOKIE)") &&
+      signUp.includes("Reset terms acceptance for this sign-up session");
+
+    result.signUpUsesPathRoutingAndDashboardRedirect =
+      signUp.includes('routing="path"') &&
+      signUp.includes('path="/sign-up"') &&
+      signUp.includes('signInUrl="/sign-in"') &&
+      signUp.includes('fallbackRedirectUrl="/dashboard"');
+
+    result.signUpKeepsProductBoundaryCopy =
+      signUp.includes("Creating an account does not change the product boundary.") &&
+      signUp.includes("descriptive rather than") &&
+      signUp.includes("predictive or advisory");
+  }
+
+  const requiredChecks = [
+    ["CLERK_AUTH_ROOT_LAYOUT_MISSING", result.rootLayoutExists, rootLayoutPath, "Root layout must exist."],
+    ["CLERK_AUTH_SIGN_IN_PAGE_MISSING", result.signInPageExists, signInPagePath, "Sign-in page must exist."],
+    ["CLERK_AUTH_SIGN_UP_PAGE_MISSING", result.signUpPageExists, signUpPagePath, "Sign-up page must exist."],
+
+    ["CLERK_LAYOUT_PROVIDER_IMPORT_MISSING", result.layoutImportsClerkProvider, rootLayoutPath, "Root layout must import ClerkProvider."],
+    ["CLERK_LAYOUT_PUBLISHABLE_KEY_CONTRACT_INVALID", result.layoutUsesPublishableKeyOnly, rootLayoutPath, "Root layout may only use NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, not CLERK_SECRET_KEY."],
+    ["CLERK_LAYOUT_MISSING_SAFE_FALLBACK", result.layoutGracefullySkipsProviderWhenMissing, rootLayoutPath, "Root layout must render children without ClerkProvider when publishable key is missing."],
+    ["CLERK_LAYOUT_CHILDREN_NOT_WRAPPED", result.layoutWrapsChildrenInAuthProvider, rootLayoutPath, "Root layout must wrap site content in AuthProvider."],
+    ["CLERK_LAYOUT_SECRET_KEY_USED", result.layoutDoesNotUseClerkSecret, rootLayoutPath, "Root layout must never reference CLERK_SECRET_KEY."],
+
+    ["CLERK_SIGN_IN_IMPORT_MISSING", result.signInImportsSignIn, signInPagePath, "Sign-in page must import Clerk SignIn."],
+    ["CLERK_SIGN_IN_CONFIG_CHECK_INVALID", result.signInRequiresPublishableAndSecret, signInPagePath, "Sign-in page must require both publishable and secret Clerk env before rendering embedded SignIn."],
+    ["CLERK_SIGN_IN_UNCONFIGURED_RENDER_INVALID", result.signInDoesNotRenderWhenUnconfigured, signInPagePath, "Sign-in page must not render SignIn when Clerk is not configured."],
+    ["CLERK_SIGN_IN_WARNING_MISSING", result.signInShowsSafeWarningWhenUnconfigured, signInPagePath, "Sign-in page must show safe configuration warning when Clerk is not configured."],
+    ["CLERK_SIGN_IN_ROUTING_INVALID", result.signInUsesPathRoutingAndDashboardRedirect, signInPagePath, "Sign-in must use path routing and dashboard fallback redirect."],
+    ["CLERK_SIGN_IN_PRODUCT_BOUNDARY_COPY_MISSING", result.signInKeepsProductBoundaryCopy, signInPagePath, "Sign-in page must preserve no-advice/no-forecast product boundary copy."],
+
+    ["CLERK_SIGN_UP_IMPORTS_INVALID", result.signUpImportsSignUpAndCookies, signUpPagePath, "Sign-up page must import Clerk SignUp and next/headers cookies."],
+    ["CLERK_SIGN_UP_CONFIG_CHECK_INVALID", result.signUpRequiresPublishableAndSecret, signUpPagePath, "Sign-up page must require both publishable and secret Clerk env before rendering embedded SignUp."],
+    ["CLERK_SIGN_UP_TERMS_VERSION_INVALID", result.signUpTermsVersionPinned, signUpPagePath, "Sign-up must pin TERMS_VERSION and terms acceptance cookie."],
+    ["CLERK_SIGN_UP_TERMS_COOKIE_INVALID", result.signUpTermsCookieHttpOnlyLaxSecureInProd, signUpPagePath, "Sign-up terms cookie must be httpOnly, sameSite lax, secure in production, and short-lived."],
+    ["CLERK_SIGN_UP_TERMS_GATE_INVALID", result.signUpRequiresTermsBeforeRenderingClerk, signUpPagePath, "Sign-up must require current terms acceptance before rendering embedded SignUp."],
+    ["CLERK_SIGN_UP_TERMS_RESET_MISSING", result.signUpCanClearTermsSession, signUpPagePath, "Sign-up must allow clearing pending terms acceptance for the session."],
+    ["CLERK_SIGN_UP_ROUTING_INVALID", result.signUpUsesPathRoutingAndDashboardRedirect, signUpPagePath, "Sign-up must use path routing and dashboard fallback redirect."],
+    ["CLERK_SIGN_UP_PRODUCT_BOUNDARY_COPY_MISSING", result.signUpKeepsProductBoundaryCopy, signUpPagePath, "Sign-up page must preserve no-advice/no-forecast product boundary copy."]
+  ];
+
+  for (const [code, ok, targetPath, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-036",
+        code,
+        path.relative(root, targetPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -5601,6 +5811,7 @@ function evaluate() {
   const environmentVariableContract = evaluateEnvironmentVariableContract(findings);
   const clientSecretBoundaryContract = evaluateClientSecretBoundaryContract(findings);
   const securityHeadersRuntimeContract = evaluateSecurityHeadersRuntimeContract(findings);
+  const clerkAuthSurfaceContract = evaluateClerkAuthSurfaceContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -5639,6 +5850,7 @@ function evaluate() {
     environmentVariableContract,
     clientSecretBoundaryContract,
     securityHeadersRuntimeContract,
+    clerkAuthSurfaceContract,
     findings,
   };
 }
@@ -5698,6 +5910,32 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Clerk auth surface contract");
+  lines.push("");
+  lines.push(`Root layout exists: ${result.clerkAuthSurfaceContract.rootLayoutExists}`);
+  lines.push(`Sign-in page exists: ${result.clerkAuthSurfaceContract.signInPageExists}`);
+  lines.push(`Sign-up page exists: ${result.clerkAuthSurfaceContract.signUpPageExists}`);
+  lines.push(`Layout imports ClerkProvider: ${result.clerkAuthSurfaceContract.layoutImportsClerkProvider}`);
+  lines.push(`Layout uses publishable key only: ${result.clerkAuthSurfaceContract.layoutUsesPublishableKeyOnly}`);
+  lines.push(`Layout safe fallback when missing key: ${result.clerkAuthSurfaceContract.layoutGracefullySkipsProviderWhenMissing}`);
+  lines.push(`Layout wraps content in AuthProvider: ${result.clerkAuthSurfaceContract.layoutWrapsChildrenInAuthProvider}`);
+  lines.push(`Layout does not use Clerk secret: ${result.clerkAuthSurfaceContract.layoutDoesNotUseClerkSecret}`);
+  lines.push(`Sign-in imports SignIn: ${result.clerkAuthSurfaceContract.signInImportsSignIn}`);
+  lines.push(`Sign-in requires publishable and secret: ${result.clerkAuthSurfaceContract.signInRequiresPublishableAndSecret}`);
+  lines.push(`Sign-in does not render unconfigured: ${result.clerkAuthSurfaceContract.signInDoesNotRenderWhenUnconfigured}`);
+  lines.push(`Sign-in warning present: ${result.clerkAuthSurfaceContract.signInShowsSafeWarningWhenUnconfigured}`);
+  lines.push(`Sign-in routing valid: ${result.clerkAuthSurfaceContract.signInUsesPathRoutingAndDashboardRedirect}`);
+  lines.push(`Sign-in product boundary copy present: ${result.clerkAuthSurfaceContract.signInKeepsProductBoundaryCopy}`);
+  lines.push(`Sign-up imports SignUp/cookies: ${result.clerkAuthSurfaceContract.signUpImportsSignUpAndCookies}`);
+  lines.push(`Sign-up requires publishable and secret: ${result.clerkAuthSurfaceContract.signUpRequiresPublishableAndSecret}`);
+  lines.push(`Sign-up terms version pinned: ${result.clerkAuthSurfaceContract.signUpTermsVersionPinned}`);
+  lines.push(`Sign-up terms cookie secure: ${result.clerkAuthSurfaceContract.signUpTermsCookieHttpOnlyLaxSecureInProd}`);
+  lines.push(`Sign-up terms gate before Clerk: ${result.clerkAuthSurfaceContract.signUpRequiresTermsBeforeRenderingClerk}`);
+  lines.push("D-036 source-order note: configured JSX branch may appear before fallback branch; audit checks ternary gating, not visual source order alone.");
+  lines.push(`Sign-up can clear terms session: ${result.clerkAuthSurfaceContract.signUpCanClearTermsSession}`);
+  lines.push(`Sign-up routing valid: ${result.clerkAuthSurfaceContract.signUpUsesPathRoutingAndDashboardRedirect}`);
+  lines.push(`Sign-up product boundary copy present: ${result.clerkAuthSurfaceContract.signUpKeepsProductBoundaryCopy}`);
+  lines.push("");
   lines.push("## Security headers runtime contract");
   lines.push("");
   lines.push(`next.config.js exists: ${result.securityHeadersRuntimeContract.nextConfigExists}`);
@@ -6179,6 +6417,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-036 Clerk Auth Surface Contract: verifies Clerk layout/sign-in/sign-up surfaces, safe unconfigured fallback, terms gating before SignUp, and no-advice product boundary copy.");
   lines.push("- D-035 Security Headers Runtime Contract: verifies Next security headers, CSP report-only policy, API no-store/noindex headers, local-only dev origins, and output tracing for canonical data.");
   lines.push("- D-034 Client Secret Boundary Contract: verifies private env references and live-secret patterns do not appear in client/public surfaces, while server-only API/storage/auth code can use private env safely.");
   lines.push("- D-033 Environment Variable Contract: verifies database, Upstash, quota, dev-key, storage, S3, deploy-hook, and production-runtime env references without checking secret values.");
