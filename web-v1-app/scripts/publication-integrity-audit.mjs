@@ -7,6 +7,11 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const publicRoot = path.join(root, "public");
+const docsRoot = path.join(root, "docs");
+const libSourceRoot = path.join(root, "src", "lib");
+const componentSourceRoot = path.join(root, "src", "components");
+const appSourceRoot = path.join(root, "src", "app");
 const publicationIntegrityAuditPath = path.join(root, "scripts", "publication-integrity-audit.mjs");
 const calculationCorrectnessAuditPath = path.join(root, "scripts", "calculation-correctness-audit.mjs");
 const apiContractAuditPath = path.join(root, "scripts", "api-contract-audit.mjs");
@@ -5141,6 +5146,251 @@ function evaluateEnvironmentVariableContract(findings) {
 
   return result;
 }
+function listSecretBoundaryFiles(dir) {
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+
+  const out = [];
+  const allowed = /\.(ts|tsx|js|jsx|mjs|cjs|md|mdx|json|yml|yaml)$/iu;
+  const skipDirs = new Set([
+    ".git",
+    ".next",
+    "node_modules",
+    "coverage",
+    "dist",
+    "out",
+    "playwright-report",
+    "test-results",
+  ]);
+
+  function walk(current) {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+
+      if (entry.isDirectory()) {
+        if (skipDirs.has(entry.name)) {
+          continue;
+        }
+
+        walk(full);
+        continue;
+      }
+
+      if (entry.isFile() && allowed.test(entry.name)) {
+        out.push(full);
+      }
+    }
+  }
+
+  walk(dir);
+  return out;
+}
+
+function getLineNumberForIndex(source, index) {
+  return source.slice(0, index).split(/\r?\n/u).length;
+}
+
+function isApiRouteFile(filePath) {
+  const normalized = path.normalize(filePath);
+  return normalized.includes(path.normalize(path.join("src", "app", "api")) + path.sep);
+}
+
+function isServerOnlyLibFile(filePath) {
+  const normalized = path.normalize(filePath);
+  const serverOnlySegments = [
+    path.normalize(path.join("src", "lib", "auth")) + path.sep,
+    path.normalize(path.join("src", "lib", "storage")) + path.sep,
+    path.normalize(path.join("src", "lib", "db")) + path.sep,
+  ];
+
+  return serverOnlySegments.some((segment) => normalized.includes(segment));
+}
+function evaluateClientSecretBoundaryContract(findings) {
+  const privateEnvNames = [
+    "DATABASE_URL",
+    "DIRECT_URL",
+    "UPSTASH_REDIS_REST_URL",
+    "UPSTASH_REDIS_REST_TOKEN",
+    "BASIC_DAILY_API_QUOTA",
+    "PRO_DAILY_API_QUOTA",
+    "DEV_API_KEYS_JSON",
+    "LOCAL_DATA_PATH",
+    "S3_REGION",
+    "S3_BUCKET",
+    "S3_PREFIX",
+    "S3_ENDPOINT",
+    "S3_ACCESS_KEY_ID",
+    "S3_SECRET_ACCESS_KEY",
+    "S3_FORCE_PATH_STYLE",
+    "VERCEL_DEPLOY_HOOK_URL",
+  ];
+
+  const liveSecretPatterns = [
+    { name: "ta_live_api_key", pattern: /\bta_live_[a-f0-9]{48}\b/gu },
+    { name: "stripe_secret_key", pattern: /\bsk_live_[A-Za-z0-9_]{16,}\b/gu },
+    { name: "stripe_restricted_key", pattern: /\brk_live_[A-Za-z0-9_]{16,}\b/gu },
+    { name: "stripe_webhook_secret", pattern: /\bwhsec_[A-Za-z0-9_]{16,}\b/gu },
+    { name: "aws_access_key_id", pattern: /\bAKIA[0-9A-Z]{16}\b/gu },
+  ];
+
+  const allowedPublicEnvNames = new Set([
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+  ]);
+
+  function isAllowedPublicEnvName(name) {
+    return allowedPublicEnvNames.has(name) || /^NEXT_PUBLIC_[A-Z0-9_]+_PUBLISHABLE_KEY$/u.test(name);
+  }
+
+  const result = {
+    scannedFiles: 0,
+    privateEnvReferencesInClientSurface: 0,
+    liveSecretPatternsInClientSurface: 0,
+    nextPublicSecretLikeNames: 0,
+    serverOnlyPrivateEnvReferencesAllowed: true,
+    apiRoutesExcludedFromClientScan: true,
+    clientBoundaryRootsPresent: {
+      app: fs.existsSync(appSourceRoot),
+      components: fs.existsSync(componentSourceRoot),
+      lib: fs.existsSync(libSourceRoot),
+      public: fs.existsSync(publicRoot),
+      docs: fs.existsSync(docsRoot),
+    },
+  };
+
+  const clientSurfaceFiles = [
+    ...listSecretBoundaryFiles(appSourceRoot).filter((file) => !isApiRouteFile(file)),
+    ...listSecretBoundaryFiles(componentSourceRoot),
+    ...listSecretBoundaryFiles(publicRoot),
+    ...listSecretBoundaryFiles(docsRoot),
+  ];
+
+  const publicLikeFiles = [
+    ...listSecretBoundaryFiles(publicRoot),
+    ...listSecretBoundaryFiles(docsRoot),
+  ];
+
+  result.scannedFiles = new Set(clientSurfaceFiles.map((file) => path.normalize(file))).size;
+
+  for (const file of clientSurfaceFiles) {
+    const relative = path.relative(root, file);
+    const source = fs.readFileSync(file, "utf8").replace(/^\uFEFF/u, "");
+
+    for (const envName of privateEnvNames) {
+      const processEnvPattern = new RegExp(`process\\.env\\.${envName}\\b|process\\.env\\[["']${envName}["']\\]`, "gu");
+      let match;
+
+      while ((match = processEnvPattern.exec(source)) !== null) {
+        result.privateEnvReferencesInClientSurface += 1;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-034",
+          "CLIENT_SURFACE_PRIVATE_ENV_REFERENCE",
+          relative,
+          `Private env ${envName} is referenced in a client/public surface at line ${getLineNumberForIndex(source, match.index)}. Private env usage must stay in server-only API/routes/lib code.`
+        );
+      }
+    }
+
+    const nextPublicSecretPattern =
+      /\bNEXT_PUBLIC_[A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|DATABASE|UPSTASH|WEBHOOK|PRIVATE_KEY|SECRET_KEY|ACCESS_KEY|API_KEY|S3_SECRET|S3_ACCESS|STRIPE_SECRET|STRIPE_WEBHOOK)[A-Z0-9_]*\b/gu;
+
+    let publicSecretMatch;
+    while ((publicSecretMatch = nextPublicSecretPattern.exec(source)) !== null) {
+      const publicEnvName = publicSecretMatch[0];
+
+      if (isAllowedPublicEnvName(publicEnvName)) {
+        continue;
+      }
+
+      result.nextPublicSecretLikeNames += 1;
+
+      addFinding(
+        findings,
+        "fail",
+        "D-034",
+        "CLIENT_SURFACE_NEXT_PUBLIC_SECRET_LIKE_NAME",
+        relative,
+        `Secret-like public env name '${publicEnvName}' appears at line ${getLineNumberForIndex(source, publicSecretMatch.index)}. NEXT_PUBLIC_* variables are client-exposed and must not contain secret/token/password/private material. Publishable client keys must be explicitly allowlisted.`
+      );
+    }
+  }
+
+  for (const file of publicLikeFiles) {
+    const relative = path.relative(root, file);
+    const source = fs.readFileSync(file, "utf8").replace(/^\uFEFF/u, "");
+
+    for (const { name, pattern } of liveSecretPatterns) {
+      let match;
+
+      while ((match = pattern.exec(source)) !== null) {
+        result.liveSecretPatternsInClientSurface += 1;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-034",
+          "PUBLIC_SURFACE_LIVE_SECRET_PATTERN",
+          relative,
+          `Live-secret-like pattern '${name}' appears in public/docs surface at line ${getLineNumberForIndex(source, match.index)}.`
+        );
+      }
+    }
+  }
+
+  const serverOnlyFiles = [
+    ...listSecretBoundaryFiles(path.join(root, "src", "app", "api")),
+    ...listSecretBoundaryFiles(libSourceRoot).filter(isServerOnlyLibFile),
+  ];
+
+  for (const file of serverOnlyFiles) {
+    const source = fs.readFileSync(file, "utf8").replace(/^\uFEFF/u, "");
+
+    for (const envName of privateEnvNames) {
+      if (source.includes(`process.env.${envName}`) || source.includes(`process.env["${envName}"]`) || source.includes(`process.env['${envName}']`)) {
+        result.serverOnlyPrivateEnvReferencesAllowed = result.serverOnlyPrivateEnvReferencesAllowed && true;
+      }
+    }
+  }
+
+  if (result.privateEnvReferencesInClientSurface !== 0) {
+    addFinding(
+      findings,
+      "fail",
+      "D-034",
+      "CLIENT_SECRET_BOUNDARY_PRIVATE_ENV_LEAKS",
+      "src/app, src/components, public, docs",
+      `Found ${result.privateEnvReferencesInClientSurface} private env reference(s) in client/public surfaces.`
+    );
+  }
+
+  if (result.nextPublicSecretLikeNames !== 0) {
+    addFinding(
+      findings,
+      "fail",
+      "D-034",
+      "CLIENT_SECRET_BOUNDARY_NEXT_PUBLIC_SECRET_NAMES",
+      "src/app, src/components, public, docs",
+      `Found ${result.nextPublicSecretLikeNames} secret-like NEXT_PUBLIC_* name(s).`
+    );
+  }
+
+  if (result.liveSecretPatternsInClientSurface !== 0) {
+    addFinding(
+      findings,
+      "fail",
+      "D-034",
+      "CLIENT_SECRET_BOUNDARY_LIVE_SECRET_PATTERNS",
+      "public, docs",
+      `Found ${result.liveSecretPatternsInClientSurface} live-secret-like pattern(s) in public/docs surfaces.`
+    );
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -5181,6 +5431,7 @@ function evaluate() {
   const buildPrismaGenerationContract = evaluateBuildPrismaGenerationContract(findings);
   const auditScriptInventoryContract = evaluateAuditScriptInventoryContract(findings);
   const environmentVariableContract = evaluateEnvironmentVariableContract(findings);
+  const clientSecretBoundaryContract = evaluateClientSecretBoundaryContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -5217,6 +5468,7 @@ function evaluate() {
     buildPrismaGenerationContract,
     auditScriptInventoryContract,
     environmentVariableContract,
+    clientSecretBoundaryContract,
     findings,
   };
 }
@@ -5276,6 +5528,17 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Client secret boundary contract");
+  lines.push("");
+  lines.push(`Scanned files: ${result.clientSecretBoundaryContract.scannedFiles}`);
+  lines.push(`Private env references in client/public surfaces: ${result.clientSecretBoundaryContract.privateEnvReferencesInClientSurface}`);
+  lines.push(`Live-secret patterns in public/docs surfaces: ${result.clientSecretBoundaryContract.liveSecretPatternsInClientSurface}`);
+  lines.push(`Secret-like NEXT_PUBLIC names: ${result.clientSecretBoundaryContract.nextPublicSecretLikeNames}`);
+  lines.push("Allowed publishable public env names: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, NEXT_PUBLIC_*_PUBLISHABLE_KEY");
+  lines.push(`Server-only private env references allowed: ${result.clientSecretBoundaryContract.serverOnlyPrivateEnvReferencesAllowed}`);
+  lines.push(`API routes excluded from client scan: ${result.clientSecretBoundaryContract.apiRoutesExcludedFromClientScan}`);
+  lines.push(`Client boundary roots present: ${JSON.stringify(result.clientSecretBoundaryContract.clientBoundaryRootsPresent)}`);
+  lines.push("");
   lines.push("## Environment variable contract");
   lines.push("");
   lines.push(`package.json exists: ${result.environmentVariableContract.packageJsonExists}`);
@@ -5723,6 +5986,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-034 Client Secret Boundary Contract: verifies private env references and live-secret patterns do not appear in client/public surfaces, while server-only API/storage/auth code can use private env safely.");
   lines.push("- D-033 Environment Variable Contract: verifies database, Upstash, quota, dev-key, storage, S3, deploy-hook, and production-runtime env references without checking secret values.");
   lines.push("- D-032 Audit Script Inventory Contract: verifies audit script files, package script bindings, .audit report output, fail exits, pass messages, and non-stubbed implementations.");
   lines.push("- D-031 Build Prisma Generation Contract: verifies Prisma generation, build script order, Prisma dependency alignment, schema generator/datasource, and build inclusion in audit gates.");
