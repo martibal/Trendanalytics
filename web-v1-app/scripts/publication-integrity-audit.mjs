@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const rateLimitPath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
 const entitlementsPath = path.join(root, "src", "lib", "auth", "entitlements.ts");
 const webPublicPublishedRoot = path.join(root, "public", "data", "published", "v1");
 
@@ -3569,6 +3570,170 @@ function evaluateEntitlementMatrixContract(findings) {
 
   return result;
 }
+function evaluateRateLimitQuotaContract(findings) {
+  const result = {
+    rateLimitModuleExists: fs.existsSync(rateLimitPath),
+    hasUpstashImports: false,
+    tierTypeBasicProOnly: false,
+    decisionSourcesIncludeFailClosed: false,
+    perMinuteWindow60s: false,
+    basicPerMinute60: false,
+    proPerMinute300: false,
+    failClosedRetryAfter60: false,
+    dailyQuotaDefaultsValid: false,
+    invalidDailyQuotaFallbacksValid: false,
+    productionRuntimeDetection: false,
+    redisRequiresUrlAndToken: false,
+    upstashSlidingWindowConfigured: false,
+    memoryFallbackOutsideProduction: false,
+    failClosedWhenRedisMissingInProduction: false,
+    failClosedWhenRateLimitBackendThrowsInProduction: false,
+    failClosedWhenDailyQuotaBackendThrowsInProduction: false,
+    dailyQuotaKeyIncludesDayTierAccountKey: false,
+    dailyQuotaExpiresAtUtcMidnight: false,
+    rateLimitHeadersValid: false,
+    dailyQuotaHeadersValid: false,
+    exportedEnforcersPresent: false,
+  };
+
+  if (!result.rateLimitModuleExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-026",
+      "RATE_LIMIT_MODULE_MISSING",
+      path.relative(root, rateLimitPath),
+      "Rate-limit module is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(rateLimitPath, "utf8").replace(/^\uFEFF/u, "");
+
+  result.hasUpstashImports =
+    source.includes('import { Ratelimit } from "@upstash/ratelimit";') &&
+    source.includes('import { Redis } from "@upstash/redis";');
+
+  result.tierTypeBasicProOnly =
+    source.includes('export type RateLimitTier = Extract<SubscriptionTier, "basic" | "pro">;');
+
+  result.decisionSourcesIncludeFailClosed =
+    source.includes('source: "upstash" | "memory" | "fail_closed";');
+
+  result.perMinuteWindow60s = source.includes("const WINDOW_MS = 60_000;");
+  result.basicPerMinute60 = source.includes("const BASIC_LIMIT = 60;");
+  result.proPerMinute300 = source.includes("const PRO_LIMIT = 300;");
+  result.failClosedRetryAfter60 = source.includes("const FAIL_CLOSED_RETRY_AFTER_SECONDS = 60;");
+
+  result.dailyQuotaDefaultsValid =
+    source.includes('process.env.BASIC_DAILY_API_QUOTA ?? "500"') &&
+    source.includes('process.env.PRO_DAILY_API_QUOTA ?? "5000"');
+
+  result.invalidDailyQuotaFallbacksValid =
+    source.includes('return tier === "pro" ? 5_000 : 500;') &&
+    source.includes("return Math.floor(value);");
+
+  result.productionRuntimeDetection =
+    source.includes('process.env.NODE_ENV === "production"') &&
+    source.includes('process.env.VERCEL_ENV === "production"');
+
+  result.redisRequiresUrlAndToken =
+    source.includes("process.env.UPSTASH_REDIS_REST_URL") &&
+    source.includes("process.env.UPSTASH_REDIS_REST_TOKEN") &&
+    source.includes("if (!url || !token)") &&
+    source.includes("return null;");
+
+  result.upstashSlidingWindowConfigured =
+    source.includes("Ratelimit.slidingWindow(getLimitForTier(tier), \"60 s\")") &&
+    source.includes("prefix: `ta:rl:${tier}`");
+
+  result.memoryFallbackOutsideProduction =
+    source.includes("return applyMemoryRateLimit(accountId, tier);") &&
+    source.includes("return applyMemoryDailyQuota(accountId, apiKeyId, tier);");
+
+  result.failClosedWhenRedisMissingInProduction =
+    source.includes("production rate-limit backend is not configured; failing closed") &&
+    source.includes("return buildFailClosedDecision(tier);") &&
+    source.includes("production daily quota backend is not configured; failing closed") &&
+    source.includes("return buildDailyQuotaFailClosedDecision(tier);");
+
+  result.failClosedWhenRateLimitBackendThrowsInProduction =
+    source.includes("[rateLimit] rate-limit backend failed") &&
+    source.includes("if (isProductionRuntime())") &&
+    source.includes("return buildFailClosedDecision(tier);");
+
+  result.failClosedWhenDailyQuotaBackendThrowsInProduction =
+    source.includes("[rateLimit] daily quota backend failed") &&
+    source.includes("return buildDailyQuotaFailClosedDecision(tier);");
+
+  result.dailyQuotaKeyIncludesDayTierAccountKey =
+    source.includes("function buildDailyQuotaMemoryKey(accountId: string, apiKeyId: string, tier: RateLimitTier): string") &&
+    source.includes("return `${getUtcDayToken()}:${tier}:${accountId}:${apiKeyId}`;") &&
+    source.includes("const key = `ta:quota:${day}:${tier}:${accountId}:${apiKeyId}`;");
+
+  result.dailyQuotaExpiresAtUtcMidnight =
+    source.includes("function getNextUtcMidnightMs(nowMs = Date.now()): number") &&
+    source.includes("Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0)") &&
+    source.includes("redis.expire(key, ttlSeconds)");
+
+  result.rateLimitHeadersValid =
+    source.includes('"X-RateLimit-Limit": String(decision.limit)') &&
+    source.includes('"X-RateLimit-Remaining": String(decision.remaining)') &&
+    source.includes('"X-RateLimit-Reset": String(Math.floor(decision.reset / 1000))') &&
+    source.includes('headers["Retry-After"] = String(decision.retryAfter);');
+
+  result.dailyQuotaHeadersValid =
+    source.includes('"X-DailyQuota-Limit": String(decision.limit)') &&
+    source.includes('"X-DailyQuota-Remaining": String(decision.remaining)') &&
+    source.includes('"X-DailyQuota-Reset": String(Math.floor(decision.reset / 1000))') &&
+    source.includes('headers["Retry-After"] = String(decision.retryAfter);');
+
+  result.exportedEnforcersPresent =
+    source.includes("export async function enforceDailyApiQuota(") &&
+    source.includes("export async function enforceAccountRateLimit(") &&
+    source.includes("export function buildDailyQuotaHeaders(") &&
+    source.includes("export function buildRateLimitHeaders(");
+
+  const requiredChecks = [
+    ["RATE_LIMIT_UPSTASH_IMPORTS_MISSING", result.hasUpstashImports, "Rate-limit module must use Upstash Redis/Ratelimit."],
+    ["RATE_LIMIT_TIER_TYPE_INVALID", result.tierTypeBasicProOnly, "RateLimitTier must be limited to basic/pro subscriptions."],
+    ["RATE_LIMIT_DECISION_SOURCE_INVALID", result.decisionSourcesIncludeFailClosed, "Rate-limit decisions must include upstash, memory, and fail_closed sources."],
+    ["RATE_LIMIT_WINDOW_INVALID", result.perMinuteWindow60s, "Per-minute rate-limit window must be 60 seconds."],
+    ["RATE_LIMIT_BASIC_LIMIT_INVALID", result.basicPerMinute60, "Basic per-minute limit must remain 60."],
+    ["RATE_LIMIT_PRO_LIMIT_INVALID", result.proPerMinute300, "Pro per-minute limit must remain 300."],
+    ["RATE_LIMIT_FAIL_CLOSED_RETRY_AFTER_INVALID", result.failClosedRetryAfter60, "Fail-closed retry-after must remain 60 seconds."],
+    ["RATE_LIMIT_DAILY_QUOTA_DEFAULTS_INVALID", result.dailyQuotaDefaultsValid, "Daily quota defaults must be BASIC=500 and PRO=5000 unless overridden by env."],
+    ["RATE_LIMIT_DAILY_QUOTA_FALLBACKS_INVALID", result.invalidDailyQuotaFallbacksValid, "Invalid daily quota env values must fall back to 500/5000."],
+    ["RATE_LIMIT_PRODUCTION_DETECTION_MISSING", result.productionRuntimeDetection, "Production runtime detection must include NODE_ENV and VERCEL_ENV."],
+    ["RATE_LIMIT_REDIS_CONFIG_GUARD_MISSING", result.redisRequiresUrlAndToken, "Redis client must require both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN."],
+    ["RATE_LIMIT_UPSTASH_SLIDING_WINDOW_MISSING", result.upstashSlidingWindowConfigured, "Upstash limiter must use a 60s sliding window with tier prefix."],
+    ["RATE_LIMIT_MEMORY_FALLBACK_MISSING", result.memoryFallbackOutsideProduction, "Non-production mode must retain memory fallback for local development."],
+    ["RATE_LIMIT_FAIL_CLOSED_MISSING_REDIS_MISSING", result.failClosedWhenRedisMissingInProduction, "Production must fail closed if Redis/rate-limit backend is not configured."],
+    ["RATE_LIMIT_FAIL_CLOSED_RATE_BACKEND_THROW_MISSING", result.failClosedWhenRateLimitBackendThrowsInProduction, "Production must fail closed when account rate-limit backend throws."],
+    ["RATE_LIMIT_FAIL_CLOSED_DAILY_BACKEND_THROW_MISSING", result.failClosedWhenDailyQuotaBackendThrowsInProduction, "Production must fail closed when daily quota backend throws."],
+    ["RATE_LIMIT_DAILY_QUOTA_KEY_INVALID", result.dailyQuotaKeyIncludesDayTierAccountKey, "Daily quota keys must include UTC day, tier, account id, and API key id."],
+    ["RATE_LIMIT_DAILY_QUOTA_TTL_INVALID", result.dailyQuotaExpiresAtUtcMidnight, "Daily quotas must reset at next UTC midnight and set Redis TTL."],
+    ["RATE_LIMIT_HEADERS_INVALID", result.rateLimitHeadersValid, "Rate-limit response headers must include limit, remaining, reset, and Retry-After on failure."],
+    ["RATE_LIMIT_DAILY_HEADERS_INVALID", result.dailyQuotaHeadersValid, "Daily quota response headers must include limit, remaining, reset, and Retry-After on failure."],
+    ["RATE_LIMIT_EXPORTED_ENFORCERS_MISSING", result.exportedEnforcersPresent, "Rate-limit module must export enforcers and header builders used by API routes."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-026",
+        code,
+        path.relative(root, rateLimitPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -3601,6 +3766,7 @@ function evaluate() {
   const publicPrivateArtifactBoundaryContract = evaluatePublicPrivateArtifactBoundaryContract(findings);
   const fileApiResponseBoundaryContract = evaluateFileApiResponseBoundaryContract(findings);
   const entitlementMatrixContract = evaluateEntitlementMatrixContract(findings);
+  const rateLimitQuotaContract = evaluateRateLimitQuotaContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -3629,6 +3795,7 @@ function evaluate() {
     publicPrivateArtifactBoundaryContract,
     fileApiResponseBoundaryContract,
     entitlementMatrixContract,
+    rateLimitQuotaContract,
     findings,
   };
 }
@@ -3688,6 +3855,31 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Rate limit quota contract");
+  lines.push("");
+  lines.push(`Rate-limit module exists: ${result.rateLimitQuotaContract.rateLimitModuleExists}`);
+  lines.push(`Upstash imports present: ${result.rateLimitQuotaContract.hasUpstashImports}`);
+  lines.push(`Tier type basic/pro only: ${result.rateLimitQuotaContract.tierTypeBasicProOnly}`);
+  lines.push(`Decision sources include fail_closed: ${result.rateLimitQuotaContract.decisionSourcesIncludeFailClosed}`);
+  lines.push(`60s per-minute window: ${result.rateLimitQuotaContract.perMinuteWindow60s}`);
+  lines.push(`Basic per-minute limit 60: ${result.rateLimitQuotaContract.basicPerMinute60}`);
+  lines.push(`Pro per-minute limit 300: ${result.rateLimitQuotaContract.proPerMinute300}`);
+  lines.push(`Fail-closed retry-after 60: ${result.rateLimitQuotaContract.failClosedRetryAfter60}`);
+  lines.push(`Daily quota defaults valid: ${result.rateLimitQuotaContract.dailyQuotaDefaultsValid}`);
+  lines.push(`Invalid daily quota fallbacks valid: ${result.rateLimitQuotaContract.invalidDailyQuotaFallbacksValid}`);
+  lines.push(`Production runtime detection: ${result.rateLimitQuotaContract.productionRuntimeDetection}`);
+  lines.push(`Redis requires URL and token: ${result.rateLimitQuotaContract.redisRequiresUrlAndToken}`);
+  lines.push(`Upstash sliding window configured: ${result.rateLimitQuotaContract.upstashSlidingWindowConfigured}`);
+  lines.push(`Memory fallback outside production: ${result.rateLimitQuotaContract.memoryFallbackOutsideProduction}`);
+  lines.push(`Fail-closed when Redis missing in production: ${result.rateLimitQuotaContract.failClosedWhenRedisMissingInProduction}`);
+  lines.push(`Fail-closed when rate backend throws in production: ${result.rateLimitQuotaContract.failClosedWhenRateLimitBackendThrowsInProduction}`);
+  lines.push(`Fail-closed when daily backend throws in production: ${result.rateLimitQuotaContract.failClosedWhenDailyQuotaBackendThrowsInProduction}`);
+  lines.push(`Daily quota key includes day/tier/account/key: ${result.rateLimitQuotaContract.dailyQuotaKeyIncludesDayTierAccountKey}`);
+  lines.push(`Daily quota expires at UTC midnight: ${result.rateLimitQuotaContract.dailyQuotaExpiresAtUtcMidnight}`);
+  lines.push(`Rate-limit headers valid: ${result.rateLimitQuotaContract.rateLimitHeadersValid}`);
+  lines.push(`Daily quota headers valid: ${result.rateLimitQuotaContract.dailyQuotaHeadersValid}`);
+  lines.push(`Exported enforcers present: ${result.rateLimitQuotaContract.exportedEnforcersPresent}`);
+  lines.push("");
   lines.push("## Entitlement matrix contract");
   lines.push("");
   lines.push(`Entitlements module exists: ${result.entitlementMatrixContract.entitlementsExists}`);
@@ -3961,6 +4153,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-026 Rate Limit Quota Contract: verifies per-minute limits, daily quotas, headers, Upstash config, memory fallback, and production fail-closed behavior.");
   lines.push("- D-025 Entitlement Matrix Contract: verifies public/basic/pro access matrix, chain/window/history limits, and entitlement decision order.");
   lines.push("- D-024 File API Response Boundary Contract: verifies file delivery authenticates, rate-limits, entitles, sanitizes paths, and returns private no-store responses before storage read.");
   lines.push("- D-023 Public/Private Artifact Boundary Contract: verifies subscriber-bound gold/meta/derived artifacts cannot resolve from or live under web public data.");
