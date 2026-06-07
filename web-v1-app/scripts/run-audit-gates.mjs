@@ -13,6 +13,11 @@ const steps = [
     args: ["run", "check:public-copy-guard"],
   },
   {
+    name: "API contract audit",
+    command: "npm",
+    args: ["run", "check:api-contract"],
+  },
+  {
     name: "Calculation correctness audit",
     command: "npm",
     args: ["run", "check:calculation-correctness"],
@@ -21,11 +26,6 @@ const steps = [
     name: "Publication integrity audit",
     command: "npm",
     args: ["run", "check:publication-integrity"],
-  },
-  {
-    name: "API contract audit",
-    command: "npm",
-    args: ["run", "check:api-contract"],
   },
   ...(skipBuild
     ? []

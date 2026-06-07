@@ -7,6 +7,8 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const auditGateRunnerPath = path.join(root, "scripts", "run-audit-gates.mjs");
+const packageJsonPath = path.join(root, "package.json");
 const prismaSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeysPath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const validateTokenPath = path.join(root, "src", "lib", "auth", "validateToken.ts");
@@ -4406,6 +4408,157 @@ function evaluateStorageAdapterContract(findings) {
 
   return result;
 }
+function evaluateAuditGateRunnerContract(findings) {
+  const result = {
+    packageJsonExists: fs.existsSync(packageJsonPath),
+    runnerExists: fs.existsSync(auditGateRunnerPath),
+
+    packageScriptsValid: false,
+    packageAuditGateScriptsValid: false,
+
+    runnerUsesSpawnSync: false,
+    runnerSupportsSkipBuild: false,
+    runnerOrderValid: false,
+    runnerIncludesBuildUnlessSkipped: false,
+    runnerStopsOnSpawnError: false,
+    runnerStopsOnRedGate: false,
+    runnerWarnsDoNotCommitPush: false,
+    runnerPassesOnlyAfterAllSteps: false,
+  };
+
+  let packageJson = null;
+  if (!result.packageJsonExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-030",
+      "PACKAGE_JSON_MISSING",
+      path.relative(root, packageJsonPath),
+      "package.json is missing, so audit gate scripts cannot be validated."
+    );
+  } else {
+    try {
+      packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8").replace(/^\uFEFF/u, ""));
+    } catch (error) {
+      addFinding(
+        findings,
+        "fail",
+        "D-030",
+        "PACKAGE_JSON_PARSE_FAILED",
+        path.relative(root, packageJsonPath),
+        `package.json could not be parsed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  if (!result.runnerExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-030",
+      "AUDIT_GATE_RUNNER_MISSING",
+      path.relative(root, auditGateRunnerPath),
+      "scripts/run-audit-gates.mjs is missing."
+    );
+  }
+
+  if (packageJson) {
+    const scripts = packageJson.scripts ?? {};
+    result.packageScriptsValid =
+      scripts["check:public-copy-guard"] === "node scripts/public-copy-guard.mjs" &&
+      scripts["check:api-contract"] === "node scripts/api-contract-audit.mjs" &&
+      scripts["check:calculation-correctness"] === "node scripts/calculation-correctness-audit.mjs" &&
+      scripts["check:publication-integrity"] === "node scripts/publication-integrity-audit.mjs";
+
+    result.packageAuditGateScriptsValid =
+      scripts["check:audit-gates"] === "node scripts/run-audit-gates.mjs" &&
+      scripts["check:audit-gates:no-build"] === "node scripts/run-audit-gates.mjs --skip-build";
+  }
+
+  if (result.runnerExists) {
+    const source = fs.readFileSync(auditGateRunnerPath, "utf8").replace(/^\uFEFF/u, "");
+    const normalized = source.replace(/\r\n/gu, "\n");
+
+    const publicIndex = normalized.indexOf('args: ["run", "check:public-copy-guard"]');
+    const apiIndex = normalized.indexOf('args: ["run", "check:api-contract"]');
+    const calculationIndex = normalized.indexOf('args: ["run", "check:calculation-correctness"]');
+    const publicationIndex = normalized.indexOf('args: ["run", "check:publication-integrity"]');
+    const buildIndex = normalized.indexOf('args: ["run", "build"]');
+
+    result.runnerUsesSpawnSync =
+      normalized.includes('import { spawnSync } from "node:child_process";') &&
+      normalized.includes("const result = spawnSync(step.command, step.args,");
+
+    result.runnerSupportsSkipBuild =
+      normalized.includes("const args = new Set(process.argv.slice(2));") &&
+      normalized.includes('const skipBuild = args.has("--skip-build");') &&
+      normalized.includes('console.log(`Build step: ${skipBuild ? "skipped" : "included"}`);');
+
+    result.runnerOrderValid =
+      publicIndex >= 0 &&
+      apiIndex >= 0 &&
+      calculationIndex >= 0 &&
+      publicationIndex >= 0 &&
+      publicIndex < apiIndex &&
+      apiIndex < calculationIndex &&
+      calculationIndex < publicationIndex;
+
+    result.runnerIncludesBuildUnlessSkipped =
+      buildIndex >= 0 &&
+      publicationIndex >= 0 &&
+      publicationIndex < buildIndex &&
+      normalized.includes("...(skipBuild") &&
+      normalized.includes("? []") &&
+      normalized.includes('name: "Production build"');
+
+    result.runnerStopsOnSpawnError =
+      normalized.includes("if (result.error)") &&
+      normalized.includes("Audit gate runner failed during:") &&
+      normalized.includes("process.exit(1);");
+
+    result.runnerStopsOnRedGate =
+      normalized.includes("if (result.status !== 0)") &&
+      normalized.includes("Audit gate runner stopped at red gate:") &&
+      normalized.includes("process.exit(result.status ?? 1);");
+
+    result.runnerWarnsDoNotCommitPush =
+      normalized.includes("Do not commit or push until this gate is green.");
+
+    result.runnerPassesOnlyAfterAllSteps =
+      normalized.includes("for (const [index, step] of steps.entries())") &&
+      normalized.includes("<<< PASS:") &&
+      normalized.includes("=== Audit gate runner passed ===") &&
+      normalized.indexOf("=== Audit gate runner passed ===") > normalized.indexOf("for (const [index, step] of steps.entries())");
+  }
+
+  const requiredChecks = [
+    ["AUDIT_GATE_PACKAGE_SCRIPTS_INVALID", result.packageScriptsValid, "package.json must define public-copy, API-contract, calculation-correctness, and publication-integrity audit scripts."],
+    ["AUDIT_GATE_PACKAGE_RUNNER_SCRIPTS_INVALID", result.packageAuditGateScriptsValid, "package.json must define check:audit-gates and check:audit-gates:no-build exactly."],
+    ["AUDIT_GATE_RUNNER_SPAWN_INVALID", result.runnerUsesSpawnSync, "Audit gate runner must execute npm scripts with spawnSync and inherit stdio."],
+    ["AUDIT_GATE_RUNNER_SKIP_BUILD_INVALID", result.runnerSupportsSkipBuild, "Audit gate runner must support --skip-build and print whether build is included."],
+    ["AUDIT_GATE_RUNNER_ORDER_INVALID", result.runnerOrderValid, "Audit gate runner order must be public-copy -> API-contract -> calculation-correctness -> publication-integrity."],
+    ["AUDIT_GATE_RUNNER_BUILD_ORDER_INVALID", result.runnerIncludesBuildUnlessSkipped, "Audit gate runner must run production build after audit gates unless --skip-build is provided."],
+    ["AUDIT_GATE_RUNNER_SPAWN_ERROR_HANDLING_INVALID", result.runnerStopsOnSpawnError, "Audit gate runner must stop on spawn errors."],
+    ["AUDIT_GATE_RUNNER_RED_GATE_HANDLING_INVALID", result.runnerStopsOnRedGate, "Audit gate runner must stop immediately on the first red gate."],
+    ["AUDIT_GATE_RUNNER_COMMIT_PUSH_WARNING_MISSING", result.runnerWarnsDoNotCommitPush, "Audit gate runner must warn not to commit/push until green."],
+    ["AUDIT_GATE_RUNNER_PASS_MESSAGE_ORDER_INVALID", result.runnerPassesOnlyAfterAllSteps, "Audit gate runner must only print final pass after iterating all steps."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-030",
+        code,
+        code.startsWith("AUDIT_GATE_PACKAGE_") ? path.relative(root, packageJsonPath) : path.relative(root, auditGateRunnerPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -4442,6 +4595,7 @@ function evaluate() {
   const apiKeyAuthContract = evaluateApiKeyAuthContract(findings);
   const databaseAuthSchemaContract = evaluateDatabaseAuthSchemaContract(findings);
   const storageAdapterContract = evaluateStorageAdapterContract(findings);
+  const auditGateRunnerContract = evaluateAuditGateRunnerContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -4474,6 +4628,7 @@ function evaluate() {
     apiKeyAuthContract,
     databaseAuthSchemaContract,
     storageAdapterContract,
+    auditGateRunnerContract,
     findings,
   };
 }
@@ -4533,6 +4688,21 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Audit gate runner contract");
+  lines.push("");
+  lines.push(`package.json exists: ${result.auditGateRunnerContract.packageJsonExists}`);
+  lines.push(`Runner exists: ${result.auditGateRunnerContract.runnerExists}`);
+  lines.push(`Package audit scripts valid: ${result.auditGateRunnerContract.packageScriptsValid}`);
+  lines.push(`Package runner scripts valid: ${result.auditGateRunnerContract.packageAuditGateScriptsValid}`);
+  lines.push(`Runner uses spawnSync: ${result.auditGateRunnerContract.runnerUsesSpawnSync}`);
+  lines.push(`Runner supports --skip-build: ${result.auditGateRunnerContract.runnerSupportsSkipBuild}`);
+  lines.push(`Runner order valid: ${result.auditGateRunnerContract.runnerOrderValid}`);
+  lines.push(`Runner includes build unless skipped: ${result.auditGateRunnerContract.runnerIncludesBuildUnlessSkipped}`);
+  lines.push(`Runner stops on spawn error: ${result.auditGateRunnerContract.runnerStopsOnSpawnError}`);
+  lines.push(`Runner stops on red gate: ${result.auditGateRunnerContract.runnerStopsOnRedGate}`);
+  lines.push(`Runner warns do-not-commit/push: ${result.auditGateRunnerContract.runnerWarnsDoNotCommitPush}`);
+  lines.push(`Runner final pass after all steps: ${result.auditGateRunnerContract.runnerPassesOnlyAfterAllSteps}`);
+  lines.push("");
   lines.push("## Storage adapter contract");
   lines.push("");
   lines.push(`Storage index exists: ${result.storageAdapterContract.storageIndexExists}`);
@@ -4908,6 +5078,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-030 Audit Gate Runner Contract: verifies package scripts and run-audit-gates order/skip-build/fail-fast behavior.");
   lines.push("- D-029 Storage Adapter Contract: verifies local/S3 storage path normalization, source selection, private-data roots, S3 env contract, content metadata, not-found behavior, and public fallback exclusion.");
   lines.push("- D-028 Database Auth Schema Contract: verifies Prisma auth/subscription/API-key/custom-output schema, indexes, and storage-critical fields.");
   lines.push("- D-027 API Key Auth Contract: verifies X-API-Key validation, production key shape, dev-key isolation, persisted scrypt verification, status handling, and auth error redaction.");
