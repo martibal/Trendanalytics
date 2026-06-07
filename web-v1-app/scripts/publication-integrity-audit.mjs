@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const entitlementHelperModulePath = path.join(root, "src", "lib", "auth", "entitlements.ts");
 const auditLogModulePath = path.join(root, "src", "lib", "auditLog.ts");
 const preAuthRateLimitPath = path.join(root, "src", "lib", "security", "preAuthRateLimit.ts");
 const originSecurityPath = path.join(root, "src", "lib", "security", "origin.ts");
@@ -7568,6 +7569,342 @@ function evaluateAuditLogRequestIdContract(findings) {
 
   return result;
 }
+function evaluateEntitlementSnapshotHelperContract(findings) {
+  const result = {
+    moduleExists: fs.existsSync(entitlementHelperModulePath),
+
+    pureHelperNoRuntimeSecrets: false,
+    typeDefinitionsValid: false,
+    snapshotShapeValid: false,
+    decisionCodesValid: false,
+    scopeShapeValid: false,
+    chainGenreWindowConstantsValid: false,
+    windowDaysMappingValid: false,
+    cloneHelpersPreventSharedMutation: false,
+    windowTokenHelpersValid: false,
+
+    proSnapshotValid: false,
+    basicSnapshotValid: false,
+    publicSnapshotValid: false,
+
+    accessHelpersValid: false,
+    labelHelpersValid: false,
+    dateRangeNoRangeAllowsAccess: false,
+    dateRangeRequiresBothDates: false,
+    dateRangeRejectsInvalidDates: false,
+    dateRangeRejectsEndBeforeStart: false,
+    dateRangeAllowsFullHistory: false,
+    dateRangeInclusiveDaysEnforced: false,
+
+    evaluateBuildsSnapshotFirst: false,
+    evaluateRejectsPublic: false,
+    evaluateRejectsInactive: false,
+    evaluateRejectsForbiddenChainGenreWindow: false,
+    evaluateChecksDateRangeAfterScope: false,
+    evaluateReturnsOkWithSnapshot: false,
+
+    factoryPublicEntitlementValid: false,
+    factoryBasicEntitlementValid: false,
+    factoryProEntitlementValid: false,
+  };
+
+  if (!result.moduleExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-043",
+      "ENTITLEMENT_HELPER_MODULE_MISSING",
+      path.relative(root, entitlementHelperModulePath),
+      "src/lib/auth/entitlements.ts is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(entitlementHelperModulePath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  result.pureHelperNoRuntimeSecrets =
+    normalized.includes('import type { ChainId } from "@/config/chains";') &&
+    !normalized.includes("process.env") &&
+    !normalized.includes("@clerk/nextjs") &&
+    !normalized.includes("@prisma/client") &&
+    !normalized.includes("Stripe") &&
+    !normalized.includes("@/lib/db") &&
+    !normalized.includes("server-only");
+
+  result.typeDefinitionsValid =
+    normalized.includes('export type SubscriptionTier = "public" | "basic" | "pro";') &&
+    normalized.includes('export type SubscriptionStatus = "active" | "inactive";') &&
+    normalized.includes('export type FileGenre = "gold" | "meta" | "derived" | "briefs";') &&
+    normalized.includes('export type WindowToken = "latest" | "7d" | "30d" | "90d" | "180d" | "365d";') &&
+    normalized.includes("export type EntitlementInput = {") &&
+    normalized.includes("tier: SubscriptionTier;") &&
+    normalized.includes("status: SubscriptionStatus;") &&
+    normalized.includes("entitledChain: ChainId | null;") &&
+    normalized.includes("historyUnlocked: boolean;");
+
+  result.snapshotShapeValid =
+    normalized.includes("export type EntitlementSnapshot = {") &&
+    normalized.includes("allowedChains: ChainId[];") &&
+    normalized.includes("allowedGenres: FileGenre[];") &&
+    normalized.includes("allowedWindows: WindowToken[];") &&
+    normalized.includes("maxWindowDays: number;") &&
+    normalized.includes("historyDepthDays: number | null;") &&
+    normalized.includes("fullHistory: boolean;") &&
+    normalized.includes("customThresholdFeeds: boolean;");
+
+  result.decisionCodesValid =
+    normalized.includes('export type EntitlementDecisionCode =') &&
+    normalized.includes('"ok"') &&
+    normalized.includes('"inactive_subscription"') &&
+    normalized.includes('"forbidden_chain"') &&
+    normalized.includes('"forbidden_genre"') &&
+    normalized.includes('"forbidden_window"') &&
+    normalized.includes('"forbidden_history_range"') &&
+    normalized.includes('"invalid_date_range"') &&
+    normalized.includes("export type EntitlementDecision = {") &&
+    normalized.includes("ok: boolean;") &&
+    normalized.includes("snapshot: EntitlementSnapshot;") &&
+    normalized.includes("detail?: string;");
+
+  result.scopeShapeValid =
+    normalized.includes("export type FileRequestScope = {") &&
+    normalized.includes("chain: ChainId;") &&
+    normalized.includes("genre: FileGenre;") &&
+    normalized.includes("window: WindowToken;") &&
+    normalized.includes("startDate?: string | null;") &&
+    normalized.includes("endDate?: string | null;");
+
+  result.chainGenreWindowConstantsValid =
+    normalized.includes('const ALL_CHAINS: ChainId[] = ["bitcoin", "ethereum", "arbitrum", "base"];') &&
+    normalized.includes('const ALL_GENRES: FileGenre[] = ["gold", "meta", "derived", "briefs"];') &&
+    normalized.includes('const BASIC_WINDOWS: WindowToken[] = ["latest", "7d", "30d", "90d"];') &&
+    normalized.includes('const PRO_WINDOWS: WindowToken[] = ["latest", "7d", "30d", "90d", "180d", "365d"];');
+
+  result.windowDaysMappingValid =
+    normalized.includes('const WINDOW_TO_DAYS: Record<Exclude<WindowToken, "latest">, number> = {') &&
+    normalized.includes('"7d": 7') &&
+    normalized.includes('"30d": 30') &&
+    normalized.includes('"90d": 90') &&
+    normalized.includes('"180d": 180') &&
+    normalized.includes('"365d": 365');
+
+  result.cloneHelpersPreventSharedMutation =
+    normalized.includes("function cloneChains(chains: ChainId[]): ChainId[]") &&
+    normalized.includes("return [...chains];") &&
+    normalized.includes("function cloneGenres(genres: FileGenre[]): FileGenre[]") &&
+    normalized.includes("function cloneWindows(windows: WindowToken[]): WindowToken[]");
+
+  result.windowTokenHelpersValid =
+    normalized.includes("export function windowTokenToDays(window: WindowToken): number | null") &&
+    normalized.includes('if (window === "latest") return null;') &&
+    normalized.includes("return WINDOW_TO_DAYS[window];") &&
+    normalized.includes("export function isWindowToken(value: string): value is WindowToken") &&
+    normalized.includes('return value === "latest" || value === "7d" || value === "30d" || value === "90d" || value === "180d" || value === "365d";');
+
+  const proIndex = normalized.indexOf('if (input.tier === "pro")');
+  const basicIndex = normalized.indexOf('if (input.tier === "basic")');
+  const publicIndex = normalized.indexOf("return {\n    tier: \"public\"");
+  const proSource = proIndex >= 0 && basicIndex > proIndex ? normalized.slice(proIndex, basicIndex) : "";
+  const basicSource = basicIndex >= 0 && publicIndex > basicIndex ? normalized.slice(basicIndex, publicIndex) : "";
+  const publicSource = publicIndex >= 0 ? normalized.slice(publicIndex, normalized.indexOf("\n}\n\nexport function canAccessChain", publicIndex)) : "";
+
+  result.proSnapshotValid =
+    proSource.includes('tier: "pro"') &&
+    proSource.includes("status: input.status") &&
+    proSource.includes("entitledChain: null") &&
+    proSource.includes("historyUnlocked: input.historyUnlocked") &&
+    proSource.includes("allowedChains: cloneChains(ALL_CHAINS)") &&
+    proSource.includes("allowedGenres: cloneGenres(ALL_GENRES)") &&
+    proSource.includes("allowedWindows: cloneWindows(PRO_WINDOWS)") &&
+    proSource.includes("maxWindowDays: 365") &&
+    proSource.includes("historyDepthDays: input.historyUnlocked ? null : 365") &&
+    proSource.includes("fullHistory: input.historyUnlocked") &&
+    proSource.includes("customThresholdFeeds: true");
+
+  result.basicSnapshotValid =
+    basicSource.includes("const allowedChains = input.entitledChain ? [input.entitledChain] : [];") &&
+    basicSource.includes('tier: "basic"') &&
+    basicSource.includes("status: input.status") &&
+    basicSource.includes("entitledChain: input.entitledChain") &&
+    basicSource.includes("historyUnlocked: input.historyUnlocked") &&
+    basicSource.includes("allowedChains") &&
+    basicSource.includes("allowedGenres: cloneGenres(ALL_GENRES)") &&
+    basicSource.includes("allowedWindows: cloneWindows(BASIC_WINDOWS)") &&
+    basicSource.includes("maxWindowDays: 90") &&
+    basicSource.includes("historyDepthDays: input.historyUnlocked ? null : 90") &&
+    basicSource.includes("fullHistory: input.historyUnlocked") &&
+    basicSource.includes("customThresholdFeeds: false");
+
+  result.publicSnapshotValid =
+    publicSource.includes('tier: "public"') &&
+    publicSource.includes("status: input.status") &&
+    publicSource.includes("entitledChain: null") &&
+    publicSource.includes("historyUnlocked: false") &&
+    publicSource.includes("allowedChains: []") &&
+    publicSource.includes("allowedGenres: []") &&
+    publicSource.includes("allowedWindows: []") &&
+    publicSource.includes("maxWindowDays: 0") &&
+    publicSource.includes("historyDepthDays: 0") &&
+    publicSource.includes("fullHistory: false") &&
+    publicSource.includes("customThresholdFeeds: false");
+
+  result.accessHelpersValid =
+    normalized.includes("export function canAccessChain(snapshot: EntitlementSnapshot, chain: ChainId): boolean") &&
+    normalized.includes("return snapshot.allowedChains.includes(chain);") &&
+    normalized.includes("export function canAccessGenre(snapshot: EntitlementSnapshot, genre: FileGenre): boolean") &&
+    normalized.includes("return snapshot.allowedGenres.includes(genre);") &&
+    normalized.includes("export function canAccessWindow(snapshot: EntitlementSnapshot, window: WindowToken): boolean") &&
+    normalized.includes("return snapshot.allowedWindows.includes(window);");
+
+  result.labelHelpersValid =
+    normalized.includes("export function getHistoryDepthLabel(snapshot: EntitlementSnapshot): string") &&
+    normalized.includes('if (snapshot.tier === "public") return "No subscriber history access";') &&
+    normalized.includes('if (snapshot.fullHistory) return "Full available history";') &&
+    normalized.includes('if (snapshot.historyDepthDays == null) return "Full available history";') &&
+    normalized.includes('return `${snapshot.historyDepthDays} days`;') &&
+    normalized.includes("export function getEntitledChainLabel(snapshot: EntitlementSnapshot): string") &&
+    normalized.includes('if (snapshot.tier === "pro") return "All chains";') &&
+    normalized.includes('if (snapshot.tier === "basic") return snapshot.entitledChain ?? "Selection required";') &&
+    normalized.includes('return "No API entitlement";');
+
+  result.dateRangeNoRangeAllowsAccess =
+    normalized.includes("if (!startDate && !endDate)") &&
+    normalized.includes('return { ok: true, code: "ok" };');
+
+  result.dateRangeRequiresBothDates =
+    normalized.includes("if (!startDate || !endDate)") &&
+    normalized.includes('code: "invalid_date_range"') &&
+    normalized.includes("Both startDate and endDate must be present when date-range access is requested.");
+
+  result.dateRangeRejectsInvalidDates =
+    normalized.includes("const start = new Date(startDate);") &&
+    normalized.includes("const end = new Date(endDate);") &&
+    normalized.includes("if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()))") &&
+    normalized.includes("Date range contains an invalid ISO date.");
+
+  result.dateRangeRejectsEndBeforeStart =
+    normalized.includes("if (end < start)") &&
+    normalized.includes("endDate must be on or after startDate.");
+
+  result.dateRangeAllowsFullHistory =
+    normalized.includes("if (snapshot.fullHistory || snapshot.historyDepthDays == null)") &&
+    normalized.includes('return { ok: true, code: "ok" };');
+
+  result.dateRangeInclusiveDaysEnforced =
+    normalized.includes("const inclusiveDays = Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;") &&
+    normalized.includes("if (inclusiveDays > snapshot.historyDepthDays)") &&
+    normalized.includes('code: "forbidden_history_range"') &&
+    normalized.includes("Requested date span ${inclusiveDays}d exceeds allowed history depth ${snapshot.historyDepthDays}d.");
+
+  const evaluateIndex = normalized.indexOf("export function evaluateFileEntitlement(");
+  const evaluateSource = evaluateIndex >= 0 ? normalized.slice(evaluateIndex, normalized.indexOf("\n}\n\nexport function createPublicEntitlement", evaluateIndex)) : "";
+
+  result.evaluateBuildsSnapshotFirst =
+    evaluateSource.includes("const snapshot = buildEntitlementSnapshot(entitlement);");
+
+  result.evaluateRejectsPublic =
+    evaluateSource.includes('if (snapshot.tier === "public")') &&
+    evaluateSource.includes('code: "inactive_subscription"') &&
+    evaluateSource.includes("Public users do not have authenticated file-delivery access.");
+
+  result.evaluateRejectsInactive =
+    evaluateSource.includes('if (snapshot.status !== "active")') &&
+    evaluateSource.includes("Subscription is not active.");
+
+  result.evaluateRejectsForbiddenChainGenreWindow =
+    evaluateSource.includes("if (!canAccessChain(snapshot, scope.chain))") &&
+    evaluateSource.includes('code: "forbidden_chain"') &&
+    evaluateSource.includes("if (!canAccessGenre(snapshot, scope.genre))") &&
+    evaluateSource.includes('code: "forbidden_genre"') &&
+    evaluateSource.includes("if (!canAccessWindow(snapshot, scope.window))") &&
+    evaluateSource.includes('code: "forbidden_window"');
+
+  result.evaluateChecksDateRangeAfterScope =
+    evaluateSource.includes("const dateRangeDecision = validateDateRangeWithinHistory(") &&
+    evaluateSource.includes("scope.startDate") &&
+    evaluateSource.includes("scope.endDate") &&
+    evaluateSource.includes("if (!dateRangeDecision.ok)") &&
+    evaluateSource.includes("code: dateRangeDecision.code");
+
+  result.evaluateReturnsOkWithSnapshot =
+    evaluateSource.includes("return {\n    ok: true,\n    code: \"ok\",\n    snapshot,\n  };");
+
+  result.factoryPublicEntitlementValid =
+    normalized.includes("export function createPublicEntitlement(): EntitlementInput") &&
+    normalized.includes('tier: "public"') &&
+    normalized.includes('status: "inactive"') &&
+    normalized.includes("entitledChain: null") &&
+    normalized.includes("historyUnlocked: false");
+
+  result.factoryBasicEntitlementValid =
+    normalized.includes("export function createBasicEntitlement(") &&
+    normalized.includes("entitledChain: ChainId | null") &&
+    normalized.includes("options?: {") &&
+    normalized.includes("status?: SubscriptionStatus;") &&
+    normalized.includes("historyUnlocked?: boolean;") &&
+    normalized.includes('tier: "basic"') &&
+    normalized.includes("status: options?.status ?? \"active\"") &&
+    normalized.includes("entitledChain,") &&
+    normalized.includes("historyUnlocked: options?.historyUnlocked ?? false");
+
+  result.factoryProEntitlementValid =
+    normalized.includes("export function createProEntitlement(options?: {") &&
+    normalized.includes("status?: SubscriptionStatus;") &&
+    normalized.includes("historyUnlocked?: boolean;") &&
+    normalized.includes('tier: "pro"') &&
+    normalized.includes("status: options?.status ?? \"active\"") &&
+    normalized.includes("entitledChain: null") &&
+    normalized.includes("historyUnlocked: options?.historyUnlocked ?? false");
+
+  const requiredChecks = [
+    ["ENTITLEMENT_HELPER_NOT_PURE", result.pureHelperNoRuntimeSecrets, "Entitlement helper must remain pure: type-only ChainId import, no env/db/Clerk/Stripe/server-only runtime dependency."],
+    ["ENTITLEMENT_TYPES_INVALID", result.typeDefinitionsValid, "Entitlement tier/status/genre/window/input types must stay stable."],
+    ["ENTITLEMENT_SNAPSHOT_SHAPE_INVALID", result.snapshotShapeValid, "EntitlementSnapshot shape must include chains/genres/windows/maxWindow/history/custom feeds."],
+    ["ENTITLEMENT_DECISION_CODES_INVALID", result.decisionCodesValid, "Entitlement decisions must preserve ok/inactive/forbidden/invalid-history codes."],
+    ["ENTITLEMENT_SCOPE_SHAPE_INVALID", result.scopeShapeValid, "File request scope must include chain, genre, window, and optional date range."],
+    ["ENTITLEMENT_CONSTANTS_INVALID", result.chainGenreWindowConstantsValid, "Entitlement constants must preserve chains, genres, basic windows, and pro windows."],
+    ["ENTITLEMENT_WINDOW_DAYS_INVALID", result.windowDaysMappingValid, "Window-to-days map must preserve 7/30/90/180/365."],
+    ["ENTITLEMENT_CLONE_HELPERS_INVALID", result.cloneHelpersPreventSharedMutation, "Allowed arrays must be cloned to avoid shared mutation."],
+    ["ENTITLEMENT_WINDOW_HELPERS_INVALID", result.windowTokenHelpersValid, "Window helper functions must preserve latest/null and valid token set."],
+    ["ENTITLEMENT_PRO_SNAPSHOT_INVALID", result.proSnapshotValid, "Pro snapshot must allow all chains/genres/pro windows, 365d max, full history when unlocked, and custom threshold feeds."],
+    ["ENTITLEMENT_BASIC_SNAPSHOT_INVALID", result.basicSnapshotValid, "Basic snapshot must allow selected chain only, all genres, latest/7/30/90 windows, 90d max, and no custom threshold feeds."],
+    ["ENTITLEMENT_PUBLIC_SNAPSHOT_INVALID", result.publicSnapshotValid, "Public snapshot must allow no authenticated file-delivery access."],
+    ["ENTITLEMENT_ACCESS_HELPERS_INVALID", result.accessHelpersValid, "canAccessChain/Genre/Window must use snapshot allowed arrays."],
+    ["ENTITLEMENT_LABEL_HELPERS_INVALID", result.labelHelpersValid, "Entitlement label helpers must preserve public/pro/basic/history labels."],
+    ["ENTITLEMENT_DATE_RANGE_NO_RANGE_INVALID", result.dateRangeNoRangeAllowsAccess, "No date range must be allowed."],
+    ["ENTITLEMENT_DATE_RANGE_BOTH_DATES_INVALID", result.dateRangeRequiresBothDates, "Date-range access must require both startDate and endDate."],
+    ["ENTITLEMENT_DATE_RANGE_INVALID_DATE_INVALID", result.dateRangeRejectsInvalidDates, "Invalid ISO dates must be rejected."],
+    ["ENTITLEMENT_DATE_RANGE_ORDER_INVALID", result.dateRangeRejectsEndBeforeStart, "endDate before startDate must be rejected."],
+    ["ENTITLEMENT_DATE_RANGE_FULL_HISTORY_INVALID", result.dateRangeAllowsFullHistory, "Full-history snapshots must allow date ranges."],
+    ["ENTITLEMENT_DATE_RANGE_DEPTH_INVALID", result.dateRangeInclusiveDaysEnforced, "Date range must enforce inclusive span against historyDepthDays."],
+    ["ENTITLEMENT_EVALUATE_SNAPSHOT_FIRST_INVALID", result.evaluateBuildsSnapshotFirst, "File entitlement evaluation must build snapshot first."],
+    ["ENTITLEMENT_EVALUATE_PUBLIC_INVALID", result.evaluateRejectsPublic, "Public tier must be rejected for authenticated file delivery."],
+    ["ENTITLEMENT_EVALUATE_INACTIVE_INVALID", result.evaluateRejectsInactive, "Inactive subscriptions must be rejected."],
+    ["ENTITLEMENT_EVALUATE_SCOPE_INVALID", result.evaluateRejectsForbiddenChainGenreWindow, "Evaluation must reject forbidden chain, genre, and window."],
+    ["ENTITLEMENT_EVALUATE_DATE_RANGE_INVALID", result.evaluateChecksDateRangeAfterScope, "Evaluation must check date range after scope checks."],
+    ["ENTITLEMENT_EVALUATE_OK_INVALID", result.evaluateReturnsOkWithSnapshot, "Evaluation must return ok with snapshot on success."],
+    ["ENTITLEMENT_FACTORY_PUBLIC_INVALID", result.factoryPublicEntitlementValid, "Public entitlement factory must be inactive with no chain/history."],
+    ["ENTITLEMENT_FACTORY_BASIC_INVALID", result.factoryBasicEntitlementValid, "Basic entitlement factory must default active and preserve selected chain/history option."],
+    ["ENTITLEMENT_FACTORY_PRO_INVALID", result.factoryProEntitlementValid, "Pro entitlement factory must default active, no entitled chain, and preserve history option."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-043",
+        code,
+        path.relative(root, entitlementHelperModulePath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -7617,6 +7954,7 @@ function evaluate() {
   const accountViewEntitlementProjectionContract = evaluateAccountViewEntitlementProjectionContract(findings);
   const requestSecurityHelpersContract = evaluateRequestSecurityHelpersContract(findings);
   const auditLogRequestIdContract = evaluateAuditLogRequestIdContract(findings);
+  const entitlementSnapshotHelperContract = evaluateEntitlementSnapshotHelperContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -7662,6 +8000,7 @@ function evaluate() {
     accountViewEntitlementProjectionContract,
     requestSecurityHelpersContract,
     auditLogRequestIdContract,
+    entitlementSnapshotHelperContract,
     findings,
   };
 }
@@ -7721,6 +8060,39 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Entitlement snapshot helper contract");
+  lines.push("");
+  lines.push(`Module exists: ${result.entitlementSnapshotHelperContract.moduleExists}`);
+  lines.push(`Pure helper/no runtime secrets: ${result.entitlementSnapshotHelperContract.pureHelperNoRuntimeSecrets}`);
+  lines.push(`Type definitions valid: ${result.entitlementSnapshotHelperContract.typeDefinitionsValid}`);
+  lines.push(`Snapshot shape valid: ${result.entitlementSnapshotHelperContract.snapshotShapeValid}`);
+  lines.push(`Decision codes valid: ${result.entitlementSnapshotHelperContract.decisionCodesValid}`);
+  lines.push(`Scope shape valid: ${result.entitlementSnapshotHelperContract.scopeShapeValid}`);
+  lines.push(`Chain/genre/window constants valid: ${result.entitlementSnapshotHelperContract.chainGenreWindowConstantsValid}`);
+  lines.push(`Window days mapping valid: ${result.entitlementSnapshotHelperContract.windowDaysMappingValid}`);
+  lines.push(`Clone helpers prevent shared mutation: ${result.entitlementSnapshotHelperContract.cloneHelpersPreventSharedMutation}`);
+  lines.push(`Window token helpers valid: ${result.entitlementSnapshotHelperContract.windowTokenHelpersValid}`);
+  lines.push(`Pro snapshot valid: ${result.entitlementSnapshotHelperContract.proSnapshotValid}`);
+  lines.push(`Basic snapshot valid: ${result.entitlementSnapshotHelperContract.basicSnapshotValid}`);
+  lines.push(`Public snapshot valid: ${result.entitlementSnapshotHelperContract.publicSnapshotValid}`);
+  lines.push(`Access helpers valid: ${result.entitlementSnapshotHelperContract.accessHelpersValid}`);
+  lines.push(`Label helpers valid: ${result.entitlementSnapshotHelperContract.labelHelpersValid}`);
+  lines.push(`Date range no-range access valid: ${result.entitlementSnapshotHelperContract.dateRangeNoRangeAllowsAccess}`);
+  lines.push(`Date range requires both dates: ${result.entitlementSnapshotHelperContract.dateRangeRequiresBothDates}`);
+  lines.push(`Date range rejects invalid dates: ${result.entitlementSnapshotHelperContract.dateRangeRejectsInvalidDates}`);
+  lines.push(`Date range rejects end before start: ${result.entitlementSnapshotHelperContract.dateRangeRejectsEndBeforeStart}`);
+  lines.push(`Date range allows full history: ${result.entitlementSnapshotHelperContract.dateRangeAllowsFullHistory}`);
+  lines.push(`Date range inclusive depth enforced: ${result.entitlementSnapshotHelperContract.dateRangeInclusiveDaysEnforced}`);
+  lines.push(`Evaluate builds snapshot first: ${result.entitlementSnapshotHelperContract.evaluateBuildsSnapshotFirst}`);
+  lines.push(`Evaluate rejects public: ${result.entitlementSnapshotHelperContract.evaluateRejectsPublic}`);
+  lines.push(`Evaluate rejects inactive: ${result.entitlementSnapshotHelperContract.evaluateRejectsInactive}`);
+  lines.push(`Evaluate rejects forbidden scope: ${result.entitlementSnapshotHelperContract.evaluateRejectsForbiddenChainGenreWindow}`);
+  lines.push(`Evaluate checks date range after scope: ${result.entitlementSnapshotHelperContract.evaluateChecksDateRangeAfterScope}`);
+  lines.push(`Evaluate returns ok with snapshot: ${result.entitlementSnapshotHelperContract.evaluateReturnsOkWithSnapshot}`);
+  lines.push(`Public factory valid: ${result.entitlementSnapshotHelperContract.factoryPublicEntitlementValid}`);
+  lines.push(`Basic factory valid: ${result.entitlementSnapshotHelperContract.factoryBasicEntitlementValid}`);
+  lines.push(`Pro factory valid: ${result.entitlementSnapshotHelperContract.factoryProEntitlementValid}`);
+  lines.push("");
   lines.push("## Audit log request-id contract");
   lines.push("");
   lines.push(`Module exists: ${result.auditLogRequestIdContract.moduleExists}`);
@@ -8417,6 +8789,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-043 Entitlement Snapshot Helper Contract: verifies pure deterministic entitlement helper rules for public/basic/pro snapshots, allowed chains/genres/windows, history depth, date-range validation, file entitlement decisions, and entitlement factories.");
   lines.push("- D-042 Audit Log Request ID Contract: verifies server-only audit logging, safe request-id generation/acceptance, latency buckets, sanitized bounded JSONL entries, console fallback, non-throwing file append, and no secret/raw-key fields.");
   lines.push("- D-041 Request Security Helpers Contract: verifies same-origin guard and pre-auth rate-limit helper implementations, including server-only boundary, origin/referer validation, no-store redacted errors, Upstash envs, scope defaults, production fail-closed behavior, and non-production memory fallback.");
   lines.push("- D-040 Account View Entitlement Projection Contract: verifies server-only account view projection from Clerk/account/subscription rows into entitlement snapshots, safe API-key views, terms-gated account creation, and production-redacted logging.");
