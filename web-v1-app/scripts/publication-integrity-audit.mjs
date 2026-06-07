@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const nextConfigPath = path.join(root, "next.config.js");
 const publicRoot = path.join(root, "public");
 const docsRoot = path.join(root, "docs");
 const libSourceRoot = path.join(root, "src", "lib");
@@ -5391,6 +5392,173 @@ function evaluateClientSecretBoundaryContract(findings) {
 
   return result;
 }
+function evaluateSecurityHeadersRuntimeContract(findings) {
+  const result = {
+    nextConfigExists: fs.existsSync(nextConfigPath),
+    hasSecurityHeadersArray: false,
+    hasHstsPreloadHeader: false,
+    hasNoSniffHeader: false,
+    hasFrameDenyHeader: false,
+    hasReferrerPolicyHeader: false,
+    hasPermissionsPolicyHeader: false,
+
+    hasCspReportOnly: false,
+    cspHasSafeCoreDirectives: false,
+    cspAllowsStripeClerkCloudflareOnlyWhereNeeded: false,
+    cspHasUpgradeInsecureRequests: false,
+    cspAppliedGlobally: false,
+
+    hasApiSecurityHeadersArray: false,
+    apiCacheControlNoStore: false,
+    apiRobotsNoIndex: false,
+    apiHeadersAppliedToApiRoutes: false,
+
+    outputTracingRootRepoRoot: false,
+    outputTracingIncludesCanonicalData: false,
+    allowedDevOriginsLocalOnly: false,
+    exportsNextConfig: false,
+  };
+
+  if (!result.nextConfigExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-035",
+      "NEXT_CONFIG_MISSING",
+      path.relative(root, nextConfigPath),
+      "next.config.js is missing, so runtime/security headers cannot be audited."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(nextConfigPath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  result.hasSecurityHeadersArray = normalized.includes("const SECURITY_HEADERS = [");
+
+  result.hasHstsPreloadHeader =
+    normalized.includes('key: "Strict-Transport-Security"') &&
+    normalized.includes('value: "max-age=63072000; includeSubDomains; preload"');
+
+  result.hasNoSniffHeader =
+    normalized.includes('key: "X-Content-Type-Options"') &&
+    normalized.includes('value: "nosniff"');
+
+  result.hasFrameDenyHeader =
+    normalized.includes('key: "X-Frame-Options"') &&
+    normalized.includes('value: "DENY"');
+
+  result.hasReferrerPolicyHeader =
+    normalized.includes('key: "Referrer-Policy"') &&
+    normalized.includes('value: "strict-origin-when-cross-origin"');
+
+  result.hasPermissionsPolicyHeader =
+    normalized.includes('key: "Permissions-Policy"') &&
+    normalized.includes("camera=()") &&
+    normalized.includes("geolocation=()") &&
+    normalized.includes("microphone=()") &&
+    normalized.includes("payment=()") &&
+    normalized.includes("publickey-credentials-get=(self)");
+
+  result.hasCspReportOnly =
+    normalized.includes("const CSP_REPORT_ONLY = [") &&
+    normalized.includes('key: "Content-Security-Policy-Report-Only"') &&
+    normalized.includes("value: CSP_REPORT_ONLY");
+
+  result.cspHasSafeCoreDirectives =
+    normalized.includes('"default-src \'self\'"') &&
+    normalized.includes('"base-uri \'self\'"') &&
+    normalized.includes('"object-src \'none\'"') &&
+    normalized.includes('"frame-ancestors \'none\'"') &&
+    normalized.includes('"manifest-src \'self\'"') &&
+    normalized.includes('"media-src \'self\'"');
+
+  result.cspAllowsStripeClerkCloudflareOnlyWhereNeeded =
+    normalized.includes("https://js.stripe.com") &&
+    normalized.includes("https://checkout.stripe.com") &&
+    normalized.includes("https://*.stripe.com") &&
+    normalized.includes("https://*.clerk.com") &&
+    normalized.includes("https://*.clerk.accounts.dev") &&
+    normalized.includes("https://challenges.cloudflare.com") &&
+    normalized.includes("form-action 'self' https://checkout.stripe.com https://*.stripe.com") &&
+    normalized.includes("connect-src 'self' https://*.stripe.com https://*.clerk.com https://*.clerk.accounts.dev https://challenges.cloudflare.com") &&
+    normalized.includes("frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://*.stripe.com https://*.clerk.com https://*.clerk.accounts.dev https://challenges.cloudflare.com");
+
+  result.cspHasUpgradeInsecureRequests =
+    normalized.includes('"upgrade-insecure-requests"');
+
+  result.cspAppliedGlobally =
+    /source:\s*"\/:path\*"\s*,[\s\S]*?\.\.\.SECURITY_HEADERS[\s\S]*?Content-Security-Policy-Report-Only/u.test(normalized);
+
+  result.hasApiSecurityHeadersArray =
+    normalized.includes("const API_SECURITY_HEADERS = [");
+
+  result.apiCacheControlNoStore =
+    normalized.includes('key: "Cache-Control"') &&
+    normalized.includes('value: "no-store, max-age=0"');
+
+  result.apiRobotsNoIndex =
+    normalized.includes('key: "X-Robots-Tag"') &&
+    normalized.includes('value: "noindex, nofollow, noarchive"');
+
+  result.apiHeadersAppliedToApiRoutes =
+    /source:\s*"\/api\/:path\*"\s*,\s*headers:\s*API_SECURITY_HEADERS/u.test(normalized);
+
+  result.outputTracingRootRepoRoot =
+    normalized.includes('const repoRoot = path.join(__dirname, "..");') &&
+    normalized.includes("outputFileTracingRoot: repoRoot") &&
+    normalized.includes("turbopack:") &&
+    normalized.includes("root: repoRoot");
+
+  result.outputTracingIncludesCanonicalData =
+    normalized.includes('outputFileTracingIncludes:') &&
+    normalized.includes('"/*": ["../data/published/v1/**/*"]');
+
+  result.allowedDevOriginsLocalOnly =
+    normalized.includes('allowedDevOrigins: ["localhost:3000", "127.0.0.1:3000"]') &&
+    !/allowedDevOrigins:\s*\[[\s\S]*https?:\/\/(?!localhost|127\.0\.0\.1)/u.test(normalized);
+
+  result.exportsNextConfig =
+    normalized.includes("module.exports = nextConfig;");
+
+  const requiredChecks = [
+    ["SECURITY_HEADERS_ARRAY_MISSING", result.hasSecurityHeadersArray, "next.config.js must define SECURITY_HEADERS."],
+    ["SECURITY_HSTS_HEADER_INVALID", result.hasHstsPreloadHeader, "Security headers must include HSTS with includeSubDomains and preload."],
+    ["SECURITY_NOSNIFF_HEADER_INVALID", result.hasNoSniffHeader, "Security headers must include X-Content-Type-Options: nosniff."],
+    ["SECURITY_FRAME_DENY_HEADER_INVALID", result.hasFrameDenyHeader, "Security headers must include X-Frame-Options: DENY."],
+    ["SECURITY_REFERRER_POLICY_INVALID", result.hasReferrerPolicyHeader, "Security headers must include Referrer-Policy: strict-origin-when-cross-origin."],
+    ["SECURITY_PERMISSIONS_POLICY_INVALID", result.hasPermissionsPolicyHeader, "Permissions-Policy must disable sensitive browser capabilities."],
+    ["SECURITY_CSP_REPORT_ONLY_MISSING", result.hasCspReportOnly, "CSP must be present as Content-Security-Policy-Report-Only while policy is tuned."],
+    ["SECURITY_CSP_CORE_DIRECTIVES_INVALID", result.cspHasSafeCoreDirectives, "CSP must preserve self/default, base-uri, object-src none, frame-ancestors none, manifest, and media directives."],
+    ["SECURITY_CSP_VENDOR_ALLOWLIST_INVALID", result.cspAllowsStripeClerkCloudflareOnlyWhereNeeded, "CSP must explicitly scope Stripe, Clerk, and Cloudflare challenge origins to the directives where needed."],
+    ["SECURITY_CSP_UPGRADE_INSECURE_REQUESTS_MISSING", result.cspHasUpgradeInsecureRequests, "CSP must include upgrade-insecure-requests."],
+    ["SECURITY_CSP_NOT_APPLIED_GLOBALLY", result.cspAppliedGlobally, "Global route header config must apply SECURITY_HEADERS and CSP report-only to /:path*."],
+    ["SECURITY_API_HEADERS_ARRAY_MISSING", result.hasApiSecurityHeadersArray, "next.config.js must define API_SECURITY_HEADERS."],
+    ["SECURITY_API_CACHE_CONTROL_INVALID", result.apiCacheControlNoStore, "API routes must receive Cache-Control: no-store, max-age=0."],
+    ["SECURITY_API_ROBOTS_HEADER_INVALID", result.apiRobotsNoIndex, "API routes must receive X-Robots-Tag: noindex, nofollow, noarchive."],
+    ["SECURITY_API_HEADERS_NOT_APPLIED", result.apiHeadersAppliedToApiRoutes, "API security headers must apply to /api/:path*."],
+    ["RUNTIME_OUTPUT_TRACING_ROOT_INVALID", result.outputTracingRootRepoRoot, "Next output tracing must use repoRoot for monorepo/canonical data access."],
+    ["RUNTIME_OUTPUT_TRACING_DATA_INCLUDE_INVALID", result.outputTracingIncludesCanonicalData, "Next output tracing must include ../data/published/v1 artifacts."],
+    ["RUNTIME_ALLOWED_DEV_ORIGINS_INVALID", result.allowedDevOriginsLocalOnly, "allowedDevOrigins must stay local-only."],
+    ["RUNTIME_NEXT_CONFIG_EXPORT_INVALID", result.exportsNextConfig, "next.config.js must export nextConfig."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-035",
+        code,
+        path.relative(root, nextConfigPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -5432,6 +5600,7 @@ function evaluate() {
   const auditScriptInventoryContract = evaluateAuditScriptInventoryContract(findings);
   const environmentVariableContract = evaluateEnvironmentVariableContract(findings);
   const clientSecretBoundaryContract = evaluateClientSecretBoundaryContract(findings);
+  const securityHeadersRuntimeContract = evaluateSecurityHeadersRuntimeContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -5469,6 +5638,7 @@ function evaluate() {
     auditScriptInventoryContract,
     environmentVariableContract,
     clientSecretBoundaryContract,
+    securityHeadersRuntimeContract,
     findings,
   };
 }
@@ -5528,6 +5698,29 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Security headers runtime contract");
+  lines.push("");
+  lines.push(`next.config.js exists: ${result.securityHeadersRuntimeContract.nextConfigExists}`);
+  lines.push(`SECURITY_HEADERS array present: ${result.securityHeadersRuntimeContract.hasSecurityHeadersArray}`);
+  lines.push(`HSTS preload header: ${result.securityHeadersRuntimeContract.hasHstsPreloadHeader}`);
+  lines.push(`X-Content-Type-Options nosniff: ${result.securityHeadersRuntimeContract.hasNoSniffHeader}`);
+  lines.push(`X-Frame-Options DENY: ${result.securityHeadersRuntimeContract.hasFrameDenyHeader}`);
+  lines.push(`Referrer-Policy valid: ${result.securityHeadersRuntimeContract.hasReferrerPolicyHeader}`);
+  lines.push(`Permissions-Policy valid: ${result.securityHeadersRuntimeContract.hasPermissionsPolicyHeader}`);
+  lines.push(`CSP report-only present: ${result.securityHeadersRuntimeContract.hasCspReportOnly}`);
+  lines.push(`CSP core directives valid: ${result.securityHeadersRuntimeContract.cspHasSafeCoreDirectives}`);
+  lines.push(`CSP vendor allowlist valid: ${result.securityHeadersRuntimeContract.cspAllowsStripeClerkCloudflareOnlyWhereNeeded}`);
+  lines.push(`CSP upgrade-insecure-requests: ${result.securityHeadersRuntimeContract.cspHasUpgradeInsecureRequests}`);
+  lines.push(`CSP applied globally: ${result.securityHeadersRuntimeContract.cspAppliedGlobally}`);
+  lines.push(`API security headers array present: ${result.securityHeadersRuntimeContract.hasApiSecurityHeadersArray}`);
+  lines.push(`API Cache-Control no-store: ${result.securityHeadersRuntimeContract.apiCacheControlNoStore}`);
+  lines.push(`API X-Robots-Tag noindex: ${result.securityHeadersRuntimeContract.apiRobotsNoIndex}`);
+  lines.push(`API headers applied to /api/:path*: ${result.securityHeadersRuntimeContract.apiHeadersAppliedToApiRoutes}`);
+  lines.push(`Output tracing root repoRoot: ${result.securityHeadersRuntimeContract.outputTracingRootRepoRoot}`);
+  lines.push(`Output tracing includes canonical data: ${result.securityHeadersRuntimeContract.outputTracingIncludesCanonicalData}`);
+  lines.push(`Allowed dev origins local-only: ${result.securityHeadersRuntimeContract.allowedDevOriginsLocalOnly}`);
+  lines.push(`nextConfig exported: ${result.securityHeadersRuntimeContract.exportsNextConfig}`);
+  lines.push("");
   lines.push("## Client secret boundary contract");
   lines.push("");
   lines.push(`Scanned files: ${result.clientSecretBoundaryContract.scannedFiles}`);
@@ -5986,6 +6179,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-035 Security Headers Runtime Contract: verifies Next security headers, CSP report-only policy, API no-store/noindex headers, local-only dev origins, and output tracing for canonical data.");
   lines.push("- D-034 Client Secret Boundary Contract: verifies private env references and live-secret patterns do not appear in client/public surfaces, while server-only API/storage/auth code can use private env safely.");
   lines.push("- D-033 Environment Variable Contract: verifies database, Upstash, quota, dev-key, storage, S3, deploy-hook, and production-runtime env references without checking secret values.");
   lines.push("- D-032 Audit Script Inventory Contract: verifies audit script files, package script bindings, .audit report output, fail exits, pass messages, and non-stubbed implementations.");
