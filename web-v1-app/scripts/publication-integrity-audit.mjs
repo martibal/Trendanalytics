@@ -7,6 +7,8 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const apiKeyManagerClientPath = path.join(root, "src", "components", "dashboard", "ApiKeyManagerClient.tsx");
+const dashboardPagePath = path.join(root, "src", "app", "dashboard", "page.tsx");
 const signUpPagePath = path.join(root, "src", "app", "sign-up", "[[...sign-up]]", "page.tsx");
 const signInPagePath = path.join(root, "src", "app", "sign-in", "[[...sign-in]]", "page.tsx");
 const rootLayoutPath = path.join(root, "src", "app", "layout.tsx");
@@ -5769,6 +5771,244 @@ function evaluateClerkAuthSurfaceContract(findings) {
 
   return result;
 }
+function evaluateDashboardAccountSurfaceContract(findings) {
+  const result = {
+    dashboardPageExists: fs.existsSync(dashboardPagePath),
+    apiKeyManagerClientExists: fs.existsSync(apiKeyManagerClientPath),
+
+    dashboardImportsServerAccountView: false,
+    dashboardImportsPersistedApiKeyRows: false,
+    dashboardImportsApiKeyManagerClient: false,
+    dashboardDerivesSubscriptionState: false,
+    dashboardDerivesLifecycleState: false,
+    dashboardUsesCurrentAccountView: false,
+    dashboardLoadsApiKeysByAccountId: false,
+    dashboardHasUnauthenticatedGate: false,
+    dashboardHasAuthUnconfiguredSafeShell: false,
+    dashboardDisplaysLifecycleAndEntitlement: false,
+    dashboardDisplaysChainScopeFromSnapshot: false,
+    dashboardPassesGatedPropsToApiKeyManager: false,
+    dashboardBillingPortalGatedByStripeCustomer: false,
+    dashboardEndpointExamplesAreNonAuthoritative: false,
+    dashboardPreservesProductBoundary: false,
+
+    apiKeyClientIsClientComponent: false,
+    apiKeyClientPropsGateMutations: false,
+    apiKeyClientCanMutateRequiresAllGates: false,
+    apiKeyClientPostCreateRoute: false,
+    apiKeyClientDeleteRevokeRoute: false,
+    apiKeyClientLimitsNonRevokedKeys: false,
+    apiKeyClientDisablesControlsWhenBlocked: false,
+    apiKeyClientShowsSecretOnce: false,
+    apiKeyClientDisplaysPartialIdentifiers: false,
+    apiKeyClientRefreshesAfterMutations: false,
+  };
+
+  const dashboard = result.dashboardPageExists
+    ? fs.readFileSync(dashboardPagePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const apiKeyClient = result.apiKeyManagerClientExists
+    ? fs.readFileSync(apiKeyManagerClientPath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  if (dashboard) {
+    result.dashboardImportsServerAccountView =
+      dashboard.includes('import { getCurrentAccountView } from "@/lib/auth/account";');
+
+    result.dashboardImportsPersistedApiKeyRows =
+      dashboard.includes('import { getPersistedApiKeyDisplayRows } from "@/lib/auth/apiKeys";');
+
+    result.dashboardImportsApiKeyManagerClient =
+      dashboard.includes('import ApiKeyManagerClient from "@/components/dashboard/ApiKeyManagerClient";');
+
+    result.dashboardDerivesSubscriptionState =
+      dashboard.includes("function deriveSubscriptionState(") &&
+      dashboard.includes("if (!params.authConfigured) return \"not_connected\";") &&
+      dashboard.includes("if (!params.isAuthenticated) return \"inactive\";") &&
+      dashboard.includes("if (params.tier === \"public\") return \"inactive\";") &&
+      dashboard.includes("if (params.status !== \"active\") return \"inactive\";") &&
+      dashboard.includes("return \"active\";");
+
+    result.dashboardDerivesLifecycleState =
+      dashboard.includes("function deriveLifecycleState(") &&
+      dashboard.includes("Auth not configured") &&
+      dashboard.includes("No authenticated session") &&
+      dashboard.includes("Authenticated, account mapping incomplete") &&
+      dashboard.includes("Account connected, billing incomplete") &&
+      dashboard.includes("Connected, inactive entitlement") &&
+      dashboard.includes("Connected, active entitlement");
+
+    result.dashboardUsesCurrentAccountView =
+      dashboard.includes("const accountView = await getCurrentAccountView();");
+
+    result.dashboardLoadsApiKeysByAccountId =
+      dashboard.includes("const apiKeys = await getPersistedApiKeyDisplayRows(") &&
+      dashboard.includes("accountView.account?.accountId ?? null");
+
+    result.dashboardHasUnauthenticatedGate =
+      dashboard.includes("if (accountView.authConfigured && !accountView.isAuthenticated)") &&
+      dashboard.includes("Authentication required") &&
+      dashboard.includes('href="/sign-in"') &&
+      dashboard.includes("Sign in first");
+
+    result.dashboardHasAuthUnconfiguredSafeShell =
+      dashboard.includes("{!accountView.authConfigured ? (") &&
+      dashboard.includes("Clerk environment variables are not configured yet") &&
+      dashboard.includes("renders safely during development before identity is connected");
+
+    result.dashboardDisplaysLifecycleAndEntitlement =
+      dashboard.includes('eyebrow="01 / Lifecycle"') &&
+      dashboard.includes('title="Account state"') &&
+      dashboard.includes('eyebrow="02 / Entitlement"') &&
+      dashboard.includes('title="Delivery scope"') &&
+      dashboard.includes("accountView.snapshot.status") &&
+      dashboard.includes("accountView.historyDepthLabel") &&
+      dashboard.includes("accountView.snapshot.maxWindowDays");
+
+    result.dashboardDisplaysChainScopeFromSnapshot =
+      dashboard.includes('eyebrow="03 / Chains"') &&
+      dashboard.includes("CHAIN_LIST.map((chain)") &&
+      dashboard.includes("accountView.snapshot.allowedChains.includes(chain.id)") &&
+      dashboard.includes("This chain is outside the current entitlement scope.");
+
+    result.dashboardPassesGatedPropsToApiKeyManager =
+      dashboard.includes("<ApiKeyManagerClient") &&
+      dashboard.includes("authConfigured={accountView.authConfigured}") &&
+      dashboard.includes("isAuthenticated={accountView.isAuthenticated}") &&
+      dashboard.includes("hasLinkedAccount={!!accountView.account?.accountId}") &&
+      dashboard.includes('subscriptionActive={subscriptionState === "active"}') &&
+      dashboard.includes("initialKeys={apiKeys.map((keyRow)");
+
+    result.dashboardBillingPortalGatedByStripeCustomer =
+      dashboard.includes("const hasBillingPortalAccess = Boolean(accountView.account?.stripeCustomerId);") &&
+      dashboard.includes("{hasBillingPortalAccess ? (") &&
+      dashboard.includes('action="/api/v1/checkout/portal"') &&
+      dashboard.includes("Stripe remains source of truth") &&
+      dashboard.includes("webhook-synced entitlements");
+
+    result.dashboardEndpointExamplesAreNonAuthoritative =
+      dashboard.includes('eyebrow="07 / Delivery paths"') &&
+      dashboard.includes("Examples only. Entitlement enforcement remains server-side on the authenticated file route.") &&
+      dashboard.includes("Forbidden scope should return 403 rather than pretending the file does not exist.") &&
+      dashboard.includes("X-API-Key");
+
+    result.dashboardPreservesProductBoundary =
+      dashboard.includes("No decorative control panels") &&
+      dashboard.includes("public reference pages") &&
+      dashboard.includes("Subscriber surface; public method pages remain separate.");
+  }
+
+  if (apiKeyClient) {
+    result.apiKeyClientIsClientComponent =
+      apiKeyClient.includes('"use client";') &&
+      apiKeyClient.includes("export default function ApiKeyManagerClient(");
+
+    result.apiKeyClientPropsGateMutations =
+      apiKeyClient.includes("authConfigured: boolean;") &&
+      apiKeyClient.includes("isAuthenticated: boolean;") &&
+      apiKeyClient.includes("hasLinkedAccount: boolean;") &&
+      apiKeyClient.includes("subscriptionActive: boolean;") &&
+      apiKeyClient.includes("initialKeys: ApiKeyRow[];");
+
+    result.apiKeyClientCanMutateRequiresAllGates =
+      apiKeyClient.includes("const canMutate =") &&
+      apiKeyClient.includes("authConfigured &&") &&
+      apiKeyClient.includes("isAuthenticated &&") &&
+      apiKeyClient.includes("hasLinkedAccount &&") &&
+      apiKeyClient.includes("subscriptionActive &&") &&
+      apiKeyClient.includes("!isPending;");
+
+    result.apiKeyClientPostCreateRoute =
+      apiKeyClient.includes('fetch("/api/v1/keys", {') &&
+      apiKeyClient.includes('method: "POST"') &&
+      apiKeyClient.includes("label: label.trim() || null");
+
+    result.apiKeyClientDeleteRevokeRoute =
+      apiKeyClient.includes('fetch("/api/v1/keys", {') &&
+      apiKeyClient.includes('method: "DELETE"') &&
+      apiKeyClient.includes("body: JSON.stringify({ keyId })") &&
+      apiKeyClient.includes('{ ...key, status: "revoked" }');
+
+    result.apiKeyClientLimitsNonRevokedKeys =
+      apiKeyClient.includes("activeOrSuspendedCount") &&
+      apiKeyClient.includes('key.status !== "revoked"') &&
+      apiKeyClient.includes("activeOrSuspendedCount >= 2") &&
+      apiKeyClient.includes("non-revoked keys");
+
+    result.apiKeyClientDisablesControlsWhenBlocked =
+      apiKeyClient.includes("disabled={!canMutate || activeOrSuspendedCount >= 2}") &&
+      apiKeyClient.includes("cursor-not-allowed") &&
+      apiKeyClient.includes("Sign in to create or revoke API keys.") &&
+      apiKeyClient.includes("An active subscription is required before API keys can be created.");
+
+    result.apiKeyClientShowsSecretOnce =
+      apiKeyClient.includes("const [createdSecret, setCreatedSecret] = useState<string | null>(null);") &&
+      apiKeyClient.includes("setCreatedSecret(created.secret)") &&
+      apiKeyClient.includes("Copy this secret now. It will not be shown again after you leave or refresh this state.") &&
+      apiKeyClient.includes("function handleHideSecret()") &&
+      apiKeyClient.includes("setCreatedSecret(null);");
+
+    result.apiKeyClientDisplaysPartialIdentifiers =
+      apiKeyClient.includes("prefix: string;") &&
+      apiKeyClient.includes("last4: string | null;") &&
+      apiKeyClient.includes("createdSecret") &&
+      apiKeyClient.includes("Secret values are shown exactly once at creation") &&
+      apiKeyClient.includes("identifiers are displayed afterward") &&
+      !apiKeyClient.includes("keyHash");
+
+    result.apiKeyClientRefreshesAfterMutations =
+      apiKeyClient.includes("const router = useRouter();") &&
+      apiKeyClient.includes("router.refresh();");
+  }
+
+  const requiredChecks = [
+    ["DASHBOARD_PAGE_MISSING", result.dashboardPageExists, dashboardPagePath, "Dashboard page must exist."],
+    ["DASHBOARD_API_KEY_MANAGER_MISSING", result.apiKeyManagerClientExists, apiKeyManagerClientPath, "API key manager client component must exist."],
+
+    ["DASHBOARD_ACCOUNT_VIEW_IMPORT_MISSING", result.dashboardImportsServerAccountView, dashboardPagePath, "Dashboard must import server-side getCurrentAccountView."],
+    ["DASHBOARD_API_KEY_ROWS_IMPORT_MISSING", result.dashboardImportsPersistedApiKeyRows, dashboardPagePath, "Dashboard must import persisted API-key display rows."],
+    ["DASHBOARD_API_KEY_MANAGER_IMPORT_MISSING", result.dashboardImportsApiKeyManagerClient, dashboardPagePath, "Dashboard must import ApiKeyManagerClient."],
+    ["DASHBOARD_SUBSCRIPTION_STATE_INVALID", result.dashboardDerivesSubscriptionState, dashboardPagePath, "Dashboard subscription state must degrade not_connected/inactive unless authenticated active non-public entitlement exists."],
+    ["DASHBOARD_LIFECYCLE_STATE_INVALID", result.dashboardDerivesLifecycleState, dashboardPagePath, "Dashboard lifecycle state must distinguish auth, account, billing, inactive entitlement, and active entitlement."],
+    ["DASHBOARD_ACCOUNT_VIEW_NOT_USED", result.dashboardUsesCurrentAccountView, dashboardPagePath, "Dashboard must resolve account view server-side."],
+    ["DASHBOARD_API_KEYS_NOT_ACCOUNT_SCOPED", result.dashboardLoadsApiKeysByAccountId, dashboardPagePath, "Dashboard must load API-key rows by linked account id only."],
+    ["DASHBOARD_UNAUTHENTICATED_GATE_MISSING", result.dashboardHasUnauthenticatedGate, dashboardPagePath, "Dashboard must show a sign-in gate when auth is configured but no session is present."],
+    ["DASHBOARD_AUTH_UNCONFIGURED_SHELL_MISSING", result.dashboardHasAuthUnconfiguredSafeShell, dashboardPagePath, "Dashboard must render a safe shell when auth env is not configured."],
+    ["DASHBOARD_LIFECYCLE_ENTITLEMENT_DISPLAY_MISSING", result.dashboardDisplaysLifecycleAndEntitlement, dashboardPagePath, "Dashboard must display lifecycle and entitlement state from account snapshot."],
+    ["DASHBOARD_CHAIN_SCOPE_INVALID", result.dashboardDisplaysChainScopeFromSnapshot, dashboardPagePath, "Dashboard chain rows must derive access from snapshot.allowedChains."],
+    ["DASHBOARD_API_KEY_PROPS_NOT_GATED", result.dashboardPassesGatedPropsToApiKeyManager, dashboardPagePath, "Dashboard must pass auth/account/subscription gates into ApiKeyManagerClient."],
+    ["DASHBOARD_BILLING_PORTAL_NOT_GATED", result.dashboardBillingPortalGatedByStripeCustomer, dashboardPagePath, "Dashboard must gate Stripe portal access by linked Stripe customer and preserve Stripe source-of-truth copy."],
+    ["DASHBOARD_ENDPOINT_BOUNDARY_COPY_MISSING", result.dashboardEndpointExamplesAreNonAuthoritative, dashboardPagePath, "Dashboard endpoint examples must state server-side entitlement enforcement remains authoritative."],
+    ["DASHBOARD_PRODUCT_BOUNDARY_COPY_MISSING", result.dashboardPreservesProductBoundary, dashboardPagePath, "Dashboard must preserve subscriber/public product-boundary copy."],
+
+    ["API_KEY_CLIENT_NOT_CLIENT_COMPONENT", result.apiKeyClientIsClientComponent, apiKeyManagerClientPath, "API key manager must be an explicit client component."],
+    ["API_KEY_CLIENT_GATE_PROPS_MISSING", result.apiKeyClientPropsGateMutations, apiKeyManagerClientPath, "API key manager props must include auth/account/subscription gate booleans."],
+    ["API_KEY_CLIENT_CAN_MUTATE_INVALID", result.apiKeyClientCanMutateRequiresAllGates, apiKeyManagerClientPath, "API key mutations must require authConfigured, isAuthenticated, linked account, active subscription, and non-pending state."],
+    ["API_KEY_CLIENT_CREATE_ROUTE_INVALID", result.apiKeyClientPostCreateRoute, apiKeyManagerClientPath, "API key creation must POST to /api/v1/keys with trimmed optional label."],
+    ["API_KEY_CLIENT_REVOKE_ROUTE_INVALID", result.apiKeyClientDeleteRevokeRoute, apiKeyManagerClientPath, "API key revoke must DELETE /api/v1/keys and mark local row revoked."],
+    ["API_KEY_CLIENT_NON_REVOKED_LIMIT_INVALID", result.apiKeyClientLimitsNonRevokedKeys, apiKeyManagerClientPath, "API key UI must keep the non-revoked key limit visible and enforced client-side."],
+    ["API_KEY_CLIENT_DISABLED_STATES_INVALID", result.apiKeyClientDisablesControlsWhenBlocked, apiKeyManagerClientPath, "API key UI controls must disable and explain when auth/account/subscription gates are not satisfied."],
+    ["API_KEY_CLIENT_SECRET_ONCE_INVALID", result.apiKeyClientShowsSecretOnce, apiKeyManagerClientPath, "API key UI must display created secret once and allow hiding it."],
+    ["API_KEY_CLIENT_PARTIAL_IDENTIFIERS_INVALID", result.apiKeyClientDisplaysPartialIdentifiers, apiKeyManagerClientPath, "API key UI must keep created secrets one-time only, display prefix/last4 afterward, and never expose keyHash."],
+    ["API_KEY_CLIENT_REFRESH_MISSING", result.apiKeyClientRefreshesAfterMutations, apiKeyManagerClientPath, "API key UI must refresh router state after create/revoke mutations."]
+  ];
+
+  for (const [code, ok, targetPath, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-037",
+        code,
+        path.relative(root, targetPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -5812,6 +6052,7 @@ function evaluate() {
   const clientSecretBoundaryContract = evaluateClientSecretBoundaryContract(findings);
   const securityHeadersRuntimeContract = evaluateSecurityHeadersRuntimeContract(findings);
   const clerkAuthSurfaceContract = evaluateClerkAuthSurfaceContract(findings);
+  const dashboardAccountSurfaceContract = evaluateDashboardAccountSurfaceContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -5851,6 +6092,7 @@ function evaluate() {
     clientSecretBoundaryContract,
     securityHeadersRuntimeContract,
     clerkAuthSurfaceContract,
+    dashboardAccountSurfaceContract,
     findings,
   };
 }
@@ -5910,6 +6152,37 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Dashboard account surface contract");
+  lines.push("");
+  lines.push(`Dashboard page exists: ${result.dashboardAccountSurfaceContract.dashboardPageExists}`);
+  lines.push(`API key manager client exists: ${result.dashboardAccountSurfaceContract.apiKeyManagerClientExists}`);
+  lines.push(`Dashboard imports account view: ${result.dashboardAccountSurfaceContract.dashboardImportsServerAccountView}`);
+  lines.push(`Dashboard imports persisted API-key rows: ${result.dashboardAccountSurfaceContract.dashboardImportsPersistedApiKeyRows}`);
+  lines.push(`Dashboard imports API-key manager: ${result.dashboardAccountSurfaceContract.dashboardImportsApiKeyManagerClient}`);
+  lines.push(`Dashboard subscription state valid: ${result.dashboardAccountSurfaceContract.dashboardDerivesSubscriptionState}`);
+  lines.push(`Dashboard lifecycle state valid: ${result.dashboardAccountSurfaceContract.dashboardDerivesLifecycleState}`);
+  lines.push(`Dashboard uses account view: ${result.dashboardAccountSurfaceContract.dashboardUsesCurrentAccountView}`);
+  lines.push(`Dashboard loads API keys by account id: ${result.dashboardAccountSurfaceContract.dashboardLoadsApiKeysByAccountId}`);
+  lines.push(`Dashboard unauthenticated gate: ${result.dashboardAccountSurfaceContract.dashboardHasUnauthenticatedGate}`);
+  lines.push(`Dashboard auth-unconfigured safe shell: ${result.dashboardAccountSurfaceContract.dashboardHasAuthUnconfiguredSafeShell}`);
+  lines.push(`Dashboard lifecycle/entitlement display: ${result.dashboardAccountSurfaceContract.dashboardDisplaysLifecycleAndEntitlement}`);
+  lines.push(`Dashboard chain scope from snapshot: ${result.dashboardAccountSurfaceContract.dashboardDisplaysChainScopeFromSnapshot}`);
+  lines.push(`Dashboard passes gated API-key props: ${result.dashboardAccountSurfaceContract.dashboardPassesGatedPropsToApiKeyManager}`);
+  lines.push(`Dashboard billing portal gated: ${result.dashboardAccountSurfaceContract.dashboardBillingPortalGatedByStripeCustomer}`);
+  lines.push(`Dashboard endpoint examples non-authoritative: ${result.dashboardAccountSurfaceContract.dashboardEndpointExamplesAreNonAuthoritative}`);
+  lines.push(`Dashboard product boundary copy: ${result.dashboardAccountSurfaceContract.dashboardPreservesProductBoundary}`);
+  lines.push(`API-key client is client component: ${result.dashboardAccountSurfaceContract.apiKeyClientIsClientComponent}`);
+  lines.push(`API-key client gate props: ${result.dashboardAccountSurfaceContract.apiKeyClientPropsGateMutations}`);
+  lines.push(`API-key canMutate requires all gates: ${result.dashboardAccountSurfaceContract.apiKeyClientCanMutateRequiresAllGates}`);
+  lines.push(`API-key create route valid: ${result.dashboardAccountSurfaceContract.apiKeyClientPostCreateRoute}`);
+  lines.push(`API-key revoke route valid: ${result.dashboardAccountSurfaceContract.apiKeyClientDeleteRevokeRoute}`);
+  lines.push(`API-key non-revoked limit valid: ${result.dashboardAccountSurfaceContract.apiKeyClientLimitsNonRevokedKeys}`);
+  lines.push(`API-key disabled states valid: ${result.dashboardAccountSurfaceContract.apiKeyClientDisablesControlsWhenBlocked}`);
+  lines.push(`API-key secret-once behavior: ${result.dashboardAccountSurfaceContract.apiKeyClientShowsSecretOnce}`);
+  lines.push(`API-key partial identifiers only: ${result.dashboardAccountSurfaceContract.apiKeyClientDisplaysPartialIdentifiers}`);
+  lines.push("D-037 partial identifier note: audit checks prefix/last4 fields, one-time createdSecret handling, and absence of keyHash; it does not depend on one exact UI sentence.");
+  lines.push(`API-key refreshes after mutations: ${result.dashboardAccountSurfaceContract.apiKeyClientRefreshesAfterMutations}`);
+  lines.push("");
   lines.push("## Clerk auth surface contract");
   lines.push("");
   lines.push(`Root layout exists: ${result.clerkAuthSurfaceContract.rootLayoutExists}`);
@@ -6417,6 +6690,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-037 Dashboard Account Surface Contract: verifies dashboard/account state, entitlement display, API-key manager mutation gating, Stripe portal gating, secret-once behavior, and endpoint-boundary copy.");
   lines.push("- D-036 Clerk Auth Surface Contract: verifies Clerk layout/sign-in/sign-up surfaces, safe unconfigured fallback, terms gating before SignUp, and no-advice product boundary copy.");
   lines.push("- D-035 Security Headers Runtime Contract: verifies Next security headers, CSP report-only policy, API no-store/noindex headers, local-only dev origins, and output tracing for canonical data.");
   lines.push("- D-034 Client Secret Boundary Contract: verifies private env references and live-secret patterns do not appear in client/public surfaces, while server-only API/storage/auth code can use private env safely.");
