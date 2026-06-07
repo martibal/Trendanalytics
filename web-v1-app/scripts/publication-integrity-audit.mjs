@@ -1660,6 +1660,313 @@ function evaluatePipelinePublishOrderContract(findings) {
 
   return result;
 }
+function isIsoTimestamp(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u.test(value);
+}
+
+function timestampSkewSeconds(left, right) {
+  if (!isIsoTimestamp(left) || !isIsoTimestamp(right)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return Math.abs((Date.parse(left) - Date.parse(right)) / 1000);
+}
+function expectedSchemaVersionForGenre(genre, dataset) {
+  return dataset?.schema_versions?.[genre] ?? `${genre}.v1`;
+}
+
+function evaluateRevisionProvenanceContract(findings, inventory) {
+  const datasetFile = path.join(publishedRoot, "dataset.json");
+  const result = {
+    datasetPresent: fs.existsSync(datasetFile),
+    datasetId: null,
+    revisionId: null,
+    computedAtUtc: null,
+    methodologyVersion: null,
+    manifestsChecked: 0,
+    manifestsWithMatchingDatasetId: 0,
+    manifestsWithMatchingRevisionId: 0,
+    manifestsWithMatchingComputedAtUtc: 0,
+    manifestsWithinComputedAtSkew: 0,
+    maxComputedAtSkewSeconds: 0,
+    allowedComputedAtSkewSeconds: 300,
+    manifestsWithMatchingMethodologyVersion: 0,
+    manifestsWithMatchingSchemaVersion: 0,
+    manifestsWithValidFilesBlock: 0,
+  };
+
+  if (!result.datasetPresent) {
+    addFinding(
+      findings,
+      "fail",
+      "D-015",
+      "REVISION_DATASET_INDEX_MISSING",
+      path.relative(root, datasetFile),
+      "dataset.json is required for revision/provenance validation."
+    );
+
+    return result;
+  }
+
+  const dataset = readJson(datasetFile);
+
+  result.datasetId = dataset.dataset_id ?? null;
+  result.revisionId = dataset.revision_id ?? null;
+  result.computedAtUtc = dataset.computed_at_utc ?? null;
+  result.methodologyVersion = dataset.methodology_version ?? null;
+
+  if (typeof dataset.dataset_id !== "string" || dataset.dataset_id.trim() === "") {
+    addFinding(
+      findings,
+      "fail",
+      "D-015",
+      "DATASET_ID_MISSING",
+      path.relative(root, datasetFile),
+      "dataset.json must contain a non-empty dataset_id so published snapshots can be identified."
+    );
+  }
+
+  if (!Number.isInteger(dataset.revision_id) || dataset.revision_id <= 0) {
+    addFinding(
+      findings,
+      "fail",
+      "D-015",
+      "DATASET_REVISION_ID_MISSING_OR_INVALID",
+      path.relative(root, datasetFile),
+      "dataset.json must contain a positive integer revision_id."
+    );
+  }
+
+  if (!isIsoTimestamp(dataset.computed_at_utc)) {
+    addFinding(
+      findings,
+      "fail",
+      "D-015",
+      "DATASET_COMPUTED_AT_UTC_INVALID",
+      path.relative(root, datasetFile),
+      "dataset.computed_at_utc must be an ISO UTC timestamp in YYYY-MM-DDTHH:mm:ssZ format."
+    );
+  }
+
+  if (typeof dataset.methodology_version !== "string" || dataset.methodology_version.trim() === "") {
+    addFinding(
+      findings,
+      "fail",
+      "D-015",
+      "DATASET_METHODOLOGY_VERSION_MISSING",
+      path.relative(root, datasetFile),
+      "dataset.json must contain methodology_version."
+    );
+  }
+
+  for (const genre of GENRES) {
+    if (typeof dataset.schema_versions?.[genre] !== "string" || dataset.schema_versions[genre].trim() === "") {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "DATASET_SCHEMA_VERSION_MISSING",
+        path.relative(root, datasetFile),
+        `dataset.schema_versions.${genre} must be present.`
+      );
+    }
+  }
+
+  const derivedDefinition = dataset.derived_definition;
+
+  if (!isPlainObject(derivedDefinition)) {
+    addFinding(
+      findings,
+      "fail",
+      "D-015",
+      "DATASET_DERIVED_DEFINITION_MISSING",
+      path.relative(root, datasetFile),
+      "dataset.derived_definition must be present so rolling-derived semantics are versioned."
+    );
+  } else {
+    if (derivedDefinition.method !== "rolling_mean") {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "DATASET_DERIVED_METHOD_UNEXPECTED",
+        path.relative(root, datasetFile),
+        `derived_definition.method must be rolling_mean, got ${derivedDefinition.method}.`
+      );
+    }
+
+    if (derivedDefinition.min_periods !== 1) {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "DATASET_DERIVED_MIN_PERIODS_UNEXPECTED",
+        path.relative(root, datasetFile),
+        `derived_definition.min_periods must be 1, got ${derivedDefinition.min_periods}.`
+      );
+    }
+
+    if (!arrayEquals(derivedDefinition.windows_days, [7, 30])) {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "DATASET_DERIVED_WINDOWS_UNEXPECTED",
+        path.relative(root, datasetFile),
+        "derived_definition.windows_days must be [7,30]."
+      );
+    }
+
+    if (derivedDefinition.suffix_format !== "__ma{window}") {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "DATASET_DERIVED_SUFFIX_FORMAT_UNEXPECTED",
+        path.relative(root, datasetFile),
+        `derived_definition.suffix_format must be __ma{window}, got ${derivedDefinition.suffix_format}.`
+      );
+    }
+  }
+
+  for (const row of inventory) {
+    const file = manifestPath(row.genre, row.chain);
+    const relativeFile = path.relative(root, file);
+
+    if (!fs.existsSync(file)) {
+      continue;
+    }
+
+    const manifest = readJson(file);
+    result.manifestsChecked += 1;
+
+    if (manifest.dataset_id === dataset.dataset_id) {
+      result.manifestsWithMatchingDatasetId += 1;
+    } else {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "MANIFEST_DATASET_ID_MISMATCH",
+        relativeFile,
+        `${row.genre}/${row.chain}: manifest.dataset_id=${manifest.dataset_id}, dataset.dataset_id=${dataset.dataset_id}.`
+      );
+    }
+
+    if (manifest.revision_id === dataset.revision_id) {
+      result.manifestsWithMatchingRevisionId += 1;
+    } else {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "MANIFEST_REVISION_ID_MISMATCH",
+        relativeFile,
+        `${row.genre}/${row.chain}: manifest.revision_id=${manifest.revision_id}, dataset.revision_id=${dataset.revision_id}.`
+      );
+    }
+
+    const computedAtSkewSeconds = timestampSkewSeconds(manifest.computed_at_utc, dataset.computed_at_utc);
+    result.maxComputedAtSkewSeconds = Math.max(result.maxComputedAtSkewSeconds, computedAtSkewSeconds);
+
+    if (manifest.computed_at_utc === dataset.computed_at_utc) {
+      result.manifestsWithMatchingComputedAtUtc += 1;
+      result.manifestsWithinComputedAtSkew += 1;
+    } else if (computedAtSkewSeconds <= result.allowedComputedAtSkewSeconds) {
+      result.manifestsWithinComputedAtSkew += 1;
+    } else {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "MANIFEST_COMPUTED_AT_UTC_SKEW_EXCEEDS_LIMIT",
+        relativeFile,
+        `${row.genre}/${row.chain}: manifest.computed_at_utc=${manifest.computed_at_utc}, dataset.computed_at_utc=${dataset.computed_at_utc}, skew_seconds=${computedAtSkewSeconds}, allowed_seconds=${result.allowedComputedAtSkewSeconds}.`
+      );
+    }
+
+    if (manifest.methodology_version === dataset.methodology_version) {
+      result.manifestsWithMatchingMethodologyVersion += 1;
+    } else {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "MANIFEST_METHODOLOGY_VERSION_MISMATCH",
+        relativeFile,
+        `${row.genre}/${row.chain}: manifest.methodology_version=${manifest.methodology_version}, dataset.methodology_version=${dataset.methodology_version}.`
+      );
+    }
+
+    const expectedSchema = expectedSchemaVersionForGenre(row.genre, dataset);
+    if (manifest.schema_version === expectedSchema) {
+      result.manifestsWithMatchingSchemaVersion += 1;
+    } else {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "MANIFEST_SCHEMA_VERSION_MISMATCH",
+        relativeFile,
+        `${row.genre}/${row.chain}: manifest.schema_version=${manifest.schema_version}, expected ${expectedSchema}.`
+      );
+    }
+
+    if (manifest.chain !== row.chain) {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "MANIFEST_CHAIN_MISMATCH",
+        relativeFile,
+        `${row.genre}/${row.chain}: manifest.chain=${manifest.chain}, expected ${row.chain}.`
+      );
+    }
+
+    if (manifest.genre !== row.genre) {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "MANIFEST_GENRE_MISMATCH",
+        relativeFile,
+        `${row.genre}/${row.chain}: manifest.genre=${manifest.genre}, expected ${row.genre}.`
+      );
+    }
+
+    if (manifest.available_days_count !== row.days.length) {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "MANIFEST_AVAILABLE_DAYS_COUNT_MISMATCH",
+        relativeFile,
+        `${row.genre}/${row.chain}: available_days_count=${manifest.available_days_count}, actual day count=${row.days.length}.`
+      );
+    }
+
+    const windows = manifest.files?.windows;
+    const hasValidFilesBlock =
+      manifest.files?.latest === "latest.json" &&
+      isPlainObject(windows) &&
+      WINDOWS.every((windowDays) => windows[String(windowDays)] === `last${windowDays}d.json`);
+
+    if (hasValidFilesBlock) {
+      result.manifestsWithValidFilesBlock += 1;
+    } else {
+      addFinding(
+        findings,
+        "fail",
+        "D-015",
+        "MANIFEST_FILES_BLOCK_INVALID",
+        relativeFile,
+        `${row.genre}/${row.chain}: manifest.files must map latest to latest.json and all supported windows to lastXd.json.`
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -1681,6 +1988,7 @@ function evaluate() {
   const localStorageResolution = evaluateLocalStorageResolution(findings);
   const s3StorageContract = evaluateS3StorageContract(findings);
   const pipelinePublishOrderContract = evaluatePipelinePublishOrderContract(findings);
+  const revisionProvenanceContract = evaluateRevisionProvenanceContract(findings, inventory);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -1698,6 +2006,7 @@ function evaluate() {
     localStorageResolution,
     s3StorageContract,
     pipelinePublishOrderContract,
+    revisionProvenanceContract,
     findings,
   };
 }
@@ -1757,6 +2066,24 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Revision provenance contract");
+  lines.push("");
+  lines.push(`Dataset present: ${result.revisionProvenanceContract.datasetPresent}`);
+  lines.push(`Dataset ID: ${result.revisionProvenanceContract.datasetId ?? "n/a"}`);
+  lines.push(`Revision ID: ${result.revisionProvenanceContract.revisionId ?? "n/a"}`);
+  lines.push(`Computed at UTC: ${result.revisionProvenanceContract.computedAtUtc ?? "n/a"}`);
+  lines.push(`Methodology version: ${result.revisionProvenanceContract.methodologyVersion ?? "n/a"}`);
+  lines.push(`Manifests checked: ${result.revisionProvenanceContract.manifestsChecked}`);
+  lines.push(`Manifests matching dataset_id: ${result.revisionProvenanceContract.manifestsWithMatchingDatasetId}`);
+  lines.push(`Manifests matching revision_id: ${result.revisionProvenanceContract.manifestsWithMatchingRevisionId}`);
+  lines.push(`Manifests matching computed_at_utc exactly: ${result.revisionProvenanceContract.manifestsWithMatchingComputedAtUtc}`);
+  lines.push(`Manifests within computed_at_utc skew: ${result.revisionProvenanceContract.manifestsWithinComputedAtSkew}`);
+  lines.push(`Max computed_at_utc skew seconds: ${result.revisionProvenanceContract.maxComputedAtSkewSeconds}`);
+  lines.push(`Allowed computed_at_utc skew seconds: ${result.revisionProvenanceContract.allowedComputedAtSkewSeconds}`);
+  lines.push(`Manifests matching methodology_version: ${result.revisionProvenanceContract.manifestsWithMatchingMethodologyVersion}`);
+  lines.push(`Manifests matching schema_version: ${result.revisionProvenanceContract.manifestsWithMatchingSchemaVersion}`);
+  lines.push(`Manifests with valid files block: ${result.revisionProvenanceContract.manifestsWithValidFilesBlock}`);
+  lines.push("");
   lines.push("## Pipeline publish order contract");
   lines.push("");
   lines.push(`run-daily-pipeline.ps1 exists: ${result.pipelinePublishOrderContract.runDailyPipelineExists}`);
@@ -1850,6 +2177,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-015 Revision Provenance Contract: checks dataset/manifests share dataset_id, revision_id, bounded computed_at_utc skew, methodology_version, schema versions, and files/window mappings.");
   lines.push("- D-014 Pipeline Publish Order Contract: checks publish/brief/sync/commit order and requires CI audit gates before push/deploy.");
   lines.push("");
   lines.push("- D-001 Published Artifact Inventory: checks genre/chain directories and dated day-file presence.");
