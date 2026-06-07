@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-
+const reportDir = path.join(root, ".audit", "public-copy");
+const reportPath = path.join(reportDir, "public-copy-guard.md");
 const scanRoots = [
   "src/app",
   "src/components",
@@ -350,6 +351,85 @@ function checkRequiredDisclosures(files) {
   return findings;
 }
 
+function escapeMarkdownCell(value) {
+  return String(value ?? "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ")
+    .trim();
+}
+
+function buildMarkdownReport({ files, findings, blockers, warnings }) {
+  const lines = [];
+
+  lines.push("# Public Copy Guard Report");
+  lines.push("");
+  lines.push(`Generated at UTC: ${new Date().toISOString()}`);
+  lines.push(`Scanned files: ${files.length}`);
+  lines.push(`Findings: ${findings.length}`);
+  lines.push(`Blockers: ${blockers.length}`);
+  lines.push(`Warnings: ${warnings.length}`);
+  lines.push("");
+  lines.push("## Scope");
+  lines.push("");
+  lines.push("This report covers product-boundary rules A-001 through A-010 for public copy, public docs, public sample data, and product-facing source files.");
+  lines.push("");
+  lines.push("## Rules");
+  lines.push("");
+  lines.push("| Rule | Severity | Description |");
+  lines.push("| --- | --- | --- |");
+
+  for (const rule of rules) {
+    lines.push(
+      `| ${escapeMarkdownCell(rule.id)} | ${escapeMarkdownCell(rule.severity)} | ${escapeMarkdownCell(rule.description)} |`
+    );
+  }
+
+  lines.push("");
+  lines.push("## Findings");
+  lines.push("");
+
+  if (findings.length === 0) {
+    lines.push("No product-boundary findings.");
+  } else {
+    lines.push("| Severity | Audit item | Rule | File | Line | Match |");
+    lines.push("| --- | --- | --- | --- | ---: | --- |");
+
+    for (const finding of findings) {
+      lines.push(
+        `| ${escapeMarkdownCell(finding.severity)} | ${escapeMarkdownCell(finding.auditItem)} | ${escapeMarkdownCell(finding.ruleId)} | ${escapeMarkdownCell(finding.file)} | ${finding.line ?? ""} | ${escapeMarkdownCell(finding.match)} |`
+      );
+    }
+
+    lines.push("");
+    lines.push("## Finding context");
+    lines.push("");
+
+    for (const finding of findings) {
+      lines.push(`### ${finding.auditItem} ${finding.ruleId}`);
+      lines.push("");
+      lines.push(`- Severity: ${finding.severity}`);
+      lines.push(`- File: ${finding.file}:${finding.line}:${finding.column}`);
+      lines.push(`- Match: ${finding.match}`);
+      lines.push(`- Reason: ${finding.description}`);
+      lines.push(`- Context: ${finding.snippet}`);
+      lines.push("");
+    }
+  }
+
+  lines.push("");
+  return `${lines.join("\n")}\n`;
+}
+
+function writeReport({ files, findings, blockers, warnings }) {
+  fs.mkdirSync(reportDir, { recursive: true });
+  fs.writeFileSync(
+    reportPath,
+    buildMarkdownReport({ files, findings, blockers, warnings }),
+    "utf8"
+  );
+
+  return path.relative(root, reportPath);
+}
 const files = collectFiles();
 const findings = [];
 
@@ -370,6 +450,7 @@ findings.push(...checkRequiredDisclosures(files));
 const blockers = findings.filter((finding) => finding.severity === "blocker");
 const warnings = findings.filter((finding) => finding.severity === "warning");
 
+const reportRelative = writeReport({ files, findings, blockers, warnings });
 if (findings.length > 0) {
   console.error("Public copy guard found product-boundary audit findings:");
   console.error("");
@@ -390,15 +471,18 @@ if (blockers.length > 0) {
   console.error(
     `Public copy guard failed with ${blockers.length} blocker(s) and ${warnings.length} warning(s).`
   );
+  console.error(`Report: ${reportRelative}`);
   process.exit(1);
 }
 
 if (warnings.length > 0) {
   console.warn(`Public copy guard passed with ${warnings.length} warning(s).`);
+  console.warn(`Report: ${reportRelative}`);
   process.exit(0);
 }
 
 console.log(
   `Public copy guard passed. Scanned ${files.length} file(s) across product-boundary rules A-001 through A-010.`
 );
+console.log(`Report: ${reportRelative}`);
 /*END FILE*/

@@ -7,6 +7,10 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const publicationIntegrityAuditPath = path.join(root, "scripts", "publication-integrity-audit.mjs");
+const calculationCorrectnessAuditPath = path.join(root, "scripts", "calculation-correctness-audit.mjs");
+const apiContractAuditPath = path.join(root, "scripts", "api-contract-audit.mjs");
+const publicCopyGuardPath = path.join(root, "scripts", "public-copy-guard.mjs");
 const auditGateRunnerPath = path.join(root, "scripts", "run-audit-gates.mjs");
 const packageJsonPath = path.join(root, "package.json");
 const prismaSchemaPath = path.join(root, "prisma", "schema.prisma");
@@ -4743,6 +4747,262 @@ function evaluateBuildPrismaGenerationContract(findings) {
 
   return result;
 }
+function evaluateAuditScriptInventoryContract(findings) {
+  const auditScripts = [
+    {
+      key: "publicCopyGuard",
+      label: "public-copy-guard",
+      path: publicCopyGuardPath,
+      packageScript: "check:public-copy-guard",
+      expectedCommand: "node scripts/public-copy-guard.mjs",
+      expectedReportFragment: "public-copy",
+      requiredFragments: [
+        "rules",
+        "boundaryContextPatterns",
+        "Scanned",
+        "process.exit",
+      ],
+    },
+    {
+      key: "apiContract",
+      label: "api-contract",
+      path: apiContractAuditPath,
+      packageScript: "check:api-contract",
+      expectedCommand: "node scripts/api-contract-audit.mjs",
+      expectedReportFragment: "api-contract",
+      requiredFragments: [
+        "endpoint",
+        "inventory",
+        "Report:",
+        "process.exit",
+      ],
+    },
+    {
+      key: "calculationCorrectness",
+      label: "calculation-correctness",
+      path: calculationCorrectnessAuditPath,
+      packageScript: "check:calculation-correctness",
+      expectedCommand: "node scripts/calculation-correctness-audit.mjs",
+      expectedReportFragment: "calculation-correctness",
+      requiredFragments: [
+        "calculation",
+        "warning",
+        "Report:",
+        "process.exit",
+      ],
+    },
+    {
+      key: "publicationIntegrity",
+      label: "publication-integrity",
+      path: publicationIntegrityAuditPath,
+      packageScript: "check:publication-integrity",
+      expectedCommand: "node scripts/publication-integrity-audit.mjs",
+      expectedReportFragment: "publication-integrity",
+      requiredFragments: [
+        "D-",
+        "findings",
+        "Report:",
+        "process.exit",
+      ],
+    },
+  ];
+
+  const result = {
+    packageJsonExists: fs.existsSync(packageJsonPath),
+    packageJsonParseable: false,
+    scripts: {},
+    allScriptsExist: true,
+    allPackageScriptsPresent: true,
+    allScriptsUseNodeShebangOrModule: true,
+    allScriptsWriteAuditReports: true,
+    allScriptsHaveFailExit: true,
+    allScriptsHavePassMessage: true,
+    allScriptsNonTrivial: true,
+    reportRootUsesDotAudit: true,
+  };
+
+  let packageJson = null;
+
+  if (!result.packageJsonExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-032",
+      "AUDIT_SCRIPT_INVENTORY_PACKAGE_JSON_MISSING",
+      path.relative(root, packageJsonPath),
+      "package.json is missing, so audit script inventory cannot be validated."
+    );
+  } else {
+    try {
+      packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8").replace(/^\uFEFF/u, ""));
+      result.packageJsonParseable = true;
+    } catch (error) {
+      addFinding(
+        findings,
+        "fail",
+        "D-032",
+        "AUDIT_SCRIPT_INVENTORY_PACKAGE_JSON_PARSE_FAILED",
+        path.relative(root, packageJsonPath),
+        `package.json could not be parsed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  const packageScripts = packageJson?.scripts ?? {};
+
+  for (const script of auditScripts) {
+    const exists = fs.existsSync(script.path);
+    const entry = {
+      exists,
+      packageScriptPresent: packageScripts[script.packageScript] === script.expectedCommand,
+      usesNodeShebangOrModule: false,
+      writesAuditReport: false,
+      hasFailExit: false,
+      hasPassMessage: false,
+      nonTrivial: false,
+    };
+
+    if (!exists) {
+      result.allScriptsExist = false;
+      addFinding(
+        findings,
+        "fail",
+        "D-032",
+        "AUDIT_SCRIPT_FILE_MISSING",
+        path.relative(root, script.path),
+        `${script.label} audit script is missing.`
+      );
+    }
+
+    if (!entry.packageScriptPresent) {
+      result.allPackageScriptsPresent = false;
+      addFinding(
+        findings,
+        "fail",
+        "D-032",
+        "AUDIT_SCRIPT_PACKAGE_SCRIPT_MISSING_OR_CHANGED",
+        path.relative(root, packageJsonPath),
+        `${script.packageScript} must equal '${script.expectedCommand}'.`
+      );
+    }
+
+    if (exists) {
+      const source = fs.readFileSync(script.path, "utf8").replace(/^\uFEFF/u, "");
+      const normalized = source.replace(/\r\n/gu, "\n");
+      const lineCount = normalized.split("\n").length;
+
+      entry.usesNodeShebangOrModule =
+        normalized.startsWith("#!/usr/bin/env node") ||
+        normalized.includes("import ") ||
+        normalized.includes("require(");
+
+      entry.writesAuditReport =
+        normalized.includes(".audit") &&
+        normalized.includes(script.expectedReportFragment) &&
+        (
+          normalized.includes("writeFileSync") ||
+          normalized.includes("writeFile") ||
+          normalized.includes("fs.write")
+        );
+
+      entry.hasFailExit =
+        normalized.includes("process.exit(1)") ||
+        normalized.includes("process.exitCode = 1") ||
+        normalized.includes("process.exit(result.status") ||
+        normalized.includes("process.exit(failures");
+
+      entry.hasPassMessage =
+        /\bpassed\b/i.test(normalized) ||
+        /PASS/u.test(normalized);
+
+      entry.nonTrivial =
+        lineCount >= 50 &&
+        script.requiredFragments.every((fragment) => normalized.includes(fragment));
+
+      if (!entry.usesNodeShebangOrModule) {
+        result.allScriptsUseNodeShebangOrModule = false;
+        addFinding(
+          findings,
+          "fail",
+          "D-032",
+          "AUDIT_SCRIPT_NOT_NODE_EXECUTABLE",
+          path.relative(root, script.path),
+          `${script.label} must be a Node-based audit script.`
+        );
+      }
+
+      if (!entry.writesAuditReport) {
+        result.allScriptsWriteAuditReports = false;
+        addFinding(
+          findings,
+          "fail",
+          "D-032",
+          "AUDIT_SCRIPT_REPORT_OUTPUT_MISSING",
+          path.relative(root, script.path),
+          `${script.label} must write a report under .audit/.`
+        );
+      }
+
+      if (!entry.hasFailExit) {
+        result.allScriptsHaveFailExit = false;
+        addFinding(
+          findings,
+          "fail",
+          "D-032",
+          "AUDIT_SCRIPT_FAIL_EXIT_MISSING",
+          path.relative(root, script.path),
+          `${script.label} must exit non-zero when the audit fails.`
+        );
+      }
+
+      if (!entry.hasPassMessage) {
+        result.allScriptsHavePassMessage = false;
+        addFinding(
+          findings,
+          "fail",
+          "D-032",
+          "AUDIT_SCRIPT_PASS_MESSAGE_MISSING",
+          path.relative(root, script.path),
+          `${script.label} should print a clear pass message.`
+        );
+      }
+
+      if (!entry.nonTrivial) {
+        result.allScriptsNonTrivial = false;
+        addFinding(
+          findings,
+          "fail",
+          "D-032",
+          "AUDIT_SCRIPT_APPEARS_STUBBED",
+          path.relative(root, script.path),
+          `${script.label} appears too small or missing required audit fragments.`
+        );
+      }
+    }
+
+    result.scripts[script.key] = entry;
+  }
+
+  if (fs.existsSync(gitignorePath)) {
+    const gitignore = fs.readFileSync(gitignorePath, "utf8").replace(/^\uFEFF/u, "");
+    result.reportRootUsesDotAudit =
+      gitignore.split(/\r?\n/u).map((line) => line.trim()).includes("web-v1-app/.audit/") &&
+      gitignore.split(/\r?\n/u).map((line) => line.trim()).includes(".audit/");
+  }
+
+  if (!result.reportRootUsesDotAudit) {
+    addFinding(
+      findings,
+      "fail",
+      "D-032",
+      "AUDIT_SCRIPT_REPORT_ROOT_NOT_IGNORED",
+      path.relative(root, gitignorePath),
+      ".gitignore must ignore .audit/ and web-v1-app/.audit/ so generated audit reports are not committed."
+    );
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -4781,6 +5041,7 @@ function evaluate() {
   const storageAdapterContract = evaluateStorageAdapterContract(findings);
   const auditGateRunnerContract = evaluateAuditGateRunnerContract(findings);
   const buildPrismaGenerationContract = evaluateBuildPrismaGenerationContract(findings);
+  const auditScriptInventoryContract = evaluateAuditScriptInventoryContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -4815,6 +5076,7 @@ function evaluate() {
     storageAdapterContract,
     auditGateRunnerContract,
     buildPrismaGenerationContract,
+    auditScriptInventoryContract,
     findings,
   };
 }
@@ -4874,6 +5136,23 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Audit script inventory contract");
+  lines.push("");
+  lines.push(`package.json exists: ${result.auditScriptInventoryContract.packageJsonExists}`);
+  lines.push(`package.json parseable: ${result.auditScriptInventoryContract.packageJsonParseable}`);
+  lines.push(`All audit scripts exist: ${result.auditScriptInventoryContract.allScriptsExist}`);
+  lines.push(`All package audit scripts present: ${result.auditScriptInventoryContract.allPackageScriptsPresent}`);
+  lines.push(`All scripts are Node executable/modules: ${result.auditScriptInventoryContract.allScriptsUseNodeShebangOrModule}`);
+  lines.push(`All scripts write .audit reports: ${result.auditScriptInventoryContract.allScriptsWriteAuditReports}`);
+  lines.push(`All scripts fail non-zero on red audit: ${result.auditScriptInventoryContract.allScriptsHaveFailExit}`);
+  lines.push(`All scripts have pass message: ${result.auditScriptInventoryContract.allScriptsHavePassMessage}`);
+  lines.push(`All scripts appear non-trivial: ${result.auditScriptInventoryContract.allScriptsNonTrivial}`);
+  lines.push(`.audit report roots ignored: ${result.auditScriptInventoryContract.reportRootUsesDotAudit}`);
+  lines.push("");
+  for (const [scriptName, script] of Object.entries(result.auditScriptInventoryContract.scripts)) {
+    lines.push(`- ${scriptName}: exists=${script.exists}, package=${script.packageScriptPresent}, report=${script.writesAuditReport}, failExit=${script.hasFailExit}, nonTrivial=${script.nonTrivial}`);
+  }
+  lines.push("");
   lines.push("## Build Prisma generation contract");
   lines.push("");
   lines.push(`package.json exists: ${result.buildPrismaGenerationContract.packageJsonExists}`);
@@ -5283,6 +5562,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-032 Audit Script Inventory Contract: verifies audit script files, package script bindings, .audit report output, fail exits, pass messages, and non-stubbed implementations.");
   lines.push("- D-031 Build Prisma Generation Contract: verifies Prisma generation, build script order, Prisma dependency alignment, schema generator/datasource, and build inclusion in audit gates.");
   lines.push("- D-030 Audit Gate Runner Contract: verifies package scripts and run-audit-gates order/skip-build/fail-fast behavior.");
   lines.push("- D-029 Storage Adapter Contract: verifies local/S3 storage path normalization, source selection, private-data roots, S3 env contract, content metadata, not-found behavior, and public fallback exclusion.");
