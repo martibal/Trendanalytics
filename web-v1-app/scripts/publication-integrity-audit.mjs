@@ -3112,6 +3112,264 @@ function evaluatePublicPrivateArtifactBoundaryContract(findings) {
 
   return result;
 }
+function sourceIndex(source, needle) {
+  return source.indexOf(needle);
+}
+
+function evaluateFileApiResponseBoundaryContract(findings) {
+  const result = {
+    routeExists: fs.existsSync(fileApiRoutePath),
+    hasPreAuthRateLimit: false,
+    hasApiKeyValidation: false,
+    hasPathSanitization: false,
+    rejectsTraversalAndNullBytes: false,
+    hasAllowedGenreAndChainLists: false,
+    usesParsedStorageSegments: false,
+    entitlementBeforeStorageRead: false,
+    authBeforeStorageRead: false,
+    rateLimitBeforeStorageRead: false,
+    returnsPrivateNoStore: false,
+    returnsEntitlementHeaders: false,
+    returnsRequestIdHeader: false,
+    touchesApiKeyAfterServed: false,
+    logsFileServed: false,
+    hidesProductionErrorDetails: false,
+  };
+
+  if (!result.routeExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_ROUTE_MISSING",
+      path.relative(root, fileApiRoutePath),
+      "The subscriber file API route is missing, so response-boundary behavior cannot be audited."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(fileApiRoutePath, "utf8").replace(/^\uFEFF/u, "");
+
+  const preAuthRateLimitIndex = sourceIndex(source, "enforcePreAuthRateLimit(request,");
+  const validateApiKeyIndex = sourceIndex(source, "validateRequestApiKey(request)");
+  const accountRateLimitIndex = sourceIndex(source, "enforceAccountRateLimit(");
+  const dailyQuotaIndex = sourceIndex(source, "enforceDailyApiQuota(");
+  const entitlementIndex = sourceIndex(source, "evaluateFileEntitlement(");
+  const storagePathIndex = sourceIndex(source, "const storagePath = buildStoragePath(parsedPath.storageSegments);");
+  const storageReadIndex = sourceIndex(source, "readStorageObject(storagePath)");
+  const fileServedLogIndex = sourceIndex(source, 'eventType: "file_served"');
+  const touchLastUsedIndex = sourceIndex(source, "touchPersistedApiKeyLastUsedAt(");
+
+  result.hasPreAuthRateLimit = preAuthRateLimitIndex >= 0;
+  result.hasApiKeyValidation = validateApiKeyIndex >= 0;
+  result.hasPathSanitization = source.includes("function sanitizeSegments(") && source.includes("sanitizeSegments(resolved.path)");
+  result.rejectsTraversalAndNullBytes =
+    source.includes('segment.includes("..")') &&
+    source.includes('segment.includes("\\\\")') &&
+    source.includes('segment.includes("\\0")');
+
+  result.hasAllowedGenreAndChainLists =
+    source.includes('const ALLOWED_GENRES') &&
+    source.includes('const ALLOWED_CHAINS') &&
+    source.includes('isFileGenre(') &&
+    source.includes('isChainId(');
+
+  result.usesParsedStorageSegments = storagePathIndex >= 0;
+  result.entitlementBeforeStorageRead = entitlementIndex >= 0 && storageReadIndex >= 0 && entitlementIndex < storageReadIndex;
+  result.authBeforeStorageRead = validateApiKeyIndex >= 0 && storageReadIndex >= 0 && validateApiKeyIndex < storageReadIndex;
+  result.rateLimitBeforeStorageRead =
+    storageReadIndex >= 0 &&
+    preAuthRateLimitIndex >= 0 &&
+    preAuthRateLimitIndex < storageReadIndex &&
+    accountRateLimitIndex >= 0 &&
+    accountRateLimitIndex < storageReadIndex &&
+    dailyQuotaIndex >= 0 &&
+    dailyQuotaIndex < storageReadIndex;
+
+  result.returnsPrivateNoStore = source.includes('"Cache-Control": "private, no-store"');
+  result.returnsEntitlementHeaders =
+    source.includes('"X-Entitlement-Tier": authResult.entitlement.tier') &&
+    source.includes('"X-Entitlement-Window": inferredWindow');
+
+  result.returnsRequestIdHeader =
+    source.includes("function withRequestId(") &&
+    source.includes('"X-Request-Id": requestId') &&
+    source.includes("...withRequestId(requestId");
+
+  result.touchesApiKeyAfterServed =
+    touchLastUsedIndex >= 0 &&
+    storageReadIndex >= 0 &&
+    storageReadIndex < touchLastUsedIndex;
+
+  result.logsFileServed =
+    fileServedLogIndex >= 0 &&
+    storageReadIndex >= 0 &&
+    storageReadIndex < fileServedLogIndex;
+
+  result.hidesProductionErrorDetails =
+    source.includes("function publicFileErrorDetail(") &&
+    source.includes('process.env.NODE_ENV !== "production"') &&
+    source.includes('return "not_found";') &&
+    source.includes('return "forbidden";') &&
+    source.includes('return "unauthenticated";');
+
+  if (!result.hasPreAuthRateLimit) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_PRE_AUTH_RATE_LIMIT_MISSING",
+      path.relative(root, fileApiRoutePath),
+      "File API route must enforce pre-auth rate limiting before API key validation."
+    );
+  }
+
+  if (!result.hasApiKeyValidation) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_KEY_VALIDATION_MISSING",
+      path.relative(root, fileApiRoutePath),
+      "File API route must validate API keys before resolving subscriber-bound files."
+    );
+  }
+
+  if (!result.hasPathSanitization || !result.rejectsTraversalAndNullBytes) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_PATH_SANITIZATION_INCOMPLETE",
+      path.relative(root, fileApiRoutePath),
+      "File API route must sanitize path segments and reject traversal, backslashes, and null bytes."
+    );
+  }
+
+  if (!result.hasAllowedGenreAndChainLists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_ALLOWED_GENRE_CHAIN_CONTRACT_MISSING",
+      path.relative(root, fileApiRoutePath),
+      "File API route must constrain paths to explicit allowed genres and chains."
+    );
+  }
+
+  if (!result.usesParsedStorageSegments) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_STORAGE_PATH_USES_UNPARSED_SEGMENTS",
+      path.relative(root, fileApiRoutePath),
+      "File API route must build storage paths from parsedPath.storageSegments, not raw request segments."
+    );
+  }
+
+  if (!result.authBeforeStorageRead) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_STORAGE_READ_BEFORE_AUTH",
+      path.relative(root, fileApiRoutePath),
+      "File API route must authenticate before readStorageObject."
+    );
+  }
+
+  if (!result.rateLimitBeforeStorageRead) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_STORAGE_READ_BEFORE_RATE_LIMITS",
+      path.relative(root, fileApiRoutePath),
+      "File API route must enforce pre-auth/account/daily rate limits before readStorageObject."
+    );
+  }
+
+  if (!result.entitlementBeforeStorageRead) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_STORAGE_READ_BEFORE_ENTITLEMENT",
+      path.relative(root, fileApiRoutePath),
+      "File API route must evaluate entitlement before readStorageObject."
+    );
+  }
+
+  if (!result.returnsPrivateNoStore) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_PRIVATE_NO_STORE_CACHE_HEADER_MISSING",
+      path.relative(root, fileApiRoutePath),
+      "Subscriber-bound file responses must return Cache-Control: private, no-store."
+    );
+  }
+
+  if (!result.returnsEntitlementHeaders) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_ENTITLEMENT_RESPONSE_HEADERS_MISSING",
+      path.relative(root, fileApiRoutePath),
+      "File API responses must expose entitlement tier/window headers for client/debug visibility."
+    );
+  }
+
+  if (!result.returnsRequestIdHeader) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_REQUEST_ID_HEADER_MISSING",
+      path.relative(root, fileApiRoutePath),
+      "File API responses and errors must include X-Request-Id."
+    );
+  }
+
+  if (!result.touchesApiKeyAfterServed) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_LAST_USED_UPDATE_MISSING",
+      path.relative(root, fileApiRoutePath),
+      "File API route must update API-key last-used metadata after a successful file read."
+    );
+  }
+
+  if (!result.logsFileServed) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_FILE_SERVED_AUDIT_LOG_MISSING",
+      path.relative(root, fileApiRoutePath),
+      "File API route must log successful file_served events after storage reads."
+    );
+  }
+
+  if (!result.hidesProductionErrorDetails) {
+    addFinding(
+      findings,
+      "fail",
+      "D-024",
+      "FILE_API_PRODUCTION_ERROR_DETAIL_GUARD_MISSING",
+      path.relative(root, fileApiRoutePath),
+      "File API route must avoid exposing raw internal error/storage details in production responses."
+    );
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -3142,6 +3400,7 @@ function evaluate() {
   const workflowDeployContract = evaluateWorkflowDeployContract(findings);
   const syncScriptMirrorContract = evaluateSyncScriptMirrorContract(findings);
   const publicPrivateArtifactBoundaryContract = evaluatePublicPrivateArtifactBoundaryContract(findings);
+  const fileApiResponseBoundaryContract = evaluateFileApiResponseBoundaryContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -3168,6 +3427,7 @@ function evaluate() {
     workflowDeployContract,
     syncScriptMirrorContract,
     publicPrivateArtifactBoundaryContract,
+    fileApiResponseBoundaryContract,
     findings,
   };
 }
@@ -3227,6 +3487,25 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## File API response boundary contract");
+  lines.push("");
+  lines.push(`Route exists: ${result.fileApiResponseBoundaryContract.routeExists}`);
+  lines.push(`Pre-auth rate limit present: ${result.fileApiResponseBoundaryContract.hasPreAuthRateLimit}`);
+  lines.push(`API key validation present: ${result.fileApiResponseBoundaryContract.hasApiKeyValidation}`);
+  lines.push(`Path sanitization present: ${result.fileApiResponseBoundaryContract.hasPathSanitization}`);
+  lines.push(`Rejects traversal/backslash/null-byte paths: ${result.fileApiResponseBoundaryContract.rejectsTraversalAndNullBytes}`);
+  lines.push(`Allowed genre/chain lists present: ${result.fileApiResponseBoundaryContract.hasAllowedGenreAndChainLists}`);
+  lines.push(`Uses parsed storage segments: ${result.fileApiResponseBoundaryContract.usesParsedStorageSegments}`);
+  lines.push(`Auth before storage read: ${result.fileApiResponseBoundaryContract.authBeforeStorageRead}`);
+  lines.push(`Rate limits before storage read: ${result.fileApiResponseBoundaryContract.rateLimitBeforeStorageRead}`);
+  lines.push(`Entitlement before storage read: ${result.fileApiResponseBoundaryContract.entitlementBeforeStorageRead}`);
+  lines.push(`Returns private no-store: ${result.fileApiResponseBoundaryContract.returnsPrivateNoStore}`);
+  lines.push(`Returns entitlement headers: ${result.fileApiResponseBoundaryContract.returnsEntitlementHeaders}`);
+  lines.push(`Returns request id header: ${result.fileApiResponseBoundaryContract.returnsRequestIdHeader}`);
+  lines.push(`Touches API key after served: ${result.fileApiResponseBoundaryContract.touchesApiKeyAfterServed}`);
+  lines.push(`Logs file served: ${result.fileApiResponseBoundaryContract.logsFileServed}`);
+  lines.push(`Hides production error details: ${result.fileApiResponseBoundaryContract.hidesProductionErrorDetails}`);
+  lines.push("");
   lines.push("## Public/private artifact boundary contract");
   lines.push("");
   lines.push(`localDev.ts exists: ${result.publicPrivateArtifactBoundaryContract.localStorageExists}`);
@@ -3452,6 +3731,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-024 File API Response Boundary Contract: verifies file delivery authenticates, rate-limits, entitles, sanitizes paths, and returns private no-store responses before storage read.");
   lines.push("- D-023 Public/Private Artifact Boundary Contract: verifies subscriber-bound gold/meta/derived artifacts cannot resolve from or live under web public data.");
   lines.push("- D-022 Sync Script Mirror Contract: verifies private mirror sync removes stale targets, byte-copies real files, and hard-fails on missing critical outputs.");
   lines.push("- D-021 Workflow Deploy Contract: verifies Vercel deployment only happens after validated push and uses the deploy-hook secret safely.");
