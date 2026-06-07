@@ -70,6 +70,7 @@ const s3StoragePath = path.join(root, "src", "lib", "storage", "s3.ts");
 const runDailyPipelinePath = path.join(root, "..", "run-daily-pipeline.ps1");
 const snapshotMetadataHarmonizerPath = path.join(root, "..", "harmonize-published-snapshot-metadata.ps1");
 const publishWebDataPath = path.join(root, "..", "publish-web-data.ps1");
+const syncPublishedDataPath = path.join(root, "..", "sync-published-data.ps1");
 const githubPipelineWorkflowPath = path.join(root, "..", ".github", "workflows", "pipeline.yml");
 
 function ensureReportDir() {
@@ -2879,6 +2880,151 @@ function evaluateWorkflowDeployContract(findings) {
 
   return result;
 }
+function evaluateSyncScriptMirrorContract(findings) {
+  const result = {
+    syncScriptExists: fs.existsSync(syncPublishedDataPath),
+    removesPreviousTarget: false,
+    copiesAsRealFiles: false,
+    usesByteCopy: false,
+    checksReparsePoints: false,
+    refusesSameSourceAndTarget: false,
+    datasetJsonHardFail: false,
+    contractJsonHardFail: false,
+    gitStatusScopedToPrivateMirror: false,
+  };
+
+  if (!result.syncScriptExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-022",
+      "SYNC_PUBLISHED_DATA_SCRIPT_MISSING",
+      path.relative(root, syncPublishedDataPath),
+      "sync-published-data.ps1 is missing, so private mirror sync behavior cannot be audited."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(syncPublishedDataPath, "utf8").replace(/^\uFEFF/u, "");
+
+  result.removesPreviousTarget =
+    source.includes('Write-Step "Removing previous deploy copy"') &&
+    source.includes("Remove-PathIfExists -PathValue $normalizedTarget");
+
+  result.copiesAsRealFiles =
+    source.includes('Write-Step "Copying published data as real files"') &&
+    source.includes("Copy-TreeAsRealFiles -Source $normalizedSource -Target $normalizedTarget");
+
+  result.usesByteCopy =
+    source.includes("[System.IO.File]::ReadAllBytes($_.FullName)") &&
+    source.includes("[System.IO.File]::WriteAllBytes($targetPath, $bytes)");
+
+  result.checksReparsePoints =
+    source.includes("Get-ReparsePointItems") &&
+    source.includes("No actual reparse points detected.") &&
+    source.includes("are still actual reparse points");
+
+  result.refusesSameSourceAndTarget =
+    source.includes("$normalizedSource -ieq $normalizedTarget") &&
+    source.includes("Source and target resolve to the same path. Refusing to continue.");
+
+  result.datasetJsonHardFail = source.includes('Fail "dataset.json was not found in target after sync."');
+  result.contractJsonHardFail = source.includes('Fail "contract.json was not found in target after sync."');
+
+  result.gitStatusScopedToPrivateMirror =
+    source.includes("git status --short -- web-v1-app/.private-data/published/v1");
+
+  if (!result.removesPreviousTarget) {
+    addFinding(
+      findings,
+      "fail",
+      "D-022",
+      "SYNC_SCRIPT_DOES_NOT_REMOVE_PREVIOUS_TARGET",
+      path.relative(root, syncPublishedDataPath),
+      "sync-published-data.ps1 must remove the previous private mirror target before copying, otherwise stale files can survive."
+    );
+  }
+
+  if (!result.copiesAsRealFiles) {
+    addFinding(
+      findings,
+      "fail",
+      "D-022",
+      "SYNC_SCRIPT_REAL_FILE_COPY_MISSING",
+      path.relative(root, syncPublishedDataPath),
+      "sync-published-data.ps1 must copy published data as real files, not symlinks/reparse points."
+    );
+  }
+
+  if (!result.usesByteCopy) {
+    addFinding(
+      findings,
+      "fail",
+      "D-022",
+      "SYNC_SCRIPT_BYTE_COPY_CONTRACT_MISSING",
+      path.relative(root, syncPublishedDataPath),
+      "sync-published-data.ps1 must byte-copy files so private mirror files can byte-match canonical source artifacts."
+    );
+  }
+
+  if (!result.checksReparsePoints) {
+    addFinding(
+      findings,
+      "fail",
+      "D-022",
+      "SYNC_SCRIPT_REPARSE_POINT_CHECK_MISSING",
+      path.relative(root, syncPublishedDataPath),
+      "sync-published-data.ps1 must fail if any reparse points remain in the private mirror."
+    );
+  }
+
+  if (!result.refusesSameSourceAndTarget) {
+    addFinding(
+      findings,
+      "fail",
+      "D-022",
+      "SYNC_SCRIPT_SAME_SOURCE_TARGET_GUARD_MISSING",
+      path.relative(root, syncPublishedDataPath),
+      "sync-published-data.ps1 must refuse to run if source and target resolve to the same path."
+    );
+  }
+
+  if (!result.datasetJsonHardFail) {
+    addFinding(
+      findings,
+      "fail",
+      "D-022",
+      "SYNC_SCRIPT_DATASET_JSON_NOT_HARD_FAIL",
+      path.relative(root, syncPublishedDataPath),
+      "sync-published-data.ps1 must fail, not warn, when dataset.json is missing after sync."
+    );
+  }
+
+  if (!result.contractJsonHardFail) {
+    addFinding(
+      findings,
+      "fail",
+      "D-022",
+      "SYNC_SCRIPT_CONTRACT_JSON_NOT_HARD_FAIL",
+      path.relative(root, syncPublishedDataPath),
+      "sync-published-data.ps1 must fail, not warn, when contract.json is missing after sync."
+    );
+  }
+
+  if (!result.gitStatusScopedToPrivateMirror) {
+    addFinding(
+      findings,
+      "warn",
+      "D-022",
+      "SYNC_SCRIPT_GIT_STATUS_SCOPE_MISSING",
+      path.relative(root, syncPublishedDataPath),
+      "sync-published-data.ps1 should scope git status output to web-v1-app/.private-data/published/v1."
+    );
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -2907,6 +3053,7 @@ function evaluate() {
   const publishScriptGateContract = evaluatePublishScriptGateContract(findings);
   const postRebaseWorkflowGateContract = evaluatePostRebaseWorkflowGateContract(findings);
   const workflowDeployContract = evaluateWorkflowDeployContract(findings);
+  const syncScriptMirrorContract = evaluateSyncScriptMirrorContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -2931,6 +3078,7 @@ function evaluate() {
     publishScriptGateContract,
     postRebaseWorkflowGateContract,
     workflowDeployContract,
+    syncScriptMirrorContract,
     findings,
   };
 }
@@ -2990,6 +3138,18 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Sync script mirror contract");
+  lines.push("");
+  lines.push(`Sync script exists: ${result.syncScriptMirrorContract.syncScriptExists}`);
+  lines.push(`Removes previous target: ${result.syncScriptMirrorContract.removesPreviousTarget}`);
+  lines.push(`Copies as real files: ${result.syncScriptMirrorContract.copiesAsRealFiles}`);
+  lines.push(`Uses byte copy: ${result.syncScriptMirrorContract.usesByteCopy}`);
+  lines.push(`Checks reparse points: ${result.syncScriptMirrorContract.checksReparsePoints}`);
+  lines.push(`Refuses same source/target: ${result.syncScriptMirrorContract.refusesSameSourceAndTarget}`);
+  lines.push(`dataset.json missing is hard fail: ${result.syncScriptMirrorContract.datasetJsonHardFail}`);
+  lines.push(`contract.json missing is hard fail: ${result.syncScriptMirrorContract.contractJsonHardFail}`);
+  lines.push(`Git status scoped to private mirror: ${result.syncScriptMirrorContract.gitStatusScopedToPrivateMirror}`);
+  lines.push("");
   lines.push("## Workflow deploy contract");
   lines.push("");
   lines.push(`Workflow exists: ${result.workflowDeployContract.workflowExists}`);
@@ -3192,6 +3352,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-022 Sync Script Mirror Contract: verifies private mirror sync removes stale targets, byte-copies real files, and hard-fails on missing critical outputs.");
   lines.push("- D-021 Workflow Deploy Contract: verifies Vercel deployment only happens after validated push and uses the deploy-hook secret safely.");
   lines.push("- D-020 Post-rebase Workflow Gate Contract: verifies GitHub Actions re-runs audit gates after rebase and before each push attempt.");
   lines.push("- D-019 Publish Script Gate Contract: verifies publish-web-data.ps1 runs central audit gates before manual commit/push paths.");

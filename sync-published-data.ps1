@@ -168,7 +168,7 @@ if (Test-Path -LiteralPath $datasetJson) {
     Write-Host "Found dataset.json" -ForegroundColor Green
 }
 else {
-    Write-Host "Warning: dataset.json was not found in target after sync." -ForegroundColor Yellow
+    Fail "dataset.json was not found in target after sync."
 }
 
 $contractJson = Join-Path $normalizedTarget "contract.json"
@@ -176,7 +176,7 @@ if (Test-Path -LiteralPath $contractJson) {
     Write-Host "Found contract.json" -ForegroundColor Green
 }
 else {
-    Write-Host "Warning: contract.json was not found in target after sync." -ForegroundColor Yellow
+    Fail "contract.json was not found in target after sync."
 }
 
 Write-Step "Checking for actual reparse points"
