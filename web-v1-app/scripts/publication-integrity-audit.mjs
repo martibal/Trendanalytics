@@ -61,6 +61,8 @@ const privateMirrorRoot = path.resolve(path.join(root, ".private-data", "publish
 const publicPublishedRoot = path.resolve(path.join(root, "public", "data", "published", "v1"));
 const fileApiRoutePath = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
 const fileApiDocsPath = path.join(root, "src", "app", "api-docs", "page.tsx");
+const storageIndexPath = path.join(root, "src", "lib", "storage", "index.ts");
+const localStoragePath = path.join(root, "src", "lib", "storage", "localDev.ts");
 
 function ensureReportDir() {
   fs.mkdirSync(reportDir, { recursive: true });
@@ -1013,6 +1015,226 @@ function evaluateFileApiArtifactMapping(findings) {
     routeUsesRawSegmentsAsStoragePath: usesRawSegmentsAsStoragePath,
   };
 }
+function normalizeStoragePathForAudit(storagePath) {
+  const cleaned = String(storagePath).replace(/^\/+/u, "");
+
+  if (cleaned.startsWith("data/published/v1/")) {
+    return cleaned.slice("data/published/v1/".length);
+  }
+
+  if (cleaned === "data/published/v1") {
+    return "";
+  }
+
+  return cleaned;
+}
+
+function localStorageCandidateRootsForAudit() {
+  return [
+    path.resolve(path.join(root, "..", "data", "published", "v1")),
+    path.resolve(path.join(root, "data", "published", "v1")),
+    privateMirrorRoot,
+    publicPublishedRoot,
+  ];
+}
+
+function firstExistingCandidateForStoragePath(storagePath) {
+  const normalizedPath = normalizeStoragePathForAudit(storagePath);
+
+  for (const candidateRoot of localStorageCandidateRootsForAudit()) {
+    const absolutePath = path.join(candidateRoot, normalizedPath);
+
+    if (fs.existsSync(absolutePath)) {
+      return {
+        normalizedPath,
+        candidateRoot,
+        absolutePath,
+      };
+    }
+  }
+
+  return {
+    normalizedPath,
+    candidateRoot: null,
+    absolutePath: null,
+  };
+}
+
+function localStorageSmokeSamples() {
+  return [
+    "data/published/v1/gold/bitcoin/latest.json",
+    "data/published/v1/gold/base/latest.json",
+    "data/published/v1/meta/bitcoin/last90d.json",
+    "data/published/v1/meta/arbitrum/last365d.json",
+    "data/published/v1/derived/ethereum/last30d.json",
+    "data/published/v1/derived/base/last7d.json",
+  ];
+}
+
+function evaluateLocalStorageResolution(findings) {
+  const storageIndexSource = fs.existsSync(storageIndexPath)
+    ? fs.readFileSync(storageIndexPath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const localStorageSource = fs.existsSync(localStoragePath)
+    ? fs.readFileSync(localStoragePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const result = {
+    storageIndexExists: fs.existsSync(storageIndexPath),
+    localStorageExists: fs.existsSync(localStoragePath),
+    stripsPublishedPrefix: false,
+    includesPrivateMirrorRoot: false,
+    includesPublicFallback: false,
+    publicFallbackAfterPrivateMirror: false,
+    samplesChecked: 0,
+    samplesResolved: 0,
+    samplesResolvedToPublic: 0,
+    sampleResolutions: [],
+  };
+
+  if (!result.storageIndexExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-012",
+      "STORAGE_INDEX_MODULE_MISSING",
+      path.relative(root, storageIndexPath),
+      "Storage index module is missing."
+    );
+  } else {
+    result.stripsPublishedPrefix =
+      storageIndexSource.includes('cleaned.startsWith("data/published/v1/")') &&
+      storageIndexSource.includes('cleaned.slice("data/published/v1/".length)');
+
+    if (!result.stripsPublishedPrefix) {
+      addFinding(
+        findings,
+        "fail",
+        "D-012",
+        "STORAGE_PATH_PREFIX_NORMALIZATION_MISSING",
+        path.relative(root, storageIndexPath),
+        "Storage index must normalize data/published/v1/* API storage paths before resolving local/S3 objects."
+      );
+    }
+  }
+
+  if (!result.localStorageExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-012",
+      "LOCAL_STORAGE_MODULE_MISSING",
+      path.relative(root, localStoragePath),
+      "Local storage module is missing."
+    );
+  } else {
+    result.includesPrivateMirrorRoot = localStorageSource.includes('".private-data"') || localStorageSource.includes("'.private-data'");
+    result.includesPublicFallback = localStorageSource.includes('"public"') || localStorageSource.includes("'public'");
+
+    const privateIndex = localStorageSource.indexOf('".private-data"') >= 0
+      ? localStorageSource.indexOf('".private-data"')
+      : localStorageSource.indexOf("'.private-data'");
+
+    const publicIndex = localStorageSource.indexOf('"public"') >= 0
+      ? localStorageSource.indexOf('"public"')
+      : localStorageSource.indexOf("'public'");
+
+    result.publicFallbackAfterPrivateMirror =
+      privateIndex >= 0 &&
+      publicIndex >= 0 &&
+      privateIndex < publicIndex;
+
+    if (!result.includesPrivateMirrorRoot) {
+      addFinding(
+        findings,
+        "fail",
+        "D-012",
+        "LOCAL_STORAGE_PRIVATE_MIRROR_ROOT_MISSING",
+        path.relative(root, localStoragePath),
+        "Local storage resolution must include web-v1-app/.private-data/published/v1 for subscriber-bound artifacts."
+      );
+    }
+
+    if (result.includesPublicFallback && !result.publicFallbackAfterPrivateMirror) {
+      addFinding(
+        findings,
+        "fail",
+        "D-012",
+        "LOCAL_STORAGE_PUBLIC_FALLBACK_PRECEDES_PRIVATE_MIRROR",
+        path.relative(root, localStoragePath),
+        "If public static data is a fallback, it must come after .private-data so subscriber artifacts do not resolve from public before private."
+      );
+    }
+  }
+
+  for (const sampleStoragePath of localStorageSmokeSamples()) {
+    result.samplesChecked += 1;
+
+    const resolution = firstExistingCandidateForStoragePath(sampleStoragePath);
+    const sourceEquivalent = path.join(publishedRoot, resolution.normalizedPath);
+    const privateEquivalent = path.join(privateMirrorRoot, resolution.normalizedPath);
+
+    const resolutionRow = {
+      storagePath: sampleStoragePath,
+      normalizedPath: resolution.normalizedPath,
+      resolvedRoot: resolution.candidateRoot ? path.relative(root, resolution.candidateRoot) || "." : null,
+      resolvedFile: resolution.absolutePath ? path.relative(root, resolution.absolutePath) : null,
+    };
+
+    result.sampleResolutions.push(resolutionRow);
+
+    if (!resolution.absolutePath) {
+      addFinding(
+        findings,
+        "fail",
+        "D-012",
+        "LOCAL_STORAGE_SAMPLE_DID_NOT_RESOLVE",
+        sampleStoragePath,
+        `No local candidate root resolved normalized path ${resolution.normalizedPath}.`
+      );
+      continue;
+    }
+
+    result.samplesResolved += 1;
+
+    if (path.resolve(resolution.candidateRoot) === publicPublishedRoot) {
+      result.samplesResolvedToPublic += 1;
+      addFinding(
+        findings,
+        "fail",
+        "D-012",
+        "LOCAL_STORAGE_SAMPLE_RESOLVED_TO_PUBLIC",
+        path.relative(root, resolution.absolutePath),
+        "Subscriber-bound sample resolved from public static data instead of source/private storage."
+      );
+    }
+
+    if (fs.existsSync(sourceEquivalent) && sha256File(resolution.absolutePath) !== sha256File(sourceEquivalent)) {
+      addFinding(
+        findings,
+        "fail",
+        "D-012",
+        "LOCAL_STORAGE_SAMPLE_DIFFERS_FROM_SOURCE_PUBLISHED",
+        path.relative(root, resolution.absolutePath),
+        `Resolved file does not byte-match source published artifact ${path.relative(root, sourceEquivalent)}.`
+      );
+    }
+
+    if (fs.existsSync(privateEquivalent) && sha256File(resolution.absolutePath) !== sha256File(privateEquivalent)) {
+      addFinding(
+        findings,
+        "fail",
+        "D-012",
+        "LOCAL_STORAGE_SAMPLE_DIFFERS_FROM_PRIVATE_MIRROR",
+        path.relative(root, resolution.absolutePath),
+        `Resolved file does not byte-match private mirror artifact ${path.relative(root, privateEquivalent)}.`
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -1031,6 +1253,7 @@ function evaluate() {
   const fileApiRouteContract = evaluateFileApiRouteContract(findings);
   const jsonEncodingAudit = evaluateJsonEncodingAndParse(findings);
   const fileApiArtifactMapping = evaluateFileApiArtifactMapping(findings);
+  const localStorageResolution = evaluateLocalStorageResolution(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -1045,6 +1268,7 @@ function evaluate() {
     fileApiRouteContract,
     jsonEncodingAudit,
     fileApiArtifactMapping,
+    localStorageResolution,
     findings,
   };
 }
@@ -1104,6 +1328,24 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Local storage resolution");
+  lines.push("");
+  lines.push(`Storage index exists: ${result.localStorageResolution.storageIndexExists}`);
+  lines.push(`Local storage module exists: ${result.localStorageResolution.localStorageExists}`);
+  lines.push(`Strips data/published/v1 prefix: ${result.localStorageResolution.stripsPublishedPrefix}`);
+  lines.push(`Includes private mirror root: ${result.localStorageResolution.includesPrivateMirrorRoot}`);
+  lines.push(`Includes public fallback: ${result.localStorageResolution.includesPublicFallback}`);
+  lines.push(`Public fallback after private mirror: ${result.localStorageResolution.publicFallbackAfterPrivateMirror}`);
+  lines.push(`Sample storage paths checked: ${result.localStorageResolution.samplesChecked}`);
+  lines.push(`Sample storage paths resolved: ${result.localStorageResolution.samplesResolved}`);
+  lines.push(`Sample storage paths resolved to public: ${result.localStorageResolution.samplesResolvedToPublic}`);
+  lines.push("");
+  lines.push(tableRow(["Storage path", "Normalized path", "Resolved root", "Resolved file"]));
+  lines.push(tableRow(["---", "---", "---", "---"]));
+  for (const row of result.localStorageResolution.sampleResolutions) {
+    lines.push(tableRow([row.storagePath, row.normalizedPath, row.resolvedRoot ?? "n/a", row.resolvedFile ?? "n/a"]));
+  }
+  lines.push("");
   lines.push("## File API artifact mapping");
   lines.push("");
   lines.push(`Documented file API patterns: ${result.fileApiArtifactMapping.documentedPatterns.join(", ") || "none"}`);
