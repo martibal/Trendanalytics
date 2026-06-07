@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /*START FILE*/
+import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
+const repoRoot = path.resolve(path.join(root, ".."));
 
 const CHAINS = ["bitcoin", "ethereum", "arbitrum", "base"];
 const GENRES = ["gold", "meta", "derived"];
@@ -13,6 +15,7 @@ const WINDOWS = [7, 30, 90, 180, 365];
 const reportDir = path.join(root, ".audit", "publication-integrity");
 const reportJsonPath = path.join(reportDir, "publication-integrity.json");
 const reportMarkdownPath = path.join(reportDir, "publication-integrity.md");
+const gitignorePath = path.join(repoRoot, ".gitignore");
 
 function candidatePublishedRoots() {
   return [
@@ -2298,6 +2301,201 @@ function evaluateSnapshotMetadataHarmonizerContract(findings) {
 
   return result;
 }
+function gitOutput(args) {
+  const result = spawnSync("git", args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    shell: process.platform === "win32",
+  });
+
+  if (result.error) {
+    return {
+      ok: false,
+      stdout: "",
+      stderr: result.error.message,
+      status: 1,
+    };
+  }
+
+  return {
+    ok: result.status === 0,
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? "",
+    status: result.status ?? 0,
+  };
+}
+
+function normalizeGitPath(value) {
+  return String(value).replace(/\\/gu, "/");
+}
+
+function gitTrackedFiles() {
+  const result = gitOutput(["ls-files"]);
+
+  if (!result.ok) {
+    return null;
+  }
+
+  return result.stdout
+    .split(/\r?\n/u)
+    .map((line) => normalizeGitPath(line.trim()))
+    .filter(Boolean);
+}
+
+function evaluateRepoHygieneContract(findings) {
+  const result = {
+    gitignoreExists: fs.existsSync(gitignorePath),
+    requiredIgnorePatternsPresent: 0,
+    requiredAllowPatternsPresent: 0,
+    trackedForbiddenArtifacts: [],
+    trackedRequiredPermanentScripts: [],
+    requiredPermanentScriptsMissing: [],
+  };
+
+  const requiredIgnorePatterns = [
+    ".audit/",
+    "audit/",
+    "web-v1-app/.audit/",
+    "web-v1-app/audit/",
+    "patch-*.ps1",
+    "repair-*.ps1",
+    "audit-code.patch",
+  ];
+
+  const requiredAllowPatterns = [
+    "!run-daily-pipeline.ps1",
+    "!publish-web-data.ps1",
+    "!sync-published-data.ps1",
+    "!harmonize-published-snapshot-metadata.ps1",
+  ];
+
+  if (!result.gitignoreExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-018",
+      "GITIGNORE_MISSING",
+      path.relative(root, gitignorePath),
+      ".gitignore is required to keep audit reports and patch scratch out of commits."
+    );
+  } else {
+    const gitignore = fs.readFileSync(gitignorePath, "utf8").replace(/^\uFEFF/u, "");
+    const gitignoreLines = new Set(
+      gitignore
+        .split(/\r?\n/u)
+        .map((line) => line.trim())
+        .filter(Boolean)
+    );
+
+    for (const pattern of requiredIgnorePatterns) {
+      if (gitignoreLines.has(pattern)) {
+        result.requiredIgnorePatternsPresent += 1;
+      } else {
+        addFinding(
+          findings,
+          "fail",
+          "D-018",
+          "GITIGNORE_REQUIRED_IGNORE_PATTERN_MISSING",
+          path.relative(root, gitignorePath),
+          `Missing required ignore pattern: ${pattern}`
+        );
+      }
+    }
+
+    for (const pattern of requiredAllowPatterns) {
+      if (gitignoreLines.has(pattern)) {
+        result.requiredAllowPatternsPresent += 1;
+      } else {
+        addFinding(
+          findings,
+          "fail",
+          "D-018",
+          "GITIGNORE_REQUIRED_ALLOW_PATTERN_MISSING",
+          path.relative(root, gitignorePath),
+          `Missing required allow-list pattern for permanent script: ${pattern}`
+        );
+      }
+    }
+  }
+
+  const tracked = gitTrackedFiles();
+
+  if (!tracked) {
+    addFinding(
+      findings,
+      "warn",
+      "D-018",
+      "GIT_LS_FILES_UNAVAILABLE",
+      path.relative(root, gitignorePath),
+      "Could not run git ls-files; tracked artifact hygiene could not be checked."
+    );
+
+    return result;
+  }
+
+  const forbiddenTrackedPatterns = [
+    /^web-v1-app\/\.audit\//u,
+    /^web-v1-app\/audit\//u,
+    /^\.audit\//u,
+    /^audit\//u,
+    /^patch-.*\.ps1$/u,
+    /^repair-.*\.ps1$/u,
+    /^audit-code\.patch$/u,
+  ];
+
+  result.trackedForbiddenArtifacts = tracked.filter((file) =>
+    forbiddenTrackedPatterns.some((pattern) => pattern.test(file))
+  );
+
+  if (result.trackedForbiddenArtifacts.length > 0) {
+    for (const file of result.trackedForbiddenArtifacts.slice(0, 50)) {
+      addFinding(
+        findings,
+        "fail",
+        "D-018",
+        "FORBIDDEN_AUDIT_OR_PATCH_ARTIFACT_TRACKED",
+        file,
+        "Audit reports and local patch/repair scratch must not be tracked in git."
+      );
+    }
+
+    if (result.trackedForbiddenArtifacts.length > 50) {
+      addFinding(
+        findings,
+        "fail",
+        "D-018",
+        "FORBIDDEN_AUDIT_OR_PATCH_ARTIFACT_TRACKED_CAPPED",
+        "git ls-files",
+        `${result.trackedForbiddenArtifacts.length} forbidden tracked files found; terminal/report findings capped.`
+      );
+    }
+  }
+
+  const requiredPermanentScripts = [
+    "run-daily-pipeline.ps1",
+    "publish-web-data.ps1",
+    "sync-published-data.ps1",
+    "harmonize-published-snapshot-metadata.ps1",
+  ];
+
+  for (const scriptPath of requiredPermanentScripts) {
+    if (tracked.includes(scriptPath)) {
+      result.trackedRequiredPermanentScripts.push(scriptPath);
+    } else {
+      result.requiredPermanentScriptsMissing.push(scriptPath);
+      addFinding(
+        findings,
+        "fail",
+        "D-018",
+        "REQUIRED_PERMANENT_SCRIPT_NOT_TRACKED",
+        scriptPath,
+        "This permanent pipeline script must be tracked. If it is ignored by *.ps1, use git add -f after verifying it is not a local patch script."
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -2322,6 +2520,7 @@ function evaluate() {
   const revisionProvenanceContract = evaluateRevisionProvenanceContract(findings, inventory);
   const historicalDerivedCoverageContract = evaluateHistoricalDerivedCoverageContract(findings, inventory);
   const snapshotMetadataHarmonizerContract = evaluateSnapshotMetadataHarmonizerContract(findings);
+  const repoHygieneContract = evaluateRepoHygieneContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -2342,6 +2541,7 @@ function evaluate() {
     revisionProvenanceContract,
     historicalDerivedCoverageContract,
     snapshotMetadataHarmonizerContract,
+    repoHygieneContract,
     findings,
   };
 }
@@ -2401,6 +2601,29 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Repo hygiene contract");
+  lines.push("");
+  lines.push(`.gitignore exists: ${result.repoHygieneContract.gitignoreExists}`);
+  lines.push(`Required ignore patterns present: ${result.repoHygieneContract.requiredIgnorePatternsPresent}`);
+  lines.push(`Required allow-list patterns present: ${result.repoHygieneContract.requiredAllowPatternsPresent}`);
+  lines.push(`Forbidden tracked audit/patch artifacts: ${result.repoHygieneContract.trackedForbiddenArtifacts.length}`);
+  lines.push(`Required permanent scripts tracked: ${result.repoHygieneContract.trackedRequiredPermanentScripts.length}`);
+  lines.push(`Required permanent scripts missing from git: ${result.repoHygieneContract.requiredPermanentScriptsMissing.length}`);
+  lines.push("");
+  if (result.repoHygieneContract.trackedForbiddenArtifacts.length > 0) {
+    lines.push("Tracked forbidden artifacts:");
+    for (const file of result.repoHygieneContract.trackedForbiddenArtifacts.slice(0, 50)) {
+      lines.push(`- ${file}`);
+    }
+    lines.push("");
+  }
+  if (result.repoHygieneContract.requiredPermanentScriptsMissing.length > 0) {
+    lines.push("Missing permanent scripts:");
+    for (const file of result.repoHygieneContract.requiredPermanentScriptsMissing) {
+      lines.push(`- ${file}`);
+    }
+    lines.push("");
+  }
   lines.push("## Snapshot metadata harmonizer contract");
   lines.push("");
   lines.push(`Harmonizer exists: ${result.snapshotMetadataHarmonizerContract.harmonizerExists}`);
@@ -2546,6 +2769,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-018 Repo Hygiene Contract: verifies audit/patch scratch is ignored and permanent pipeline scripts are explicitly allowed/tracked.");
   lines.push("- D-017 Snapshot Metadata Harmonizer Contract: verifies the pipeline permanently harmonizes dataset/manifests computed_at_utc before private sync and commit.");
   lines.push("- D-016 Historical Derived Coverage Contract: verifies derived day-files/manifests/dataset asof align exactly with gold per chain.");
   lines.push("- D-015 Revision Provenance Contract: checks dataset/manifests share dataset_id, revision_id, bounded computed_at_utc skew, methodology_version, schema versions, and files/window mappings.");
