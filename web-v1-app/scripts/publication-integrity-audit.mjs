@@ -2732,6 +2732,153 @@ function evaluatePostRebaseWorkflowGateContract(findings) {
 
   return result;
 }
+function evaluateWorkflowDeployContract(findings) {
+  const result = {
+    workflowExists: fs.existsSync(githubPipelineWorkflowPath),
+    deployStepPresent: false,
+    deployHookSecretReferenced: false,
+    deployHookMissingCheckPresent: false,
+    deployAfterPush: false,
+    deployAfterPostRebaseGate: false,
+    deployNotAlways: false,
+    pushStepIndex: -1,
+    postRebaseGateIndex: -1,
+    deployStepIndex: -1,
+  };
+
+  if (!result.workflowExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-021",
+      "WORKFLOW_MISSING_FOR_DEPLOY_CONTRACT",
+      path.relative(root, githubPipelineWorkflowPath),
+      ".github/workflows/pipeline.yml is missing, so deploy ordering cannot be audited."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(githubPipelineWorkflowPath, "utf8").replace(/^\uFEFF/u, "");
+
+  result.pushStepIndex = firstIndexOfAny(source, [
+    "git push origin HEAD:main",
+    "Push local published-data commit with remote sync",
+  ]);
+
+  result.postRebaseGateIndex = firstIndexOfAny(source, [
+    "Re-running audit gates after rebase and before push",
+    "Post-rebase audit gates failed; refusing to push.",
+  ]);
+
+  result.deployStepIndex = firstIndexOfAny(source, [
+    "Trigger Vercel production deployment",
+    "VERCEL_DEPLOY_HOOK_URL",
+  ]);
+
+  result.deployStepPresent = result.deployStepIndex >= 0;
+  result.deployHookSecretReferenced =
+    source.includes("secrets.VERCEL_DEPLOY_HOOK_URL") ||
+    source.includes("$env:VERCEL_DEPLOY_HOOK_URL") ||
+    source.includes("${{ secrets.VERCEL_DEPLOY_HOOK_URL }}");
+
+  result.deployHookMissingCheckPresent =
+    source.includes("VERCEL_DEPLOY_HOOK_URL") &&
+    (
+      source.includes("Missing VERCEL_DEPLOY_HOOK_URL") ||
+      source.includes("VERCEL_DEPLOY_HOOK_URL is not configured") ||
+      source.includes("Vercel deploy hook")
+    );
+
+  result.deployAfterPush =
+    result.pushStepIndex >= 0 &&
+    result.deployStepIndex >= 0 &&
+    result.pushStepIndex < result.deployStepIndex;
+
+  result.deployAfterPostRebaseGate =
+    result.postRebaseGateIndex >= 0 &&
+    result.deployStepIndex >= 0 &&
+    result.postRebaseGateIndex < result.deployStepIndex;
+
+  const deploySectionStart = result.deployStepIndex >= 0 ? result.deployStepIndex : 0;
+  const deploySectionEnd = result.deployStepIndex >= 0
+    ? source.indexOf("\n      - name:", result.deployStepIndex + 1)
+    : -1;
+
+  const deploySection = result.deployStepIndex >= 0
+    ? source.slice(deploySectionStart, deploySectionEnd >= 0 ? deploySectionEnd : source.length)
+    : "";
+
+  result.deployNotAlways = result.deployStepPresent && !deploySection.includes("if: always()");
+
+  if (!result.deployStepPresent) {
+    addFinding(
+      findings,
+      "fail",
+      "D-021",
+      "WORKFLOW_DEPLOY_STEP_MISSING",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Workflow must contain an explicit Vercel deployment trigger step after a validated push."
+    );
+  }
+
+  if (!result.deployHookSecretReferenced) {
+    addFinding(
+      findings,
+      "fail",
+      "D-021",
+      "WORKFLOW_DEPLOY_HOOK_SECRET_NOT_REFERENCED",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Workflow deploy step must use the VERCEL_DEPLOY_HOOK_URL secret rather than a hard-coded URL."
+    );
+  }
+
+  if (!result.deployHookMissingCheckPresent) {
+    addFinding(
+      findings,
+      "fail",
+      "D-021",
+      "WORKFLOW_DEPLOY_HOOK_MISSING_CHECK_ABSENT",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Workflow deploy step should explicitly fail or skip safely if VERCEL_DEPLOY_HOOK_URL is missing."
+    );
+  }
+
+  if (!result.deployAfterPush) {
+    addFinding(
+      findings,
+      "fail",
+      "D-021",
+      "WORKFLOW_DEPLOY_BEFORE_VALIDATED_PUSH",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Vercel deployment must trigger only after the workflow push step succeeds."
+    );
+  }
+
+  if (!result.deployAfterPostRebaseGate) {
+    addFinding(
+      findings,
+      "fail",
+      "D-021",
+      "WORKFLOW_DEPLOY_BEFORE_POST_REBASE_GATE",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Vercel deployment must occur after post-rebase audit gates, so the deployed commit has been validated."
+    );
+  }
+
+  if (!result.deployNotAlways) {
+    addFinding(
+      findings,
+      "fail",
+      "D-021",
+      "WORKFLOW_DEPLOY_USES_ALWAYS",
+      path.relative(root, githubPipelineWorkflowPath),
+      "Vercel deployment step must not use if: always(); it must depend on prior push/audit success."
+    );
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -2759,6 +2906,7 @@ function evaluate() {
   const repoHygieneContract = evaluateRepoHygieneContract(findings);
   const publishScriptGateContract = evaluatePublishScriptGateContract(findings);
   const postRebaseWorkflowGateContract = evaluatePostRebaseWorkflowGateContract(findings);
+  const workflowDeployContract = evaluateWorkflowDeployContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -2782,6 +2930,7 @@ function evaluate() {
     repoHygieneContract,
     publishScriptGateContract,
     postRebaseWorkflowGateContract,
+    workflowDeployContract,
     findings,
   };
 }
@@ -2841,6 +2990,19 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Workflow deploy contract");
+  lines.push("");
+  lines.push(`Workflow exists: ${result.workflowDeployContract.workflowExists}`);
+  lines.push(`Deploy step present: ${result.workflowDeployContract.deployStepPresent}`);
+  lines.push(`Deploy hook secret referenced: ${result.workflowDeployContract.deployHookSecretReferenced}`);
+  lines.push(`Deploy hook missing check present: ${result.workflowDeployContract.deployHookMissingCheckPresent}`);
+  lines.push(`Deploy after push: ${result.workflowDeployContract.deployAfterPush}`);
+  lines.push(`Deploy after post-rebase gate: ${result.workflowDeployContract.deployAfterPostRebaseGate}`);
+  lines.push(`Deploy step does not use if: always(): ${result.workflowDeployContract.deployNotAlways}`);
+  lines.push(`Push step index: ${result.workflowDeployContract.pushStepIndex}`);
+  lines.push(`Post-rebase gate index: ${result.workflowDeployContract.postRebaseGateIndex}`);
+  lines.push(`Deploy step index: ${result.workflowDeployContract.deployStepIndex}`);
+  lines.push("");
   lines.push("## Post-rebase workflow gate contract");
   lines.push("");
   lines.push(`Workflow exists: ${result.postRebaseWorkflowGateContract.workflowExists}`);
@@ -3030,6 +3192,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-021 Workflow Deploy Contract: verifies Vercel deployment only happens after validated push and uses the deploy-hook secret safely.");
   lines.push("- D-020 Post-rebase Workflow Gate Contract: verifies GitHub Actions re-runs audit gates after rebase and before each push attempt.");
   lines.push("- D-019 Publish Script Gate Contract: verifies publish-web-data.ps1 runs central audit gates before manual commit/push paths.");
   lines.push("- D-018 Repo Hygiene Contract: verifies audit/patch scratch is ignored and permanent pipeline scripts are explicitly allowed/tracked.");
