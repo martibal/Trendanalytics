@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const apiKeysRoutePath = path.join(root, "src", "app", "api", "v1", "keys", "route.ts");
 const apiKeyManagerClientPath = path.join(root, "src", "components", "dashboard", "ApiKeyManagerClient.tsx");
 const dashboardPagePath = path.join(root, "src", "app", "dashboard", "page.tsx");
 const signUpPagePath = path.join(root, "src", "app", "sign-up", "[[...sign-up]]", "page.tsx");
@@ -6009,6 +6010,355 @@ function evaluateDashboardAccountSurfaceContract(findings) {
 
   return result;
 }
+function evaluateApiKeyRouteContract(findings) {
+  const result = {
+    routeExists: fs.existsSync(apiKeysRoutePath),
+
+    importsClerkAuth: false,
+    importsPrismaStatuses: false,
+    importsDb: false,
+    importsAuditLog: false,
+    importsSameOriginGuard: false,
+    importsPreAuthRateLimit: false,
+
+    errorResponsesNoStore: false,
+    productionErrorDetailsRedacted: false,
+    labelNormalizationValid: false,
+    secretGenerationValid: false,
+    keyHashingValid: false,
+    prefixAndLast4Valid: false,
+
+    accountLookupUsesClerkUserId: false,
+    accountLookupIncludesLatestSubscriptionAndApiKeys: false,
+
+    postHasOriginBeforeRateLimitBeforeAuth: false,
+    postRequiresAuthenticatedUser: false,
+    postRequiresLinkedAccount: false,
+    postRequiresActiveSubscription: false,
+    postEnforcesTwoNonRevokedKeyLimit: false,
+    postCreatesAccountScopedScryptKey: false,
+    postSelectDoesNotReturnKeyHash: false,
+    postLogsCreatedEvent: false,
+    postResponseSecretOnceNoStore: false,
+
+    deleteHasOriginBeforeRateLimitBeforeAuth: false,
+    deleteRequiresAuthenticatedUser: false,
+    deleteRequiresLinkedAccount: false,
+    deleteValidatesJsonBodyAndKeyId: false,
+    deleteFindsKeyByAccountId: false,
+    deleteRevokesWithoutDeleting: false,
+    deleteLogsRevokedEvent: false,
+    deleteResponseNoStore: false,
+  };
+
+  if (!result.routeExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-038",
+      "API_KEYS_ROUTE_MISSING",
+      path.relative(root, apiKeysRoutePath),
+      "/api/v1/keys route is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(apiKeysRoutePath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  const postIndex = normalized.indexOf("export async function POST(request: Request)");
+  const deleteIndex = normalized.indexOf("export async function DELETE(request: Request)");
+  const postSource = postIndex >= 0 && deleteIndex > postIndex
+    ? normalized.slice(postIndex, deleteIndex)
+    : "";
+  const deleteSource = deleteIndex >= 0
+    ? normalized.slice(deleteIndex)
+    : "";
+
+  result.importsClerkAuth =
+    normalized.includes('import { auth } from "@clerk/nextjs/server";');
+
+  result.importsPrismaStatuses =
+    normalized.includes('import { ApiKeyStatus, SubscriptionStatus } from "@prisma/client";');
+
+  result.importsDb =
+    normalized.includes('import { db } from "@/lib/db";');
+
+  result.importsAuditLog =
+    normalized.includes('import { getOrCreateRequestId, logApiEvent } from "@/lib/auditLog";');
+
+  result.importsSameOriginGuard =
+    normalized.includes('import { validateSameOriginRequest } from "@/lib/security/origin";');
+
+  result.importsPreAuthRateLimit =
+    normalized.includes('import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";');
+
+  result.errorResponsesNoStore =
+    normalized.includes("function jsonError(") &&
+    normalized.includes('"Cache-Control": "no-store"');
+
+  result.productionErrorDetailsRedacted =
+    normalized.includes("function publicKeyErrorDetail(") &&
+    normalized.includes('process.env.NODE_ENV !== "production"') &&
+    normalized.includes('process.env.VERCEL_ENV !== "production"') &&
+    normalized.includes('return "unauthenticated";') &&
+    normalized.includes('return "forbidden";') &&
+    normalized.includes('return "server_error";');
+
+  result.labelNormalizationValid =
+    normalized.includes("function normalizeLabel(value: unknown): string | null") &&
+    normalized.includes("const trimmed = value.trim();") &&
+    normalized.includes("return trimmed.slice(0, 64);");
+
+  result.secretGenerationValid =
+    normalized.includes("function buildApiKeySecret()") &&
+    normalized.includes('return `ta_live_${crypto.randomBytes(24).toString("hex")}`;');
+
+  result.keyHashingValid =
+    normalized.includes("function hashApiKey(secret: string)") &&
+    normalized.includes("const salt = crypto.randomBytes(16).toString(\"hex\");") &&
+    normalized.includes("const derived = crypto.scryptSync(secret, salt, 64).toString(\"hex\");") &&
+    normalized.includes("return `scrypt:${salt}:${derived}`;");
+
+  result.prefixAndLast4Valid =
+    normalized.includes("function buildKeyPrefix(secret: string)") &&
+    normalized.includes("return secret.slice(0, Math.min(12, secret.length));") &&
+    normalized.includes("function buildKeyLast4(secret: string)") &&
+    normalized.includes("return secret.slice(Math.max(0, secret.length - 4));");
+
+  result.accountLookupUsesClerkUserId =
+    normalized.includes("async function getAuthenticatedAccount()") &&
+    normalized.includes("const { userId } = await auth();") &&
+    normalized.includes("where: { authProviderUserId: userId }");
+
+  result.accountLookupIncludesLatestSubscriptionAndApiKeys =
+    normalized.includes("subscriptions: {") &&
+    normalized.includes('orderBy: { updatedAt: "desc" }') &&
+    normalized.includes("take: 1") &&
+    normalized.includes("apiKeys: {") &&
+    normalized.includes('orderBy: { createdAt: "desc" }');
+
+  if (postSource) {
+    const originIndex = postSource.indexOf("const originGuard = validateSameOriginRequest(request);");
+    const rateLimitIndex = postSource.indexOf('const preAuthRateLimit = await enforcePreAuthRateLimit(request, "keys-api");');
+    const authIndex = postSource.indexOf("const { userId, account } = await getAuthenticatedAccount();");
+    const accountIndex = postSource.indexOf("if (!account)");
+    const subscriptionIndex = postSource.indexOf("const latestSubscription = account.subscriptions[0] ?? null;");
+    const nonRevokedIndex = postSource.indexOf("const nonRevokedKeys = account.apiKeys.filter");
+    const createIndex = postSource.indexOf("const created = await db.apiKey.create({");
+    const logIndex = postSource.indexOf('eventType: "api_key_created"');
+    const responseIndex = postSource.indexOf("return NextResponse.json(");
+
+    result.postHasOriginBeforeRateLimitBeforeAuth =
+      originIndex >= 0 &&
+      rateLimitIndex >= 0 &&
+      authIndex >= 0 &&
+      originIndex < rateLimitIndex &&
+      rateLimitIndex < authIndex;
+
+    result.postRequiresAuthenticatedUser =
+      authIndex >= 0 &&
+      postSource.includes("if (!userId)") &&
+      postSource.includes('"You must be signed in to create an API key."') &&
+      postSource.includes('"Missing authenticated user session."');
+
+    result.postRequiresLinkedAccount =
+      accountIndex >= 0 &&
+      authIndex >= 0 &&
+      authIndex < accountIndex &&
+      postSource.includes('"No subscriber account record is linked to this user yet."') &&
+      postSource.includes('"Missing Account row for authenticated Clerk user."');
+
+    result.postRequiresActiveSubscription =
+      subscriptionIndex >= 0 &&
+      accountIndex >= 0 &&
+      accountIndex < subscriptionIndex &&
+      postSource.includes("!latestSubscription || latestSubscription.status !== SubscriptionStatus.active") &&
+      postSource.includes('"Active subscription required before creating API keys."') &&
+      postSource.includes('"inactive_subscription"');
+
+    result.postEnforcesTwoNonRevokedKeyLimit =
+      nonRevokedIndex >= 0 &&
+      subscriptionIndex >= 0 &&
+      subscriptionIndex < nonRevokedIndex &&
+      postSource.includes("key.status !== ApiKeyStatus.revoked") &&
+      postSource.includes("if (nonRevokedKeys.length >= 2)") &&
+      postSource.includes('"key_limit_reached"');
+
+    result.postCreatesAccountScopedScryptKey =
+      createIndex >= 0 &&
+      postSource.includes("const secret = buildApiKeySecret();") &&
+      postSource.includes("const keyHash = hashApiKey(secret);") &&
+      postSource.includes("const keyPrefix = buildKeyPrefix(secret);") &&
+      postSource.includes("const keyLast4 = buildKeyLast4(secret);") &&
+      postSource.includes("accountId: account.id,") &&
+      postSource.includes("keyHash,") &&
+      postSource.includes("keyPrefix,") &&
+      postSource.includes("keyLast4,") &&
+      postSource.includes("ApiKeyStatus.active");
+
+    const selectBlockMatch = postSource.match(/select:\s*\{[\s\S]*?\n\s*\}\s*,?\n\s*\}\);/u);
+    const selectBlock = selectBlockMatch ? selectBlockMatch[0] : "";
+
+    result.postSelectDoesNotReturnKeyHash =
+      selectBlock.includes("id: true") &&
+      selectBlock.includes("keyPrefix: true") &&
+      selectBlock.includes("keyLast4: true") &&
+      !selectBlock.includes("keyHash");
+
+    result.postLogsCreatedEvent =
+      logIndex >= 0 &&
+      createIndex >= 0 &&
+      createIndex < logIndex &&
+      postSource.includes("logApiEvent({") &&
+      postSource.includes('eventType: "api_key_created"') &&
+      postSource.includes("statusCode: 201") &&
+      postSource.includes("accountId: account.id") &&
+      postSource.includes("keyId: created.id");
+
+    const responseSlice = responseIndex >= 0 ? postSource.slice(responseIndex) : "";
+
+    result.postResponseSecretOnceNoStore =
+      responseIndex >= 0 &&
+      logIndex >= 0 &&
+      logIndex < responseIndex &&
+      responseSlice.includes("secret,") &&
+      responseSlice.includes("prefix: created.keyPrefix") &&
+      responseSlice.includes("last4: created.keyLast4") &&
+      responseSlice.includes("status: 201") &&
+      responseSlice.includes('"Cache-Control": "no-store"') &&
+      !responseSlice.includes("keyHash");
+  }
+
+  if (deleteSource) {
+    const originIndex = deleteSource.indexOf("const originGuard = validateSameOriginRequest(request);");
+    const rateLimitIndex = deleteSource.indexOf('const preAuthRateLimit = await enforcePreAuthRateLimit(request, "keys-api");');
+    const authIndex = deleteSource.indexOf("const { userId, account } = await getAuthenticatedAccount();");
+    const accountIndex = deleteSource.indexOf("if (!account)");
+    const bodyIndex = deleteSource.indexOf("body = (await request.json()) as RevokeKeyRequestBody;");
+    const keyIdIndex = deleteSource.indexOf('const keyId = typeof body.keyId === "string" ? body.keyId.trim() : "";');
+    const findIndex = deleteSource.indexOf("const existing = await db.apiKey.findFirst({");
+    const updateIndex = deleteSource.indexOf("await db.apiKey.update({");
+    const logIndex = deleteSource.indexOf('eventType: "api_key_revoked"');
+    const responseIndex = deleteSource.indexOf("return NextResponse.json(");
+
+    result.deleteHasOriginBeforeRateLimitBeforeAuth =
+      originIndex >= 0 &&
+      rateLimitIndex >= 0 &&
+      authIndex >= 0 &&
+      originIndex < rateLimitIndex &&
+      rateLimitIndex < authIndex;
+
+    result.deleteRequiresAuthenticatedUser =
+      authIndex >= 0 &&
+      deleteSource.includes("if (!userId)") &&
+      deleteSource.includes('"You must be signed in to revoke an API key."') &&
+      deleteSource.includes('"Missing authenticated user session."');
+
+    result.deleteRequiresLinkedAccount =
+      accountIndex >= 0 &&
+      authIndex >= 0 &&
+      authIndex < accountIndex &&
+      deleteSource.includes('"No subscriber account record is linked to this user yet."') &&
+      deleteSource.includes('"Missing Account row for authenticated Clerk user."');
+
+    result.deleteValidatesJsonBodyAndKeyId =
+      bodyIndex >= 0 &&
+      keyIdIndex >= 0 &&
+      bodyIndex < keyIdIndex &&
+      deleteSource.includes('"Request body must be valid JSON."') &&
+      deleteSource.includes('"Missing keyId."') &&
+      deleteSource.includes('"Provide keyId in request body."');
+
+    result.deleteFindsKeyByAccountId =
+      findIndex >= 0 &&
+      keyIdIndex >= 0 &&
+      keyIdIndex < findIndex &&
+      deleteSource.includes("id: keyId,") &&
+      deleteSource.includes("accountId: account.id,") &&
+      deleteSource.includes('"API key not found for this account."');
+
+    result.deleteRevokesWithoutDeleting =
+      updateIndex >= 0 &&
+      findIndex >= 0 &&
+      findIndex < updateIndex &&
+      deleteSource.includes("if (existing.status !== ApiKeyStatus.revoked)") &&
+      deleteSource.includes("where: { id: existing.id }") &&
+      deleteSource.includes("data: { status: ApiKeyStatus.revoked }") &&
+      !deleteSource.includes("db.apiKey.delete");
+
+    result.deleteLogsRevokedEvent =
+      logIndex >= 0 &&
+      updateIndex >= 0 &&
+      updateIndex < logIndex &&
+      deleteSource.includes("logApiEvent({") &&
+      deleteSource.includes('eventType: "api_key_revoked"') &&
+      deleteSource.includes("statusCode: 200") &&
+      deleteSource.includes("accountId: account.id") &&
+      deleteSource.includes("keyId: existing.id");
+
+    result.deleteResponseNoStore =
+      responseIndex >= 0 &&
+      logIndex >= 0 &&
+      logIndex < responseIndex &&
+      deleteSource.includes("revoked: true") &&
+      deleteSource.includes("keyId: existing.id") &&
+      deleteSource.includes("status: 200") &&
+      deleteSource.includes('"Cache-Control": "no-store"');
+  }
+
+  const requiredChecks = [
+    ["API_KEYS_ROUTE_CLERK_AUTH_IMPORT_MISSING", result.importsClerkAuth, "API key route must import Clerk server auth."],
+    ["API_KEYS_ROUTE_PRISMA_STATUS_IMPORT_MISSING", result.importsPrismaStatuses, "API key route must import ApiKeyStatus and SubscriptionStatus."],
+    ["API_KEYS_ROUTE_DB_IMPORT_MISSING", result.importsDb, "API key route must import db."],
+    ["API_KEYS_ROUTE_AUDIT_LOG_IMPORT_MISSING", result.importsAuditLog, "API key route must import request id and audit logging helpers."],
+    ["API_KEYS_ROUTE_ORIGIN_GUARD_IMPORT_MISSING", result.importsSameOriginGuard, "API key route must import same-origin guard."],
+    ["API_KEYS_ROUTE_PREAUTH_RATE_LIMIT_IMPORT_MISSING", result.importsPreAuthRateLimit, "API key route must import pre-auth rate limit."],
+    ["API_KEYS_ROUTE_ERROR_NO_STORE_INVALID", result.errorResponsesNoStore, "API key route error responses must be no-store."],
+    ["API_KEYS_ROUTE_PRODUCTION_DETAIL_REDACTION_INVALID", result.productionErrorDetailsRedacted, "API key route must redact internal error details in production."],
+    ["API_KEYS_ROUTE_LABEL_NORMALIZATION_INVALID", result.labelNormalizationValid, "API key label normalization must trim and cap labels at 64 chars."],
+    ["API_KEYS_ROUTE_SECRET_GENERATION_INVALID", result.secretGenerationValid, "API key secrets must use ta_live_ plus 24 random bytes as lowercase hex."],
+    ["API_KEYS_ROUTE_HASHING_INVALID", result.keyHashingValid, "API key route must hash created secrets with salted scrypt."],
+    ["API_KEYS_ROUTE_PREFIX_LAST4_INVALID", result.prefixAndLast4Valid, "API key route must derive key prefix and last4."],
+    ["API_KEYS_ROUTE_ACCOUNT_LOOKUP_INVALID", result.accountLookupUsesClerkUserId, "API key route must resolve account by Clerk authProviderUserId."],
+    ["API_KEYS_ROUTE_ACCOUNT_INCLUDE_INVALID", result.accountLookupIncludesLatestSubscriptionAndApiKeys, "API key route account lookup must include latest subscription and API keys."],
+
+    ["API_KEYS_POST_ORDER_INVALID", result.postHasOriginBeforeRateLimitBeforeAuth, "POST must run same-origin guard, then pre-auth rate-limit, then account auth."],
+    ["API_KEYS_POST_AUTH_REQUIRED", result.postRequiresAuthenticatedUser, "POST must require authenticated Clerk user."],
+    ["API_KEYS_POST_ACCOUNT_REQUIRED", result.postRequiresLinkedAccount, "POST must require linked account row."],
+    ["API_KEYS_POST_ACTIVE_SUBSCRIPTION_REQUIRED", result.postRequiresActiveSubscription, "POST must require active subscription before creating keys."],
+    ["API_KEYS_POST_NON_REVOKED_LIMIT_INVALID", result.postEnforcesTwoNonRevokedKeyLimit, "POST must enforce a maximum of two non-revoked API keys."],
+    ["API_KEYS_POST_CREATE_SHAPE_INVALID", result.postCreatesAccountScopedScryptKey, "POST must create account-scoped scrypt-hashed key with prefix/last4 metadata."],
+    ["API_KEYS_POST_SELECT_EXPOSES_KEY_HASH", result.postSelectDoesNotReturnKeyHash, "POST select must not return keyHash."],
+    ["API_KEYS_POST_AUDIT_LOG_MISSING", result.postLogsCreatedEvent, "POST must audit log api_key_created."],
+    ["API_KEYS_POST_RESPONSE_INVALID", result.postResponseSecretOnceNoStore, "POST must return secret exactly once with prefix/last4 metadata and no-store, never keyHash."],
+
+    ["API_KEYS_DELETE_ORDER_INVALID", result.deleteHasOriginBeforeRateLimitBeforeAuth, "DELETE must run same-origin guard, then pre-auth rate-limit, then account auth."],
+    ["API_KEYS_DELETE_AUTH_REQUIRED", result.deleteRequiresAuthenticatedUser, "DELETE must require authenticated Clerk user."],
+    ["API_KEYS_DELETE_ACCOUNT_REQUIRED", result.deleteRequiresLinkedAccount, "DELETE must require linked account row."],
+    ["API_KEYS_DELETE_BODY_VALIDATION_INVALID", result.deleteValidatesJsonBodyAndKeyId, "DELETE must validate JSON body and keyId."],
+    ["API_KEYS_DELETE_ACCOUNT_SCOPE_INVALID", result.deleteFindsKeyByAccountId, "DELETE must find key by id and accountId."],
+    ["API_KEYS_DELETE_REVOKE_NOT_DELETE_INVALID", result.deleteRevokesWithoutDeleting, "DELETE must revoke by status update, not delete the row."],
+    ["API_KEYS_DELETE_AUDIT_LOG_MISSING", result.deleteLogsRevokedEvent, "DELETE must audit log api_key_revoked."],
+    ["API_KEYS_DELETE_RESPONSE_INVALID", result.deleteResponseNoStore, "DELETE must return revoked/keyId no-store response."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-038",
+        code,
+        path.relative(root, apiKeysRoutePath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -6053,6 +6403,7 @@ function evaluate() {
   const securityHeadersRuntimeContract = evaluateSecurityHeadersRuntimeContract(findings);
   const clerkAuthSurfaceContract = evaluateClerkAuthSurfaceContract(findings);
   const dashboardAccountSurfaceContract = evaluateDashboardAccountSurfaceContract(findings);
+  const apiKeyRouteContract = evaluateApiKeyRouteContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -6093,6 +6444,7 @@ function evaluate() {
     securityHeadersRuntimeContract,
     clerkAuthSurfaceContract,
     dashboardAccountSurfaceContract,
+    apiKeyRouteContract,
     findings,
   };
 }
@@ -6152,6 +6504,41 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## API key route contract");
+  lines.push("");
+  lines.push(`Route exists: ${result.apiKeyRouteContract.routeExists}`);
+  lines.push(`Imports Clerk auth: ${result.apiKeyRouteContract.importsClerkAuth}`);
+  lines.push(`Imports Prisma statuses: ${result.apiKeyRouteContract.importsPrismaStatuses}`);
+  lines.push(`Imports db: ${result.apiKeyRouteContract.importsDb}`);
+  lines.push(`Imports audit log: ${result.apiKeyRouteContract.importsAuditLog}`);
+  lines.push(`Imports same-origin guard: ${result.apiKeyRouteContract.importsSameOriginGuard}`);
+  lines.push(`Imports pre-auth rate-limit: ${result.apiKeyRouteContract.importsPreAuthRateLimit}`);
+  lines.push(`Error responses no-store: ${result.apiKeyRouteContract.errorResponsesNoStore}`);
+  lines.push(`Production error details redacted: ${result.apiKeyRouteContract.productionErrorDetailsRedacted}`);
+  lines.push(`Label normalization valid: ${result.apiKeyRouteContract.labelNormalizationValid}`);
+  lines.push(`Secret generation valid: ${result.apiKeyRouteContract.secretGenerationValid}`);
+  lines.push(`Key hashing valid: ${result.apiKeyRouteContract.keyHashingValid}`);
+  lines.push(`Prefix/last4 valid: ${result.apiKeyRouteContract.prefixAndLast4Valid}`);
+  lines.push(`Account lookup uses Clerk user id: ${result.apiKeyRouteContract.accountLookupUsesClerkUserId}`);
+  lines.push(`Account lookup includes latest subscription/API keys: ${result.apiKeyRouteContract.accountLookupIncludesLatestSubscriptionAndApiKeys}`);
+  lines.push(`POST order valid: ${result.apiKeyRouteContract.postHasOriginBeforeRateLimitBeforeAuth}`);
+  lines.push(`POST requires authenticated user: ${result.apiKeyRouteContract.postRequiresAuthenticatedUser}`);
+  lines.push(`POST requires linked account: ${result.apiKeyRouteContract.postRequiresLinkedAccount}`);
+  lines.push(`POST requires active subscription: ${result.apiKeyRouteContract.postRequiresActiveSubscription}`);
+  lines.push(`POST enforces two non-revoked key limit: ${result.apiKeyRouteContract.postEnforcesTwoNonRevokedKeyLimit}`);
+  lines.push(`POST creates account-scoped scrypt key: ${result.apiKeyRouteContract.postCreatesAccountScopedScryptKey}`);
+  lines.push(`POST select does not return keyHash: ${result.apiKeyRouteContract.postSelectDoesNotReturnKeyHash}`);
+  lines.push(`POST audit log created event: ${result.apiKeyRouteContract.postLogsCreatedEvent}`);
+  lines.push(`POST response secret-once no-store: ${result.apiKeyRouteContract.postResponseSecretOnceNoStore}`);
+  lines.push(`DELETE order valid: ${result.apiKeyRouteContract.deleteHasOriginBeforeRateLimitBeforeAuth}`);
+  lines.push(`DELETE requires authenticated user: ${result.apiKeyRouteContract.deleteRequiresAuthenticatedUser}`);
+  lines.push(`DELETE requires linked account: ${result.apiKeyRouteContract.deleteRequiresLinkedAccount}`);
+  lines.push(`DELETE validates body/keyId: ${result.apiKeyRouteContract.deleteValidatesJsonBodyAndKeyId}`);
+  lines.push(`DELETE account-scoped lookup: ${result.apiKeyRouteContract.deleteFindsKeyByAccountId}`);
+  lines.push(`DELETE revokes without deleting: ${result.apiKeyRouteContract.deleteRevokesWithoutDeleting}`);
+  lines.push(`DELETE audit log revoked event: ${result.apiKeyRouteContract.deleteLogsRevokedEvent}`);
+  lines.push(`DELETE response no-store: ${result.apiKeyRouteContract.deleteResponseNoStore}`);
+  lines.push("");
   lines.push("## Dashboard account surface contract");
   lines.push("");
   lines.push(`Dashboard page exists: ${result.dashboardAccountSurfaceContract.dashboardPageExists}`);
@@ -6690,6 +7077,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-038 API Key Route Contract: verifies /api/v1/keys same-origin/pre-auth gating, Clerk/account/subscription checks, scrypt key creation, account-scoped revoke, audit logs, no-store responses, and no keyHash exposure.");
   lines.push("- D-037 Dashboard Account Surface Contract: verifies dashboard/account state, entitlement display, API-key manager mutation gating, Stripe portal gating, secret-once behavior, and endpoint-boundary copy.");
   lines.push("- D-036 Clerk Auth Surface Contract: verifies Clerk layout/sign-in/sign-up surfaces, safe unconfigured fallback, terms gating before SignUp, and no-advice product boundary copy.");
   lines.push("- D-035 Security Headers Runtime Contract: verifies Next security headers, CSP report-only policy, API no-store/noindex headers, local-only dev origins, and output tracing for canonical data.");
