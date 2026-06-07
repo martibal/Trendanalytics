@@ -4165,6 +4165,247 @@ function evaluateDatabaseAuthSchemaContract(findings) {
 
   return result;
 }
+function evaluateStorageAdapterContract(findings) {
+  const result = {
+    storageIndexExists: fs.existsSync(storageIndexPath),
+    localStorageExists: fs.existsSync(localStoragePath),
+    s3StorageExists: fs.existsSync(s3StoragePath),
+
+    indexDataSourceUnionValid: false,
+    indexDefaultsToLocal: false,
+    indexSelectsS3OnlyWhenExplicit: false,
+    indexNormalizesPublishedPrefix: false,
+    indexDispatchesByDataSource: false,
+
+    localReturnsUniformShape: false,
+    localInfersContentTypes: false,
+    localSupportsConfiguredRoot: false,
+    localCandidateRootsValid: false,
+    localDoesNotUsePublicFallback: false,
+    localReadsOnlyFiles: false,
+    localEnoentReturnsNull: false,
+    localUnexpectedErrorThrows: false,
+
+    s3UsesAwsSdk: false,
+    s3EnvContractValid: false,
+    s3PrefixDefaultValid: false,
+    s3OptionalEndpointCredentialsValid: false,
+    s3ForcePathStyleValid: false,
+    s3KeyJoinNormalizesLeadingSlash: false,
+    s3FailsWhenNotConfigured: false,
+    s3UsesGetObjectBucketKey: false,
+    s3ReturnsUniformShape: false,
+    s3NotFoundReturnsNull: false,
+    s3UnexpectedErrorThrows: false,
+  };
+
+  if (!result.storageIndexExists) {
+    addFinding(findings, "fail", "D-029", "STORAGE_INDEX_MODULE_MISSING", path.relative(root, storageIndexPath), "Storage index module is missing.");
+  }
+
+  if (!result.localStorageExists) {
+    addFinding(findings, "fail", "D-029", "LOCAL_STORAGE_MODULE_MISSING", path.relative(root, localStoragePath), "Local storage module is missing.");
+  }
+
+  if (!result.s3StorageExists) {
+    addFinding(findings, "fail", "D-029", "S3_STORAGE_MODULE_MISSING", path.relative(root, s3StoragePath), "S3 storage module is missing.");
+  }
+
+  const indexSource = result.storageIndexExists
+    ? fs.readFileSync(storageIndexPath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const localSource = result.localStorageExists
+    ? fs.readFileSync(localStoragePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const s3Source = result.s3StorageExists
+    ? fs.readFileSync(s3StoragePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  if (indexSource) {
+    result.indexDataSourceUnionValid =
+      indexSource.includes('export type DataSource = "local" | "s3";');
+
+    result.indexDefaultsToLocal =
+      indexSource.includes("return \"local\";") &&
+      indexSource.includes("const raw = process.env.DATA_SOURCE?.trim().toLowerCase();");
+
+    result.indexSelectsS3OnlyWhenExplicit =
+      indexSource.includes('if (raw === "s3")') &&
+      indexSource.includes('return "s3";');
+
+    result.indexNormalizesPublishedPrefix =
+      indexSource.includes('storagePath.replace(/^\\/+/, "")') &&
+      indexSource.includes('cleaned.startsWith("data/published/v1/")') &&
+      indexSource.includes('return cleaned.slice("data/published/v1/".length);') &&
+      indexSource.includes('if (cleaned === "data/published/v1")') &&
+      indexSource.includes('return "";');
+
+    result.indexDispatchesByDataSource =
+      indexSource.includes("const source = getDataSource();") &&
+      indexSource.includes("const normalizedPath = normalizeStoragePath(storagePath);") &&
+      indexSource.includes('if (source === "s3")') &&
+      indexSource.includes("return readS3StorageObject(normalizedPath);") &&
+      indexSource.includes("return readLocalStorageObject(normalizedPath);");
+  }
+
+  if (localSource) {
+    result.localReturnsUniformShape =
+      localSource.includes("body: ArrayBuffer;") &&
+      localSource.includes("contentType: string;") &&
+      localSource.includes("contentLength: number;") &&
+      localSource.includes("etag: string | null;") &&
+      localSource.includes("lastModified: string | null;") &&
+      localSource.includes('source: "local";');
+
+    result.localInfersContentTypes =
+      localSource.includes('storagePath.endsWith(".json")') &&
+      localSource.includes('"application/json; charset=utf-8"') &&
+      localSource.includes('storagePath.endsWith(".csv")') &&
+      localSource.includes('"text/csv; charset=utf-8"') &&
+      localSource.includes('storagePath.endsWith(".parquet")') &&
+      localSource.includes('"application/octet-stream"');
+
+    result.localSupportsConfiguredRoot =
+      localSource.includes("process.env.LOCAL_DATA_PATH?.trim()") &&
+      localSource.includes("if (configured)") &&
+      localSource.includes("return [configured];");
+
+    result.localCandidateRootsValid =
+      localSource.includes('path.join(appRoot, "..", "data", "published", "v1")') &&
+      localSource.includes('path.join(appRoot, "data", "published", "v1")') &&
+      localSource.includes('path.join(appRoot, ".private-data", "published", "v1")');
+
+    result.localDoesNotUsePublicFallback =
+      !/path\.join\(\s*appRoot\s*,\s*["']public["']\s*,\s*["']data["']\s*,\s*["']published["']\s*,\s*["']v1["']\s*\)/u.test(localSource);
+
+    result.localReadsOnlyFiles =
+      localSource.includes("const stat = await fs.stat(absolutePath);") &&
+      localSource.includes("if (!stat.isFile())") &&
+      localSource.includes("return null;");
+
+    result.localEnoentReturnsNull =
+      localSource.includes('if (code === "ENOENT")') &&
+      localSource.includes("return null;");
+
+    result.localUnexpectedErrorThrows =
+      localSource.includes("throw new Error(") &&
+      localSource.includes("Failed to read local storage object");
+  }
+
+  if (s3Source) {
+    result.s3UsesAwsSdk =
+      s3Source.includes('import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";');
+
+    result.s3EnvContractValid =
+      s3Source.includes('getEnv("S3_REGION")') &&
+      s3Source.includes('getEnv("S3_BUCKET")') &&
+      s3Source.includes('getEnv("S3_ENDPOINT")') &&
+      s3Source.includes('getEnv("S3_ACCESS_KEY_ID")') &&
+      s3Source.includes('getEnv("S3_SECRET_ACCESS_KEY")');
+
+    result.s3PrefixDefaultValid =
+      s3Source.includes('process.env.S3_PREFIX ?? "published/v1"') &&
+      s3Source.includes('raw.replace(/^\\/+|\\/+$/g, "")');
+
+    result.s3OptionalEndpointCredentialsValid =
+      s3Source.includes("if (endpoint)") &&
+      s3Source.includes("config.endpoint = endpoint;") &&
+      s3Source.includes("if (accessKeyId && secretAccessKey)") &&
+      s3Source.includes("config.credentials = {") &&
+      s3Source.includes("accessKeyId,") &&
+      s3Source.includes("secretAccessKey,");
+
+    result.s3ForcePathStyleValid =
+      s3Source.includes("process.env.S3_FORCE_PATH_STYLE?.trim().toLowerCase()") &&
+      s3Source.includes('raw === "1" || raw === "true" || raw === "yes"') &&
+      s3Source.includes("config.forcePathStyle = getS3ForcePathStyle();");
+
+    result.s3KeyJoinNormalizesLeadingSlash =
+      s3Source.includes('const cleanedPath = storagePath.replace(/^\\/+/, "");') &&
+      s3Source.includes("return prefix ? `${prefix}/${cleanedPath}` : cleanedPath;");
+
+    result.s3FailsWhenNotConfigured =
+      s3Source.includes("if (!client || !bucket)") &&
+      s3Source.includes("S3-compatible storage is not configured. Missing S3_REGION or S3_BUCKET.");
+
+    result.s3UsesGetObjectBucketKey =
+      s3Source.includes("const command = new GetObjectCommand({") &&
+      s3Source.includes("Bucket: bucket,") &&
+      s3Source.includes("Key: joinS3Key(storagePath),") &&
+      s3Source.includes("const response = await client.send(command);");
+
+    result.s3ReturnsUniformShape =
+      s3Source.includes("body: ArrayBuffer;") &&
+      s3Source.includes("contentType: string;") &&
+      s3Source.includes("contentLength: number;") &&
+      s3Source.includes("etag: string | null;") &&
+      s3Source.includes("lastModified: string | null;") &&
+      s3Source.includes('source: "s3";') &&
+      s3Source.includes("contentType: response.ContentType ?? \"application/octet-stream\"") &&
+      s3Source.includes("contentLength: response.ContentLength ?? body.byteLength") &&
+      s3Source.includes("etag: response.ETag ?? null") &&
+      s3Source.includes("lastModified: response.LastModified?.toISOString() ?? null");
+
+    result.s3NotFoundReturnsNull =
+      s3Source.includes('message.includes("NoSuchKey")') &&
+      s3Source.includes('message.includes("The specified key does not exist")') &&
+      s3Source.includes('message.includes("NotFound")') &&
+      s3Source.includes("return null;");
+
+    result.s3UnexpectedErrorThrows =
+      s3Source.includes("throw error;");
+  }
+
+  const requiredChecks = [
+    ["STORAGE_INDEX_DATA_SOURCE_UNION_INVALID", result.indexDataSourceUnionValid, "Storage data source must be local | s3."],
+    ["STORAGE_INDEX_DEFAULT_LOCAL_INVALID", result.indexDefaultsToLocal, "Storage source must default to local unless DATA_SOURCE=s3."],
+    ["STORAGE_INDEX_S3_SELECTION_INVALID", result.indexSelectsS3OnlyWhenExplicit, "S3 storage must only be selected by explicit DATA_SOURCE=s3."],
+    ["STORAGE_INDEX_PREFIX_NORMALIZATION_INVALID", result.indexNormalizesPublishedPrefix, "Storage index must normalize leading slashes and data/published/v1 prefix."],
+    ["STORAGE_INDEX_DISPATCH_INVALID", result.indexDispatchesByDataSource, "Storage index must dispatch normalized paths to S3/local readers."],
+
+    ["LOCAL_STORAGE_RESULT_SHAPE_INVALID", result.localReturnsUniformShape, "Local storage result shape must match file API response expectations."],
+    ["LOCAL_STORAGE_CONTENT_TYPES_INVALID", result.localInfersContentTypes, "Local storage must infer JSON/CSV/TXT/Parquet content types."],
+    ["LOCAL_STORAGE_CONFIGURED_ROOT_INVALID", result.localSupportsConfiguredRoot, "Local storage must allow LOCAL_DATA_PATH override."],
+    ["LOCAL_STORAGE_CANDIDATE_ROOTS_INVALID", result.localCandidateRootsValid, "Local storage roots must include canonical repo data, app data, and .private-data mirror."],
+    ["LOCAL_STORAGE_PUBLIC_FALLBACK_PRESENT", result.localDoesNotUsePublicFallback, "Local storage must not read subscriber-bound data from web public published root."],
+    ["LOCAL_STORAGE_FILE_ONLY_INVALID", result.localReadsOnlyFiles, "Local storage must only return regular files."],
+    ["LOCAL_STORAGE_ENOENT_NULL_INVALID", result.localEnoentReturnsNull, "Local storage missing files must return null."],
+    ["LOCAL_STORAGE_UNEXPECTED_ERROR_NOT_THROWN", result.localUnexpectedErrorThrows, "Local storage unexpected errors must throw."],
+
+    ["S3_STORAGE_AWS_SDK_IMPORT_INVALID", result.s3UsesAwsSdk, "S3 storage must use AWS SDK S3Client/GetObjectCommand."],
+    ["S3_STORAGE_ENV_CONTRACT_INVALID", result.s3EnvContractValid, "S3 storage must read S3_REGION, S3_BUCKET, S3_ENDPOINT, S3_ACCESS_KEY_ID, and S3_SECRET_ACCESS_KEY."],
+    ["S3_STORAGE_PREFIX_DEFAULT_INVALID", result.s3PrefixDefaultValid, "S3 storage prefix must default to published/v1 and trim slashes."],
+    ["S3_STORAGE_ENDPOINT_CREDENTIALS_INVALID", result.s3OptionalEndpointCredentialsValid, "S3 storage must support optional endpoint and explicit credentials."],
+    ["S3_STORAGE_FORCE_PATH_STYLE_INVALID", result.s3ForcePathStyleValid, "S3 storage must support S3_FORCE_PATH_STYLE for S3-compatible storage."],
+    ["S3_STORAGE_KEY_JOIN_INVALID", result.s3KeyJoinNormalizesLeadingSlash, "S3 storage must normalize leading slashes before prefixing keys."],
+    ["S3_STORAGE_CONFIG_FAIL_INVALID", result.s3FailsWhenNotConfigured, "S3 storage must fail when S3_REGION or S3_BUCKET is missing."],
+    ["S3_STORAGE_GET_OBJECT_INVALID", result.s3UsesGetObjectBucketKey, "S3 storage must read objects using bucket and joined storage key."],
+    ["S3_STORAGE_RESULT_SHAPE_INVALID", result.s3ReturnsUniformShape, "S3 storage result shape must match file API response expectations."],
+    ["S3_STORAGE_NOT_FOUND_NULL_INVALID", result.s3NotFoundReturnsNull, "S3 not-found errors must return null."],
+    ["S3_STORAGE_UNEXPECTED_ERROR_NOT_THROWN", result.s3UnexpectedErrorThrows, "Unexpected S3 errors must be rethrown."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      let targetPath = storageIndexPath;
+      if (code.startsWith("LOCAL_STORAGE_")) targetPath = localStoragePath;
+      if (code.startsWith("S3_STORAGE_")) targetPath = s3StoragePath;
+
+      addFinding(
+        findings,
+        "fail",
+        "D-029",
+        code,
+        path.relative(root, targetPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -4200,6 +4441,7 @@ function evaluate() {
   const rateLimitQuotaContract = evaluateRateLimitQuotaContract(findings);
   const apiKeyAuthContract = evaluateApiKeyAuthContract(findings);
   const databaseAuthSchemaContract = evaluateDatabaseAuthSchemaContract(findings);
+  const storageAdapterContract = evaluateStorageAdapterContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -4231,6 +4473,7 @@ function evaluate() {
     rateLimitQuotaContract,
     apiKeyAuthContract,
     databaseAuthSchemaContract,
+    storageAdapterContract,
     findings,
   };
 }
@@ -4290,6 +4533,36 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Storage adapter contract");
+  lines.push("");
+  lines.push(`Storage index exists: ${result.storageAdapterContract.storageIndexExists}`);
+  lines.push(`Local storage exists: ${result.storageAdapterContract.localStorageExists}`);
+  lines.push(`S3 storage exists: ${result.storageAdapterContract.s3StorageExists}`);
+  lines.push(`Index data source union valid: ${result.storageAdapterContract.indexDataSourceUnionValid}`);
+  lines.push(`Index defaults to local: ${result.storageAdapterContract.indexDefaultsToLocal}`);
+  lines.push(`Index selects S3 only explicitly: ${result.storageAdapterContract.indexSelectsS3OnlyWhenExplicit}`);
+  lines.push(`Index normalizes published prefix: ${result.storageAdapterContract.indexNormalizesPublishedPrefix}`);
+  lines.push(`Index dispatches by data source: ${result.storageAdapterContract.indexDispatchesByDataSource}`);
+  lines.push(`Local result shape valid: ${result.storageAdapterContract.localReturnsUniformShape}`);
+  lines.push(`Local content types valid: ${result.storageAdapterContract.localInfersContentTypes}`);
+  lines.push(`Local configured root supported: ${result.storageAdapterContract.localSupportsConfiguredRoot}`);
+  lines.push(`Local candidate roots valid: ${result.storageAdapterContract.localCandidateRootsValid}`);
+  lines.push(`Local public fallback absent: ${result.storageAdapterContract.localDoesNotUsePublicFallback}`);
+  lines.push(`Local reads only files: ${result.storageAdapterContract.localReadsOnlyFiles}`);
+  lines.push(`Local ENOENT returns null: ${result.storageAdapterContract.localEnoentReturnsNull}`);
+  lines.push(`Local unexpected errors throw: ${result.storageAdapterContract.localUnexpectedErrorThrows}`);
+  lines.push(`S3 uses AWS SDK: ${result.storageAdapterContract.s3UsesAwsSdk}`);
+  lines.push(`S3 env contract valid: ${result.storageAdapterContract.s3EnvContractValid}`);
+  lines.push(`S3 prefix default valid: ${result.storageAdapterContract.s3PrefixDefaultValid}`);
+  lines.push(`S3 optional endpoint/credentials valid: ${result.storageAdapterContract.s3OptionalEndpointCredentialsValid}`);
+  lines.push(`S3 force path style valid: ${result.storageAdapterContract.s3ForcePathStyleValid}`);
+  lines.push(`S3 key join normalizes leading slash: ${result.storageAdapterContract.s3KeyJoinNormalizesLeadingSlash}`);
+  lines.push(`S3 fails when not configured: ${result.storageAdapterContract.s3FailsWhenNotConfigured}`);
+  lines.push(`S3 uses GetObject bucket/key: ${result.storageAdapterContract.s3UsesGetObjectBucketKey}`);
+  lines.push(`S3 result shape valid: ${result.storageAdapterContract.s3ReturnsUniformShape}`);
+  lines.push(`S3 not found returns null: ${result.storageAdapterContract.s3NotFoundReturnsNull}`);
+  lines.push(`S3 unexpected errors throw: ${result.storageAdapterContract.s3UnexpectedErrorThrows}`);
+  lines.push("");
   lines.push("## Database auth schema contract");
   lines.push("");
   lines.push(`Prisma schema exists: ${result.databaseAuthSchemaContract.prismaSchemaExists}`);
@@ -4635,6 +4908,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-029 Storage Adapter Contract: verifies local/S3 storage path normalization, source selection, private-data roots, S3 env contract, content metadata, not-found behavior, and public fallback exclusion.");
   lines.push("- D-028 Database Auth Schema Contract: verifies Prisma auth/subscription/API-key/custom-output schema, indexes, and storage-critical fields.");
   lines.push("- D-027 API Key Auth Contract: verifies X-API-Key validation, production key shape, dev-key isolation, persisted scrypt verification, status handling, and auth error redaction.");
   lines.push("- D-026 Rate Limit Quota Contract: verifies per-minute limits, daily quotas, headers, Upstash config, memory fallback, and production fail-closed behavior.");
