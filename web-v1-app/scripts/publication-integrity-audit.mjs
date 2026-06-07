@@ -5003,6 +5003,144 @@ function evaluateAuditScriptInventoryContract(findings) {
 
   return result;
 }
+function readTextIfExists(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return "";
+  }
+
+  return fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/u, "");
+}
+
+function sourceIncludesAll(source, values) {
+  return values.every((value) => source.includes(value));
+}
+
+function evaluateEnvironmentVariableContract(findings) {
+  const packageSource = readTextIfExists(packageJsonPath);
+  const prismaSource = readTextIfExists(prismaSchemaPath);
+  const rateLimitSource = readTextIfExists(rateLimitPath);
+  const validateTokenSource = readTextIfExists(validateTokenPath);
+  const storageIndexSource = readTextIfExists(storageIndexPath);
+  const localStorageSource = readTextIfExists(localStoragePath);
+  const s3StorageSource = readTextIfExists(s3StoragePath);
+  const workflowSource = readTextIfExists(githubPipelineWorkflowPath);
+
+  const result = {
+    packageJsonExists: fs.existsSync(packageJsonPath),
+    prismaSchemaExists: fs.existsSync(prismaSchemaPath),
+    rateLimitModuleExists: fs.existsSync(rateLimitPath),
+    validateTokenModuleExists: fs.existsSync(validateTokenPath),
+    storageIndexExists: fs.existsSync(storageIndexPath),
+    localStorageExists: fs.existsSync(localStoragePath),
+    s3StorageExists: fs.existsSync(s3StoragePath),
+    workflowExists: fs.existsSync(githubPipelineWorkflowPath),
+
+    databaseEnvContract: false,
+    rateLimitRedisEnvContract: false,
+    dailyQuotaEnvContract: false,
+    developmentApiKeysEnvContract: false,
+    storageDataSourceEnvContract: false,
+    localStorageEnvContract: false,
+    s3EnvContract: false,
+    workflowDeployHookEnvContract: false,
+    packageDoesNotInlineSecrets: false,
+    productionRuntimeEnvContract: false,
+  };
+
+  result.databaseEnvContract =
+    prismaSource.includes('env("DATABASE_URL")') &&
+    prismaSource.includes('env("DIRECT_URL")');
+
+  result.rateLimitRedisEnvContract =
+    sourceIncludesAll(rateLimitSource, [
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
+      "process.env.UPSTASH_REDIS_REST_URL",
+      "process.env.UPSTASH_REDIS_REST_TOKEN",
+    ]);
+
+  result.dailyQuotaEnvContract =
+    sourceIncludesAll(rateLimitSource, [
+      "BASIC_DAILY_API_QUOTA",
+      "PRO_DAILY_API_QUOTA",
+      'process.env.BASIC_DAILY_API_QUOTA ?? "500"',
+      'process.env.PRO_DAILY_API_QUOTA ?? "5000"',
+    ]);
+
+  result.developmentApiKeysEnvContract =
+    validateTokenSource.includes("DEV_API_KEYS_JSON") &&
+    validateTokenSource.includes("process.env.DEV_API_KEYS_JSON") &&
+    validateTokenSource.includes("canUseDevelopmentApiKeys") &&
+    validateTokenSource.includes('process.env.NODE_ENV === "production"') &&
+    validateTokenSource.includes('process.env.VERCEL_ENV === "production"');
+
+  result.storageDataSourceEnvContract =
+    storageIndexSource.includes("DATA_SOURCE") &&
+    storageIndexSource.includes("process.env.DATA_SOURCE?.trim().toLowerCase()") &&
+    storageIndexSource.includes('if (raw === "s3")') &&
+    storageIndexSource.includes('return "local";');
+
+  result.localStorageEnvContract =
+    localStorageSource.includes("LOCAL_DATA_PATH") &&
+    localStorageSource.includes("process.env.LOCAL_DATA_PATH?.trim()");
+
+  result.s3EnvContract =
+    sourceIncludesAll(s3StorageSource, [
+      "S3_REGION",
+      "S3_BUCKET",
+      "S3_PREFIX",
+      "S3_ENDPOINT",
+      "S3_ACCESS_KEY_ID",
+      "S3_SECRET_ACCESS_KEY",
+      "S3_FORCE_PATH_STYLE",
+      'process.env.S3_PREFIX ?? "published/v1"',
+    ]);
+
+  result.workflowDeployHookEnvContract =
+    workflowSource.includes("VERCEL_DEPLOY_HOOK_URL") &&
+    (
+      workflowSource.includes("secrets.VERCEL_DEPLOY_HOOK_URL") ||
+      workflowSource.includes("${{ secrets.VERCEL_DEPLOY_HOOK_URL }}")
+    );
+
+  result.packageDoesNotInlineSecrets =
+    !/(DATABASE_URL|DIRECT_URL|UPSTASH_REDIS_REST_TOKEN|S3_SECRET_ACCESS_KEY|VERCEL_DEPLOY_HOOK_URL)\s*=\s*[^"\s]+/u.test(packageSource) &&
+    !/ta_live_[a-f0-9]{48}/u.test(packageSource);
+
+  result.productionRuntimeEnvContract =
+    rateLimitSource.includes('process.env.NODE_ENV === "production"') &&
+    rateLimitSource.includes('process.env.VERCEL_ENV === "production"') &&
+    validateTokenSource.includes('process.env.NODE_ENV === "production"') &&
+    validateTokenSource.includes('process.env.VERCEL_ENV === "production"');
+
+  const requiredChecks = [
+    ["ENV_DATABASE_CONTRACT_INVALID", result.databaseEnvContract, prismaSchemaPath, "Prisma schema must use DATABASE_URL and DIRECT_URL env vars."],
+    ["ENV_UPSTASH_REDIS_CONTRACT_INVALID", result.rateLimitRedisEnvContract, rateLimitPath, "Rate-limit module must use UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN."],
+    ["ENV_DAILY_QUOTA_CONTRACT_INVALID", result.dailyQuotaEnvContract, rateLimitPath, "Rate-limit module must expose BASIC_DAILY_API_QUOTA and PRO_DAILY_API_QUOTA with safe defaults."],
+    ["ENV_DEV_API_KEYS_CONTRACT_INVALID", result.developmentApiKeysEnvContract, validateTokenPath, "Development API keys must come from DEV_API_KEYS_JSON and be disabled in production."],
+    ["ENV_STORAGE_DATA_SOURCE_CONTRACT_INVALID", result.storageDataSourceEnvContract, storageIndexPath, "Storage source must use DATA_SOURCE and default to local unless explicitly s3."],
+    ["ENV_LOCAL_STORAGE_CONTRACT_INVALID", result.localStorageEnvContract, localStoragePath, "Local storage must support LOCAL_DATA_PATH override."],
+    ["ENV_S3_CONTRACT_INVALID", result.s3EnvContract, s3StoragePath, "S3 storage must use S3_REGION, S3_BUCKET, S3_PREFIX, S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, and S3_FORCE_PATH_STYLE."],
+    ["ENV_VERCEL_DEPLOY_HOOK_CONTRACT_INVALID", result.workflowDeployHookEnvContract, githubPipelineWorkflowPath, "Workflow must use VERCEL_DEPLOY_HOOK_URL as a GitHub secret for deploy trigger."],
+    ["ENV_PACKAGE_INLINE_SECRET_RISK", result.packageDoesNotInlineSecrets, packageJsonPath, "package.json must not inline secret-looking env assignments or live API keys."],
+    ["ENV_PRODUCTION_RUNTIME_CONTRACT_INVALID", result.productionRuntimeEnvContract, rateLimitPath, "Production-sensitive code must check NODE_ENV and VERCEL_ENV."]
+  ];
+
+  for (const [code, ok, targetPath, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-033",
+        code,
+        path.relative(root, targetPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -5042,6 +5180,7 @@ function evaluate() {
   const auditGateRunnerContract = evaluateAuditGateRunnerContract(findings);
   const buildPrismaGenerationContract = evaluateBuildPrismaGenerationContract(findings);
   const auditScriptInventoryContract = evaluateAuditScriptInventoryContract(findings);
+  const environmentVariableContract = evaluateEnvironmentVariableContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -5077,6 +5216,7 @@ function evaluate() {
     auditGateRunnerContract,
     buildPrismaGenerationContract,
     auditScriptInventoryContract,
+    environmentVariableContract,
     findings,
   };
 }
@@ -5136,6 +5276,27 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Environment variable contract");
+  lines.push("");
+  lines.push(`package.json exists: ${result.environmentVariableContract.packageJsonExists}`);
+  lines.push(`Prisma schema exists: ${result.environmentVariableContract.prismaSchemaExists}`);
+  lines.push(`Rate-limit module exists: ${result.environmentVariableContract.rateLimitModuleExists}`);
+  lines.push(`Validate-token module exists: ${result.environmentVariableContract.validateTokenModuleExists}`);
+  lines.push(`Storage index exists: ${result.environmentVariableContract.storageIndexExists}`);
+  lines.push(`Local storage module exists: ${result.environmentVariableContract.localStorageExists}`);
+  lines.push(`S3 storage module exists: ${result.environmentVariableContract.s3StorageExists}`);
+  lines.push(`Workflow exists: ${result.environmentVariableContract.workflowExists}`);
+  lines.push(`Database env contract: ${result.environmentVariableContract.databaseEnvContract}`);
+  lines.push(`Upstash Redis env contract: ${result.environmentVariableContract.rateLimitRedisEnvContract}`);
+  lines.push(`Daily quota env contract: ${result.environmentVariableContract.dailyQuotaEnvContract}`);
+  lines.push(`Development API keys env contract: ${result.environmentVariableContract.developmentApiKeysEnvContract}`);
+  lines.push(`Storage DATA_SOURCE env contract: ${result.environmentVariableContract.storageDataSourceEnvContract}`);
+  lines.push(`Local storage env contract: ${result.environmentVariableContract.localStorageEnvContract}`);
+  lines.push(`S3 env contract: ${result.environmentVariableContract.s3EnvContract}`);
+  lines.push(`Workflow deploy hook env contract: ${result.environmentVariableContract.workflowDeployHookEnvContract}`);
+  lines.push(`package.json does not inline secrets: ${result.environmentVariableContract.packageDoesNotInlineSecrets}`);
+  lines.push(`Production runtime env contract: ${result.environmentVariableContract.productionRuntimeEnvContract}`);
+  lines.push("");
   lines.push("## Audit script inventory contract");
   lines.push("");
   lines.push(`package.json exists: ${result.auditScriptInventoryContract.packageJsonExists}`);
@@ -5562,6 +5723,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-033 Environment Variable Contract: verifies database, Upstash, quota, dev-key, storage, S3, deploy-hook, and production-runtime env references without checking secret values.");
   lines.push("- D-032 Audit Script Inventory Contract: verifies audit script files, package script bindings, .audit report output, fail exits, pass messages, and non-stubbed implementations.");
   lines.push("- D-031 Build Prisma Generation Contract: verifies Prisma generation, build script order, Prisma dependency alignment, schema generator/datasource, and build inclusion in audit gates.");
   lines.push("- D-030 Audit Gate Runner Contract: verifies package scripts and run-audit-gates order/skip-build/fail-fast behavior.");
