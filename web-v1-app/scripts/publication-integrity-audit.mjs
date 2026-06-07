@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const prismaSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeysPath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const validateTokenPath = path.join(root, "src", "lib", "auth", "validateToken.ts");
 const rateLimitPath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -4005,6 +4006,165 @@ function evaluateApiKeyAuthContract(findings) {
 
   return result;
 }
+function prismaModelBlock(source, modelName) {
+  const pattern = new RegExp(`model\\s+${modelName}\\s+\\{([\\s\\S]*?)\\n\\}`, "u");
+  const match = source.match(pattern);
+  return match ? match[1] : "";
+}
+
+function prismaEnumBlock(source, enumName) {
+  const pattern = new RegExp(`enum\\s+${enumName}\\s+\\{([\\s\\S]*?)\\n\\}`, "u");
+  const match = source.match(pattern);
+  return match ? match[1] : "";
+}
+function evaluateDatabaseAuthSchemaContract(findings) {
+  const result = {
+    prismaSchemaExists: fs.existsSync(prismaSchemaPath),
+    datasourceUsesPostgresAndEnvUrls: false,
+    subscriptionTierEnumValid: false,
+    subscriptionStatusEnumValid: false,
+    apiKeyStatusEnumValid: false,
+    accountModelValid: false,
+    subscriptionModelValid: false,
+    subscriptionIndexesValid: false,
+    apiKeyModelValid: false,
+    apiKeyIndexesValid: false,
+    customOutputModelValid: false,
+    customOutputIndexesValid: false,
+  };
+
+  if (!result.prismaSchemaExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-028",
+      "PRISMA_SCHEMA_MISSING",
+      path.relative(root, prismaSchemaPath),
+      "Prisma schema is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(prismaSchemaPath, "utf8").replace(/^\uFEFF/u, "");
+
+  const subscriptionTier = prismaEnumBlock(source, "SubscriptionTier");
+  const subscriptionStatus = prismaEnumBlock(source, "SubscriptionStatus");
+  const apiKeyStatus = prismaEnumBlock(source, "ApiKeyStatus");
+  const account = prismaModelBlock(source, "Account");
+  const subscription = prismaModelBlock(source, "Subscription");
+  const apiKey = prismaModelBlock(source, "ApiKey");
+  const customOutput = prismaModelBlock(source, "CustomOutput");
+
+  result.datasourceUsesPostgresAndEnvUrls =
+    source.includes('provider  = "postgresql"') &&
+    source.includes('url       = env("DATABASE_URL")') &&
+    source.includes('directUrl = env("DIRECT_URL")');
+
+  result.subscriptionTierEnumValid =
+    /\bbasic\b/u.test(subscriptionTier) &&
+    /\bpro\b/u.test(subscriptionTier) &&
+    !/\bpublic\b/u.test(subscriptionTier);
+
+  result.subscriptionStatusEnumValid =
+    /\bactive\b/u.test(subscriptionStatus) &&
+    /\binactive\b/u.test(subscriptionStatus);
+
+  result.apiKeyStatusEnumValid =
+    /\bactive\b/u.test(apiKeyStatus) &&
+    /\bsuspended\b/u.test(apiKeyStatus) &&
+    /\brevoked\b/u.test(apiKeyStatus);
+
+  result.accountModelValid =
+    account.includes("id                 String         @id @default(uuid()) @db.Uuid") &&
+    account.includes("authProviderUserId String         @unique @map(\"auth_provider_user_id\")") &&
+    account.includes("email              String?") &&
+    account.includes("subscriptions      Subscription[]") &&
+    account.includes("apiKeys            ApiKey[]") &&
+    account.includes("customOutputs      CustomOutput[]") &&
+    account.includes("@@map(\"accounts\")");
+
+  result.subscriptionModelValid =
+    subscription.includes("id                   String             @id @default(uuid()) @db.Uuid") &&
+    subscription.includes("accountId            String             @map(\"account_id\") @db.Uuid") &&
+    subscription.includes("stripeCustomerId     String             @unique @map(\"stripe_customer_id\")") &&
+    subscription.includes("stripeSubscriptionId String?            @unique @map(\"stripe_subscription_id\")") &&
+    subscription.includes("tier                 SubscriptionTier") &&
+    subscription.includes("historyUnlocked      Boolean            @default(false) @map(\"history_unlocked\")") &&
+    subscription.includes("entitledChain        String?            @map(\"entitled_chain\")") &&
+    subscription.includes("status               SubscriptionStatus") &&
+    subscription.includes("updatedAt            DateTime           @default(now()) @updatedAt @map(\"updated_at\") @db.Timestamptz(6)") &&
+    subscription.includes("@relation(fields: [accountId], references: [id], onDelete: Cascade)") &&
+    subscription.includes("@@map(\"subscriptions\")");
+
+  result.subscriptionIndexesValid =
+    subscription.includes("@@index([accountId], map: \"subscriptions_account_id_idx\")") &&
+    subscription.includes("@@index([status], map: \"subscriptions_status_idx\")") &&
+    subscription.includes("@@index([tier], map: \"subscriptions_tier_idx\")") &&
+    subscription.includes("@@index([entitledChain], map: \"subscriptions_entitled_chain_idx\")");
+
+  result.apiKeyModelValid =
+    apiKey.includes("id          String       @id @default(uuid()) @db.Uuid") &&
+    apiKey.includes("accountId   String       @map(\"account_id\") @db.Uuid") &&
+    apiKey.includes("keyHash     String       @unique @map(\"key_hash\")") &&
+    apiKey.includes("keyPrefix   String       @map(\"key_prefix\")") &&
+    apiKey.includes("keyLast4    String?      @map(\"key_last4\")") &&
+    apiKey.includes("label       String?") &&
+    apiKey.includes("status      ApiKeyStatus") &&
+    apiKey.includes("createdAt   DateTime     @default(now()) @map(\"created_at\") @db.Timestamptz(6)") &&
+    apiKey.includes("lastUsedAt  DateTime?    @map(\"last_used_at\") @db.Timestamptz(6)") &&
+    apiKey.includes("@relation(fields: [accountId], references: [id], onDelete: Cascade)") &&
+    apiKey.includes("@@map(\"api_keys\")");
+
+  result.apiKeyIndexesValid =
+    apiKey.includes("@@index([accountId], map: \"api_keys_account_id_idx\")") &&
+    apiKey.includes("@@index([status], map: \"api_keys_status_idx\")") &&
+    apiKey.includes("@@index([keyPrefix], map: \"api_keys_key_prefix_idx\")");
+
+  result.customOutputModelValid =
+    customOutput.includes("id                  String    @id @default(uuid()) @db.Uuid") &&
+    customOutput.includes("accountId           String    @map(\"account_id\") @db.Uuid") &&
+    customOutput.includes("canonicalRevisionId Int       @map(\"canonical_revision_id\")") &&
+    customOutput.includes("identityHash        String    @map(\"identity_hash\")") &&
+    customOutput.includes("thresholdsJson      Json      @map(\"thresholds_json\")") &&
+    customOutput.includes("storagePath         String    @map(\"storage_path\")") &&
+    customOutput.includes("@relation(fields: [accountId], references: [id], onDelete: Cascade)") &&
+    customOutput.includes("@@map(\"custom_outputs\")");
+
+  result.customOutputIndexesValid =
+    customOutput.includes("@@unique([accountId, identityHash], map: \"custom_outputs_account_id_identity_hash_key\")") &&
+    customOutput.includes("@@index([accountId], map: \"custom_outputs_account_id_idx\")") &&
+    customOutput.includes("@@index([canonicalRevisionId], map: \"custom_outputs_canonical_revision_id_idx\")");
+
+  const requiredChecks = [
+    ["PRISMA_DATASOURCE_INVALID", result.datasourceUsesPostgresAndEnvUrls, "Datasource must be PostgreSQL with DATABASE_URL and DIRECT_URL env vars."],
+    ["PRISMA_SUBSCRIPTION_TIER_ENUM_INVALID", result.subscriptionTierEnumValid, "SubscriptionTier enum must be basic/pro only. Public is an entitlement state, not a persisted paid subscription tier."],
+    ["PRISMA_SUBSCRIPTION_STATUS_ENUM_INVALID", result.subscriptionStatusEnumValid, "SubscriptionStatus enum must include active and inactive."],
+    ["PRISMA_API_KEY_STATUS_ENUM_INVALID", result.apiKeyStatusEnumValid, "ApiKeyStatus enum must include active, suspended, revoked."],
+    ["PRISMA_ACCOUNT_MODEL_INVALID", result.accountModelValid, "Account model must preserve auth provider id, subscriptions, API keys, and custom outputs relations."],
+    ["PRISMA_SUBSCRIPTION_MODEL_INVALID", result.subscriptionModelValid, "Subscription model must preserve Stripe ids, tier/status, entitled chain, history unlock, updatedAt, and cascade account relation."],
+    ["PRISMA_SUBSCRIPTION_INDEXES_INVALID", result.subscriptionIndexesValid, "Subscription indexes must cover accountId, status, tier, and entitledChain."],
+    ["PRISMA_API_KEY_MODEL_INVALID", result.apiKeyModelValid, "ApiKey model must preserve hash, prefix, last4, status, timestamps, and cascade account relation."],
+    ["PRISMA_API_KEY_INDEXES_INVALID", result.apiKeyIndexesValid, "ApiKey indexes must cover accountId, status, and keyPrefix."],
+    ["PRISMA_CUSTOM_OUTPUT_MODEL_INVALID", result.customOutputModelValid, "CustomOutput model must preserve account, canonical revision, identity hash, thresholds JSON, and storage path."],
+    ["PRISMA_CUSTOM_OUTPUT_INDEXES_INVALID", result.customOutputIndexesValid, "CustomOutput indexes must cover unique account+identityHash, accountId, and canonicalRevisionId."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-028",
+        code,
+        path.relative(root, prismaSchemaPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -4039,6 +4199,7 @@ function evaluate() {
   const entitlementMatrixContract = evaluateEntitlementMatrixContract(findings);
   const rateLimitQuotaContract = evaluateRateLimitQuotaContract(findings);
   const apiKeyAuthContract = evaluateApiKeyAuthContract(findings);
+  const databaseAuthSchemaContract = evaluateDatabaseAuthSchemaContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -4069,6 +4230,7 @@ function evaluate() {
     entitlementMatrixContract,
     rateLimitQuotaContract,
     apiKeyAuthContract,
+    databaseAuthSchemaContract,
     findings,
   };
 }
@@ -4128,6 +4290,21 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Database auth schema contract");
+  lines.push("");
+  lines.push(`Prisma schema exists: ${result.databaseAuthSchemaContract.prismaSchemaExists}`);
+  lines.push(`Datasource uses PostgreSQL/env URLs: ${result.databaseAuthSchemaContract.datasourceUsesPostgresAndEnvUrls}`);
+  lines.push(`SubscriptionTier enum valid: ${result.databaseAuthSchemaContract.subscriptionTierEnumValid}`);
+  lines.push(`SubscriptionStatus enum valid: ${result.databaseAuthSchemaContract.subscriptionStatusEnumValid}`);
+  lines.push(`ApiKeyStatus enum valid: ${result.databaseAuthSchemaContract.apiKeyStatusEnumValid}`);
+  lines.push(`Account model valid: ${result.databaseAuthSchemaContract.accountModelValid}`);
+  lines.push(`Subscription model valid: ${result.databaseAuthSchemaContract.subscriptionModelValid}`);
+  lines.push(`Subscription indexes valid: ${result.databaseAuthSchemaContract.subscriptionIndexesValid}`);
+  lines.push(`ApiKey model valid: ${result.databaseAuthSchemaContract.apiKeyModelValid}`);
+  lines.push(`ApiKey indexes valid: ${result.databaseAuthSchemaContract.apiKeyIndexesValid}`);
+  lines.push(`CustomOutput model valid: ${result.databaseAuthSchemaContract.customOutputModelValid}`);
+  lines.push(`CustomOutput indexes valid: ${result.databaseAuthSchemaContract.customOutputIndexesValid}`);
+  lines.push("");
   lines.push("## API key auth contract");
   lines.push("");
   lines.push(`validateToken.ts exists: ${result.apiKeyAuthContract.validateTokenExists}`);
@@ -4458,6 +4635,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-028 Database Auth Schema Contract: verifies Prisma auth/subscription/API-key/custom-output schema, indexes, and storage-critical fields.");
   lines.push("- D-027 API Key Auth Contract: verifies X-API-Key validation, production key shape, dev-key isolation, persisted scrypt verification, status handling, and auth error redaction.");
   lines.push("- D-026 Rate Limit Quota Contract: verifies per-minute limits, daily quotas, headers, Upstash config, memory fallback, and production fail-closed behavior.");
   lines.push("- D-025 Entitlement Matrix Contract: verifies public/basic/pro access matrix, chain/window/history limits, and entitlement decision order.");
