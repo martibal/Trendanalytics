@@ -1967,6 +1967,187 @@ function evaluateRevisionProvenanceContract(findings, inventory) {
 
   return result;
 }
+function setDifference(left, right) {
+  const rightSet = new Set(right);
+  return left.filter((value) => !rightSet.has(value));
+}
+
+function inventoryAsofForRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  if (typeof row.asof === "string" && row.asof.trim() !== "") {
+    return row.asof;
+  }
+
+  if (typeof row.latestDay === "string" && row.latestDay.trim() !== "") {
+    return row.latestDay;
+  }
+
+  if (Array.isArray(row.days) && row.days.length > 0) {
+    return [...row.days].sort().at(-1) ?? null;
+  }
+
+  return null;
+}
+function evaluateHistoricalDerivedCoverageContract(findings, inventory) {
+  const datasetFile = path.join(publishedRoot, "dataset.json");
+  const dataset = fs.existsSync(datasetFile) ? readJson(datasetFile) : null;
+
+  const result = {
+    chainsChecked: 0,
+    chainsWithMatchingGoldDerivedDays: 0,
+    chainsWithMatchingGoldDerivedAsof: 0,
+    chainsWithMatchingDatasetAsof: 0,
+    rows: [],
+  };
+
+  for (const chain of CHAINS) {
+    const goldRow = inventory.find((row) => row.genre === "gold" && row.chain === chain);
+    const derivedRow = inventory.find((row) => row.genre === "derived" && row.chain === chain);
+
+    result.chainsChecked += 1;
+
+    const rowResult = {
+      chain,
+      goldDays: goldRow?.days?.length ?? 0,
+      derivedDays: derivedRow?.days?.length ?? 0,
+      goldAsof: inventoryAsofForRow(goldRow),
+      derivedAsof: inventoryAsofForRow(derivedRow),
+      missingDerivedDays: [],
+      extraDerivedDays: [],
+      manifestDaysMatch: false,
+      manifestAsofMatch: false,
+      datasetAsofMatch: false,
+    };
+
+    result.rows.push(rowResult);
+
+    if (!goldRow) {
+      addFinding(
+        findings,
+        "fail",
+        "D-016",
+        "HISTORICAL_GOLD_INVENTORY_MISSING",
+        `gold/${chain}`,
+        `Missing GOLD inventory row for ${chain}.`
+      );
+      continue;
+    }
+
+    if (!derivedRow) {
+      addFinding(
+        findings,
+        "fail",
+        "D-016",
+        "HISTORICAL_DERIVED_INVENTORY_MISSING",
+        `derived/${chain}`,
+        `Missing DERIVED inventory row for ${chain}.`
+      );
+      continue;
+    }
+
+    rowResult.missingDerivedDays = setDifference(goldRow.days, derivedRow.days);
+    rowResult.extraDerivedDays = setDifference(derivedRow.days, goldRow.days);
+
+    if (rowResult.missingDerivedDays.length === 0 && rowResult.extraDerivedDays.length === 0) {
+      result.chainsWithMatchingGoldDerivedDays += 1;
+    } else {
+      addFinding(
+        findings,
+        "fail",
+        "D-016",
+        "DERIVED_HISTORY_DATES_DO_NOT_MATCH_GOLD",
+        path.relative(root, path.join(publishedRoot, "derived", chain)),
+        `${chain}: derived day-files must cover exactly the same dates as gold. Missing derived days: ${rowResult.missingDerivedDays.slice(0, 10).join(", ") || "none"}${rowResult.missingDerivedDays.length > 10 ? " ..." : ""}. Extra derived days: ${rowResult.extraDerivedDays.slice(0, 10).join(", ") || "none"}${rowResult.extraDerivedDays.length > 10 ? " ..." : ""}.`
+      );
+    }
+
+    if (rowResult.goldAsof === rowResult.derivedAsof) {
+      result.chainsWithMatchingGoldDerivedAsof += 1;
+    } else {
+      addFinding(
+        findings,
+        "fail",
+        "D-016",
+        "DERIVED_ASOF_DOES_NOT_MATCH_GOLD",
+        path.relative(root, path.join(publishedRoot, "derived", chain, "manifest.json")),
+        `${chain}: derived asof ${rowResult.derivedAsof} must match gold asof ${rowResult.goldAsof}.`
+      );
+    }
+
+    const goldManifestFile = manifestPath("gold", chain);
+    const derivedManifestFile = manifestPath("derived", chain);
+
+    if (fs.existsSync(goldManifestFile) && fs.existsSync(derivedManifestFile)) {
+      const goldManifest = readJson(goldManifestFile);
+      const derivedManifest = readJson(derivedManifestFile);
+
+      rowResult.manifestDaysMatch = arrayEquals(goldManifest.available_days, derivedManifest.available_days);
+      rowResult.manifestAsofMatch = goldManifest.asof === derivedManifest.asof;
+
+      if (!rowResult.manifestDaysMatch) {
+        addFinding(
+          findings,
+          "fail",
+          "D-016",
+          "DERIVED_MANIFEST_AVAILABLE_DAYS_DO_NOT_MATCH_GOLD",
+          path.relative(root, derivedManifestFile),
+          `${chain}: derived manifest available_days must equal gold manifest available_days.`
+        );
+      }
+
+      if (!rowResult.manifestAsofMatch) {
+        addFinding(
+          findings,
+          "fail",
+          "D-016",
+          "DERIVED_MANIFEST_ASOF_DOES_NOT_MATCH_GOLD",
+          path.relative(root, derivedManifestFile),
+          `${chain}: derived manifest asof ${derivedManifest.asof} must match gold manifest asof ${goldManifest.asof}.`
+        );
+      }
+
+      if (derivedManifest.available_days_count !== goldManifest.available_days_count) {
+        addFinding(
+          findings,
+          "fail",
+          "D-016",
+          "DERIVED_MANIFEST_DAY_COUNT_DOES_NOT_MATCH_GOLD",
+          path.relative(root, derivedManifestFile),
+          `${chain}: derived manifest available_days_count ${derivedManifest.available_days_count} must match gold manifest available_days_count ${goldManifest.available_days_count}.`
+        );
+      }
+    }
+
+    const datasetGoldAsof = dataset?.asof_by_genre_chain?.gold?.[chain] ?? null;
+    const datasetDerivedAsof = dataset?.asof_by_genre_chain?.derived?.[chain] ?? null;
+    const datasetGoldCoverageAsof = dataset?.coverage?.[chain]?.gold?.asof ?? null;
+    const datasetDerivedCoverageAsof = dataset?.coverage?.[chain]?.derived?.asof ?? null;
+
+    rowResult.datasetAsofMatch =
+      datasetGoldAsof === datasetDerivedAsof &&
+      datasetGoldCoverageAsof === datasetDerivedCoverageAsof &&
+      datasetGoldAsof === rowResult.goldAsof &&
+      datasetDerivedAsof === rowResult.derivedAsof;
+
+    if (rowResult.datasetAsofMatch) {
+      result.chainsWithMatchingDatasetAsof += 1;
+    } else {
+      addFinding(
+        findings,
+        "fail",
+        "D-016",
+        "DATASET_GOLD_DERIVED_ASOF_MISMATCH",
+        path.relative(root, datasetFile),
+        `${chain}: dataset asof values must align with inventory. dataset gold=${datasetGoldAsof}, dataset derived=${datasetDerivedAsof}, dataset coverage gold=${datasetGoldCoverageAsof}, dataset coverage derived=${datasetDerivedCoverageAsof}, inventory gold=${rowResult.goldAsof}, inventory derived=${rowResult.derivedAsof}.`
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -1989,6 +2170,7 @@ function evaluate() {
   const s3StorageContract = evaluateS3StorageContract(findings);
   const pipelinePublishOrderContract = evaluatePipelinePublishOrderContract(findings);
   const revisionProvenanceContract = evaluateRevisionProvenanceContract(findings, inventory);
+  const historicalDerivedCoverageContract = evaluateHistoricalDerivedCoverageContract(findings, inventory);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -2007,6 +2189,7 @@ function evaluate() {
     s3StorageContract,
     pipelinePublishOrderContract,
     revisionProvenanceContract,
+    historicalDerivedCoverageContract,
     findings,
   };
 }
@@ -2066,6 +2249,27 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Historical derived coverage contract");
+  lines.push("");
+  lines.push(`Chains checked: ${result.historicalDerivedCoverageContract.chainsChecked}`);
+  lines.push(`Chains with matching gold/derived day dates: ${result.historicalDerivedCoverageContract.chainsWithMatchingGoldDerivedDays}`);
+  lines.push(`Chains with matching gold/derived asof: ${result.historicalDerivedCoverageContract.chainsWithMatchingGoldDerivedAsof}`);
+  lines.push(`Chains with matching dataset asof: ${result.historicalDerivedCoverageContract.chainsWithMatchingDatasetAsof}`);
+  lines.push("");
+  lines.push(tableRow(["Chain", "Gold days", "Derived days", "Gold asof", "Derived asof", "Missing derived", "Extra derived"]));
+  lines.push(tableRow(["---", "---", "---", "---", "---", "---", "---"]));
+  for (const row of result.historicalDerivedCoverageContract.rows) {
+    lines.push(tableRow([
+      row.chain,
+      row.goldDays,
+      row.derivedDays,
+      row.goldAsof ?? "n/a",
+      row.derivedAsof ?? "n/a",
+      row.missingDerivedDays.length,
+      row.extraDerivedDays.length,
+    ]));
+  }
+  lines.push("");
   lines.push("## Revision provenance contract");
   lines.push("");
   lines.push(`Dataset present: ${result.revisionProvenanceContract.datasetPresent}`);
@@ -2177,6 +2381,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-016 Historical Derived Coverage Contract: verifies derived day-files/manifests/dataset asof align exactly with gold per chain.");
   lines.push("- D-015 Revision Provenance Contract: checks dataset/manifests share dataset_id, revision_id, bounded computed_at_utc skew, methodology_version, schema versions, and files/window mappings.");
   lines.push("- D-014 Pipeline Publish Order Contract: checks publish/brief/sync/commit order and requires CI audit gates before push/deploy.");
   lines.push("");
