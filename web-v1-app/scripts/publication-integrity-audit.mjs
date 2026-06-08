@@ -19,6 +19,7 @@ const prismaSchemaDeploymentPath = path.join(root, "prisma", "schema.prisma");
 const prismaPackageDeploymentPath = path.join(root, "package.json");
 const prismaMigrationsDeploymentPath = path.join(root, "prisma", "migrations");
 const stripeWebhookEventMigrationPath = path.join(root, "prisma", "migrations", "20260608120000_add_stripe_webhook_events", "migration.sql");
+const stripeWebhookDeploymentRunbookPath = path.join(root, "docs", "stripe-webhook-deployment-runbook.md");
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -10881,6 +10882,147 @@ function evaluateStripeWebhookEventMigrationRequiredContract(findings) {
 
   return result;
 }
+function evaluateStripeWebhookDeploymentRunbookContract(findings) {
+  const result = {
+    runbookExists: fs.existsSync(stripeWebhookDeploymentRunbookPath),
+
+    documentsEndpointPath: false,
+    documentsRequiredStripeEvents: false,
+    documentsRequiredEnvVars: false,
+    documentsProductionLiveKeyBoundary: false,
+    documentsWebhookSecretSource: false,
+    documentsDatabaseMigrationRequirement: false,
+    documentsMigrationPath: false,
+    distinguishesPrismaGenerateFromDbMigration: false,
+    documentsDeploymentSequence: false,
+    documentsOperationalExpectations: false,
+    documentsReplayHandling: false,
+    documentsFailureHandling: false,
+    noLiteralStripeSecrets: false,
+    noAdviceOrForecastCopy: false,
+  };
+
+  if (!result.runbookExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-058",
+      "STRIPE_WEBHOOK_DEPLOYMENT_RUNBOOK_MISSING",
+      path.relative(root, stripeWebhookDeploymentRunbookPath),
+      "Stripe webhook deployment runbook must exist before production webhook traffic is enabled."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(stripeWebhookDeploymentRunbookPath, "utf8").replace(/^\\uFEFF/u, "");
+  const normalized = source.replace(/\\r\\n/gu, "\\n");
+
+  result.documentsEndpointPath =
+    normalized.includes("/api/v1/stripe/webhook") &&
+    normalized.includes("full Stripe endpoint URL") &&
+    normalized.includes("production app origin");
+
+  result.documentsRequiredStripeEvents =
+    normalized.includes("checkout.session.completed") &&
+    normalized.includes("customer.subscription.updated") &&
+    normalized.includes("customer.subscription.deleted");
+
+  result.documentsRequiredEnvVars =
+    normalized.includes("STRIPE_SECRET_KEY") &&
+    normalized.includes("STRIPE_WEBHOOK_SECRET") &&
+    normalized.includes("STRIPE_PRICE_BASIC") &&
+    normalized.includes("STRIPE_PRICE_PRO") &&
+    normalized.includes("NEXT_PUBLIC_APP_URL") &&
+    normalized.includes("DATABASE_URL") &&
+    normalized.includes("DIRECT_URL");
+
+  result.documentsProductionLiveKeyBoundary =
+    normalized.includes("live key for production checkout") &&
+    normalized.includes("Test keys are valid only in non-production environments");
+
+  result.documentsWebhookSecretSource =
+    normalized.includes("STRIPE_WEBHOOK_SECRET must come from the Stripe Dashboard webhook endpoint configuration") &&
+    normalized.includes("Do not reuse webhook secrets across unrelated endpoints");
+
+  result.documentsDatabaseMigrationRequirement =
+    normalized.includes("Before the webhook endpoint receives production traffic") &&
+    normalized.includes("deploy the Prisma migration") &&
+    normalized.includes("stripe_webhook_events") &&
+    normalized.includes("StripeWebhookEventStatus");
+
+  result.documentsMigrationPath =
+    normalized.includes("prisma/migrations/20260608120000_add_stripe_webhook_events/migration.sql");
+
+  result.distinguishesPrismaGenerateFromDbMigration =
+    normalized.includes("Do not rely on `prisma generate` to update the database") &&
+    normalized.includes("Prisma Client only");
+
+  result.documentsDeploymentSequence =
+    normalized.includes("Recommended deployment sequence") &&
+    normalized.includes("Deploy application code") &&
+    normalized.includes("Apply the database migration") &&
+    normalized.includes("Configure the Stripe Dashboard webhook endpoint") &&
+    normalized.includes("Send a Stripe test webhook event") &&
+    normalized.includes("Enable live checkout traffic");
+
+  result.documentsOperationalExpectations =
+    normalized.includes("verify the stripe-signature header") &&
+    normalized.includes("use raw request body verification") &&
+    normalized.includes("reject invalid signatures") &&
+    normalized.includes("sync local subscription state idempotently") &&
+    normalized.includes("never return raw Stripe event payloads") &&
+    normalized.includes("never log or expose Stripe secret values");
+
+  result.documentsReplayHandling =
+    normalized.includes("persist Stripe event IDs before business processing") &&
+    normalized.includes("treat duplicate Stripe event IDs as safe ignored acknowledgements");
+
+  result.documentsFailureHandling =
+    normalized.includes("Rollback and failure handling") &&
+    normalized.includes("replay failed events from Stripe Dashboard") &&
+    normalized.includes("If the database migration has not been applied, do not enable live webhook traffic");
+
+  result.noLiteralStripeSecrets =
+    !/sk_live_[A-Za-z0-9_]+/u.test(normalized) &&
+    !/rk_live_[A-Za-z0-9_]+/u.test(normalized) &&
+    !/whsec_[A-Za-z0-9_]+/u.test(normalized);
+
+  result.noAdviceOrForecastCopy =
+    !/\\b(?:buy|sell|hold|forecast|prediction|price target|investment advice|financial advice|should invest|expected return)\\b/iu.test(normalized);
+
+  const requiredChecks = [
+    ["STRIPE_WEBHOOK_RUNBOOK_ENDPOINT_INVALID", result.documentsEndpointPath, "Runbook must document production endpoint path and origin requirement."],
+    ["STRIPE_WEBHOOK_RUNBOOK_EVENTS_INVALID", result.documentsRequiredStripeEvents, "Runbook must document required Stripe webhook events."],
+    ["STRIPE_WEBHOOK_RUNBOOK_ENV_INVALID", result.documentsRequiredEnvVars, "Runbook must document required Stripe/database/app URL environment variables."],
+    ["STRIPE_WEBHOOK_RUNBOOK_LIVE_KEY_BOUNDARY_INVALID", result.documentsProductionLiveKeyBoundary, "Runbook must document production live-key boundary."],
+    ["STRIPE_WEBHOOK_RUNBOOK_SECRET_SOURCE_INVALID", result.documentsWebhookSecretSource, "Runbook must document Stripe Dashboard webhook secret source and endpoint-specific secret use."],
+    ["STRIPE_WEBHOOK_RUNBOOK_DB_MIGRATION_INVALID", result.documentsDatabaseMigrationRequirement, "Runbook must document DB migration requirement before production webhook traffic."],
+    ["STRIPE_WEBHOOK_RUNBOOK_MIGRATION_PATH_INVALID", result.documentsMigrationPath, "Runbook must document the committed stripe_webhook_events migration path."],
+    ["STRIPE_WEBHOOK_RUNBOOK_PRISMA_GENERATE_BOUNDARY_INVALID", result.distinguishesPrismaGenerateFromDbMigration, "Runbook must distinguish Prisma Client generation from DB migration/deployment."],
+    ["STRIPE_WEBHOOK_RUNBOOK_DEPLOYMENT_SEQUENCE_INVALID", result.documentsDeploymentSequence, "Runbook must document safe deployment sequence."],
+    ["STRIPE_WEBHOOK_RUNBOOK_OPERATIONAL_EXPECTATIONS_INVALID", result.documentsOperationalExpectations, "Runbook must document webhook verification, idempotency, and no-secret/no-payload behavior."],
+    ["STRIPE_WEBHOOK_RUNBOOK_REPLAY_INVALID", result.documentsReplayHandling, "Runbook must document duplicate/replay handling."],
+    ["STRIPE_WEBHOOK_RUNBOOK_FAILURE_HANDLING_INVALID", result.documentsFailureHandling, "Runbook must document rollback/failure handling and replay of failed events."],
+    ["STRIPE_WEBHOOK_RUNBOOK_SECRET_EXPOSURE_RISK", result.noLiteralStripeSecrets, "Runbook must not contain literal live/restricted Stripe keys or whsec values."],
+    ["STRIPE_WEBHOOK_RUNBOOK_ADVICE_COPY_RISK", result.noAdviceOrForecastCopy, "Runbook must not contain advice/forecast copy."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-058",
+        code,
+        path.relative(root, stripeWebhookDeploymentRunbookPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -10943,6 +11085,7 @@ function evaluate() {
   const stripeWebhookReplayIdempotencyContract = evaluateStripeWebhookReplayIdempotencyContract(findings);
   const prismaDbDeploymentContract = evaluatePrismaDbDeploymentContract(findings);
   const stripeWebhookEventMigrationRequiredContract = evaluateStripeWebhookEventMigrationRequiredContract(findings);
+  const stripeWebhookDeploymentRunbookContract = evaluateStripeWebhookDeploymentRunbookContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -11001,6 +11144,7 @@ function evaluate() {
     stripeWebhookReplayIdempotencyContract,
     prismaDbDeploymentContract,
     stripeWebhookEventMigrationRequiredContract,
+    stripeWebhookDeploymentRunbookContract,
     findings,
   };
 }
@@ -11060,6 +11204,24 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Stripe webhook deployment runbook contract");
+  lines.push("");
+  lines.push(`Runbook exists: ${result.stripeWebhookDeploymentRunbookContract.runbookExists}`);
+  lines.push(`Documents endpoint path: ${result.stripeWebhookDeploymentRunbookContract.documentsEndpointPath}`);
+  lines.push(`Documents required Stripe events: ${result.stripeWebhookDeploymentRunbookContract.documentsRequiredStripeEvents}`);
+  lines.push(`Documents required env vars: ${result.stripeWebhookDeploymentRunbookContract.documentsRequiredEnvVars}`);
+  lines.push(`Documents production live-key boundary: ${result.stripeWebhookDeploymentRunbookContract.documentsProductionLiveKeyBoundary}`);
+  lines.push(`Documents webhook secret source: ${result.stripeWebhookDeploymentRunbookContract.documentsWebhookSecretSource}`);
+  lines.push(`Documents database migration requirement: ${result.stripeWebhookDeploymentRunbookContract.documentsDatabaseMigrationRequirement}`);
+  lines.push(`Documents migration path: ${result.stripeWebhookDeploymentRunbookContract.documentsMigrationPath}`);
+  lines.push(`Distinguishes prisma generate from DB migration: ${result.stripeWebhookDeploymentRunbookContract.distinguishesPrismaGenerateFromDbMigration}`);
+  lines.push(`Documents deployment sequence: ${result.stripeWebhookDeploymentRunbookContract.documentsDeploymentSequence}`);
+  lines.push(`Documents operational expectations: ${result.stripeWebhookDeploymentRunbookContract.documentsOperationalExpectations}`);
+  lines.push(`Documents replay handling: ${result.stripeWebhookDeploymentRunbookContract.documentsReplayHandling}`);
+  lines.push(`Documents failure handling: ${result.stripeWebhookDeploymentRunbookContract.documentsFailureHandling}`);
+  lines.push(`No literal Stripe secrets: ${result.stripeWebhookDeploymentRunbookContract.noLiteralStripeSecrets}`);
+  lines.push(`No advice/forecast copy: ${result.stripeWebhookDeploymentRunbookContract.noAdviceOrForecastCopy}`);
+  lines.push("");
   lines.push("## Stripe webhook event migration required contract");
   lines.push("");
   lines.push(`Schema exists: ${result.stripeWebhookEventMigrationRequiredContract.schemaExists}`);
@@ -12074,6 +12236,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-058 Stripe Webhook Deployment Runbook Contract: requires a committed deployment runbook for Stripe webhook production setup, including endpoint path, required events, env vars, live/test boundary, webhook secret source, DB migration requirement, migration path, Prisma generate vs DB migration distinction, deployment sequence, replay handling, failure handling, and no secret/advice copy.");
   lines.push("- D-057 Stripe Webhook Event Migration Required Contract: hard-requires the committed stripe_webhook_events migration to match Prisma schema, including StripeWebhookEventStatus, table columns, unique stripe_event_id, replay indexes, UUID/timestamptz field types, IF NOT EXISTS safety, schema mapping parity, and no literal Stripe secrets.");
   lines.push("- D-055 Prisma DB Deployment Contract: distinguishes Prisma Client generation from database deployment, verifies build/postinstall generate Prisma Client, blocks implicit db push/migrate deploy inside build, verifies PostgreSQL DATABASE_URL/DIRECT_URL datasource, checks StripeWebhookEvent schema/table mapping, and reports missing migration SQL as an explicit production deployment warning.");
   lines.push("- D-053 Stripe Webhook Replay Idempotency Contract: reports event-level Stripe webhook replay persistence as a warning when absent, and hard-fails partial implementations unless a StripeWebhookEvent model, unique stripeEventId, processing/processed/ignored/failed status, duplicate handling, event status updates, idempotent state upserts, and raw payload protection are complete.");
