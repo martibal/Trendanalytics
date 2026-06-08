@@ -9,6 +9,7 @@ const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
 const appApiRouteRoot = path.join(root, "src", "app", "api");
 const stripeWebhookRouteRoot = path.join(root, "src", "app", "api");
+const stripeWebhookRoutePath = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -9665,6 +9666,288 @@ function evaluateStripeWebhookReadinessContract(findings) {
 
   return result;
 }
+function evaluateStripeWebhookRouteContract(findings) {
+  const result = {
+    routeExists: fs.existsSync(stripeWebhookRoutePath),
+
+    importsExpectedRuntimeAndDb: false,
+    definesSafeJsonResponse: false,
+    readsSecretsSafely: false,
+    usesPostOnly: false,
+    usesRawBodyAndStripeSignature: false,
+    verifiesConstructEvent: false,
+    avoidsBrowserRequestGuards: false,
+    doesNotExposeRawEventOrSecrets: false,
+
+    normalizesChainPlanBooleanAndStatus: false,
+    derivesStripeObjectIdsSafely: false,
+    extractsCurrentPeriodEndSafely: false,
+    checkoutCompletedSyncValid: false,
+    checkoutSyncUsesTransactionAndUpsert: false,
+    checkoutSyncUsesMetadataAndCustomFields: false,
+    subscriptionPlanResolutionValid: false,
+    subscriptionUpdateDeleteSyncValid: false,
+    subscriptionSyncUsesExistingBindingOrMetadata: false,
+    subscriptionSyncUsesIdempotentUpsert: false,
+
+    handlesRequiredEvents: false,
+    deletedEventForcesInactive: false,
+    returnsOkIgnoredOrErrorOnly: false,
+    logsOperationalWarnings: false,
+    noPublicAdviceOrPredictionCopy: false,
+  };
+
+  if (!result.routeExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-050",
+      "STRIPE_WEBHOOK_ROUTE_MISSING",
+      path.relative(root, stripeWebhookRoutePath),
+      "Stripe webhook route must exist now that subscription sync has been implemented."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(stripeWebhookRoutePath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  result.importsExpectedRuntimeAndDb =
+    normalized.includes('import { NextResponse } from "next/server";') &&
+    normalized.includes('import { SubscriptionStatus, SubscriptionTier } from "@prisma/client";') &&
+    normalized.includes('import Stripe from "stripe";') &&
+    normalized.includes('import type { ChainId } from "@/config/chains";') &&
+    normalized.includes('import { db } from "@/lib/db";');
+
+  result.definesSafeJsonResponse =
+    normalized.includes("type WebhookJsonCode =") &&
+    normalized.includes('"Cache-Control": "no-store"') &&
+    normalized.includes("function jsonResponse(status: number, code: WebhookJsonCode, message: string)") &&
+    normalized.includes("return NextResponse.json(") &&
+    normalized.includes("headers: NO_STORE_HEADERS");
+
+  result.readsSecretsSafely =
+    normalized.includes("function getStripeSecretKey(): string | null") &&
+    normalized.includes('["STRIPE", "SECRET", "KEY"].join("_")') &&
+    normalized.includes("process.env[keyName]?.trim()") &&
+    normalized.includes("function getWebhookSecret(): string | null") &&
+    normalized.includes("process.env.STRIPE_WEBHOOK_SECRET?.trim()") &&
+    normalized.includes("function getStripeClient(): Stripe | null") &&
+    normalized.includes("return new Stripe(secretKey);");
+
+  result.usesPostOnly =
+    normalized.includes("export async function POST(request: Request)") &&
+    !normalized.includes("export async function GET(") &&
+    !normalized.includes("export async function PUT(") &&
+    !normalized.includes("export async function PATCH(") &&
+    !normalized.includes("export async function DELETE(");
+
+  result.usesRawBodyAndStripeSignature =
+    normalized.includes('request.headers.get("stripe-signature")') &&
+    normalized.includes("const payload = await request.text();");
+
+  result.verifiesConstructEvent =
+    normalized.includes("let event: Stripe.Event;") &&
+    normalized.includes("stripe.webhooks.constructEvent(payload, signature, webhookSecret)") &&
+    normalized.includes('return jsonResponse(400, "bad_signature", "Invalid Stripe signature.");');
+
+  result.avoidsBrowserRequestGuards =
+    !normalized.includes("validateSameOriginRequest") &&
+    !normalized.includes("enforcePreAuthRateLimit") &&
+    !normalized.includes("@clerk/nextjs/server");
+
+  result.doesNotExposeRawEventOrSecrets =
+    !normalized.includes("return NextResponse.json(event") &&
+    !normalized.includes("return Response.json(event") &&
+    !normalized.includes("return jsonResponse(200, result, JSON.stringify") &&
+    !/sk_live_|rk_live_|whsec_[A-Za-z0-9_]+/u.test(normalized);
+
+  result.normalizesChainPlanBooleanAndStatus =
+    normalized.includes("const SUPPORTED_CHAINS: ChainId[] = [\"bitcoin\", \"ethereum\", \"arbitrum\", \"base\"];") &&
+    normalized.includes("function normalizeChain(value: unknown): ChainId | null") &&
+    normalized.includes("function parseBoolean(value: unknown): boolean") &&
+    normalized.includes("function normalizePlan(value: unknown): CheckoutPlan | null") &&
+    normalized.includes("function normalizeStripeSubscriptionStatus(") &&
+    normalized.includes("return SubscriptionStatus.active;") &&
+    normalized.includes("return SubscriptionStatus.inactive;") &&
+    normalized.includes("function tierFromPlan(plan: CheckoutPlan | null): SubscriptionTier") &&
+    normalized.includes("function historyUnlockedFromPlan(plan: CheckoutPlan | null, metadataValue: unknown): boolean");
+
+  result.derivesStripeObjectIdsSafely =
+    normalized.includes("function getStripeObjectId(value: unknown): string | null") &&
+    normalized.includes('if (typeof value === "string")') &&
+    normalized.includes('if (typeof value === "object" && "id" in value)') &&
+    normalized.includes("return typeof id === \"string\" ? id : null;") &&
+    normalized.includes("function getSubscriptionIdFromSession(session: Stripe.Checkout.Session): string | null") &&
+    normalized.includes("function getCustomerIdFromSession(session: Stripe.Checkout.Session): string | null") &&
+    normalized.includes("function getCustomerIdFromSubscription(subscription: Stripe.Subscription): string | null");
+
+  result.extractsCurrentPeriodEndSafely =
+    normalized.includes("function getSubscriptionCurrentPeriodEnd(subscription: Stripe.Subscription): Date | null") &&
+    normalized.includes("current_period_end?: unknown") &&
+    normalized.includes('typeof raw !== "number"') &&
+    normalized.includes("new Date(raw * 1000)");
+
+  result.checkoutCompletedSyncValid =
+    normalized.includes("async function syncCheckoutSessionCompleted(") &&
+    normalized.includes("const stripeCustomerId = getCustomerIdFromSession(session);") &&
+    normalized.includes("const stripeSubscriptionId = getSubscriptionIdFromSession(session);") &&
+    normalized.includes("const accountId = session.client_reference_id ?? session.metadata?.account_id ?? null;") &&
+    normalized.includes("const authProviderUserId = session.metadata?.auth_provider_user_id ?? null;") &&
+    normalized.includes("const plan = normalizePlan(session.metadata?.checkout_plan);") &&
+    normalized.includes("const tier = tierFromPlan(plan);") &&
+    normalized.includes("const retrievedSubscription = await retrieveSubscriptionForCheckout(stripe, stripeSubscriptionId);") &&
+    normalized.includes("const status = normalizeStripeSubscriptionStatus(retrievedSubscription?.status ?? \"active\");") &&
+    normalized.includes("const currentPeriodEnd = retrievedSubscription ? getSubscriptionCurrentPeriodEnd(retrievedSubscription) : null;") &&
+    normalized.includes("if (!stripeCustomerId || !stripeSubscriptionId || !accountId)") &&
+    normalized.includes('return "ignored";');
+
+  result.checkoutSyncUsesTransactionAndUpsert =
+    normalized.includes("await db.$transaction(async (tx) => {") &&
+    normalized.includes("await tx.account.updateMany({") &&
+    normalized.includes("id: accountId,") &&
+    normalized.includes("authProviderUserId,") &&
+    normalized.includes("termsAcceptedAt: new Date(),") &&
+    normalized.includes("await tx.subscription.upsert({") &&
+    normalized.includes("where: {") &&
+    normalized.includes("stripeCustomerId,") &&
+    normalized.includes("update: {") &&
+    normalized.includes("stripeSubscriptionId,") &&
+    normalized.includes("tier,") &&
+    normalized.includes("historyUnlocked,") &&
+    normalized.includes("entitledChain,") &&
+    normalized.includes("status,") &&
+    normalized.includes("currentPeriodEnd,") &&
+    normalized.includes("create: {") &&
+    normalized.includes("accountId,");
+
+  result.checkoutSyncUsesMetadataAndCustomFields =
+    normalized.includes("function entitledChainFromSession(session: Stripe.Checkout.Session): ChainId | null") &&
+    normalized.includes("session.metadata?.entitled_chain") &&
+    normalized.includes("session.custom_fields") &&
+    normalized.includes('field.key !== "entitled_chain"') &&
+    normalized.includes("field.dropdown?.value") &&
+    normalized.includes("metadata.history_unlocked ?? session.metadata?.history_unlocked");
+
+  result.subscriptionPlanResolutionValid =
+    normalized.includes("function subscriptionPlan(subscription: Stripe.Subscription): CheckoutPlan | null") &&
+    normalized.includes("const fromMetadata = normalizePlan(metadata.checkout_plan);") &&
+    normalized.includes("const priceIds = subscription.items.data") &&
+    normalized.includes("process.env.STRIPE_PRICE_BASIC?.trim()") &&
+    normalized.includes("process.env.STRIPE_PRICE_PRO?.trim()") &&
+    normalized.includes('return "basic";') &&
+    normalized.includes('return "pro";');
+
+  result.subscriptionUpdateDeleteSyncValid =
+    normalized.includes("async function syncSubscriptionEvent(") &&
+    normalized.includes("forcedStatus?: SubscriptionStatus") &&
+    normalized.includes("const stripeSubscriptionId = subscription.id;") &&
+    normalized.includes("const stripeCustomerId = getCustomerIdFromSubscription(subscription);") &&
+    normalized.includes("const metadata = getSubscriptionMetadata(subscription);") &&
+    normalized.includes("const accountId = typeof metadata.account_id === \"string\" ? metadata.account_id : null;") &&
+    normalized.includes("const plan = subscriptionPlan(subscription);") &&
+    normalized.includes("const tier = tierFromPlan(plan);") &&
+    normalized.includes("const status = forcedStatus ?? normalizeStripeSubscriptionStatus(subscription.status);") &&
+    normalized.includes("const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(subscription);");
+
+  result.subscriptionSyncUsesExistingBindingOrMetadata =
+    normalized.includes("const existing = await tx.subscription.findFirst({") &&
+    normalized.includes("OR: [") &&
+    normalized.includes("stripeSubscriptionId,") &&
+    normalized.includes("stripeCustomerId,") &&
+    normalized.includes("select: {") &&
+    normalized.includes("accountId: true,") &&
+    normalized.includes("const resolvedAccountId = existing?.accountId ?? accountId;") &&
+    normalized.includes("if (!resolvedAccountId)") &&
+    normalized.includes('return "ignored";');
+
+  result.subscriptionSyncUsesIdempotentUpsert =
+    normalized.includes("await tx.subscription.upsert({") &&
+    normalized.includes("where: {") &&
+    normalized.includes("stripeCustomerId,") &&
+    normalized.includes("update: {") &&
+    normalized.includes("create: {") &&
+    normalized.includes("accountId: resolvedAccountId,") &&
+    normalized.includes("stripeSubscriptionId,") &&
+    normalized.includes("historyUnlocked,") &&
+    normalized.includes("entitledChain,") &&
+    normalized.includes("currentPeriodEnd,");
+
+  result.handlesRequiredEvents =
+    normalized.includes("async function handleVerifiedEvent(stripe: Stripe, event: Stripe.Event): Promise<\"ok\" | \"ignored\">") &&
+    normalized.includes('case "checkout.session.completed":') &&
+    normalized.includes("return syncCheckoutSessionCompleted(stripe, event.data.object as Stripe.Checkout.Session);") &&
+    normalized.includes('case "customer.subscription.updated":') &&
+    normalized.includes("return syncSubscriptionEvent(event.data.object as Stripe.Subscription);") &&
+    normalized.includes('case "customer.subscription.deleted":') &&
+    normalized.includes('default:') &&
+    normalized.includes('return "ignored";');
+
+  result.deletedEventForcesInactive =
+    normalized.includes('case "customer.subscription.deleted":') &&
+    normalized.includes("return syncSubscriptionEvent(event.data.object as Stripe.Subscription, SubscriptionStatus.inactive);");
+
+  result.returnsOkIgnoredOrErrorOnly =
+    normalized.includes('return jsonResponse(503, "not_configured", "Stripe webhook is not configured.");') &&
+    normalized.includes('return jsonResponse(400, "bad_signature", "Missing Stripe signature.");') &&
+    normalized.includes('return jsonResponse(400, "bad_signature", "Invalid Stripe signature.");') &&
+    normalized.includes('result === "ok" ? "Stripe webhook processed." : "Stripe webhook event ignored."') &&
+    normalized.includes('return jsonResponse(500, "webhook_error", "Stripe webhook processing failed.");');
+
+  result.logsOperationalWarnings =
+    normalized.includes('console.warn("[stripe-webhook] failed to retrieve subscription for checkout"') &&
+    normalized.includes('console.warn("[stripe-webhook] checkout.session.completed missing required identifiers"') &&
+    normalized.includes('console.warn("[stripe-webhook] subscription event missing required Stripe identifiers"') &&
+    normalized.includes('console.warn("[stripe-webhook] subscription event has no account binding"') &&
+    normalized.includes('console.error("[stripe-webhook] webhook not configured"') &&
+    normalized.includes('console.warn("[stripe-webhook] invalid signature"') &&
+    normalized.includes('console.error("[stripe-webhook] processing failed"');
+
+  result.noPublicAdviceOrPredictionCopy =
+    !/\b(?:buy|sell|hold|forecast|prediction|price target|investment advice|financial advice|should invest|expected return)\b/iu.test(normalized);
+
+  const requiredChecks = [
+    ["STRIPE_WEBHOOK_ROUTE_IMPORTS_INVALID", result.importsExpectedRuntimeAndDb, "Stripe webhook route must import NextResponse, Stripe, Prisma subscription enums, ChainId, and db."],
+    ["STRIPE_WEBHOOK_JSON_RESPONSE_INVALID", result.definesSafeJsonResponse, "Stripe webhook route must centralize no-store JSON responses."],
+    ["STRIPE_WEBHOOK_SECRET_ACCESS_INVALID", result.readsSecretsSafely, "Stripe webhook route must read Stripe secret key and STRIPE_WEBHOOK_SECRET safely and instantiate Stripe server-side."],
+    ["STRIPE_WEBHOOK_POST_ONLY_INVALID", result.usesPostOnly, "Stripe webhook route must expose POST only."],
+    ["STRIPE_WEBHOOK_RAW_BODY_SIGNATURE_INVALID", result.usesRawBodyAndStripeSignature, "Stripe webhook route must read raw body and stripe-signature header."],
+    ["STRIPE_WEBHOOK_CONSTRUCT_EVENT_INVALID", result.verifiesConstructEvent, "Stripe webhook route must verify Stripe event signatures with constructEvent and reject bad signatures."],
+    ["STRIPE_WEBHOOK_BROWSER_GUARD_RISK", result.avoidsBrowserRequestGuards, "Stripe webhook route must not use browser same-origin/pre-auth/Clerk guards."],
+    ["STRIPE_WEBHOOK_SECRET_RESPONSE_RISK", result.doesNotExposeRawEventOrSecrets, "Stripe webhook route must not return raw event payloads or contain literal live/restricted/webhook secrets."],
+    ["STRIPE_WEBHOOK_NORMALIZERS_INVALID", result.normalizesChainPlanBooleanAndStatus, "Stripe webhook route must normalize chain, plan, booleans, tier, history, and subscription status."],
+    ["STRIPE_WEBHOOK_OBJECT_ID_HELPERS_INVALID", result.derivesStripeObjectIdsSafely, "Stripe webhook route must safely derive Stripe object IDs from strings or expanded objects."],
+    ["STRIPE_WEBHOOK_PERIOD_END_HELPER_INVALID", result.extractsCurrentPeriodEndSafely, "Stripe webhook route must safely derive currentPeriodEnd from Stripe current_period_end seconds."],
+    ["STRIPE_WEBHOOK_CHECKOUT_SYNC_INVALID", result.checkoutCompletedSyncValid, "checkout.session.completed sync must collect customer/subscription/account/user/plan/subscription/status/period identifiers and ignore incomplete events."],
+    ["STRIPE_WEBHOOK_CHECKOUT_TRANSACTION_INVALID", result.checkoutSyncUsesTransactionAndUpsert, "checkout.session.completed sync must transactionally update account terms and upsert subscription by stripeCustomerId."],
+    ["STRIPE_WEBHOOK_CHECKOUT_METADATA_INVALID", result.checkoutSyncUsesMetadataAndCustomFields, "checkout.session.completed sync must derive entitled chain/history from metadata/custom fields."],
+    ["STRIPE_WEBHOOK_SUBSCRIPTION_PLAN_INVALID", result.subscriptionPlanResolutionValid, "Subscription events must resolve plan from metadata or configured Stripe price IDs."],
+    ["STRIPE_WEBHOOK_SUBSCRIPTION_SYNC_INVALID", result.subscriptionUpdateDeleteSyncValid, "Subscription update/delete sync must derive customer/subscription/account/plan/tier/status/currentPeriodEnd."],
+    ["STRIPE_WEBHOOK_SUBSCRIPTION_BINDING_INVALID", result.subscriptionSyncUsesExistingBindingOrMetadata, "Subscription events must resolve account binding from existing subscription or metadata."],
+    ["STRIPE_WEBHOOK_SUBSCRIPTION_UPSERT_INVALID", result.subscriptionSyncUsesIdempotentUpsert, "Subscription events must upsert idempotently by stripeCustomerId."],
+    ["STRIPE_WEBHOOK_REQUIRED_EVENTS_INVALID", result.handlesRequiredEvents, "Webhook route must handle checkout.session.completed, customer.subscription.updated, and customer.subscription.deleted."],
+    ["STRIPE_WEBHOOK_DELETED_INACTIVE_INVALID", result.deletedEventForcesInactive, "customer.subscription.deleted must force SubscriptionStatus.inactive."],
+    ["STRIPE_WEBHOOK_RESPONSE_CODES_INVALID", result.returnsOkIgnoredOrErrorOnly, "Webhook route must return only safe ok/ignored/config/signature/error responses."],
+    ["STRIPE_WEBHOOK_OPERATIONAL_LOGGING_INVALID", result.logsOperationalWarnings, "Webhook route must log safe operational warnings/errors without exposing secrets."],
+    ["STRIPE_WEBHOOK_ADVICE_COPY_RISK", result.noPublicAdviceOrPredictionCopy, "Webhook route must not contain public advice/forecast wording."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-050",
+        code,
+        path.relative(root, stripeWebhookRoutePath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -9721,6 +10004,7 @@ function evaluate() {
   const prismaBillingDataModelContract = evaluatePrismaBillingDataModelContract(findings);
   const apiRouteBoundaryInventoryContract = evaluateApiRouteBoundaryInventoryContract(findings);
   const stripeWebhookReadinessContract = evaluateStripeWebhookReadinessContract(findings);
+  const stripeWebhookRouteContract = evaluateStripeWebhookRouteContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -9773,6 +10057,7 @@ function evaluate() {
     prismaBillingDataModelContract,
     apiRouteBoundaryInventoryContract,
     stripeWebhookReadinessContract,
+    stripeWebhookRouteContract,
     findings,
   };
 }
@@ -9832,6 +10117,33 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Stripe webhook route contract");
+  lines.push("");
+  lines.push(`Route exists: ${result.stripeWebhookRouteContract.routeExists}`);
+  lines.push(`Imports runtime/db: ${result.stripeWebhookRouteContract.importsExpectedRuntimeAndDb}`);
+  lines.push(`Safe no-store JSON response: ${result.stripeWebhookRouteContract.definesSafeJsonResponse}`);
+  lines.push(`Reads secrets safely: ${result.stripeWebhookRouteContract.readsSecretsSafely}`);
+  lines.push(`POST only: ${result.stripeWebhookRouteContract.usesPostOnly}`);
+  lines.push(`Raw body + Stripe signature: ${result.stripeWebhookRouteContract.usesRawBodyAndStripeSignature}`);
+  lines.push(`constructEvent verification: ${result.stripeWebhookRouteContract.verifiesConstructEvent}`);
+  lines.push(`Avoids browser request guards: ${result.stripeWebhookRouteContract.avoidsBrowserRequestGuards}`);
+  lines.push(`No raw event/secret exposure: ${result.stripeWebhookRouteContract.doesNotExposeRawEventOrSecrets}`);
+  lines.push(`Normalizers valid: ${result.stripeWebhookRouteContract.normalizesChainPlanBooleanAndStatus}`);
+  lines.push(`Stripe object ID helpers valid: ${result.stripeWebhookRouteContract.derivesStripeObjectIdsSafely}`);
+  lines.push(`currentPeriodEnd helper valid: ${result.stripeWebhookRouteContract.extractsCurrentPeriodEndSafely}`);
+  lines.push(`Checkout sync valid: ${result.stripeWebhookRouteContract.checkoutCompletedSyncValid}`);
+  lines.push(`Checkout transaction/upsert valid: ${result.stripeWebhookRouteContract.checkoutSyncUsesTransactionAndUpsert}`);
+  lines.push(`Checkout metadata/custom fields valid: ${result.stripeWebhookRouteContract.checkoutSyncUsesMetadataAndCustomFields}`);
+  lines.push(`Subscription plan resolution valid: ${result.stripeWebhookRouteContract.subscriptionPlanResolutionValid}`);
+  lines.push(`Subscription update/delete sync valid: ${result.stripeWebhookRouteContract.subscriptionUpdateDeleteSyncValid}`);
+  lines.push(`Subscription binding valid: ${result.stripeWebhookRouteContract.subscriptionSyncUsesExistingBindingOrMetadata}`);
+  lines.push(`Subscription idempotent upsert valid: ${result.stripeWebhookRouteContract.subscriptionSyncUsesIdempotentUpsert}`);
+  lines.push(`Handles required events: ${result.stripeWebhookRouteContract.handlesRequiredEvents}`);
+  lines.push(`Deleted event forces inactive: ${result.stripeWebhookRouteContract.deletedEventForcesInactive}`);
+  lines.push(`Response codes safe: ${result.stripeWebhookRouteContract.returnsOkIgnoredOrErrorOnly}`);
+  lines.push(`Operational logging valid: ${result.stripeWebhookRouteContract.logsOperationalWarnings}`);
+  lines.push(`No advice/prediction copy: ${result.stripeWebhookRouteContract.noPublicAdviceOrPredictionCopy}`);
+  lines.push("");
   lines.push("## Stripe webhook readiness contract");
   lines.push("");
   lines.push(`Webhook route count: ${result.stripeWebhookReadinessContract.webhookRouteCount}`);
@@ -10723,6 +11035,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-050 Stripe Webhook Route Contract: verifies the implemented Stripe webhook route, including POST-only raw-body signature verification, safe secret access, no browser guards, checkout/session and subscription sync, idempotent DB upserts, deletion-to-inactive behavior, safe no-store JSON responses, operational logging, and no raw event/secret/advice exposure.");
   lines.push("- D-049 Stripe Webhook Readiness Contract: reports missing Stripe webhook as a launch warning during pre-implementation, and enforces POST-only raw-body signature verification, STRIPE_WEBHOOK_SECRET, no browser same-origin guard, DB subscription sync, idempotent upsert/update semantics, no-store responses, and no raw payload/secret exposure once a webhook route exists.");
   lines.push("- D-048 API Route Boundary Inventory Contract: inventories src/app/api route.ts files, classifies public read/browser mutation/authenticated file/webhook routes, blocks unclassified mutations, enforces origin/pre-auth/no-store on browser mutations, protects public read routes from private auth/billing/secrets/advice copy, and confirms authenticated file delivery uses API-key entitlement before storage reads.");
   lines.push("- D-047 Prisma Billing Data Model Contract: verifies Prisma datasource, paid-tier/status enums, Account/Subscription/ApiKey/CustomOutput models, Stripe uniqueness, entitlement fields, keyHash/keyPrefix persistence, cascade relations, indexes, table mappings, and no plaintext API-key secret fields.");
