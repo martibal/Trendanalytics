@@ -20,6 +20,7 @@ const prismaPackageDeploymentPath = path.join(root, "package.json");
 const prismaMigrationsDeploymentPath = path.join(root, "prisma", "migrations");
 const stripeWebhookEventMigrationPath = path.join(root, "prisma", "migrations", "20260608120000_add_stripe_webhook_events", "migration.sql");
 const stripeWebhookDeploymentRunbookPath = path.join(root, "docs", "stripe-webhook-deployment-runbook.md");
+const stripeWebhookOperationalVerificationPath = path.join(root, "docs", "stripe-webhook-operational-verification.md");
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -11023,6 +11024,146 @@ function evaluateStripeWebhookDeploymentRunbookContract(findings) {
 
   return result;
 }
+function evaluateStripeWebhookOperationalVerificationContract(findings) {
+  const result = {
+    checklistExists: fs.existsSync(stripeWebhookOperationalVerificationPath),
+
+    documentsPrerequisites: false,
+    documentsRequiredEvents: false,
+    documentsSignatureAcceptanceAndRejection: false,
+    documentsDatabaseEventVerification: false,
+    documentsSubscriptionStateVerification: false,
+    documentsReplayVerification: false,
+    documentsFailureRecoveryVerification: false,
+    documentsSecurityVerification: false,
+    documentsRollbackVerification: false,
+    documentsCompletionCriteria: false,
+    noLiteralStripeSecrets: false,
+    noAdviceOrForecastCopy: false,
+  };
+
+  if (!result.checklistExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-059",
+      "STRIPE_WEBHOOK_OPERATIONAL_VERIFICATION_MISSING",
+      path.relative(root, stripeWebhookOperationalVerificationPath),
+      "Stripe webhook operational verification checklist must exist before production launch."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(stripeWebhookOperationalVerificationPath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  result.documentsPrerequisites =
+    normalized.includes("Application code is deployed") &&
+    normalized.includes("Prisma Client was generated") &&
+    normalized.includes("Production database migration was applied") &&
+    normalized.includes("Stripe Dashboard webhook endpoint points to /api/v1/stripe/webhook") &&
+    normalized.includes("STRIPE_WEBHOOK_SECRET is set from that exact Stripe endpoint");
+
+  result.documentsRequiredEvents =
+    normalized.includes("checkout.session.completed") &&
+    normalized.includes("customer.subscription.updated") &&
+    normalized.includes("customer.subscription.deleted");
+
+  result.documentsSignatureAcceptanceAndRejection =
+    normalized.includes("safe 2xx acknowledgement") &&
+    normalized.includes("Invalid signatures must return a safe 4xx response") &&
+    normalized.includes("must not create subscription state");
+
+  result.documentsDatabaseEventVerification =
+    normalized.includes("one stripe_webhook_events row for the Stripe event id") &&
+    normalized.includes("stripe_event_id populated") &&
+    normalized.includes("event_type populated") &&
+    normalized.includes("status is processed or ignored") &&
+    normalized.includes("received_at populated") &&
+    normalized.includes("processed_at populated after handling");
+
+  result.documentsSubscriptionStateVerification =
+    normalized.includes("stripe_customer_id") &&
+    normalized.includes("stripe_subscription_id") &&
+    normalized.includes("tier") &&
+    normalized.includes("history_unlocked") &&
+    normalized.includes("entitled_chain when tier is basic") &&
+    normalized.includes("current_period_end when Stripe supplied it");
+
+  result.documentsReplayVerification =
+    normalized.includes("Replay the same Stripe event id") &&
+    normalized.includes("no duplicate stripe_webhook_events row is created") &&
+    normalized.includes("subscription state remains stable") &&
+    normalized.includes("duplicate event is treated as ignored");
+
+  result.documentsFailureRecoveryVerification =
+    normalized.includes("Force or observe a failing webhook event only in a controlled non-production environment") &&
+    normalized.includes("stripe_webhook_events row is marked failed") &&
+    normalized.includes("failed event can be replayed after the underlying issue is fixed") &&
+    normalized.includes("Stripe Dashboard failed-event replay");
+
+  result.documentsSecurityVerification =
+    normalized.includes("STRIPE_SECRET_KEY") &&
+    normalized.includes("STRIPE_WEBHOOK_SECRET") &&
+    normalized.includes("sk_live_") &&
+    normalized.includes("rk_live_") &&
+    normalized.includes("whsec_") &&
+    normalized.includes("raw Stripe event JSON");
+
+  result.documentsRollbackVerification =
+    normalized.includes("stop live checkout traffic if subscription sync cannot be trusted") &&
+    normalized.includes("keep failed Stripe events available for later replay") &&
+    normalized.includes("do not delete Stripe webhook event history");
+
+  result.documentsCompletionCriteria =
+    normalized.includes("valid signed events are accepted") &&
+    normalized.includes("invalid signatures are rejected") &&
+    normalized.includes("checkout completion creates or updates local subscription state") &&
+    normalized.includes("subscription update changes local subscription state") &&
+    normalized.includes("subscription deletion marks local subscription state inactive") &&
+    normalized.includes("duplicate event id is safely ignored") &&
+    normalized.includes("failed events are observable and replayable") &&
+    normalized.includes("logs and responses expose no secrets or raw payloads");
+
+  result.noLiteralStripeSecrets =
+    !/sk_live_[A-Za-z0-9]{8,}/u.test(normalized) &&
+    !/rk_live_[A-Za-z0-9]{8,}/u.test(normalized) &&
+    !/whsec_[A-Za-z0-9]{8,}/u.test(normalized);
+
+  result.noAdviceOrForecastCopy =
+    !/\b(?:buy|sell|hold|forecast|prediction|price target|investment advice|financial advice|should invest|expected return)\b/iu.test(normalized);
+
+  const requiredChecks = [
+    ["STRIPE_WEBHOOK_VERIFICATION_PREREQS_INVALID", result.documentsPrerequisites, "Operational checklist must document deployment, Prisma Client, DB migration, endpoint, and endpoint-specific webhook secret prerequisites."],
+    ["STRIPE_WEBHOOK_VERIFICATION_EVENTS_INVALID", result.documentsRequiredEvents, "Operational checklist must document required Stripe event delivery tests."],
+    ["STRIPE_WEBHOOK_VERIFICATION_SIGNATURES_INVALID", result.documentsSignatureAcceptanceAndRejection, "Operational checklist must document valid signature acceptance and invalid signature rejection."],
+    ["STRIPE_WEBHOOK_VERIFICATION_EVENT_DB_INVALID", result.documentsDatabaseEventVerification, "Operational checklist must document stripe_webhook_events DB verification."],
+    ["STRIPE_WEBHOOK_VERIFICATION_SUBSCRIPTION_DB_INVALID", result.documentsSubscriptionStateVerification, "Operational checklist must document local subscription state verification."],
+    ["STRIPE_WEBHOOK_VERIFICATION_REPLAY_INVALID", result.documentsReplayVerification, "Operational checklist must document duplicate/replay verification."],
+    ["STRIPE_WEBHOOK_VERIFICATION_FAILURE_RECOVERY_INVALID", result.documentsFailureRecoveryVerification, "Operational checklist must document controlled failure and replay recovery verification."],
+    ["STRIPE_WEBHOOK_VERIFICATION_SECURITY_INVALID", result.documentsSecurityVerification, "Operational checklist must document response/log secret and raw-payload checks."],
+    ["STRIPE_WEBHOOK_VERIFICATION_ROLLBACK_INVALID", result.documentsRollbackVerification, "Operational checklist must document rollback behavior."],
+    ["STRIPE_WEBHOOK_VERIFICATION_COMPLETION_INVALID", result.documentsCompletionCriteria, "Operational checklist must define completion criteria."],
+    ["STRIPE_WEBHOOK_VERIFICATION_SECRET_EXPOSURE_RISK", result.noLiteralStripeSecrets, "Operational checklist must not contain literal live/restricted Stripe keys or whsec values."],
+    ["STRIPE_WEBHOOK_VERIFICATION_ADVICE_COPY_RISK", result.noAdviceOrForecastCopy, "Operational checklist must not contain advice/forecast copy."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-059",
+        code,
+        path.relative(root, stripeWebhookOperationalVerificationPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -11086,6 +11227,7 @@ function evaluate() {
   const prismaDbDeploymentContract = evaluatePrismaDbDeploymentContract(findings);
   const stripeWebhookEventMigrationRequiredContract = evaluateStripeWebhookEventMigrationRequiredContract(findings);
   const stripeWebhookDeploymentRunbookContract = evaluateStripeWebhookDeploymentRunbookContract(findings);
+  const stripeWebhookOperationalVerificationContract = evaluateStripeWebhookOperationalVerificationContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -11145,6 +11287,7 @@ function evaluate() {
     prismaDbDeploymentContract,
     stripeWebhookEventMigrationRequiredContract,
     stripeWebhookDeploymentRunbookContract,
+    stripeWebhookOperationalVerificationContract,
     findings,
   };
 }
@@ -11204,6 +11347,22 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Stripe webhook operational verification contract");
+  lines.push("");
+  lines.push(`Checklist exists: ${result.stripeWebhookOperationalVerificationContract.checklistExists}`);
+  lines.push(`Documents prerequisites: ${result.stripeWebhookOperationalVerificationContract.documentsPrerequisites}`);
+  lines.push(`Documents required events: ${result.stripeWebhookOperationalVerificationContract.documentsRequiredEvents}`);
+  lines.push(`Documents signature acceptance/rejection: ${result.stripeWebhookOperationalVerificationContract.documentsSignatureAcceptanceAndRejection}`);
+  lines.push(`Documents DB event verification: ${result.stripeWebhookOperationalVerificationContract.documentsDatabaseEventVerification}`);
+  lines.push(`Documents subscription state verification: ${result.stripeWebhookOperationalVerificationContract.documentsSubscriptionStateVerification}`);
+  lines.push(`Documents replay verification: ${result.stripeWebhookOperationalVerificationContract.documentsReplayVerification}`);
+  lines.push(`Documents failure recovery verification: ${result.stripeWebhookOperationalVerificationContract.documentsFailureRecoveryVerification}`);
+  lines.push(`Documents security verification: ${result.stripeWebhookOperationalVerificationContract.documentsSecurityVerification}`);
+  lines.push(`Documents rollback verification: ${result.stripeWebhookOperationalVerificationContract.documentsRollbackVerification}`);
+  lines.push(`Documents completion criteria: ${result.stripeWebhookOperationalVerificationContract.documentsCompletionCriteria}`);
+  lines.push(`No literal Stripe secrets: ${result.stripeWebhookOperationalVerificationContract.noLiteralStripeSecrets}`);
+  lines.push(`No advice/forecast copy: ${result.stripeWebhookOperationalVerificationContract.noAdviceOrForecastCopy}`);
+  lines.push("");
   lines.push("## Stripe webhook deployment runbook contract");
   lines.push("");
   lines.push(`Runbook exists: ${result.stripeWebhookDeploymentRunbookContract.runbookExists}`);
@@ -12236,6 +12395,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-059 Stripe Webhook Operational Verification Contract: requires a committed operational verification checklist for Stripe webhook production validation, including prerequisites, event delivery tests, valid/invalid signature behavior, stripe_webhook_events DB checks, subscription state checks, duplicate replay checks, failure/recovery replay, rollback behavior, completion criteria, and no literal secret/advice copy.");
   lines.push("- D-058 Stripe Webhook Deployment Runbook Contract: requires a committed deployment runbook for Stripe webhook production setup, including endpoint path, required events, env vars, live/test boundary, webhook secret source, DB migration requirement, migration path, Prisma generate vs DB migration distinction, deployment sequence, replay handling, failure handling, and no secret/advice copy.");
   lines.push("- D-057 Stripe Webhook Event Migration Required Contract: hard-requires the committed stripe_webhook_events migration to match Prisma schema, including StripeWebhookEventStatus, table columns, unique stripe_event_id, replay indexes, UUID/timestamptz field types, IF NOT EXISTS safety, schema mapping parity, and no literal Stripe secrets.");
   lines.push("- D-055 Prisma DB Deployment Contract: distinguishes Prisma Client generation from database deployment, verifies build/postinstall generate Prisma Client, blocks implicit db push/migrate deploy inside build, verifies PostgreSQL DATABASE_URL/DIRECT_URL datasource, checks StripeWebhookEvent schema/table mapping, and reports missing migration SQL as an explicit production deployment warning.");
