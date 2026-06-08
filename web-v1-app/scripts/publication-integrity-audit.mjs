@@ -13,6 +13,8 @@ const stripeWebhookRoutePath = path.join(root, "src", "app", "api", "v1", "strip
 const checkoutRoutePathForWebhookCoupling = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
 const stripeWebhookRoutePathForCoupling = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
 const stripeBillingEnvContractFiles = [path.join(root, ".env.example"), path.join(repoRoot, ".env.example")];
+const stripeWebhookReplaySchemaPath = path.join(root, "prisma", "schema.prisma");
+const stripeWebhookReplayRoutePath = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -10304,6 +10306,226 @@ function evaluateStripeBillingEnvContract(findings) {
 
   return result;
 }
+function getOptionalPrismaModelBlock(schemaSource, modelName) {
+  const match = schemaSource.match(new RegExp(`model\\s+${modelName}\\s+\\{[\\s\\S]*?\\n\\}`, "u"));
+  return match ? match[0] : "";
+}
+
+function getOptionalPrismaEnumBlock(schemaSource, enumName) {
+  const match = schemaSource.match(new RegExp(`enum\\s+${enumName}\\s+\\{[\\s\\S]*?\\n\\}`, "u"));
+  return match ? match[0] : "";
+}
+
+function evaluateStripeWebhookReplayIdempotencyContract(findings) {
+  const result = {
+    schemaExists: fs.existsSync(stripeWebhookReplaySchemaPath),
+    webhookRouteExists: fs.existsSync(stripeWebhookReplayRoutePath),
+
+    replayPersistenceImplemented: false,
+    replayPersistenceLaunchGap: false,
+    replayPersistencePartiallyImplemented: false,
+
+    schemaHasStripeWebhookEventModel: false,
+    schemaHasWebhookEventStatusEnum: false,
+    schemaHasUniqueStripeEventId: false,
+    schemaHasEventTypeStatusTimestamps: false,
+    schemaHasReplayIndexesAndMapping: false,
+
+    routeReadsStripeEventId: false,
+    routeUsesWebhookEventPersistence: false,
+    routeChecksOrCreatesEventBeforeProcessing: false,
+    routeHandlesDuplicateEventsAsIgnored: false,
+    routeMarksProcessedIgnoredFailed: false,
+    routeKeepsStateSyncIdempotent: false,
+    routeDoesNotExposeEventPayload: false,
+  };
+
+  if (!result.schemaExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-053",
+      "STRIPE_WEBHOOK_REPLAY_SCHEMA_MISSING",
+      path.relative(root, stripeWebhookReplaySchemaPath),
+      "Prisma schema is missing; cannot evaluate Stripe webhook replay/idempotency persistence."
+    );
+
+    return result;
+  }
+
+  if (!result.webhookRouteExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-053",
+      "STRIPE_WEBHOOK_REPLAY_ROUTE_MISSING",
+      path.relative(root, stripeWebhookReplayRoutePath),
+      "Stripe webhook route is missing; cannot evaluate replay/idempotency persistence."
+    );
+
+    return result;
+  }
+
+  const schema = fs.readFileSync(stripeWebhookReplaySchemaPath, "utf8").replace(/^\uFEFF/u, "").replace(/\r\n/gu, "\n");
+  const route = fs.readFileSync(stripeWebhookReplayRoutePath, "utf8").replace(/^\uFEFF/u, "").replace(/\r\n/gu, "\n");
+
+  const model = getOptionalPrismaModelBlock(schema, "StripeWebhookEvent");
+  const statusEnum = getOptionalPrismaEnumBlock(schema, "StripeWebhookEventStatus");
+
+  result.schemaHasStripeWebhookEventModel = model.length > 0;
+
+  result.schemaHasWebhookEventStatusEnum =
+    statusEnum.includes("processing") &&
+    statusEnum.includes("processed") &&
+    statusEnum.includes("ignored") &&
+    statusEnum.includes("failed");
+
+  result.schemaHasUniqueStripeEventId =
+    model.includes("stripeEventId") &&
+    model.includes("@unique") &&
+    model.includes('@map("stripe_event_id")');
+
+  result.schemaHasEventTypeStatusTimestamps =
+    model.includes("eventType") &&
+    model.includes('@map("event_type")') &&
+    model.includes("status") &&
+    model.includes("StripeWebhookEventStatus") &&
+    model.includes("receivedAt") &&
+    model.includes('@map("received_at")') &&
+    model.includes("@db.Timestamptz(6)") &&
+    model.includes("processedAt") &&
+    model.includes('@map("processed_at")') &&
+    model.includes("errorCode") &&
+    model.includes('@map("error_code")');
+
+  result.schemaHasReplayIndexesAndMapping =
+    model.includes('@@index([eventType]') &&
+    model.includes('@@index([status]') &&
+    model.includes('@@index([receivedAt]') &&
+    model.includes('@@map("stripe_webhook_events")');
+
+  result.routeReadsStripeEventId =
+    route.includes("event.id") ||
+    route.includes("stripeEventId");
+
+  result.routeUsesWebhookEventPersistence =
+    route.includes("stripeWebhookEvent") ||
+    route.includes("StripeWebhookEventStatus");
+
+  result.routeChecksOrCreatesEventBeforeProcessing =
+    result.routeUsesWebhookEventPersistence &&
+    (
+      route.includes("stripeWebhookEvent.create") ||
+      route.includes("stripeWebhookEvent.upsert") ||
+      route.includes("stripeWebhookEvent.findUnique") ||
+      route.includes("stripeWebhookEvent.findFirst")
+    ) &&
+    route.indexOf("stripeWebhookEvent") >= 0 &&
+    route.indexOf("handleVerifiedEvent") >= 0 &&
+    route.indexOf("stripeWebhookEvent") < route.indexOf("handleVerifiedEvent");
+
+  result.routeHandlesDuplicateEventsAsIgnored =
+    result.routeUsesWebhookEventPersistence &&
+    (
+      route.includes("P2002") ||
+      route.includes("duplicate") ||
+      route.includes("already processed") ||
+      route.includes('"ignored"')
+    );
+
+  result.routeMarksProcessedIgnoredFailed =
+    result.routeUsesWebhookEventPersistence &&
+    route.includes("processed") &&
+    route.includes("ignored") &&
+    route.includes("failed") &&
+    (
+      route.includes("stripeWebhookEvent.update") ||
+      route.includes("stripeWebhookEvent.updateMany") ||
+      route.includes("stripeWebhookEvent.upsert")
+    );
+
+  result.routeKeepsStateSyncIdempotent =
+    route.includes("tx.subscription.upsert") &&
+    route.includes("stripeCustomerId") &&
+    route.includes("stripeSubscriptionId") &&
+    route.includes("update: {") &&
+    route.includes("create: {");
+
+  result.routeDoesNotExposeEventPayload =
+    !route.includes("return NextResponse.json(event") &&
+    !route.includes("return Response.json(event") &&
+    !route.includes("return jsonResponse(200, result, payload") &&
+    !route.includes("payload,");
+
+  result.replayPersistenceImplemented =
+    result.schemaHasStripeWebhookEventModel &&
+    result.schemaHasWebhookEventStatusEnum &&
+    result.schemaHasUniqueStripeEventId &&
+    result.schemaHasEventTypeStatusTimestamps &&
+    result.schemaHasReplayIndexesAndMapping &&
+    result.routeReadsStripeEventId &&
+    result.routeUsesWebhookEventPersistence &&
+    result.routeChecksOrCreatesEventBeforeProcessing &&
+    result.routeHandlesDuplicateEventsAsIgnored &&
+    result.routeMarksProcessedIgnoredFailed &&
+    result.routeKeepsStateSyncIdempotent &&
+    result.routeDoesNotExposeEventPayload;
+
+  result.replayPersistencePartiallyImplemented =
+    !result.replayPersistenceImplemented &&
+    (
+      result.schemaHasStripeWebhookEventModel ||
+      result.schemaHasWebhookEventStatusEnum ||
+      result.routeUsesWebhookEventPersistence
+    );
+
+  result.replayPersistenceLaunchGap =
+    !result.replayPersistenceImplemented &&
+    !result.replayPersistencePartiallyImplemented;
+
+  if (result.replayPersistenceLaunchGap) {
+    addFinding(
+      findings,
+      "warn",
+      "D-053",
+      "STRIPE_WEBHOOK_EVENT_REPLAY_PERSISTENCE_NOT_IMPLEMENTED",
+      `${path.relative(root, stripeWebhookReplaySchemaPath)} + ${path.relative(root, stripeWebhookReplayRoutePath)}`,
+      "Webhook state sync is idempotent by subscription upsert, but event-level replay persistence keyed by Stripe event.id is not implemented yet. Launch may proceed only if this risk is accepted, or close it with a StripeWebhookEvent model and route-level duplicate handling."
+    );
+
+    return result;
+  }
+
+  const requiredChecks = [
+    ["STRIPE_WEBHOOK_EVENT_MODEL_MISSING", result.schemaHasStripeWebhookEventModel, "Prisma schema must define StripeWebhookEvent once replay persistence starts."],
+    ["STRIPE_WEBHOOK_EVENT_STATUS_ENUM_INVALID", result.schemaHasWebhookEventStatusEnum, "StripeWebhookEventStatus enum must include processing/processed/ignored/failed."],
+    ["STRIPE_WEBHOOK_EVENT_ID_UNIQUE_INVALID", result.schemaHasUniqueStripeEventId, "StripeWebhookEvent must uniquely persist stripeEventId mapped to stripe_event_id."],
+    ["STRIPE_WEBHOOK_EVENT_FIELDS_INVALID", result.schemaHasEventTypeStatusTimestamps, "StripeWebhookEvent must persist eventType, status, receivedAt, processedAt, and errorCode with DB mappings."],
+    ["STRIPE_WEBHOOK_EVENT_INDEXES_INVALID", result.schemaHasReplayIndexesAndMapping, "StripeWebhookEvent must index eventType/status/receivedAt and map to stripe_webhook_events."],
+    ["STRIPE_WEBHOOK_ROUTE_EVENT_ID_MISSING", result.routeReadsStripeEventId, "Webhook route must read Stripe event.id for replay persistence."],
+    ["STRIPE_WEBHOOK_ROUTE_EVENT_STORE_MISSING", result.routeUsesWebhookEventPersistence, "Webhook route must use stripeWebhookEvent persistence once replay persistence starts."],
+    ["STRIPE_WEBHOOK_ROUTE_PREPROCESS_DEDUPE_INVALID", result.routeChecksOrCreatesEventBeforeProcessing, "Webhook route must create/check event persistence before business processing."],
+    ["STRIPE_WEBHOOK_ROUTE_DUPLICATE_HANDLING_INVALID", result.routeHandlesDuplicateEventsAsIgnored, "Webhook route must treat duplicate/replayed events as ignored/successful acknowledgements."],
+    ["STRIPE_WEBHOOK_ROUTE_EVENT_STATUS_UPDATE_INVALID", result.routeMarksProcessedIgnoredFailed, "Webhook route must mark event persistence as processed/ignored/failed."],
+    ["STRIPE_WEBHOOK_ROUTE_STATE_IDEMPOTENCY_INVALID", result.routeKeepsStateSyncIdempotent, "Webhook route must retain idempotent subscription upsert state sync."],
+    ["STRIPE_WEBHOOK_ROUTE_EVENT_PAYLOAD_EXPOSURE_RISK", result.routeDoesNotExposeEventPayload, "Webhook route must not expose raw event payloads."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-053",
+        code,
+        `${path.relative(root, stripeWebhookReplaySchemaPath)} + ${path.relative(root, stripeWebhookReplayRoutePath)}`,
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -10363,6 +10585,7 @@ function evaluate() {
   const stripeWebhookRouteContract = evaluateStripeWebhookRouteContract(findings);
   const checkoutWebhookMetadataCouplingContract = evaluateCheckoutWebhookMetadataCouplingContract(findings);
   const stripeBillingEnvContract = evaluateStripeBillingEnvContract(findings);
+  const stripeWebhookReplayIdempotencyContract = evaluateStripeWebhookReplayIdempotencyContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -10418,6 +10641,7 @@ function evaluate() {
     stripeWebhookRouteContract,
     checkoutWebhookMetadataCouplingContract,
     stripeBillingEnvContract,
+    stripeWebhookReplayIdempotencyContract,
     findings,
   };
 }
@@ -10477,6 +10701,27 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Stripe webhook replay idempotency contract");
+  lines.push("");
+  lines.push(`Schema exists: ${result.stripeWebhookReplayIdempotencyContract.schemaExists}`);
+  lines.push(`Webhook route exists: ${result.stripeWebhookReplayIdempotencyContract.webhookRouteExists}`);
+  lines.push(`Replay persistence implemented: ${result.stripeWebhookReplayIdempotencyContract.replayPersistenceImplemented}`);
+  lines.push(`Replay persistence launch gap: ${result.stripeWebhookReplayIdempotencyContract.replayPersistenceLaunchGap}`);
+  lines.push(`Replay persistence partially implemented: ${result.stripeWebhookReplayIdempotencyContract.replayPersistencePartiallyImplemented}`);
+  lines.push(`Schema has StripeWebhookEvent model: ${result.stripeWebhookReplayIdempotencyContract.schemaHasStripeWebhookEventModel}`);
+  lines.push(`Schema has status enum: ${result.stripeWebhookReplayIdempotencyContract.schemaHasWebhookEventStatusEnum}`);
+  lines.push(`Schema has unique stripeEventId: ${result.stripeWebhookReplayIdempotencyContract.schemaHasUniqueStripeEventId}`);
+  lines.push(`Schema has event/status/timestamps: ${result.stripeWebhookReplayIdempotencyContract.schemaHasEventTypeStatusTimestamps}`);
+  lines.push(`Schema has replay indexes/mapping: ${result.stripeWebhookReplayIdempotencyContract.schemaHasReplayIndexesAndMapping}`);
+  lines.push(`Route reads Stripe event.id: ${result.stripeWebhookReplayIdempotencyContract.routeReadsStripeEventId}`);
+  lines.push(`Route uses event persistence: ${result.stripeWebhookReplayIdempotencyContract.routeUsesWebhookEventPersistence}`);
+  lines.push(`Route creates/checks event before processing: ${result.stripeWebhookReplayIdempotencyContract.routeChecksOrCreatesEventBeforeProcessing}`);
+  lines.push(`Route handles duplicates as ignored: ${result.stripeWebhookReplayIdempotencyContract.routeHandlesDuplicateEventsAsIgnored}`);
+  lines.push(`Route marks processed/ignored/failed: ${result.stripeWebhookReplayIdempotencyContract.routeMarksProcessedIgnoredFailed}`);
+  lines.push(`Route state sync remains idempotent: ${result.stripeWebhookReplayIdempotencyContract.routeKeepsStateSyncIdempotent}`);
+  lines.push(`Route avoids raw event payload exposure: ${result.stripeWebhookReplayIdempotencyContract.routeDoesNotExposeEventPayload}`);
+  lines.push("D-053 launch note: missing event-level replay persistence is currently a warning unless schema/route persistence is partially implemented; partial implementations fail until complete.");
+  lines.push("");
   lines.push("## Stripe billing environment contract");
   lines.push("");
   lines.push(`Env documentation file count: ${result.stripeBillingEnvContract.envDocumentationFileCount}`);
@@ -11434,6 +11679,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-053 Stripe Webhook Replay Idempotency Contract: reports event-level Stripe webhook replay persistence as a warning when absent, and hard-fails partial implementations unless a StripeWebhookEvent model, unique stripeEventId, processing/processed/ignored/failed status, duplicate handling, event status updates, idempotent state upserts, and raw payload protection are complete.");
   lines.push("- D-052 Stripe Billing Environment Contract: verifies Stripe billing runtime environment documentation and route references for STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_BASIC, STRIPE_PRICE_PRO, app URL sources, live/test boundary, no literal Stripe live/webhook secrets in env docs, checkout production live-key guard, and webhook fail-closed behavior.");
   lines.push("- D-051 Checkout Webhook Metadata Coupling Contract: verifies checkout metadata emitted to Stripe matches webhook parsing and subscription sync, including checkout_plan/account_id/auth_provider_user_id/entitled_chain/history_unlocked, client_reference_id, basic entitled-chain custom field, customer reuse, price fallbacks, entitlement field sync, and no secret/raw payload/advice exposure across the coupled routes.");
   lines.push("- D-050 Stripe Webhook Route Contract: verifies the implemented Stripe webhook route, including POST-only raw-body signature verification, safe secret access, no browser guards, checkout/session and subscription sync, idempotent DB upserts, deletion-to-inactive behavior, safe no-store JSON responses, operational logging, and no raw event/secret/advice exposure.");
