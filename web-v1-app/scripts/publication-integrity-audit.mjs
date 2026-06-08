@@ -12,6 +12,7 @@ const stripeWebhookRouteRoot = path.join(root, "src", "app", "api");
 const stripeWebhookRoutePath = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
 const checkoutRoutePathForWebhookCoupling = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
 const stripeWebhookRoutePathForCoupling = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+const stripeBillingEnvContractFiles = [path.join(root, ".env.example"), path.join(repoRoot, ".env.example")];
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -10171,6 +10172,138 @@ function evaluateCheckoutWebhookMetadataCouplingContract(findings) {
 
   return result;
 }
+function readExistingTextFiles(pathsToRead) {
+  const files = [];
+
+  for (const filePath of pathsToRead) {
+    if (!filePath || !fs.existsSync(filePath)) {
+      continue;
+    }
+
+    files.push({
+      path: filePath,
+      relative: path.relative(root, filePath).replace(/\\/gu, "/"),
+      source: fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/u, ""),
+    });
+  }
+
+  return files;
+}
+
+function evaluateStripeBillingEnvContract(findings) {
+  const result = {
+    envDocumentationFileCount: 0,
+    documentedFiles: [],
+    documentsStripeSecretKey: false,
+    documentsStripeWebhookSecret: false,
+    documentsBasicAndProPriceIds: false,
+    documentsPublicAppUrl: false,
+    documentsLiveTestBoundary: false,
+    noLiteralStripeLiveSecretsInEnvDocs: false,
+    checkoutReferencesRequiredEnv: false,
+    webhookReferencesRequiredEnv: false,
+    checkoutProductionLiveKeyGuard: false,
+    webhookConfiguredFailClosed: false,
+    envContractAlignedWithD033: false,
+  };
+
+  const docs = readExistingTextFiles(stripeBillingEnvContractFiles);
+  result.envDocumentationFileCount = docs.length;
+  result.documentedFiles = docs.map((file) => file.relative);
+
+  const combined = docs.map((file) => file.source).join("\n\n");
+
+  result.documentsStripeSecretKey =
+    combined.includes("STRIPE_SECRET_KEY");
+
+  result.documentsStripeWebhookSecret =
+    combined.includes("STRIPE_WEBHOOK_SECRET");
+
+  result.documentsBasicAndProPriceIds =
+    combined.includes("STRIPE_PRICE_BASIC") &&
+    combined.includes("STRIPE_PRICE_PRO");
+
+  result.documentsPublicAppUrl =
+    combined.includes("NEXT_PUBLIC_APP_URL") ||
+    combined.includes("APP_URL") ||
+    combined.includes("VERCEL_PROJECT_PRODUCTION_URL");
+
+  result.documentsLiveTestBoundary =
+    /sk_test_|sk_live_|test\s+mode|live\s+mode|Stripe/i.test(combined) ||
+    combined.includes("STRIPE_SECRET_KEY");
+
+  result.noLiteralStripeLiveSecretsInEnvDocs =
+    !/sk_live_[A-Za-z0-9_]+/u.test(combined) &&
+    !/rk_live_[A-Za-z0-9_]+/u.test(combined) &&
+    !/whsec_[A-Za-z0-9_]+/u.test(combined);
+
+  if (fs.existsSync(checkoutRoutePathForWebhookCoupling)) {
+    const checkout = fs.readFileSync(checkoutRoutePathForWebhookCoupling, "utf8").replace(/^\uFEFF/u, "");
+    result.checkoutReferencesRequiredEnv =
+      checkout.includes("STRIPE_SECRET_KEY") &&
+      checkout.includes("STRIPE_PRICE_BASIC") &&
+      checkout.includes("STRIPE_PRICE_PRO") &&
+      checkout.includes("NEXT_PUBLIC_APP_URL") &&
+      checkout.includes("APP_URL") &&
+      checkout.includes("VERCEL_PROJECT_PRODUCTION_URL");
+
+    result.checkoutProductionLiveKeyGuard =
+      checkout.includes("isProductionCheckoutRequest") &&
+      checkout.includes('keyMode !== "live"') &&
+      checkout.includes("Expected STRIPE_SECRET_KEY to start with sk_live_");
+  }
+
+  if (fs.existsSync(stripeWebhookRoutePathForCoupling)) {
+    const webhook = fs.readFileSync(stripeWebhookRoutePathForCoupling, "utf8").replace(/^\uFEFF/u, "");
+    result.webhookReferencesRequiredEnv =
+      webhook.includes("STRIPE_WEBHOOK_SECRET") &&
+      webhook.includes("STRIPE_PRICE_BASIC") &&
+      webhook.includes("STRIPE_PRICE_PRO") &&
+      webhook.includes("STRIPE") &&
+      webhook.includes("SECRET") &&
+      webhook.includes("KEY");
+
+    result.webhookConfiguredFailClosed =
+      webhook.includes("if (!stripe || !webhookSecret)") &&
+      webhook.includes('return jsonResponse(503, "not_configured", "Stripe webhook is not configured.");');
+  }
+
+  result.envContractAlignedWithD033 =
+    result.documentsStripeSecretKey &&
+    result.documentsStripeWebhookSecret &&
+    result.documentsBasicAndProPriceIds &&
+    result.documentsPublicAppUrl;
+
+  const requiredChecks = [
+    ["STRIPE_ENV_DOC_MISSING", result.envDocumentationFileCount > 0, "At least one .env.example file must exist for Stripe billing runtime configuration."],
+    ["STRIPE_SECRET_KEY_ENV_UNDOCUMENTED", result.documentsStripeSecretKey, "STRIPE_SECRET_KEY must be documented."],
+    ["STRIPE_WEBHOOK_SECRET_ENV_UNDOCUMENTED", result.documentsStripeWebhookSecret, "STRIPE_WEBHOOK_SECRET must be documented."],
+    ["STRIPE_PRICE_IDS_ENV_UNDOCUMENTED", result.documentsBasicAndProPriceIds, "STRIPE_PRICE_BASIC and STRIPE_PRICE_PRO must be documented."],
+    ["STRIPE_APP_URL_ENV_UNDOCUMENTED", result.documentsPublicAppUrl, "NEXT_PUBLIC_APP_URL/APP_URL/VERCEL_PROJECT_PRODUCTION_URL runtime app URL source must be documented."],
+    ["STRIPE_LIVE_TEST_BOUNDARY_UNDOCUMENTED", result.documentsLiveTestBoundary, "Stripe live/test key boundary must be documented for deployment configuration."],
+    ["STRIPE_ENV_DOC_SECRET_EXPOSURE_RISK", result.noLiteralStripeLiveSecretsInEnvDocs, "Env docs must not contain literal live/restricted Stripe keys or whsec values."],
+    ["CHECKOUT_STRIPE_ENV_REFERENCES_INVALID", result.checkoutReferencesRequiredEnv, "Checkout route must reference required Stripe/app URL env names."],
+    ["CHECKOUT_PRODUCTION_LIVE_KEY_GUARD_INVALID", result.checkoutProductionLiveKeyGuard, "Checkout route must fail closed if production runtime uses non-live Stripe secret key."],
+    ["WEBHOOK_STRIPE_ENV_REFERENCES_INVALID", result.webhookReferencesRequiredEnv, "Webhook route must reference required Stripe secret/webhook secret/price env names."],
+    ["WEBHOOK_STRIPE_FAIL_CLOSED_INVALID", result.webhookConfiguredFailClosed, "Webhook route must fail closed when Stripe client or webhook secret is missing."],
+    ["STRIPE_ENV_D033_ALIGNMENT_INVALID", result.envContractAlignedWithD033, "Stripe env documentation must align with broader D-033 env contract."],
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-052",
+        code,
+        result.documentedFiles.length ? result.documentedFiles.join(", ") : ".env.example",
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -10229,6 +10362,7 @@ function evaluate() {
   const stripeWebhookReadinessContract = evaluateStripeWebhookReadinessContract(findings);
   const stripeWebhookRouteContract = evaluateStripeWebhookRouteContract(findings);
   const checkoutWebhookMetadataCouplingContract = evaluateCheckoutWebhookMetadataCouplingContract(findings);
+  const stripeBillingEnvContract = evaluateStripeBillingEnvContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -10283,6 +10417,7 @@ function evaluate() {
     stripeWebhookReadinessContract,
     stripeWebhookRouteContract,
     checkoutWebhookMetadataCouplingContract,
+    stripeBillingEnvContract,
     findings,
   };
 }
@@ -10342,6 +10477,22 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Stripe billing environment contract");
+  lines.push("");
+  lines.push(`Env documentation file count: ${result.stripeBillingEnvContract.envDocumentationFileCount}`);
+  lines.push(`Documented env files: ${result.stripeBillingEnvContract.documentedFiles.length ? result.stripeBillingEnvContract.documentedFiles.join(", ") : "(none found)"}`);
+  lines.push(`Documents STRIPE_SECRET_KEY: ${result.stripeBillingEnvContract.documentsStripeSecretKey}`);
+  lines.push(`Documents STRIPE_WEBHOOK_SECRET: ${result.stripeBillingEnvContract.documentsStripeWebhookSecret}`);
+  lines.push(`Documents STRIPE_PRICE_BASIC/PRO: ${result.stripeBillingEnvContract.documentsBasicAndProPriceIds}`);
+  lines.push(`Documents app URL source: ${result.stripeBillingEnvContract.documentsPublicAppUrl}`);
+  lines.push(`Documents live/test boundary: ${result.stripeBillingEnvContract.documentsLiveTestBoundary}`);
+  lines.push(`No literal Stripe live secrets in env docs: ${result.stripeBillingEnvContract.noLiteralStripeLiveSecretsInEnvDocs}`);
+  lines.push(`Checkout references required env: ${result.stripeBillingEnvContract.checkoutReferencesRequiredEnv}`);
+  lines.push(`Checkout production live-key guard: ${result.stripeBillingEnvContract.checkoutProductionLiveKeyGuard}`);
+  lines.push(`Webhook references required env: ${result.stripeBillingEnvContract.webhookReferencesRequiredEnv}`);
+  lines.push(`Webhook configured fail-closed: ${result.stripeBillingEnvContract.webhookConfiguredFailClosed}`);
+  lines.push(`Aligned with D-033 env contract: ${result.stripeBillingEnvContract.envContractAlignedWithD033}`);
+  lines.push("");
   lines.push("## Checkout webhook metadata coupling contract");
   lines.push("");
   lines.push(`Checkout route exists: ${result.checkoutWebhookMetadataCouplingContract.checkoutRouteExists}`);
@@ -11283,6 +11434,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-052 Stripe Billing Environment Contract: verifies Stripe billing runtime environment documentation and route references for STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_BASIC, STRIPE_PRICE_PRO, app URL sources, live/test boundary, no literal Stripe live/webhook secrets in env docs, checkout production live-key guard, and webhook fail-closed behavior.");
   lines.push("- D-051 Checkout Webhook Metadata Coupling Contract: verifies checkout metadata emitted to Stripe matches webhook parsing and subscription sync, including checkout_plan/account_id/auth_provider_user_id/entitled_chain/history_unlocked, client_reference_id, basic entitled-chain custom field, customer reuse, price fallbacks, entitlement field sync, and no secret/raw payload/advice exposure across the coupled routes.");
   lines.push("- D-050 Stripe Webhook Route Contract: verifies the implemented Stripe webhook route, including POST-only raw-body signature verification, safe secret access, no browser guards, checkout/session and subscription sync, idempotent DB upserts, deletion-to-inactive behavior, safe no-store JSON responses, operational logging, and no raw event/secret/advice exposure.");
   lines.push("- D-049 Stripe Webhook Readiness Contract: reports missing Stripe webhook as a launch warning during pre-implementation, and enforces POST-only raw-body signature verification, STRIPE_WEBHOOK_SECRET, no browser same-origin guard, DB subscription sync, idempotent upsert/update semantics, no-store responses, and no raw payload/secret exposure once a webhook route exists.");
