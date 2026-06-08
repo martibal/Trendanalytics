@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
 const authenticatedFileRoutePath = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
@@ -8978,6 +8979,165 @@ function evaluateApiKeyPersistenceHelperContract(findings) {
 
   return result;
 }
+function getPrismaBlock(schemaSource, blockType, blockName) {
+  const match = schemaSource.match(new RegExp(`${blockType}\\s+${blockName}\\s+\\{[\\s\\S]*?\\n\\}`, "u"));
+  return match ? match[0] : "";
+}
+
+function evaluatePrismaBillingDataModelContract(findings) {
+  const result = {
+    schemaExists: fs.existsSync(prismaBillingSchemaPath),
+    generatorAndDatasourceValid: false,
+    enumsValid: false,
+    accountValid: false,
+    subscriptionValid: false,
+    apiKeyValid: false,
+    customOutputValid: false,
+    relationsCascadeValid: false,
+    indexesValid: false,
+    mappingsValid: false,
+    noPlaintextApiKeySecret: false,
+    noPersistedPublicTier: false,
+  };
+
+  if (!result.schemaExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-047",
+      "PRISMA_SCHEMA_MISSING",
+      path.relative(root, prismaBillingSchemaPath),
+      "prisma/schema.prisma is missing."
+    );
+    return result;
+  }
+
+  const schema = fs.readFileSync(prismaBillingSchemaPath, "utf8").replace(/^\uFEFF/u, "").replace(/\r\n/gu, "\n");
+  const account = getPrismaBlock(schema, "model", "Account");
+  const subscription = getPrismaBlock(schema, "model", "Subscription");
+  const apiKey = getPrismaBlock(schema, "model", "ApiKey");
+  const customOutput = getPrismaBlock(schema, "model", "CustomOutput");
+  const tierEnum = getPrismaBlock(schema, "enum", "SubscriptionTier");
+  const subscriptionStatusEnum = getPrismaBlock(schema, "enum", "SubscriptionStatus");
+  const apiKeyStatusEnum = getPrismaBlock(schema, "enum", "ApiKeyStatus");
+
+  result.generatorAndDatasourceValid =
+    schema.includes("generator client {") &&
+    schema.includes('provider = "prisma-client-js"') &&
+    schema.includes("datasource db {") &&
+    schema.includes('provider  = "postgresql"') &&
+    schema.includes('url       = env("DATABASE_URL")') &&
+    schema.includes('directUrl = env("DIRECT_URL")');
+
+  result.enumsValid =
+    tierEnum.includes("basic") &&
+    tierEnum.includes("pro") &&
+    !tierEnum.includes("public") &&
+    subscriptionStatusEnum.includes("active") &&
+    subscriptionStatusEnum.includes("inactive") &&
+    apiKeyStatusEnum.includes("active") &&
+    apiKeyStatusEnum.includes("suspended") &&
+    apiKeyStatusEnum.includes("revoked");
+
+  result.accountValid =
+    account.includes("id") && account.includes("@id @default(uuid()) @db.Uuid") &&
+    account.includes('authProviderUserId') && account.includes('@unique @map("auth_provider_user_id")') &&
+    account.includes("email              String?") &&
+    account.includes('@map("created_at") @db.Timestamptz(6)') &&
+    account.includes('@map("terms_accepted_at") @db.Timestamptz(6)') &&
+    account.includes('@map("terms_version")') &&
+    account.includes("subscriptions      Subscription[]") &&
+    account.includes("apiKeys            ApiKey[]") &&
+    account.includes("customOutputs      CustomOutput[]");
+
+  result.subscriptionValid =
+    subscription.includes("@id @default(uuid()) @db.Uuid") &&
+    subscription.includes('@map("account_id") @db.Uuid') &&
+    subscription.includes('@unique @map("stripe_customer_id")') &&
+    subscription.includes('@unique @map("stripe_subscription_id")') &&
+    subscription.includes("tier                 SubscriptionTier") &&
+    subscription.includes('@default(false) @map("history_unlocked")') &&
+    subscription.includes('@map("entitled_chain")') &&
+    subscription.includes("status               SubscriptionStatus") &&
+    subscription.includes('@map("current_period_end") @db.Timestamptz(6)') &&
+    subscription.includes('@default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)');
+
+  result.apiKeyValid =
+    apiKey.includes("@id @default(uuid()) @db.Uuid") &&
+    apiKey.includes('@map("account_id") @db.Uuid') &&
+    apiKey.includes('@unique @map("key_hash")') &&
+    apiKey.includes('@map("key_prefix")') &&
+    apiKey.includes('@map("key_last4")') &&
+    apiKey.includes("status      ApiKeyStatus") &&
+    apiKey.includes('@default(now()) @map("created_at") @db.Timestamptz(6)') &&
+    apiKey.includes('@map("last_used_at") @db.Timestamptz(6)');
+
+  result.customOutputValid =
+    customOutput.includes("@id @default(uuid()) @db.Uuid") &&
+    customOutput.includes('@map("account_id") @db.Uuid') &&
+    customOutput.includes('@map("canonical_revision_id")') &&
+    customOutput.includes('@map("identity_hash")') &&
+    customOutput.includes('@map("thresholds_json")') &&
+    customOutput.includes('@map("storage_path")') &&
+    customOutput.includes('@default(now()) @map("created_at") @db.Timestamptz(6)');
+
+  result.relationsCascadeValid =
+    subscription.includes("Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)") &&
+    apiKey.includes("Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)") &&
+    customOutput.includes("Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)");
+
+  result.indexesValid =
+    subscription.includes('@@index([accountId], map: "subscriptions_account_id_idx")') &&
+    subscription.includes('@@index([status], map: "subscriptions_status_idx")') &&
+    subscription.includes('@@index([tier], map: "subscriptions_tier_idx")') &&
+    subscription.includes('@@index([entitledChain], map: "subscriptions_entitled_chain_idx")') &&
+    apiKey.includes('@@index([accountId], map: "api_keys_account_id_idx")') &&
+    apiKey.includes('@@index([status], map: "api_keys_status_idx")') &&
+    apiKey.includes('@@index([keyPrefix], map: "api_keys_key_prefix_idx")') &&
+    customOutput.includes('@@unique([accountId, identityHash], map: "custom_outputs_account_id_identity_hash_key")') &&
+    customOutput.includes('@@index([accountId], map: "custom_outputs_account_id_idx")') &&
+    customOutput.includes('@@index([canonicalRevisionId], map: "custom_outputs_canonical_revision_id_idx")');
+
+  result.mappingsValid =
+    account.includes('@@map("accounts")') &&
+    subscription.includes('@@map("subscriptions")') &&
+    apiKey.includes('@@map("api_keys")') &&
+    customOutput.includes('@@map("custom_outputs")');
+
+  result.noPlaintextApiKeySecret =
+    !/\b(secret|token|plaintext|plainText|rawKey|apiKeySecret)\b/u.test(apiKey.replace(/keyPrefix|keyLast4/gu, ""));
+
+  result.noPersistedPublicTier = !tierEnum.includes("public");
+
+  const requiredChecks = [
+    ["PRISMA_GENERATOR_DATASOURCE_INVALID", result.generatorAndDatasourceValid, "Prisma schema must use prisma-client-js, PostgreSQL, DATABASE_URL, and DIRECT_URL."],
+    ["PRISMA_ENUMS_INVALID", result.enumsValid, "Prisma enums must preserve paid tiers basic/pro, subscription statuses active/inactive, and API-key statuses active/suspended/revoked."],
+    ["PRISMA_ACCOUNT_MODEL_INVALID", result.accountValid, "Account model must preserve UUID identity, unique authProviderUserId, terms fields, and core relations."],
+    ["PRISMA_SUBSCRIPTION_MODEL_INVALID", result.subscriptionValid, "Subscription model must preserve Stripe identifiers, entitlement fields, status, and period/update timestamps."],
+    ["PRISMA_API_KEY_MODEL_INVALID", result.apiKeyValid, "ApiKey model must preserve hashed key storage, prefix/last4 metadata, status, and timestamps."],
+    ["PRISMA_CUSTOM_OUTPUT_MODEL_INVALID", result.customOutputValid, "CustomOutput model must preserve account/revision/identity/payload/storage fields."],
+    ["PRISMA_RELATIONS_CASCADE_INVALID", result.relationsCascadeValid, "Subscription, ApiKey, and CustomOutput must cascade from Account via accountId."],
+    ["PRISMA_INDEXES_INVALID", result.indexesValid, "Billing/API-key/custom-output indexes and uniqueness constraints must stay stable."],
+    ["PRISMA_TABLE_MAPPINGS_INVALID", result.mappingsValid, "Prisma models must preserve snake_case table mappings."],
+    ["PRISMA_API_KEY_PLAINTEXT_SECRET_RISK", result.noPlaintextApiKeySecret, "ApiKey model must not introduce plaintext secret/token/raw-key fields."],
+    ["PRISMA_PUBLIC_TIER_PERSISTED_INVALID", result.noPersistedPublicTier, "Public tier must remain derived app state, not a persisted SubscriptionTier enum value."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-047",
+        code,
+        path.relative(root, prismaBillingSchemaPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -9031,6 +9191,7 @@ function evaluate() {
   const authenticatedFileDeliveryRouteContract = evaluateAuthenticatedFileDeliveryRouteContract(findings);
   const accountRateLimitDailyQuotaContract = evaluateAccountRateLimitDailyQuotaContract(findings);
   const apiKeyPersistenceHelperContract = evaluateApiKeyPersistenceHelperContract(findings);
+  const prismaBillingDataModelContract = evaluatePrismaBillingDataModelContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -9080,6 +9241,7 @@ function evaluate() {
     authenticatedFileDeliveryRouteContract,
     accountRateLimitDailyQuotaContract,
     apiKeyPersistenceHelperContract,
+    prismaBillingDataModelContract,
     findings,
   };
 }
@@ -9139,6 +9301,21 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Prisma billing data model contract");
+  lines.push("");
+  lines.push(`Schema exists: ${result.prismaBillingDataModelContract.schemaExists}`);
+  lines.push(`Generator/datasource valid: ${result.prismaBillingDataModelContract.generatorAndDatasourceValid}`);
+  lines.push(`Enums valid: ${result.prismaBillingDataModelContract.enumsValid}`);
+  lines.push(`Account model valid: ${result.prismaBillingDataModelContract.accountValid}`);
+  lines.push(`Subscription model valid: ${result.prismaBillingDataModelContract.subscriptionValid}`);
+  lines.push(`ApiKey model valid: ${result.prismaBillingDataModelContract.apiKeyValid}`);
+  lines.push(`CustomOutput model valid: ${result.prismaBillingDataModelContract.customOutputValid}`);
+  lines.push(`Cascade relations valid: ${result.prismaBillingDataModelContract.relationsCascadeValid}`);
+  lines.push(`Indexes valid: ${result.prismaBillingDataModelContract.indexesValid}`);
+  lines.push(`Table mappings valid: ${result.prismaBillingDataModelContract.mappingsValid}`);
+  lines.push(`No plaintext API-key secret field: ${result.prismaBillingDataModelContract.noPlaintextApiKeySecret}`);
+  lines.push(`No persisted public tier: ${result.prismaBillingDataModelContract.noPersistedPublicTier}`);
+  lines.push("");
   lines.push("## API key persistence helper contract");
   lines.push("");
   lines.push(`Module exists: ${result.apiKeyPersistenceHelperContract.moduleExists}`);
@@ -9964,6 +10141,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-047 Prisma Billing Data Model Contract: verifies Prisma datasource, paid-tier/status enums, Account/Subscription/ApiKey/CustomOutput models, Stripe uniqueness, entitlement fields, keyHash/keyPrefix persistence, cascade relations, indexes, table mappings, and no plaintext API-key secret fields.");
   lines.push("- D-046 API Key Persistence Helper Contract: verifies development and persisted API-key helpers, prefix-before-hash lookup, scrypt verification, latest-subscription entitlement projection, revoked-key lastUsedAt guard, safe display rows, and no raw secret exposure in dashboard-facing helpers.");
   lines.push("- D-045 Account Rate Limit Daily Quota Contract: verifies tier-based authenticated rate limits, daily API quotas, Upstash/env configuration, UTC-day quota reset, production fail-closed behavior, non-production memory fallback, and rate/quota headers.");
   lines.push("- D-044 Authenticated File Delivery Route Contract: verifies /api/v1/files/[...path] API-key authentication, pre-auth/account rate limits, entitlement checks before storage reads, documented window-to-artifact mapping, audit logging, last-used key touch, private no-store file responses, and redacted errors.");
