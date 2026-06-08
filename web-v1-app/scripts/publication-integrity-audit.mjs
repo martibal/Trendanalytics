@@ -15,6 +15,9 @@ const stripeWebhookRoutePathForCoupling = path.join(root, "src", "app", "api", "
 const stripeBillingEnvContractFiles = [path.join(root, ".env.example"), path.join(repoRoot, ".env.example")];
 const stripeWebhookReplaySchemaPath = path.join(root, "prisma", "schema.prisma");
 const stripeWebhookReplayRoutePath = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+const prismaSchemaDeploymentPath = path.join(root, "prisma", "schema.prisma");
+const prismaPackageDeploymentPath = path.join(root, "package.json");
+const prismaMigrationsDeploymentPath = path.join(root, "prisma", "migrations");
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -10525,6 +10528,202 @@ function evaluateStripeWebhookReplayIdempotencyContract(findings) {
 
   return result;
 }
+function listPrismaMigrationSqlFiles(migrationsRoot) {
+  if (!fs.existsSync(migrationsRoot)) {
+    return [];
+  }
+
+  const files = [];
+
+  function walk(current) {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+
+      if (entry.isFile() && entry.name === "migration.sql") {
+        files.push(full);
+      }
+    }
+  }
+
+  walk(migrationsRoot);
+  return files.sort((a, b) => a.localeCompare(b));
+}
+
+function evaluatePrismaDbDeploymentContract(findings) {
+  const result = {
+    schemaExists: fs.existsSync(prismaSchemaDeploymentPath),
+    packageExists: fs.existsSync(prismaPackageDeploymentPath),
+
+    packageBuildRunsPrismaGenerate: false,
+    packagePostinstallRunsPrismaGenerate: false,
+    packageDoesNotAutoDbPushInBuild: false,
+    packageDoesNotAutoMigrateDeployInBuild: false,
+
+    schemaUsesPostgresAndDirectUrl: false,
+    schemaHasStripeWebhookEventRuntimeModel: false,
+    schemaHasReplayPersistenceTableMapping: false,
+
+    migrationsDirectoryExists: fs.existsSync(prismaMigrationsDeploymentPath),
+    migrationSqlFileCount: 0,
+    migrationSqlFiles: [],
+    migrationContainsStripeWebhookEventTable: false,
+    migrationContainsStripeWebhookEventStatusEnum: false,
+    migrationContainsStripeWebhookIndexes: false,
+    migrationDeploymentGap: false,
+  };
+
+  if (!result.schemaExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-055",
+      "PRISMA_DEPLOYMENT_SCHEMA_MISSING",
+      path.relative(root, prismaSchemaDeploymentPath),
+      "Prisma schema is missing; cannot validate DB deployment contract."
+    );
+
+    return result;
+  }
+
+  if (!result.packageExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-055",
+      "PRISMA_DEPLOYMENT_PACKAGE_MISSING",
+      path.relative(root, prismaPackageDeploymentPath),
+      "package.json is missing; cannot validate Prisma generation/deployment scripts."
+    );
+
+    return result;
+  }
+
+  const schema = fs.readFileSync(prismaSchemaDeploymentPath, "utf8").replace(/^\uFEFF/u, "").replace(/\r\n/gu, "\n");
+  const packageJson = JSON.parse(fs.readFileSync(prismaPackageDeploymentPath, "utf8"));
+
+  const scripts = packageJson.scripts && typeof packageJson.scripts === "object" ? packageJson.scripts : {};
+  const buildScript = typeof scripts.build === "string" ? scripts.build : "";
+  const postinstallScript = typeof scripts.postinstall === "string" ? scripts.postinstall : "";
+
+  result.packageBuildRunsPrismaGenerate =
+    buildScript.includes("prisma generate");
+
+  result.packagePostinstallRunsPrismaGenerate =
+    postinstallScript.includes("prisma generate");
+
+  result.packageDoesNotAutoDbPushInBuild =
+    !/\bprisma\s+db\s+push\b/u.test(buildScript);
+
+  result.packageDoesNotAutoMigrateDeployInBuild =
+    !/\bprisma\s+migrate\s+deploy\b/u.test(buildScript);
+
+  result.schemaUsesPostgresAndDirectUrl =
+    schema.includes("datasource db {") &&
+    schema.includes('provider  = "postgresql"') &&
+    schema.includes('url       = env("DATABASE_URL")') &&
+    schema.includes('directUrl = env("DIRECT_URL")');
+
+  result.schemaHasStripeWebhookEventRuntimeModel =
+    schema.includes("model StripeWebhookEvent {") &&
+    schema.includes("stripeEventId") &&
+    schema.includes("eventType") &&
+    schema.includes("status        StripeWebhookEventStatus") &&
+    schema.includes("receivedAt") &&
+    schema.includes("processedAt") &&
+    schema.includes("errorCode");
+
+  result.schemaHasReplayPersistenceTableMapping =
+    schema.includes('@@map("stripe_webhook_events")') &&
+    schema.includes('@map("stripe_event_id")') &&
+    schema.includes('@map("event_type")') &&
+    schema.includes('@map("received_at")') &&
+    schema.includes('@map("processed_at")') &&
+    schema.includes('@map("error_code")');
+
+  const migrationFiles = listPrismaMigrationSqlFiles(prismaMigrationsDeploymentPath);
+  result.migrationSqlFileCount = migrationFiles.length;
+  result.migrationSqlFiles = migrationFiles.map((file) => path.relative(root, file).replace(/\\/gu, "/"));
+
+  const migrationText = migrationFiles
+    .map((file) => fs.readFileSync(file, "utf8").replace(/^\uFEFF/u, ""))
+    .join("\n\n");
+
+  result.migrationContainsStripeWebhookEventTable =
+    migrationText.includes("stripe_webhook_events") &&
+    /CREATE\s+TABLE\s+["']?stripe_webhook_events["']?/iu.test(migrationText);
+
+  result.migrationContainsStripeWebhookEventStatusEnum =
+    migrationText.includes("StripeWebhookEventStatus") ||
+    migrationText.includes("stripe_webhook_event_status") ||
+    (
+      migrationText.includes("processing") &&
+      migrationText.includes("processed") &&
+      migrationText.includes("ignored") &&
+      migrationText.includes("failed")
+    );
+
+  result.migrationContainsStripeWebhookIndexes =
+    migrationText.includes("stripe_webhook_events_event_type_idx") &&
+    migrationText.includes("stripe_webhook_events_status_idx") &&
+    migrationText.includes("stripe_webhook_events_received_at_idx") &&
+    (
+      migrationText.includes("stripe_event_id") &&
+      (
+        migrationText.includes("UNIQUE") ||
+        migrationText.includes("unique")
+      )
+    );
+
+  result.migrationDeploymentGap =
+    result.schemaHasStripeWebhookEventRuntimeModel &&
+    (
+      !result.migrationsDirectoryExists ||
+      !result.migrationContainsStripeWebhookEventTable ||
+      !result.migrationContainsStripeWebhookEventStatusEnum ||
+      !result.migrationContainsStripeWebhookIndexes
+    );
+
+  const hardChecks = [
+    ["PRISMA_BUILD_GENERATE_MISSING", result.packageBuildRunsPrismaGenerate, "Build must run prisma generate before next build so Prisma Client matches schema."],
+    ["PRISMA_POSTINSTALL_GENERATE_MISSING", result.packagePostinstallRunsPrismaGenerate, "postinstall must run prisma generate so deployed installs have Prisma Client generated."],
+    ["PRISMA_DB_PUSH_IN_BUILD_RISK", result.packageDoesNotAutoDbPushInBuild, "Build script must not run prisma db push; DB schema changes must be an explicit deployment operation."],
+    ["PRISMA_MIGRATE_DEPLOY_IN_BUILD_RISK", result.packageDoesNotAutoMigrateDeployInBuild, "Build script must not run prisma migrate deploy implicitly; DB migrations must be explicitly sequenced before webhook traffic."],
+    ["PRISMA_DATASOURCE_DEPLOYMENT_INVALID", result.schemaUsesPostgresAndDirectUrl, "Prisma schema must use PostgreSQL DATABASE_URL and DIRECT_URL for runtime/deployment separation."],
+    ["PRISMA_WEBHOOK_EVENT_MODEL_INVALID", result.schemaHasStripeWebhookEventRuntimeModel, "Prisma schema must include StripeWebhookEvent runtime model after replay persistence is implemented."],
+    ["PRISMA_WEBHOOK_EVENT_MAPPING_INVALID", result.schemaHasReplayPersistenceTableMapping, "StripeWebhookEvent must map fields/table to stable snake_case database names."]
+  ];
+
+  for (const [code, ok, detail] of hardChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-055",
+        code,
+        `${path.relative(root, prismaPackageDeploymentPath)} + ${path.relative(root, prismaSchemaDeploymentPath)}`,
+        detail
+      );
+    }
+  }
+
+  if (result.migrationDeploymentGap) {
+    addFinding(
+      findings,
+      "warn",
+      "D-055",
+      "PRISMA_WEBHOOK_EVENT_MIGRATION_DEPLOYMENT_GAP",
+      result.migrationSqlFiles.length ? result.migrationSqlFiles.join(", ") : path.relative(root, prismaMigrationsDeploymentPath),
+      "StripeWebhookEvent exists in Prisma schema, but a matching Prisma migration SQL was not found. Build can still pass, but production DB must be updated explicitly before webhook traffic uses replay persistence."
+    );
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -10585,6 +10784,7 @@ function evaluate() {
   const checkoutWebhookMetadataCouplingContract = evaluateCheckoutWebhookMetadataCouplingContract(findings);
   const stripeBillingEnvContract = evaluateStripeBillingEnvContract(findings);
   const stripeWebhookReplayIdempotencyContract = evaluateStripeWebhookReplayIdempotencyContract(findings);
+  const prismaDbDeploymentContract = evaluatePrismaDbDeploymentContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -10641,6 +10841,7 @@ function evaluate() {
     checkoutWebhookMetadataCouplingContract,
     stripeBillingEnvContract,
     stripeWebhookReplayIdempotencyContract,
+    prismaDbDeploymentContract,
     findings,
   };
 }
@@ -10700,6 +10901,26 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Prisma DB deployment contract");
+  lines.push("");
+  lines.push(`Schema exists: ${result.prismaDbDeploymentContract.schemaExists}`);
+  lines.push(`Package exists: ${result.prismaDbDeploymentContract.packageExists}`);
+  lines.push(`Build runs prisma generate: ${result.prismaDbDeploymentContract.packageBuildRunsPrismaGenerate}`);
+  lines.push(`Postinstall runs prisma generate: ${result.prismaDbDeploymentContract.packagePostinstallRunsPrismaGenerate}`);
+  lines.push(`Build avoids prisma db push: ${result.prismaDbDeploymentContract.packageDoesNotAutoDbPushInBuild}`);
+  lines.push(`Build avoids prisma migrate deploy: ${result.prismaDbDeploymentContract.packageDoesNotAutoMigrateDeployInBuild}`);
+  lines.push(`Schema uses PostgreSQL + directUrl: ${result.prismaDbDeploymentContract.schemaUsesPostgresAndDirectUrl}`);
+  lines.push(`Schema has StripeWebhookEvent model: ${result.prismaDbDeploymentContract.schemaHasStripeWebhookEventRuntimeModel}`);
+  lines.push(`Schema has replay table mapping: ${result.prismaDbDeploymentContract.schemaHasReplayPersistenceTableMapping}`);
+  lines.push(`Migrations directory exists: ${result.prismaDbDeploymentContract.migrationsDirectoryExists}`);
+  lines.push(`Migration SQL file count: ${result.prismaDbDeploymentContract.migrationSqlFileCount}`);
+  lines.push(`Migration SQL files: ${result.prismaDbDeploymentContract.migrationSqlFiles.length ? result.prismaDbDeploymentContract.migrationSqlFiles.join(", ") : "(none found)"}`);
+  lines.push(`Migration contains stripe_webhook_events table: ${result.prismaDbDeploymentContract.migrationContainsStripeWebhookEventTable}`);
+  lines.push(`Migration contains webhook event status enum: ${result.prismaDbDeploymentContract.migrationContainsStripeWebhookEventStatusEnum}`);
+  lines.push(`Migration contains webhook event indexes: ${result.prismaDbDeploymentContract.migrationContainsStripeWebhookIndexes}`);
+  lines.push(`Migration deployment gap: ${result.prismaDbDeploymentContract.migrationDeploymentGap}`);
+  lines.push("D-055 note: migration deployment gaps are warnings so local hardening can continue, but production DB must be updated explicitly before webhook replay persistence receives traffic.");
+  lines.push("");
   lines.push("## Stripe webhook replay idempotency contract");
   lines.push("");
   lines.push(`Schema exists: ${result.stripeWebhookReplayIdempotencyContract.schemaExists}`);
@@ -11678,6 +11899,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-055 Prisma DB Deployment Contract: distinguishes Prisma Client generation from database deployment, verifies build/postinstall generate Prisma Client, blocks implicit db push/migrate deploy inside build, verifies PostgreSQL DATABASE_URL/DIRECT_URL datasource, checks StripeWebhookEvent schema/table mapping, and reports missing migration SQL as an explicit production deployment warning.");
   lines.push("- D-053 Stripe Webhook Replay Idempotency Contract: reports event-level Stripe webhook replay persistence as a warning when absent, and hard-fails partial implementations unless a StripeWebhookEvent model, unique stripeEventId, processing/processed/ignored/failed status, duplicate handling, event status updates, idempotent state upserts, and raw payload protection are complete.");
   lines.push("- D-052 Stripe Billing Environment Contract: verifies Stripe billing runtime environment documentation and route references for STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_BASIC, STRIPE_PRICE_PRO, app URL sources, live/test boundary, no literal Stripe live/webhook secrets in env docs, checkout production live-key guard, and webhook fail-closed behavior.");
   lines.push("- D-051 Checkout Webhook Metadata Coupling Contract: verifies checkout metadata emitted to Stripe matches webhook parsing and subscription sync, including checkout_plan/account_id/auth_provider_user_id/entitled_chain/history_unlocked, client_reference_id, basic entitled-chain custom field, customer reuse, price fallbacks, entitlement field sync, and no secret/raw payload/advice exposure across the coupled routes.");
