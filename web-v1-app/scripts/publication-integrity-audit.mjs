@@ -10,6 +10,8 @@ const repoRoot = path.resolve(path.join(root, ".."));
 const appApiRouteRoot = path.join(root, "src", "app", "api");
 const stripeWebhookRouteRoot = path.join(root, "src", "app", "api");
 const stripeWebhookRoutePath = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+const checkoutRoutePathForWebhookCoupling = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+const stripeWebhookRoutePathForCoupling = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -9948,6 +9950,227 @@ function evaluateStripeWebhookRouteContract(findings) {
 
   return result;
 }
+function evaluateCheckoutWebhookMetadataCouplingContract(findings) {
+  const result = {
+    checkoutRouteExists: fs.existsSync(checkoutRoutePathForWebhookCoupling),
+    webhookRouteExists: fs.existsSync(stripeWebhookRoutePathForCoupling),
+
+    checkoutDefinesMetadataContract: false,
+    checkoutAttachesMetadataToSessionAndSubscription: false,
+    checkoutUsesClientReferenceAccountId: false,
+    checkoutBasicPlanCustomFieldMatchesWebhook: false,
+    checkoutCustomerReuseMatchesWebhook: false,
+
+    webhookReadsCheckoutMetadataKeys: false,
+    webhookReadsClientReferenceAccountId: false,
+    webhookReadsBasicCustomField: false,
+    webhookReadsSubscriptionMetadataFallback: false,
+    webhookUsesSamePlanAliasesAsCheckout: false,
+    webhookUsesSameEntitledChainSemantics: false,
+    webhookUsesSameHistoryUnlockedSemantics: false,
+    webhookSyncsSameStripeIdentifiers: false,
+    webhookSyncsSameEntitlementFields: false,
+    webhookUsesPriceFallbacksForSubscriptionEvents: false,
+
+    metadataKeySetStable: false,
+    noCouplingSecretExposure: false,
+    noAdviceCopyInCoupledRoutes: false,
+  };
+
+  if (!result.checkoutRouteExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-051",
+      "CHECKOUT_ROUTE_FOR_WEBHOOK_COUPLING_MISSING",
+      path.relative(root, checkoutRoutePathForWebhookCoupling),
+      "Checkout route is missing; cannot verify checkout-to-webhook metadata coupling."
+    );
+  }
+
+  if (!result.webhookRouteExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-051",
+      "WEBHOOK_ROUTE_FOR_CHECKOUT_COUPLING_MISSING",
+      path.relative(root, stripeWebhookRoutePathForCoupling),
+      "Stripe webhook route is missing; cannot verify checkout-to-webhook metadata coupling."
+    );
+  }
+
+  if (!result.checkoutRouteExists || !result.webhookRouteExists) {
+    return result;
+  }
+
+  const checkoutSource = fs.readFileSync(checkoutRoutePathForWebhookCoupling, "utf8").replace(/^\uFEFF/u, "");
+  const webhookSource = fs.readFileSync(stripeWebhookRoutePathForCoupling, "utf8").replace(/^\uFEFF/u, "");
+  const checkout = checkoutSource.replace(/\r\n/gu, "\n");
+  const webhook = webhookSource.replace(/\r\n/gu, "\n");
+
+  const requiredMetadataKeys = [
+    "checkout_plan",
+    "account_id",
+    "auth_provider_user_id",
+    "entitled_chain",
+    "history_unlocked"
+  ];
+
+  result.checkoutDefinesMetadataContract =
+    checkout.includes("function checkoutMetadata(params: {") &&
+    checkout.includes("plan: CheckoutPlan;") &&
+    checkout.includes("accountId: string;") &&
+    checkout.includes("authProviderUserId: string;") &&
+    checkout.includes("checkout_plan: params.plan,") &&
+    checkout.includes("account_id: params.accountId,") &&
+    checkout.includes("auth_provider_user_id: params.authProviderUserId,") &&
+    checkout.includes('entitled_chain: params.plan === "basic" ? "checkout_selection" : "",') &&
+    checkout.includes('history_unlocked: "false",');
+
+  result.checkoutAttachesMetadataToSessionAndSubscription =
+    checkout.includes("const metadata = checkoutMetadata({") &&
+    checkout.includes("plan,") &&
+    checkout.includes("accountId: account.id,") &&
+    checkout.includes("authProviderUserId: signedInUser.userId,") &&
+    checkout.includes("metadata,") &&
+    checkout.includes("subscription_data: {") &&
+    checkout.includes("metadata,") &&
+    checkout.includes("mode: \"subscription\"");
+
+  result.checkoutUsesClientReferenceAccountId =
+    checkout.includes("client_reference_id: account.id,");
+
+  result.checkoutBasicPlanCustomFieldMatchesWebhook =
+    checkout.includes('if (plan === "basic")') &&
+    checkout.includes("sessionParams.custom_fields = [") &&
+    checkout.includes('key: "entitled_chain"') &&
+    checkout.includes('custom: "Select chain"') &&
+    checkout.includes('type: "dropdown"') &&
+    checkout.includes("CHAIN_OPTIONS.map((chain) => ({") &&
+    checkout.includes("value: chain.value,");
+
+  result.checkoutCustomerReuseMatchesWebhook =
+    checkout.includes("const existingStripeCustomerId = account.subscriptions[0]?.stripeCustomerId ?? null;") &&
+    checkout.includes("sessionParams.customer = existingStripeCustomerId;") &&
+    checkout.includes("sessionParams.customer_email = signedInUser.email;");
+
+  result.webhookReadsCheckoutMetadataKeys =
+    requiredMetadataKeys.every((key) => webhook.includes(key)) &&
+    webhook.includes("session.metadata?.account_id") &&
+    webhook.includes("session.metadata?.auth_provider_user_id") &&
+    webhook.includes("session.metadata?.checkout_plan") &&
+    webhook.includes("session.metadata?.history_unlocked");
+
+  result.webhookReadsClientReferenceAccountId =
+    webhook.includes("session.client_reference_id ?? session.metadata?.account_id ?? null");
+
+  result.webhookReadsBasicCustomField =
+    webhook.includes("function entitledChainFromSession(session: Stripe.Checkout.Session): ChainId | null") &&
+    webhook.includes("session.metadata?.entitled_chain") &&
+    webhook.includes("session.custom_fields") &&
+    webhook.includes('field.key !== "entitled_chain"') &&
+    webhook.includes("field.dropdown?.value");
+
+  result.webhookReadsSubscriptionMetadataFallback =
+    webhook.includes("const metadata = retrievedSubscription ? getSubscriptionMetadata(retrievedSubscription) : (session.metadata ?? {});") &&
+    webhook.includes("metadata.entitled_chain") &&
+    webhook.includes("metadata.history_unlocked ?? session.metadata?.history_unlocked");
+
+  result.webhookUsesSamePlanAliasesAsCheckout =
+    checkout.includes('value === "basic" || value === "single-chain" || value === "single_chain"') &&
+    checkout.includes('value === "pro" || value === "research"') &&
+    webhook.includes('value === "basic" || value === "single-chain" || value === "single_chain"') &&
+    webhook.includes('value === "pro" || value === "research"');
+
+  result.webhookUsesSameEntitledChainSemantics =
+    checkout.includes('params.plan === "basic" ? "checkout_selection" : ""') &&
+    webhook.includes("tier === SubscriptionTier.basic") &&
+    webhook.includes("entitledChainFromSession(session) ?? normalizeChain(metadata.entitled_chain)") &&
+    webhook.includes("tier === SubscriptionTier.basic ? normalizeChain(metadata.entitled_chain) : null");
+
+  result.webhookUsesSameHistoryUnlockedSemantics =
+    checkout.includes('history_unlocked: "false"') &&
+    webhook.includes("function historyUnlockedFromPlan(plan: CheckoutPlan | null, metadataValue: unknown): boolean") &&
+    webhook.includes("if (parseBoolean(metadataValue))") &&
+    webhook.includes('return plan === "pro";');
+
+  result.webhookSyncsSameStripeIdentifiers =
+    webhook.includes("const stripeCustomerId = getCustomerIdFromSession(session);") &&
+    webhook.includes("const stripeSubscriptionId = getSubscriptionIdFromSession(session);") &&
+    webhook.includes("const stripeCustomerId = getCustomerIdFromSubscription(subscription);") &&
+    webhook.includes("const stripeSubscriptionId = subscription.id;") &&
+    webhook.includes("stripeCustomerId,") &&
+    webhook.includes("stripeSubscriptionId,");
+
+  result.webhookSyncsSameEntitlementFields =
+    webhook.includes("tier,") &&
+    webhook.includes("historyUnlocked,") &&
+    webhook.includes("entitledChain,") &&
+    webhook.includes("status,") &&
+    webhook.includes("currentPeriodEnd,") &&
+    webhook.includes("SubscriptionStatus.inactive") &&
+    webhook.includes("SubscriptionTier.basic") &&
+    webhook.includes("SubscriptionTier.pro");
+
+  result.webhookUsesPriceFallbacksForSubscriptionEvents =
+    webhook.includes("const basicPrice = process.env.STRIPE_PRICE_BASIC?.trim();") &&
+    webhook.includes("const proPrice = process.env.STRIPE_PRICE_PRO?.trim();") &&
+    webhook.includes("priceIds.includes(basicPrice)") &&
+    webhook.includes("priceIds.includes(proPrice)");
+
+  result.metadataKeySetStable =
+    requiredMetadataKeys.every((key) => checkout.includes(key) && webhook.includes(key));
+
+  const secretLiteralPattern = /(?:sk_live_|rk_live_|whsec_[A-Za-z0-9_]+)/u;
+  result.noCouplingSecretExposure =
+    !secretLiteralPattern.test(checkout) &&
+    !secretLiteralPattern.test(webhook) &&
+    !checkout.includes("return NextResponse.json(session") &&
+    !webhook.includes("return NextResponse.json(event") &&
+    !webhook.includes("return Response.json(event");
+
+  const advicePattern = /\b(?:buy|sell|hold|forecast|prediction|price target|investment advice|financial advice|should invest|expected return)\b/iu;
+  result.noAdviceCopyInCoupledRoutes =
+    !advicePattern.test(checkout) &&
+    !advicePattern.test(webhook);
+
+  const requiredChecks = [
+    ["CHECKOUT_METADATA_CONTRACT_INVALID", result.checkoutDefinesMetadataContract, "Checkout route must define checkout_plan/account_id/auth_provider_user_id/entitled_chain/history_unlocked metadata."],
+    ["CHECKOUT_METADATA_ATTACHMENT_INVALID", result.checkoutAttachesMetadataToSessionAndSubscription, "Checkout route must attach metadata to both Checkout Session and subscription_data."],
+    ["CHECKOUT_CLIENT_REFERENCE_INVALID", result.checkoutUsesClientReferenceAccountId, "Checkout route must set client_reference_id to account.id."],
+    ["CHECKOUT_BASIC_CUSTOM_FIELD_INVALID", result.checkoutBasicPlanCustomFieldMatchesWebhook, "Checkout basic plan must expose entitled_chain dropdown matching webhook parsing."],
+    ["CHECKOUT_CUSTOMER_REUSE_INVALID", result.checkoutCustomerReuseMatchesWebhook, "Checkout route must reuse existing Stripe customer when present and otherwise use customer_email."],
+
+    ["WEBHOOK_METADATA_READ_INVALID", result.webhookReadsCheckoutMetadataKeys, "Webhook route must read every metadata key emitted by checkout."],
+    ["WEBHOOK_CLIENT_REFERENCE_READ_INVALID", result.webhookReadsClientReferenceAccountId, "Webhook route must fallback from client_reference_id to metadata.account_id."],
+    ["WEBHOOK_BASIC_CUSTOM_FIELD_READ_INVALID", result.webhookReadsBasicCustomField, "Webhook route must read entitled_chain from metadata or Checkout custom_fields."],
+    ["WEBHOOK_SUBSCRIPTION_METADATA_FALLBACK_INVALID", result.webhookReadsSubscriptionMetadataFallback, "Webhook route must retrieve subscription metadata and fallback to session metadata."],
+    ["CHECKOUT_WEBHOOK_PLAN_ALIAS_DRIFT", result.webhookUsesSamePlanAliasesAsCheckout, "Checkout and webhook must recognize the same plan aliases."],
+    ["CHECKOUT_WEBHOOK_ENTITLED_CHAIN_DRIFT", result.webhookUsesSameEntitledChainSemantics, "Checkout and webhook entitled_chain semantics must remain coupled."],
+    ["CHECKOUT_WEBHOOK_HISTORY_UNLOCKED_DRIFT", result.webhookUsesSameHistoryUnlockedSemantics, "Checkout and webhook history_unlocked semantics must remain coupled."],
+    ["CHECKOUT_WEBHOOK_STRIPE_IDENTIFIER_DRIFT", result.webhookSyncsSameStripeIdentifiers, "Webhook must sync the same Stripe customer/subscription identifiers created by checkout."],
+    ["CHECKOUT_WEBHOOK_ENTITLEMENT_FIELD_DRIFT", result.webhookSyncsSameEntitlementFields, "Webhook must sync tier/historyUnlocked/entitledChain/status/currentPeriodEnd fields expected by checkout and entitlements."],
+    ["CHECKOUT_WEBHOOK_PRICE_FALLBACK_INVALID", result.webhookUsesPriceFallbacksForSubscriptionEvents, "Webhook must use configured Stripe price IDs as fallback for subscription events."],
+    ["CHECKOUT_WEBHOOK_METADATA_KEYSET_INVALID", result.metadataKeySetStable, "Checkout and webhook metadata key set must remain stable."],
+    ["CHECKOUT_WEBHOOK_SECRET_EXPOSURE_RISK", result.noCouplingSecretExposure, "Checkout/webhook coupled routes must not expose raw Stripe session/event payloads or literal live/webhook secrets."],
+    ["CHECKOUT_WEBHOOK_ADVICE_COPY_RISK", result.noAdviceCopyInCoupledRoutes, "Checkout/webhook coupled routes must remain operational/descriptive and contain no advice/forecast copy."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-051",
+        code,
+        `${path.relative(root, checkoutRoutePathForWebhookCoupling)} + ${path.relative(root, stripeWebhookRoutePathForCoupling)}`,
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -10005,6 +10228,7 @@ function evaluate() {
   const apiRouteBoundaryInventoryContract = evaluateApiRouteBoundaryInventoryContract(findings);
   const stripeWebhookReadinessContract = evaluateStripeWebhookReadinessContract(findings);
   const stripeWebhookRouteContract = evaluateStripeWebhookRouteContract(findings);
+  const checkoutWebhookMetadataCouplingContract = evaluateCheckoutWebhookMetadataCouplingContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -10058,6 +10282,7 @@ function evaluate() {
     apiRouteBoundaryInventoryContract,
     stripeWebhookReadinessContract,
     stripeWebhookRouteContract,
+    checkoutWebhookMetadataCouplingContract,
     findings,
   };
 }
@@ -10117,6 +10342,29 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Checkout webhook metadata coupling contract");
+  lines.push("");
+  lines.push(`Checkout route exists: ${result.checkoutWebhookMetadataCouplingContract.checkoutRouteExists}`);
+  lines.push(`Webhook route exists: ${result.checkoutWebhookMetadataCouplingContract.webhookRouteExists}`);
+  lines.push(`Checkout metadata contract: ${result.checkoutWebhookMetadataCouplingContract.checkoutDefinesMetadataContract}`);
+  lines.push(`Checkout attaches metadata to session/subscription: ${result.checkoutWebhookMetadataCouplingContract.checkoutAttachesMetadataToSessionAndSubscription}`);
+  lines.push(`Checkout uses client_reference_id account id: ${result.checkoutWebhookMetadataCouplingContract.checkoutUsesClientReferenceAccountId}`);
+  lines.push(`Checkout basic custom field matches webhook: ${result.checkoutWebhookMetadataCouplingContract.checkoutBasicPlanCustomFieldMatchesWebhook}`);
+  lines.push(`Checkout customer reuse matches webhook: ${result.checkoutWebhookMetadataCouplingContract.checkoutCustomerReuseMatchesWebhook}`);
+  lines.push(`Webhook reads checkout metadata keys: ${result.checkoutWebhookMetadataCouplingContract.webhookReadsCheckoutMetadataKeys}`);
+  lines.push(`Webhook reads client_reference_id: ${result.checkoutWebhookMetadataCouplingContract.webhookReadsClientReferenceAccountId}`);
+  lines.push(`Webhook reads basic custom field: ${result.checkoutWebhookMetadataCouplingContract.webhookReadsBasicCustomField}`);
+  lines.push(`Webhook reads subscription metadata fallback: ${result.checkoutWebhookMetadataCouplingContract.webhookReadsSubscriptionMetadataFallback}`);
+  lines.push(`Plan aliases coupled: ${result.checkoutWebhookMetadataCouplingContract.webhookUsesSamePlanAliasesAsCheckout}`);
+  lines.push(`Entitled chain semantics coupled: ${result.checkoutWebhookMetadataCouplingContract.webhookUsesSameEntitledChainSemantics}`);
+  lines.push(`History unlocked semantics coupled: ${result.checkoutWebhookMetadataCouplingContract.webhookUsesSameHistoryUnlockedSemantics}`);
+  lines.push(`Stripe identifiers coupled: ${result.checkoutWebhookMetadataCouplingContract.webhookSyncsSameStripeIdentifiers}`);
+  lines.push(`Entitlement fields coupled: ${result.checkoutWebhookMetadataCouplingContract.webhookSyncsSameEntitlementFields}`);
+  lines.push(`Subscription price fallbacks valid: ${result.checkoutWebhookMetadataCouplingContract.webhookUsesPriceFallbacksForSubscriptionEvents}`);
+  lines.push(`Metadata key set stable: ${result.checkoutWebhookMetadataCouplingContract.metadataKeySetStable}`);
+  lines.push(`No coupling secret exposure: ${result.checkoutWebhookMetadataCouplingContract.noCouplingSecretExposure}`);
+  lines.push(`No advice copy in coupled routes: ${result.checkoutWebhookMetadataCouplingContract.noAdviceCopyInCoupledRoutes}`);
+  lines.push("");
   lines.push("## Stripe webhook route contract");
   lines.push("");
   lines.push(`Route exists: ${result.stripeWebhookRouteContract.routeExists}`);
@@ -11035,6 +11283,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-051 Checkout Webhook Metadata Coupling Contract: verifies checkout metadata emitted to Stripe matches webhook parsing and subscription sync, including checkout_plan/account_id/auth_provider_user_id/entitled_chain/history_unlocked, client_reference_id, basic entitled-chain custom field, customer reuse, price fallbacks, entitlement field sync, and no secret/raw payload/advice exposure across the coupled routes.");
   lines.push("- D-050 Stripe Webhook Route Contract: verifies the implemented Stripe webhook route, including POST-only raw-body signature verification, safe secret access, no browser guards, checkout/session and subscription sync, idempotent DB upserts, deletion-to-inactive behavior, safe no-store JSON responses, operational logging, and no raw event/secret/advice exposure.");
   lines.push("- D-049 Stripe Webhook Readiness Contract: reports missing Stripe webhook as a launch warning during pre-implementation, and enforces POST-only raw-body signature verification, STRIPE_WEBHOOK_SECRET, no browser same-origin guard, DB subscription sync, idempotent upsert/update semantics, no-store responses, and no raw payload/secret exposure once a webhook route exists.");
   lines.push("- D-048 API Route Boundary Inventory Contract: inventories src/app/api route.ts files, classifies public read/browser mutation/authenticated file/webhook routes, blocks unclassified mutations, enforces origin/pre-auth/no-store on browser mutations, protects public read routes from private auth/billing/secrets/advice copy, and confirms authenticated file delivery uses API-key entitlement before storage reads.");
