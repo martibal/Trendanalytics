@@ -7,6 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
+const appApiRouteRoot = path.join(root, "src", "app", "api");
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -9138,6 +9139,345 @@ function evaluatePrismaBillingDataModelContract(findings) {
 
   return result;
 }
+function listRouteFilesUnder(dir) {
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+
+  const out = [];
+
+  function walk(current) {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+
+      if (entry.isFile() && entry.name === "route.ts") {
+        out.push(full);
+      }
+    }
+  }
+
+  walk(dir);
+  return out.sort((a, b) => a.localeCompare(b));
+}
+
+function classifyApiRoute(relativePath, source) {
+  const normalized = relativePath.replace(/\\/gu, "/");
+
+  if (normalized.includes("/api/v1/files/[...path]/route.ts")) {
+    return "authenticated_file_delivery";
+  }
+
+  if (normalized.includes("/api/v1/keys/route.ts")) {
+    return "browser_api_key_mutation";
+  }
+
+  if (normalized.includes("/api/v1/checkout/portal/route.ts")) {
+    return "browser_billing_portal_mutation";
+  }
+
+  if (normalized.includes("/api/v1/checkout/route.ts")) {
+    return "browser_checkout_mutation";
+  }
+
+  if (normalized.includes("webhook") || source.includes("constructEvent(") || source.includes("STRIPE_WEBHOOK_SECRET")) {
+    return "webhook_receiver";
+  }
+
+  if (
+    source.includes("export async function POST") ||
+    source.includes("export async function PUT") ||
+    source.includes("export async function PATCH") ||
+    source.includes("export async function DELETE")
+  ) {
+    return "unclassified_mutation";
+  }
+
+  return "public_read";
+}
+
+function evaluateApiRouteBoundaryInventoryContract(findings) {
+  const result = {
+    apiRootExists: fs.existsSync(appApiRouteRoot),
+    routeCount: 0,
+    publicReadRouteCount: 0,
+    browserMutationRouteCount: 0,
+    authenticatedFileRouteCount: 0,
+    webhookRouteCount: 0,
+    unclassifiedMutationRouteCount: 0,
+
+    allRoutesClassified: true,
+    publicReadRoutesDoNotUsePrivateAuthOrBilling: true,
+    publicReadRoutesDoNotExposeSecrets: true,
+    publicReadRoutesDoNotReturnAdviceCopy: true,
+    browserMutationRoutesUseOriginAndPreAuth: true,
+    browserMutationRoutesUseNoStore: true,
+    authenticatedFileRouteUsesApiKeyEntitlement: true,
+    webhookRoutesDoNotUseSameOriginGuard: true,
+    webhookRoutesUseSignatureVerification: true,
+    allApiRoutesHaveExplicitResponseConstruction: true,
+    noRouteExposesKeyHashOrSecretPatterns: true,
+    routeInventory: [],
+  };
+
+  if (!result.apiRootExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-048",
+      "API_ROUTE_ROOT_MISSING",
+      path.relative(root, appApiRouteRoot),
+      "src/app/api route root is missing."
+    );
+
+    return result;
+  }
+
+  const routeFiles = listRouteFilesUnder(appApiRouteRoot);
+  result.routeCount = routeFiles.length;
+
+  if (routeFiles.length === 0) {
+    addFinding(
+      findings,
+      "fail",
+      "D-048",
+      "API_ROUTE_INVENTORY_EMPTY",
+      path.relative(root, appApiRouteRoot),
+      "No route.ts files were found under src/app/api."
+    );
+
+    return result;
+  }
+
+  const secretPattern = /\b(?:sk_live_|rk_live_|whsec_|ta_live_[a-f0-9]{48}|keyHash|key_hash|S3_SECRET_ACCESS_KEY|UPSTASH_REDIS_REST_TOKEN|DATABASE_URL|DIRECT_URL|STRIPE_SECRET_KEY|CLERK_SECRET_KEY)\b/u;
+  const advicePattern = /\b(?:buy|sell|hold|price target|forecast|prediction|investment advice|financial advice|should invest|expected return)\b/iu;
+
+  for (const file of routeFiles) {
+    const relative = path.relative(root, file);
+    const source = fs.readFileSync(file, "utf8").replace(/^\uFEFF/u, "");
+    const classification = classifyApiRoute(relative, source);
+
+    result.routeInventory.push({
+      path: relative.replace(/\\/gu, "/"),
+      classification,
+    });
+
+    if (classification === "public_read") {
+      result.publicReadRouteCount += 1;
+
+      const usesPrivateAuthOrBilling =
+        source.includes("@clerk/nextjs") ||
+        source.includes("CLERK_SECRET_KEY") ||
+        source.includes("STRIPE_SECRET_KEY") ||
+        source.includes("@prisma/client") ||
+        source.includes("@/lib/db") ||
+        source.includes("validateRequestApiKey") ||
+        source.includes("getCurrentAccountView");
+
+      if (usesPrivateAuthOrBilling) {
+        result.publicReadRoutesDoNotUsePrivateAuthOrBilling = false;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-048",
+          "PUBLIC_READ_ROUTE_USES_PRIVATE_AUTH_OR_BILLING",
+          relative,
+          "Public read route must not import/use Clerk secret auth, Stripe secret billing, Prisma db, API-key validation, or account view."
+        );
+      }
+
+      if (secretPattern.test(source)) {
+        result.publicReadRoutesDoNotExposeSecrets = false;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-048",
+          "PUBLIC_READ_ROUTE_SECRET_EXPOSURE_RISK",
+          relative,
+          "Public read route contains secret/key-hash/private-env-like text."
+        );
+      }
+
+      if (advicePattern.test(source)) {
+        result.publicReadRoutesDoNotReturnAdviceCopy = false;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-048",
+          "PUBLIC_READ_ROUTE_ADVICE_COPY_RISK",
+          relative,
+          "Public read route contains advice/forecast-like wording that violates descriptive-only product boundaries."
+        );
+      }
+    }
+
+    if (
+      classification === "browser_api_key_mutation" ||
+      classification === "browser_billing_portal_mutation" ||
+      classification === "browser_checkout_mutation"
+    ) {
+      result.browserMutationRouteCount += 1;
+
+      const usesOriginAndPreAuth =
+        source.includes("validateSameOriginRequest") &&
+        source.includes("enforcePreAuthRateLimit");
+
+      if (!usesOriginAndPreAuth) {
+        result.browserMutationRoutesUseOriginAndPreAuth = false;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-048",
+          "BROWSER_MUTATION_ROUTE_MISSING_ORIGIN_PREAUTH",
+          relative,
+          "Browser mutation route must use same-origin guard and pre-auth rate-limit."
+        );
+      }
+
+      if (!source.includes('"Cache-Control": "no-store"') && !source.includes('headers.set("Cache-Control", "no-store")')) {
+        result.browserMutationRoutesUseNoStore = false;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-048",
+          "BROWSER_MUTATION_ROUTE_NO_STORE_MISSING",
+          relative,
+          "Browser mutation route must set Cache-Control: no-store on responses/redirects."
+        );
+      }
+    }
+
+    if (classification === "authenticated_file_delivery") {
+      result.authenticatedFileRouteCount += 1;
+
+      const usesApiKeyEntitlement =
+        source.includes("validateRequestApiKey") &&
+        source.includes("evaluateFileEntitlement") &&
+        source.includes("readStorageObject") &&
+        source.indexOf("evaluateFileEntitlement") < source.indexOf("readStorageObject");
+
+      if (!usesApiKeyEntitlement) {
+        result.authenticatedFileRouteUsesApiKeyEntitlement = false;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-048",
+          "AUTH_FILE_ROUTE_BOUNDARY_INVALID",
+          relative,
+          "Authenticated file route must validate API key and evaluate entitlement before storage read."
+        );
+      }
+    }
+
+    if (classification === "webhook_receiver") {
+      result.webhookRouteCount += 1;
+
+      if (source.includes("validateSameOriginRequest")) {
+        result.webhookRoutesDoNotUseSameOriginGuard = false;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-048",
+          "WEBHOOK_ROUTE_USES_BROWSER_ORIGIN_GUARD",
+          relative,
+          "Webhook routes must not use browser same-origin guard; they should verify provider signatures instead."
+        );
+      }
+
+      if (!source.includes("constructEvent(") && !source.includes("STRIPE_WEBHOOK_SECRET")) {
+        result.webhookRoutesUseSignatureVerification = false;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-048",
+          "WEBHOOK_ROUTE_SIGNATURE_VERIFICATION_MISSING",
+          relative,
+          "Webhook route classification requires provider signature verification."
+        );
+      }
+    }
+
+    if (classification === "unclassified_mutation") {
+      result.unclassifiedMutationRouteCount += 1;
+      result.allRoutesClassified = false;
+
+      addFinding(
+        findings,
+        "fail",
+        "D-048",
+        "API_ROUTE_UNCLASSIFIED_MUTATION",
+        relative,
+        "State-changing API route is not classified as checkout, portal, keys, authenticated file delivery, or webhook. Add a contract before relying on this route."
+      );
+    }
+
+    if (!source.includes("NextResponse") && !source.includes("Response.json") && !source.includes("new Response(")) {
+      result.allApiRoutesHaveExplicitResponseConstruction = false;
+
+      addFinding(
+        findings,
+        "fail",
+        "D-048",
+        "API_ROUTE_RESPONSE_CONSTRUCTION_MISSING",
+        relative,
+        "API route should use explicit NextResponse/Response construction."
+      );
+    }
+
+    if (secretPattern.test(source) && classification !== "webhook_receiver") {
+      const allowedServerSecretUse =
+        classification === "browser_checkout_mutation" ||
+        classification === "browser_billing_portal_mutation";
+
+      if (!allowedServerSecretUse) {
+        result.noRouteExposesKeyHashOrSecretPatterns = false;
+
+        addFinding(
+          findings,
+          "fail",
+          "D-048",
+          "API_ROUTE_SECRET_PATTERN_RISK",
+          relative,
+          "API route contains keyHash/private-secret-like text outside allowed server billing/webhook boundaries."
+        );
+      }
+    }
+  }
+
+  const minimumExpectedRoutes = [
+    ["authenticated_file_delivery", result.authenticatedFileRouteCount > 0, "Authenticated file delivery route must be present in API inventory."],
+    ["browser_api_key_mutation", result.routeInventory.some((item) => item.classification === "browser_api_key_mutation"), "API-key mutation route must be present in API inventory."],
+    ["browser_checkout_mutation", result.routeInventory.some((item) => item.classification === "browser_checkout_mutation"), "Checkout mutation route must be present in API inventory."],
+    ["browser_billing_portal_mutation", result.routeInventory.some((item) => item.classification === "browser_billing_portal_mutation"), "Billing portal mutation route must be present in API inventory."]
+  ];
+
+  for (const [classification, ok, detail] of minimumExpectedRoutes) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-048",
+        "API_ROUTE_EXPECTED_CLASS_MISSING",
+        path.relative(root, appApiRouteRoot),
+        `${detail} Missing class: ${classification}.`
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -9192,6 +9532,7 @@ function evaluate() {
   const accountRateLimitDailyQuotaContract = evaluateAccountRateLimitDailyQuotaContract(findings);
   const apiKeyPersistenceHelperContract = evaluateApiKeyPersistenceHelperContract(findings);
   const prismaBillingDataModelContract = evaluatePrismaBillingDataModelContract(findings);
+  const apiRouteBoundaryInventoryContract = evaluateApiRouteBoundaryInventoryContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -9242,6 +9583,7 @@ function evaluate() {
     accountRateLimitDailyQuotaContract,
     apiKeyPersistenceHelperContract,
     prismaBillingDataModelContract,
+    apiRouteBoundaryInventoryContract,
     findings,
   };
 }
@@ -9301,6 +9643,31 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## API route boundary inventory contract");
+  lines.push("");
+  lines.push(`API root exists: ${result.apiRouteBoundaryInventoryContract.apiRootExists}`);
+  lines.push(`Route count: ${result.apiRouteBoundaryInventoryContract.routeCount}`);
+  lines.push(`Public read routes: ${result.apiRouteBoundaryInventoryContract.publicReadRouteCount}`);
+  lines.push(`Browser mutation routes: ${result.apiRouteBoundaryInventoryContract.browserMutationRouteCount}`);
+  lines.push(`Authenticated file routes: ${result.apiRouteBoundaryInventoryContract.authenticatedFileRouteCount}`);
+  lines.push(`Webhook routes: ${result.apiRouteBoundaryInventoryContract.webhookRouteCount}`);
+  lines.push(`Unclassified mutation routes: ${result.apiRouteBoundaryInventoryContract.unclassifiedMutationRouteCount}`);
+  lines.push(`All routes classified: ${result.apiRouteBoundaryInventoryContract.allRoutesClassified}`);
+  lines.push(`Public read routes avoid private auth/billing: ${result.apiRouteBoundaryInventoryContract.publicReadRoutesDoNotUsePrivateAuthOrBilling}`);
+  lines.push(`Public read routes avoid secrets: ${result.apiRouteBoundaryInventoryContract.publicReadRoutesDoNotExposeSecrets}`);
+  lines.push(`Public read routes avoid advice copy: ${result.apiRouteBoundaryInventoryContract.publicReadRoutesDoNotReturnAdviceCopy}`);
+  lines.push(`Browser mutation routes use origin/pre-auth: ${result.apiRouteBoundaryInventoryContract.browserMutationRoutesUseOriginAndPreAuth}`);
+  lines.push(`Browser mutation routes use no-store: ${result.apiRouteBoundaryInventoryContract.browserMutationRoutesUseNoStore}`);
+  lines.push(`Authenticated file route uses API-key entitlement: ${result.apiRouteBoundaryInventoryContract.authenticatedFileRouteUsesApiKeyEntitlement}`);
+  lines.push(`Webhook routes avoid same-origin guard: ${result.apiRouteBoundaryInventoryContract.webhookRoutesDoNotUseSameOriginGuard}`);
+  lines.push(`Webhook routes use signature verification: ${result.apiRouteBoundaryInventoryContract.webhookRoutesUseSignatureVerification}`);
+  lines.push(`All API routes use explicit response construction: ${result.apiRouteBoundaryInventoryContract.allApiRoutesHaveExplicitResponseConstruction}`);
+  lines.push(`No route exposes keyHash/secret patterns: ${result.apiRouteBoundaryInventoryContract.noRouteExposesKeyHashOrSecretPatterns}`);
+  lines.push("Route inventory:");
+  for (const item of result.apiRouteBoundaryInventoryContract.routeInventory) {
+    lines.push(`- ${item.classification}: ${item.path}`);
+  }
+  lines.push("");
   lines.push("## Prisma billing data model contract");
   lines.push("");
   lines.push(`Schema exists: ${result.prismaBillingDataModelContract.schemaExists}`);
@@ -10141,6 +10508,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-048 API Route Boundary Inventory Contract: inventories src/app/api route.ts files, classifies public read/browser mutation/authenticated file/webhook routes, blocks unclassified mutations, enforces origin/pre-auth/no-store on browser mutations, protects public read routes from private auth/billing/secrets/advice copy, and confirms authenticated file delivery uses API-key entitlement before storage reads.");
   lines.push("- D-047 Prisma Billing Data Model Contract: verifies Prisma datasource, paid-tier/status enums, Account/Subscription/ApiKey/CustomOutput models, Stripe uniqueness, entitlement fields, keyHash/keyPrefix persistence, cascade relations, indexes, table mappings, and no plaintext API-key secret fields.");
   lines.push("- D-046 API Key Persistence Helper Contract: verifies development and persisted API-key helpers, prefix-before-hash lookup, scrypt verification, latest-subscription entitlement projection, revoked-key lastUsedAt guard, safe display rows, and no raw secret exposure in dashboard-facing helpers.");
   lines.push("- D-045 Account Rate Limit Daily Quota Contract: verifies tier-based authenticated rate limits, daily API quotas, Upstash/env configuration, UTC-day quota reset, production fail-closed behavior, non-production memory fallback, and rate/quota headers.");
