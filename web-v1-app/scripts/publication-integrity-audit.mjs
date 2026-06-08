@@ -8,6 +8,7 @@ import path from "node:path";
 const root = process.cwd();
 const repoRoot = path.resolve(path.join(root, ".."));
 const appApiRouteRoot = path.join(root, "src", "app", "api");
+const stripeWebhookRouteRoot = path.join(root, "src", "app", "api");
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -9478,6 +9479,192 @@ function evaluateApiRouteBoundaryInventoryContract(findings) {
 
   return result;
 }
+function findStripeWebhookRouteFiles() {
+  if (!fs.existsSync(stripeWebhookRouteRoot)) {
+    return [];
+  }
+
+  const candidates = [];
+
+  function walk(current) {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+
+      if (!entry.isFile() || entry.name !== "route.ts") {
+        continue;
+      }
+
+      const relative = path.relative(root, full).replace(/\\/gu, "/");
+      const source = fs.readFileSync(full, "utf8").replace(/^\uFEFF/u, "");
+
+      if (
+        relative.toLowerCase().includes("webhook") ||
+        source.includes("STRIPE_WEBHOOK_SECRET") ||
+        source.includes("stripe.webhooks.constructEvent") ||
+        source.includes("constructEvent(")
+      ) {
+        candidates.push({ full, relative, source });
+      }
+    }
+  }
+
+  walk(stripeWebhookRouteRoot);
+  return candidates.sort((a, b) => a.relative.localeCompare(b.relative));
+}
+
+function evaluateStripeWebhookReadinessContract(findings) {
+  const result = {
+    webhookRouteCount: 0,
+    routePaths: [],
+    routeMissingLaunchGap: false,
+
+    usesPostOnly: true,
+    usesRawRequestBody: true,
+    usesStripeSignatureHeader: true,
+    usesWebhookSecret: true,
+    usesConstructEvent: true,
+    avoidsSameOriginGuard: true,
+    avoidsPreAuthRateLimit: true,
+    usesDatabaseWritePath: true,
+    syncsAccountByStripeCustomer: true,
+    syncsSubscriptionIdentifiers: true,
+    syncsTierStatusEntitlement: true,
+    syncsCurrentPeriodEnd: true,
+    handlesCheckoutCompleted: true,
+    handlesSubscriptionUpdated: true,
+    handlesSubscriptionDeleted: true,
+    handlesIdempotentUpsertOrUpdate: true,
+    returnsNoStoreJson: true,
+    doesNotExposeSecretsOrWebhookPayload: true,
+    recordsAuditEventOrSafeWarning: true,
+  };
+
+  const routes = findStripeWebhookRouteFiles();
+  result.webhookRouteCount = routes.length;
+  result.routePaths = routes.map((route) => route.relative);
+
+  if (routes.length === 0) {
+    result.routeMissingLaunchGap = true;
+
+    addFinding(
+      findings,
+      "warn",
+      "D-049",
+      "STRIPE_WEBHOOK_ROUTE_NOT_IMPLEMENTED",
+      path.relative(root, stripeWebhookRouteRoot),
+      "Stripe webhook route was not found. This is acceptable during pre-launch hardening, but launch remains incomplete until subscription sync is implemented and covered by this contract."
+    );
+
+    return result;
+  }
+
+  for (const route of routes) {
+    const source = route.source;
+    const relative = route.relative;
+
+    const checks = {
+      usesPostOnly: source.includes("export async function POST") && !source.includes("export async function GET"),
+      usesRawRequestBody:
+        source.includes("await request.text()") ||
+        source.includes("await req.text()") ||
+        source.includes("request.arrayBuffer()"),
+      usesStripeSignatureHeader:
+        source.includes('headers().get("stripe-signature")') ||
+        source.includes('request.headers.get("stripe-signature")') ||
+        source.includes("'stripe-signature'"),
+      usesWebhookSecret: source.includes("STRIPE_WEBHOOK_SECRET"),
+      usesConstructEvent:
+        source.includes("stripe.webhooks.constructEvent") ||
+        source.includes(".webhooks.constructEvent") ||
+        source.includes("constructEvent("),
+      avoidsSameOriginGuard: !source.includes("validateSameOriginRequest"),
+      avoidsPreAuthRateLimit: !source.includes("enforcePreAuthRateLimit"),
+      usesDatabaseWritePath:
+        source.includes("@/lib/db") ||
+        source.includes("db.") ||
+        source.includes("prisma."),
+      syncsAccountByStripeCustomer:
+        source.includes("stripeCustomerId") &&
+        (source.includes("customer") || source.includes("customerId")),
+      syncsSubscriptionIdentifiers:
+        source.includes("stripeSubscriptionId") &&
+        source.includes("subscription"),
+      syncsTierStatusEntitlement:
+        source.includes("SubscriptionTier") &&
+        source.includes("SubscriptionStatus") &&
+        source.includes("historyUnlocked") &&
+        source.includes("entitledChain"),
+      syncsCurrentPeriodEnd:
+        source.includes("currentPeriodEnd") ||
+        source.includes("current_period_end"),
+      handlesCheckoutCompleted:
+        source.includes("checkout.session.completed"),
+      handlesSubscriptionUpdated:
+        source.includes("customer.subscription.updated"),
+      handlesSubscriptionDeleted:
+        source.includes("customer.subscription.deleted"),
+      handlesIdempotentUpsertOrUpdate:
+        source.includes("upsert") ||
+        source.includes("updateMany") ||
+        source.includes("connectOrCreate") ||
+        source.includes("transaction"),
+      returnsNoStoreJson:
+        source.includes('"Cache-Control": "no-store"') ||
+        source.includes('headers.set("Cache-Control", "no-store")'),
+      doesNotExposeSecretsOrWebhookPayload:
+        !source.includes("return NextResponse.json(event") &&
+        !source.includes("return Response.json(event") &&
+        !source.includes("STRIPE_SECRET_KEY") &&
+        !source.includes("whsec_") &&
+        !source.includes("sk_live_"),
+      recordsAuditEventOrSafeWarning:
+        source.includes("writeAuditLog") ||
+        source.includes("console.warn") ||
+        source.includes("console.error"),
+    };
+
+    for (const [key, ok] of Object.entries(checks)) {
+      if (!ok) {
+        result[key] = false;
+      }
+    }
+
+    const failures = [
+      ["STRIPE_WEBHOOK_POST_ONLY_INVALID", checks.usesPostOnly, "Stripe webhook route must expose POST only."],
+      ["STRIPE_WEBHOOK_RAW_BODY_MISSING", checks.usesRawRequestBody, "Stripe webhook route must use raw request body for signature verification."],
+      ["STRIPE_WEBHOOK_SIGNATURE_HEADER_MISSING", checks.usesStripeSignatureHeader, "Stripe webhook route must read the stripe-signature header."],
+      ["STRIPE_WEBHOOK_SECRET_MISSING", checks.usesWebhookSecret, "Stripe webhook route must use STRIPE_WEBHOOK_SECRET."],
+      ["STRIPE_WEBHOOK_CONSTRUCT_EVENT_MISSING", checks.usesConstructEvent, "Stripe webhook route must verify payload via stripe.webhooks.constructEvent."],
+      ["STRIPE_WEBHOOK_SAME_ORIGIN_GUARD_INVALID", checks.avoidsSameOriginGuard, "Stripe webhook route must not use browser same-origin guard."],
+      ["STRIPE_WEBHOOK_PREAUTH_RATE_LIMIT_INVALID", checks.avoidsPreAuthRateLimit, "Stripe webhook route must not use browser pre-auth rate-limit."],
+      ["STRIPE_WEBHOOK_DB_WRITE_PATH_MISSING", checks.usesDatabaseWritePath, "Stripe webhook route must write subscription/account state to the database."],
+      ["STRIPE_WEBHOOK_CUSTOMER_SYNC_MISSING", checks.syncsAccountByStripeCustomer, "Stripe webhook route must sync Account/Subscription by stripeCustomerId."],
+      ["STRIPE_WEBHOOK_SUBSCRIPTION_ID_SYNC_MISSING", checks.syncsSubscriptionIdentifiers, "Stripe webhook route must sync stripeSubscriptionId."],
+      ["STRIPE_WEBHOOK_ENTITLEMENT_SYNC_MISSING", checks.syncsTierStatusEntitlement, "Stripe webhook route must sync tier/status/historyUnlocked/entitledChain."],
+      ["STRIPE_WEBHOOK_PERIOD_END_SYNC_MISSING", checks.syncsCurrentPeriodEnd, "Stripe webhook route must sync currentPeriodEnd."],
+      ["STRIPE_WEBHOOK_CHECKOUT_COMPLETED_MISSING", checks.handlesCheckoutCompleted, "Stripe webhook route must handle checkout.session.completed."],
+      ["STRIPE_WEBHOOK_SUBSCRIPTION_UPDATED_MISSING", checks.handlesSubscriptionUpdated, "Stripe webhook route must handle customer.subscription.updated."],
+      ["STRIPE_WEBHOOK_SUBSCRIPTION_DELETED_MISSING", checks.handlesSubscriptionDeleted, "Stripe webhook route must handle customer.subscription.deleted."],
+      ["STRIPE_WEBHOOK_IDEMPOTENCY_MISSING", checks.handlesIdempotentUpsertOrUpdate, "Stripe webhook route must be idempotent via upsert/updateMany/transaction/connectOrCreate."],
+      ["STRIPE_WEBHOOK_NO_STORE_MISSING", checks.returnsNoStoreJson, "Stripe webhook route must return no-store JSON responses."],
+      ["STRIPE_WEBHOOK_SECRET_OR_PAYLOAD_EXPOSURE_RISK", checks.doesNotExposeSecretsOrWebhookPayload, "Stripe webhook route must not return raw event payloads or contain literal live secrets."],
+      ["STRIPE_WEBHOOK_AUDIT_OR_WARNING_MISSING", checks.recordsAuditEventOrSafeWarning, "Stripe webhook route must record an audit event or emit safe operational warnings/errors."]
+    ];
+
+    for (const [code, ok, detail] of failures) {
+      if (!ok) {
+        addFinding(findings, "fail", "D-049", code, relative, detail);
+      }
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -9533,6 +9720,7 @@ function evaluate() {
   const apiKeyPersistenceHelperContract = evaluateApiKeyPersistenceHelperContract(findings);
   const prismaBillingDataModelContract = evaluatePrismaBillingDataModelContract(findings);
   const apiRouteBoundaryInventoryContract = evaluateApiRouteBoundaryInventoryContract(findings);
+  const stripeWebhookReadinessContract = evaluateStripeWebhookReadinessContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -9584,6 +9772,7 @@ function evaluate() {
     apiKeyPersistenceHelperContract,
     prismaBillingDataModelContract,
     apiRouteBoundaryInventoryContract,
+    stripeWebhookReadinessContract,
     findings,
   };
 }
@@ -9643,6 +9832,32 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Stripe webhook readiness contract");
+  lines.push("");
+  lines.push(`Webhook route count: ${result.stripeWebhookReadinessContract.webhookRouteCount}`);
+  lines.push(`Webhook route missing launch gap: ${result.stripeWebhookReadinessContract.routeMissingLaunchGap}`);
+  lines.push(`Webhook routes: ${result.stripeWebhookReadinessContract.routePaths.length ? result.stripeWebhookReadinessContract.routePaths.join(", ") : "(none found)"}`);
+  lines.push(`POST only: ${result.stripeWebhookReadinessContract.usesPostOnly}`);
+  lines.push(`Raw request body: ${result.stripeWebhookReadinessContract.usesRawRequestBody}`);
+  lines.push(`Stripe signature header: ${result.stripeWebhookReadinessContract.usesStripeSignatureHeader}`);
+  lines.push(`Webhook secret: ${result.stripeWebhookReadinessContract.usesWebhookSecret}`);
+  lines.push(`constructEvent verification: ${result.stripeWebhookReadinessContract.usesConstructEvent}`);
+  lines.push(`Avoids same-origin guard: ${result.stripeWebhookReadinessContract.avoidsSameOriginGuard}`);
+  lines.push(`Avoids pre-auth rate-limit: ${result.stripeWebhookReadinessContract.avoidsPreAuthRateLimit}`);
+  lines.push(`Database write path: ${result.stripeWebhookReadinessContract.usesDatabaseWritePath}`);
+  lines.push(`Syncs account by Stripe customer: ${result.stripeWebhookReadinessContract.syncsAccountByStripeCustomer}`);
+  lines.push(`Syncs subscription identifiers: ${result.stripeWebhookReadinessContract.syncsSubscriptionIdentifiers}`);
+  lines.push(`Syncs tier/status/entitlement: ${result.stripeWebhookReadinessContract.syncsTierStatusEntitlement}`);
+  lines.push(`Syncs currentPeriodEnd: ${result.stripeWebhookReadinessContract.syncsCurrentPeriodEnd}`);
+  lines.push(`Handles checkout.session.completed: ${result.stripeWebhookReadinessContract.handlesCheckoutCompleted}`);
+  lines.push(`Handles customer.subscription.updated: ${result.stripeWebhookReadinessContract.handlesSubscriptionUpdated}`);
+  lines.push(`Handles customer.subscription.deleted: ${result.stripeWebhookReadinessContract.handlesSubscriptionDeleted}`);
+  lines.push(`Idempotent upsert/update/transaction path: ${result.stripeWebhookReadinessContract.handlesIdempotentUpsertOrUpdate}`);
+  lines.push(`No-store JSON responses: ${result.stripeWebhookReadinessContract.returnsNoStoreJson}`);
+  lines.push(`No secret/raw payload exposure: ${result.stripeWebhookReadinessContract.doesNotExposeSecretsOrWebhookPayload}`);
+  lines.push(`Audit event or safe warning: ${result.stripeWebhookReadinessContract.recordsAuditEventOrSafeWarning}`);
+  lines.push("D-049 launch note: absence of a Stripe webhook route is reported as a warning, not a failing gate, until subscription sync implementation starts.");
+  lines.push("");
   lines.push("## API route boundary inventory contract");
   lines.push("");
   lines.push(`API root exists: ${result.apiRouteBoundaryInventoryContract.apiRootExists}`);
@@ -10508,6 +10723,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-049 Stripe Webhook Readiness Contract: reports missing Stripe webhook as a launch warning during pre-implementation, and enforces POST-only raw-body signature verification, STRIPE_WEBHOOK_SECRET, no browser same-origin guard, DB subscription sync, idempotent upsert/update semantics, no-store responses, and no raw payload/secret exposure once a webhook route exists.");
   lines.push("- D-048 API Route Boundary Inventory Contract: inventories src/app/api route.ts files, classifies public read/browser mutation/authenticated file/webhook routes, blocks unclassified mutations, enforces origin/pre-auth/no-store on browser mutations, protects public read routes from private auth/billing/secrets/advice copy, and confirms authenticated file delivery uses API-key entitlement before storage reads.");
   lines.push("- D-047 Prisma Billing Data Model Contract: verifies Prisma datasource, paid-tier/status enums, Account/Subscription/ApiKey/CustomOutput models, Stripe uniqueness, entitlement fields, keyHash/keyPrefix persistence, cascade relations, indexes, table mappings, and no plaintext API-key secret fields.");
   lines.push("- D-046 API Key Persistence Helper Contract: verifies development and persisted API-key helpers, prefix-before-hash lookup, scrypt verification, latest-subscription entitlement projection, revoked-key lastUsedAt guard, safe display rows, and no raw secret exposure in dashboard-facing helpers.");
