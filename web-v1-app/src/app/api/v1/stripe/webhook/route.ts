@@ -389,6 +389,56 @@ async function syncSubscriptionEvent(
   return "ok";
 }
 
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
+async function recordStripeWebhookEventReceived(event: Stripe.Event): Promise<"created" | "duplicate"> {
+  try {
+    await db.stripeWebhookEvent.create({
+      data: {
+        stripeEventId: event.id,
+        eventType: event.type,
+        status: "processing",
+      },
+    });
+
+    return "created";
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      console.info("[stripe-webhook] duplicate event ignored", {
+        stripeEventId: event.id,
+        type: event.type,
+      });
+
+      return "duplicate";
+    }
+
+    throw error;
+  }
+}
+
+async function markStripeWebhookEvent(
+  event: Stripe.Event,
+  status: "processed" | "ignored" | "failed",
+  errorCode?: string
+): Promise<void> {
+  await db.stripeWebhookEvent.updateMany({
+    where: {
+      stripeEventId: event.id,
+    },
+    data: {
+      status,
+      processedAt: new Date(),
+      errorCode: errorCode ?? null,
+    },
+  });
+}
 async function handleVerifiedEvent(stripe: Stripe, event: Stripe.Event): Promise<"ok" | "ignored"> {
   switch (event.type) {
     case "checkout.session.completed":
@@ -439,7 +489,27 @@ export async function POST(request: Request) {
   }
 
   try {
+    const replayDecision = await recordStripeWebhookEventReceived(event);
+
+    if (replayDecision === "duplicate") {
+      return jsonResponse(200, "ignored", "Stripe webhook event already processed.");
+    }
+  } catch (error) {
+    console.error("[stripe-webhook] replay persistence failed", {
+      type: event.type,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return jsonResponse(500, "webhook_error", "Stripe webhook replay persistence failed.");
+  }
+
+  try {
     const result = await handleVerifiedEvent(stripe, event);
+    await markStripeWebhookEvent(
+      event,
+      result === "ok" ? "processed" : "ignored"
+    );
+
     return jsonResponse(
       200,
       result,
@@ -449,6 +519,13 @@ export async function POST(request: Request) {
     console.error("[stripe-webhook] processing failed", {
       type: event.type,
       error: error instanceof Error ? error.message : String(error),
+    });
+
+    await markStripeWebhookEvent(event, "failed", "processing_failed").catch((markError) => {
+      console.warn("[stripe-webhook] failed to mark webhook event as failed", {
+        type: event.type,
+        error: markError instanceof Error ? markError.message : String(markError),
+      });
     });
 
     return jsonResponse(500, "webhook_error", "Stripe webhook processing failed.");

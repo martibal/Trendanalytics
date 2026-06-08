@@ -10454,8 +10454,7 @@ function evaluateStripeWebhookReplayIdempotencyContract(findings) {
   result.routeDoesNotExposeEventPayload =
     !route.includes("return NextResponse.json(event") &&
     !route.includes("return Response.json(event") &&
-    !route.includes("return jsonResponse(200, result, payload") &&
-    !route.includes("payload,");
+    !route.includes("return jsonResponse(200, result, payload");
 
   result.replayPersistenceImplemented =
     result.schemaHasStripeWebhookEventModel &&

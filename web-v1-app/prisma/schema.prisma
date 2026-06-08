@@ -26,6 +26,13 @@ enum ApiKeyStatus {
   revoked
 }
 
+
+enum StripeWebhookEventStatus {
+  processing
+  processed
+  ignored
+  failed
+}
 model Account {
   id                 String         @id @default(uuid()) @db.Uuid
   authProviderUserId String         @unique @map("auth_provider_user_id")
@@ -96,4 +103,19 @@ model CustomOutput {
   @@index([accountId], map: "custom_outputs_account_id_idx")
   @@index([canonicalRevisionId], map: "custom_outputs_canonical_revision_id_idx")
   @@map("custom_outputs")
+}
+
+model StripeWebhookEvent {
+  id            String                   @id @default(uuid()) @db.Uuid
+  stripeEventId String                   @unique @map("stripe_event_id")
+  eventType     String                   @map("event_type")
+  status        StripeWebhookEventStatus
+  receivedAt    DateTime                 @default(now()) @map("received_at") @db.Timestamptz(6)
+  processedAt   DateTime?                @map("processed_at") @db.Timestamptz(6)
+  errorCode     String?                  @map("error_code")
+
+  @@index([eventType], map: "stripe_webhook_events_event_type_idx")
+  @@index([status], map: "stripe_webhook_events_status_idx")
+  @@index([receivedAt], map: "stripe_webhook_events_received_at_idx")
+  @@map("stripe_webhook_events")
 }
