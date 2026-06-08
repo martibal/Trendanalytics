@@ -21,6 +21,7 @@ const prismaMigrationsDeploymentPath = path.join(root, "prisma", "migrations");
 const stripeWebhookEventMigrationPath = path.join(root, "prisma", "migrations", "20260608120000_add_stripe_webhook_events", "migration.sql");
 const stripeWebhookDeploymentRunbookPath = path.join(root, "docs", "stripe-webhook-deployment-runbook.md");
 const stripeWebhookOperationalVerificationPath = path.join(root, "docs", "stripe-webhook-operational-verification.md");
+const billingLaunchChecklistPath = path.join(root, "docs", "billing-launch-checklist.md");
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -11164,6 +11165,170 @@ function evaluateStripeWebhookOperationalVerificationContract(findings) {
 
   return result;
 }
+function evaluateBillingLaunchChecklistContract(findings) {
+  const result = {
+    checklistExists: fs.existsSync(billingLaunchChecklistPath),
+
+    documentsCodeAndBuildGates: false,
+    documentsDatabaseGates: false,
+    documentsStripeEnvGates: false,
+    documentsStripeDashboardGates: false,
+    documentsCheckoutGates: false,
+    documentsWebhookGates: false,
+    documentsAccountApiAccessGates: false,
+    documentsBillingPortalGates: false,
+    documentsOperationalRunbooks: false,
+    documentsRollbackGates: false,
+    documentsCompletionCriteria: false,
+    noLiteralStripeSecrets: false,
+    noAdviceOrForecastCopy: false,
+  };
+
+  if (!result.checklistExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-060",
+      "BILLING_LAUNCH_CHECKLIST_MISSING",
+      path.relative(root, billingLaunchChecklistPath),
+      "Billing launch checklist must exist before live checkout traffic is enabled."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(billingLaunchChecklistPath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  result.documentsCodeAndBuildGates =
+    normalized.includes("npm run check:publication-integrity") &&
+    normalized.includes("npm run check:audit-gates") &&
+    normalized.includes("npm run build") &&
+    normalized.includes("Prisma Client generation before Next.js build");
+
+  result.documentsDatabaseGates =
+    normalized.includes("production database") &&
+    normalized.includes("stripe_webhook_events") &&
+    normalized.includes("StripeWebhookEventStatus") &&
+    normalized.includes("prisma/migrations/20260608120000_add_stripe_webhook_events/migration.sql") &&
+    normalized.includes("Do not enable live checkout traffic before this migration is applied");
+
+  result.documentsStripeEnvGates =
+    normalized.includes("STRIPE_SECRET_KEY") &&
+    normalized.includes("STRIPE_WEBHOOK_SECRET") &&
+    normalized.includes("STRIPE_PRICE_BASIC") &&
+    normalized.includes("STRIPE_PRICE_PRO") &&
+    normalized.includes("NEXT_PUBLIC_APP_URL") &&
+    normalized.includes("DATABASE_URL") &&
+    normalized.includes("DIRECT_URL") &&
+    normalized.includes("live key in production") &&
+    normalized.includes("exact Stripe Dashboard webhook endpoint");
+
+  result.documentsStripeDashboardGates =
+    normalized.includes("Product/price for basic plan") &&
+    normalized.includes("Product/price for pro plan") &&
+    normalized.includes("Webhook endpoint pointing to /api/v1/stripe/webhook") &&
+    normalized.includes("checkout.session.completed enabled") &&
+    normalized.includes("customer.subscription.updated enabled") &&
+    normalized.includes("customer.subscription.deleted enabled") &&
+    normalized.includes("match the production Stripe prices");
+
+  result.documentsCheckoutGates =
+    normalized.includes("unauthenticated users cannot create checkout sessions") &&
+    normalized.includes("same-origin validation") &&
+    normalized.includes("pre-auth rate limiting") &&
+    normalized.includes("basic checkout asks for entitled_chain") &&
+    normalized.includes("pro checkout does not require entitled_chain") &&
+    normalized.includes("client_reference_id to account id") &&
+    normalized.includes("metadata used by webhook sync");
+
+  result.documentsWebhookGates =
+    normalized.includes("webhook rejects invalid signatures") &&
+    normalized.includes("webhook accepts valid signed events") &&
+    normalized.includes("webhook creates stripe_webhook_events row before business processing") &&
+    normalized.includes("duplicate Stripe event id returns safe ignored acknowledgement") &&
+    normalized.includes("checkout.session.completed creates or updates local subscription state") &&
+    normalized.includes("customer.subscription.updated updates local subscription state") &&
+    normalized.includes("customer.subscription.deleted marks local subscription inactive");
+
+  result.documentsAccountApiAccessGates =
+    normalized.includes("dashboard displays subscription tier") &&
+    normalized.includes("dashboard displays allowed chains and windows") &&
+    normalized.includes("API key creation is authenticated") &&
+    normalized.includes("generated API key is shown only once") &&
+    normalized.includes("file/API delivery enforces API key authentication") &&
+    normalized.includes("file/API delivery enforces entitlement before storage access") &&
+    normalized.includes("public preview data remains public-only");
+
+  result.documentsBillingPortalGates =
+    normalized.includes("authenticated user can open billing portal") &&
+    normalized.includes("unauthenticated user cannot open billing portal") &&
+    normalized.includes("billing portal uses existing Stripe customer id only") &&
+    normalized.includes("billing portal requests are same-origin protected") &&
+    normalized.includes("billing portal responses are no-store");
+
+  result.documentsOperationalRunbooks =
+    normalized.includes("docs/stripe-webhook-operational-verification.md") &&
+    normalized.includes("docs/stripe-webhook-deployment-runbook.md");
+
+  result.documentsRollbackGates =
+    normalized.includes("stop live checkout traffic") &&
+    normalized.includes("keep Stripe failed events available for replay") &&
+    normalized.includes("preserve stripe_webhook_events history") &&
+    normalized.includes("do not delete subscription records as a rollback shortcut") &&
+    normalized.includes("replay failed Stripe events only after the underlying issue is fixed");
+
+  result.documentsCompletionCriteria =
+    normalized.includes("all audit gates are green") &&
+    normalized.includes("production DB migration is applied") &&
+    normalized.includes("production Stripe env vars are set") &&
+    normalized.includes("Stripe Dashboard webhook endpoint is configured") &&
+    normalized.includes("checkout creates Stripe sessions") &&
+    normalized.includes("webhook syncs subscription state") &&
+    normalized.includes("duplicate events are ignored safely") &&
+    normalized.includes("billing portal opens for subscribed users") &&
+    normalized.includes("API/file delivery enforces entitlements") &&
+    normalized.includes("logs and responses expose no secrets or raw Stripe payloads");
+
+  result.noLiteralStripeSecrets =
+    !/sk_live_[A-Za-z0-9]{8,}/u.test(normalized) &&
+    !/rk_live_[A-Za-z0-9]{8,}/u.test(normalized) &&
+    !/whsec_[A-Za-z0-9]{8,}/u.test(normalized);
+
+  result.noAdviceOrForecastCopy =
+    !/\b(?:buy|sell|hold|forecast|prediction|price target|investment advice|financial advice|should invest|expected return)\b/iu.test(normalized);
+
+  const requiredChecks = [
+    ["BILLING_LAUNCH_CODE_BUILD_GATES_INVALID", result.documentsCodeAndBuildGates, "Billing launch checklist must document code/build audit gates."],
+    ["BILLING_LAUNCH_DATABASE_GATES_INVALID", result.documentsDatabaseGates, "Billing launch checklist must document DB migration gates."],
+    ["BILLING_LAUNCH_STRIPE_ENV_GATES_INVALID", result.documentsStripeEnvGates, "Billing launch checklist must document Stripe/database/app environment gates."],
+    ["BILLING_LAUNCH_STRIPE_DASHBOARD_GATES_INVALID", result.documentsStripeDashboardGates, "Billing launch checklist must document Stripe Dashboard gates."],
+    ["BILLING_LAUNCH_CHECKOUT_GATES_INVALID", result.documentsCheckoutGates, "Billing launch checklist must document checkout behavior gates."],
+    ["BILLING_LAUNCH_WEBHOOK_GATES_INVALID", result.documentsWebhookGates, "Billing launch checklist must document webhook behavior gates."],
+    ["BILLING_LAUNCH_ACCOUNT_API_GATES_INVALID", result.documentsAccountApiAccessGates, "Billing launch checklist must document dashboard/API/file entitlement gates."],
+    ["BILLING_LAUNCH_PORTAL_GATES_INVALID", result.documentsBillingPortalGates, "Billing launch checklist must document billing portal gates."],
+    ["BILLING_LAUNCH_RUNBOOK_LINKS_INVALID", result.documentsOperationalRunbooks, "Billing launch checklist must link operational verification and deployment runbooks."],
+    ["BILLING_LAUNCH_ROLLBACK_GATES_INVALID", result.documentsRollbackGates, "Billing launch checklist must document rollback gates."],
+    ["BILLING_LAUNCH_COMPLETION_CRITERIA_INVALID", result.documentsCompletionCriteria, "Billing launch checklist must define completion criteria."],
+    ["BILLING_LAUNCH_SECRET_EXPOSURE_RISK", result.noLiteralStripeSecrets, "Billing launch checklist must not contain literal live/restricted Stripe keys or whsec values."],
+    ["BILLING_LAUNCH_ADVICE_COPY_RISK", result.noAdviceOrForecastCopy, "Billing launch checklist must not contain advice/forecast copy."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-060",
+        code,
+        path.relative(root, billingLaunchChecklistPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -11228,6 +11393,7 @@ function evaluate() {
   const stripeWebhookEventMigrationRequiredContract = evaluateStripeWebhookEventMigrationRequiredContract(findings);
   const stripeWebhookDeploymentRunbookContract = evaluateStripeWebhookDeploymentRunbookContract(findings);
   const stripeWebhookOperationalVerificationContract = evaluateStripeWebhookOperationalVerificationContract(findings);
+  const billingLaunchChecklistContract = evaluateBillingLaunchChecklistContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -11288,6 +11454,7 @@ function evaluate() {
     stripeWebhookEventMigrationRequiredContract,
     stripeWebhookDeploymentRunbookContract,
     stripeWebhookOperationalVerificationContract,
+    billingLaunchChecklistContract,
     findings,
   };
 }
@@ -11347,6 +11514,23 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Billing launch checklist contract");
+  lines.push("");
+  lines.push(`Checklist exists: ${result.billingLaunchChecklistContract.checklistExists}`);
+  lines.push(`Documents code/build gates: ${result.billingLaunchChecklistContract.documentsCodeAndBuildGates}`);
+  lines.push(`Documents database gates: ${result.billingLaunchChecklistContract.documentsDatabaseGates}`);
+  lines.push(`Documents Stripe env gates: ${result.billingLaunchChecklistContract.documentsStripeEnvGates}`);
+  lines.push(`Documents Stripe Dashboard gates: ${result.billingLaunchChecklistContract.documentsStripeDashboardGates}`);
+  lines.push(`Documents checkout gates: ${result.billingLaunchChecklistContract.documentsCheckoutGates}`);
+  lines.push(`Documents webhook gates: ${result.billingLaunchChecklistContract.documentsWebhookGates}`);
+  lines.push(`Documents account/API access gates: ${result.billingLaunchChecklistContract.documentsAccountApiAccessGates}`);
+  lines.push(`Documents billing portal gates: ${result.billingLaunchChecklistContract.documentsBillingPortalGates}`);
+  lines.push(`Documents operational runbooks: ${result.billingLaunchChecklistContract.documentsOperationalRunbooks}`);
+  lines.push(`Documents rollback gates: ${result.billingLaunchChecklistContract.documentsRollbackGates}`);
+  lines.push(`Documents completion criteria: ${result.billingLaunchChecklistContract.documentsCompletionCriteria}`);
+  lines.push(`No literal Stripe secrets: ${result.billingLaunchChecklistContract.noLiteralStripeSecrets}`);
+  lines.push(`No advice/forecast copy: ${result.billingLaunchChecklistContract.noAdviceOrForecastCopy}`);
+  lines.push("");
   lines.push("## Stripe webhook operational verification contract");
   lines.push("");
   lines.push(`Checklist exists: ${result.stripeWebhookOperationalVerificationContract.checklistExists}`);
@@ -12395,6 +12579,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-060 Billing Launch Checklist Contract: requires a committed billing launch checklist covering code/build gates, DB migration gates, Stripe env and Dashboard setup, checkout behavior, webhook behavior, dashboard/API/file entitlement enforcement, billing portal, runbook links, rollback gates, completion criteria, and no literal secret/advice copy.");
   lines.push("- D-059 Stripe Webhook Operational Verification Contract: requires a committed operational verification checklist for Stripe webhook production validation, including prerequisites, event delivery tests, valid/invalid signature behavior, stripe_webhook_events DB checks, subscription state checks, duplicate replay checks, failure/recovery replay, rollback behavior, completion criteria, and no literal secret/advice copy.");
   lines.push("- D-058 Stripe Webhook Deployment Runbook Contract: requires a committed deployment runbook for Stripe webhook production setup, including endpoint path, required events, env vars, live/test boundary, webhook secret source, DB migration requirement, migration path, Prisma generate vs DB migration distinction, deployment sequence, replay handling, failure handling, and no secret/advice copy.");
   lines.push("- D-057 Stripe Webhook Event Migration Required Contract: hard-requires the committed stripe_webhook_events migration to match Prisma schema, including StripeWebhookEventStatus, table columns, unique stripe_event_id, replay indexes, UUID/timestamptz field types, IF NOT EXISTS safety, schema mapping parity, and no literal Stripe secrets.");
