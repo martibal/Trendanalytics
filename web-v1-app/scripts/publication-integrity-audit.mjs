@@ -18,6 +18,7 @@ const stripeWebhookReplayRoutePath = path.join(root, "src", "app", "api", "v1", 
 const prismaSchemaDeploymentPath = path.join(root, "prisma", "schema.prisma");
 const prismaPackageDeploymentPath = path.join(root, "package.json");
 const prismaMigrationsDeploymentPath = path.join(root, "prisma", "migrations");
+const stripeWebhookEventMigrationPath = path.join(root, "prisma", "migrations", "20260608120000_add_stripe_webhook_events", "migration.sql");
 const prismaBillingSchemaPath = path.join(root, "prisma", "schema.prisma");
 const apiKeyPersistenceModulePath = path.join(root, "src", "lib", "auth", "apiKeys.ts");
 const accountRateLimitModulePath = path.join(root, "src", "lib", "auth", "rateLimit.ts");
@@ -10724,6 +10725,162 @@ function evaluatePrismaDbDeploymentContract(findings) {
 
   return result;
 }
+function evaluateStripeWebhookEventMigrationRequiredContract(findings) {
+  const result = {
+    schemaExists: fs.existsSync(prismaSchemaDeploymentPath),
+    migrationExists: fs.existsSync(stripeWebhookEventMigrationPath),
+
+    schemaDefinesWebhookEventStatusEnum: false,
+    schemaDefinesWebhookEventModel: false,
+    migrationCreatesWebhookEventStatusEnum: false,
+    migrationCreatesWebhookEventsTable: false,
+    migrationCreatesUniqueStripeEventIdIndex: false,
+    migrationCreatesRequiredReplayIndexes: false,
+    migrationUsesIfNotExistsSafety: false,
+    migrationUsesUuidPrimaryKey: false,
+    migrationUsesTimestamptzFields: false,
+    migrationMatchesSchemaFieldNames: false,
+    migrationNoLiteralSecrets: false,
+  };
+
+  if (!result.schemaExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-057",
+      "STRIPE_WEBHOOK_EVENT_SCHEMA_MISSING",
+      path.relative(root, prismaSchemaDeploymentPath),
+      "Prisma schema is missing; cannot verify webhook event migration."
+    );
+
+    return result;
+  }
+
+  if (!result.migrationExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-057",
+      "STRIPE_WEBHOOK_EVENT_MIGRATION_MISSING",
+      path.relative(root, stripeWebhookEventMigrationPath),
+      "Stripe webhook event replay persistence now requires a committed migration.sql."
+    );
+
+    return result;
+  }
+
+  const schema = fs.readFileSync(prismaSchemaDeploymentPath, "utf8").replace(/^\uFEFF/u, "").replace(/\r\n/gu, "\n");
+  const migration = fs.readFileSync(stripeWebhookEventMigrationPath, "utf8").replace(/^\uFEFF/u, "").replace(/\r\n/gu, "\n");
+
+  result.schemaDefinesWebhookEventStatusEnum =
+    schema.includes("enum StripeWebhookEventStatus") &&
+    schema.includes("processing") &&
+    schema.includes("processed") &&
+    schema.includes("ignored") &&
+    schema.includes("failed");
+
+  result.schemaDefinesWebhookEventModel =
+    schema.includes("model StripeWebhookEvent {") &&
+    schema.includes("stripeEventId") &&
+    schema.includes('@map("stripe_event_id")') &&
+    schema.includes("eventType") &&
+    schema.includes('@map("event_type")') &&
+    schema.includes("status        StripeWebhookEventStatus") &&
+    schema.includes("receivedAt") &&
+    schema.includes('@map("received_at")') &&
+    schema.includes("processedAt") &&
+    schema.includes('@map("processed_at")') &&
+    schema.includes("errorCode") &&
+    schema.includes('@map("error_code")') &&
+    schema.includes('@@map("stripe_webhook_events")');
+
+  result.migrationCreatesWebhookEventStatusEnum =
+    migration.includes('CREATE TYPE "StripeWebhookEventStatus" AS ENUM') &&
+    migration.includes("'processing'") &&
+    migration.includes("'processed'") &&
+    migration.includes("'ignored'") &&
+    migration.includes("'failed'");
+
+  result.migrationCreatesWebhookEventsTable =
+    migration.includes('CREATE TABLE IF NOT EXISTS "stripe_webhook_events"') &&
+    migration.includes('"stripe_event_id" TEXT NOT NULL') &&
+    migration.includes('"event_type" TEXT NOT NULL') &&
+    migration.includes('"status" "StripeWebhookEventStatus" NOT NULL') &&
+    migration.includes('CONSTRAINT "stripe_webhook_events_pkey" PRIMARY KEY ("id")');
+
+  result.migrationCreatesUniqueStripeEventIdIndex =
+    migration.includes('CREATE UNIQUE INDEX IF NOT EXISTS "stripe_webhook_events_stripe_event_id_key"') &&
+    migration.includes('ON "stripe_webhook_events"("stripe_event_id")');
+
+  result.migrationCreatesRequiredReplayIndexes =
+    migration.includes('CREATE INDEX IF NOT EXISTS "stripe_webhook_events_event_type_idx"') &&
+    migration.includes('ON "stripe_webhook_events"("event_type")') &&
+    migration.includes('CREATE INDEX IF NOT EXISTS "stripe_webhook_events_status_idx"') &&
+    migration.includes('ON "stripe_webhook_events"("status")') &&
+    migration.includes('CREATE INDEX IF NOT EXISTS "stripe_webhook_events_received_at_idx"') &&
+    migration.includes('ON "stripe_webhook_events"("received_at")');
+
+  result.migrationUsesIfNotExistsSafety =
+    migration.includes("IF NOT EXISTS") &&
+    migration.includes("DO $$") &&
+    migration.includes("pg_type") &&
+    migration.includes("CREATE TABLE IF NOT EXISTS") &&
+    migration.includes("CREATE UNIQUE INDEX IF NOT EXISTS") &&
+    migration.includes("CREATE INDEX IF NOT EXISTS");
+
+  result.migrationUsesUuidPrimaryKey =
+    migration.includes('"id" UUID NOT NULL DEFAULT gen_random_uuid()') &&
+    migration.includes('PRIMARY KEY ("id")');
+
+  result.migrationUsesTimestamptzFields =
+    migration.includes('"received_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP') &&
+    migration.includes('"processed_at" TIMESTAMPTZ(6)');
+
+  result.migrationMatchesSchemaFieldNames =
+    [
+      "stripe_event_id",
+      "event_type",
+      "status",
+      "received_at",
+      "processed_at",
+      "error_code",
+      "stripe_webhook_events"
+    ].every((token) => schema.includes(token) && migration.includes(token));
+
+  result.migrationNoLiteralSecrets =
+    !/sk_live_[A-Za-z0-9_]+/u.test(migration) &&
+    !/rk_live_[A-Za-z0-9_]+/u.test(migration) &&
+    !/whsec_[A-Za-z0-9_]+/u.test(migration);
+
+  const requiredChecks = [
+    ["STRIPE_WEBHOOK_EVENT_STATUS_SCHEMA_INVALID", result.schemaDefinesWebhookEventStatusEnum, "Schema must define StripeWebhookEventStatus enum with processing/processed/ignored/failed."],
+    ["STRIPE_WEBHOOK_EVENT_MODEL_SCHEMA_INVALID", result.schemaDefinesWebhookEventModel, "Schema must define StripeWebhookEvent model with mapped replay fields/table."],
+    ["STRIPE_WEBHOOK_EVENT_STATUS_MIGRATION_INVALID", result.migrationCreatesWebhookEventStatusEnum, "Migration must create StripeWebhookEventStatus enum values."],
+    ["STRIPE_WEBHOOK_EVENTS_TABLE_MIGRATION_INVALID", result.migrationCreatesWebhookEventsTable, "Migration must create stripe_webhook_events table with required columns and primary key."],
+    ["STRIPE_WEBHOOK_EVENT_ID_UNIQUE_MIGRATION_INVALID", result.migrationCreatesUniqueStripeEventIdIndex, "Migration must create unique index on stripe_event_id."],
+    ["STRIPE_WEBHOOK_REPLAY_INDEXES_MIGRATION_INVALID", result.migrationCreatesRequiredReplayIndexes, "Migration must create event_type/status/received_at replay indexes."],
+    ["STRIPE_WEBHOOK_MIGRATION_IDEMPOTENCY_INVALID", result.migrationUsesIfNotExistsSafety, "Migration must be safe to apply in guarded deployment contexts via IF NOT EXISTS patterns."],
+    ["STRIPE_WEBHOOK_MIGRATION_UUID_PK_INVALID", result.migrationUsesUuidPrimaryKey, "Migration must use UUID primary key matching schema."],
+    ["STRIPE_WEBHOOK_MIGRATION_TIMESTAMPTZ_INVALID", result.migrationUsesTimestamptzFields, "Migration must use TIMESTAMPTZ(6) for replay timestamps."],
+    ["STRIPE_WEBHOOK_MIGRATION_SCHEMA_DRIFT", result.migrationMatchesSchemaFieldNames, "Migration field/table names must match Prisma schema mappings."],
+    ["STRIPE_WEBHOOK_MIGRATION_SECRET_EXPOSURE_RISK", result.migrationNoLiteralSecrets, "Migration SQL must not contain literal Stripe live/restricted/webhook secrets."]
+  ];
+
+  for (const [code, ok, detail] of requiredChecks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-057",
+        code,
+        `${path.relative(root, prismaSchemaDeploymentPath)} + ${path.relative(root, stripeWebhookEventMigrationPath)}`,
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -10785,6 +10942,7 @@ function evaluate() {
   const stripeBillingEnvContract = evaluateStripeBillingEnvContract(findings);
   const stripeWebhookReplayIdempotencyContract = evaluateStripeWebhookReplayIdempotencyContract(findings);
   const prismaDbDeploymentContract = evaluatePrismaDbDeploymentContract(findings);
+  const stripeWebhookEventMigrationRequiredContract = evaluateStripeWebhookEventMigrationRequiredContract(findings);
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -10842,6 +11000,7 @@ function evaluate() {
     stripeBillingEnvContract,
     stripeWebhookReplayIdempotencyContract,
     prismaDbDeploymentContract,
+    stripeWebhookEventMigrationRequiredContract,
     findings,
   };
 }
@@ -10901,6 +11060,22 @@ function markdownReport(result) {
   lines.push(`Request id header: ${result.fileApiRouteContract.hasRequestIdHeader}`);
   lines.push("");
 
+  lines.push("## Stripe webhook event migration required contract");
+  lines.push("");
+  lines.push(`Schema exists: ${result.stripeWebhookEventMigrationRequiredContract.schemaExists}`);
+  lines.push(`Migration exists: ${result.stripeWebhookEventMigrationRequiredContract.migrationExists}`);
+  lines.push(`Schema defines webhook event status enum: ${result.stripeWebhookEventMigrationRequiredContract.schemaDefinesWebhookEventStatusEnum}`);
+  lines.push(`Schema defines webhook event model: ${result.stripeWebhookEventMigrationRequiredContract.schemaDefinesWebhookEventModel}`);
+  lines.push(`Migration creates webhook event status enum: ${result.stripeWebhookEventMigrationRequiredContract.migrationCreatesWebhookEventStatusEnum}`);
+  lines.push(`Migration creates webhook events table: ${result.stripeWebhookEventMigrationRequiredContract.migrationCreatesWebhookEventsTable}`);
+  lines.push(`Migration creates unique stripe event id index: ${result.stripeWebhookEventMigrationRequiredContract.migrationCreatesUniqueStripeEventIdIndex}`);
+  lines.push(`Migration creates replay indexes: ${result.stripeWebhookEventMigrationRequiredContract.migrationCreatesRequiredReplayIndexes}`);
+  lines.push(`Migration uses IF NOT EXISTS safety: ${result.stripeWebhookEventMigrationRequiredContract.migrationUsesIfNotExistsSafety}`);
+  lines.push(`Migration uses UUID primary key: ${result.stripeWebhookEventMigrationRequiredContract.migrationUsesUuidPrimaryKey}`);
+  lines.push(`Migration uses timestamptz fields: ${result.stripeWebhookEventMigrationRequiredContract.migrationUsesTimestamptzFields}`);
+  lines.push(`Migration matches schema field names: ${result.stripeWebhookEventMigrationRequiredContract.migrationMatchesSchemaFieldNames}`);
+  lines.push(`Migration has no literal secrets: ${result.stripeWebhookEventMigrationRequiredContract.migrationNoLiteralSecrets}`);
+  lines.push("");
   lines.push("## Prisma DB deployment contract");
   lines.push("");
   lines.push(`Schema exists: ${result.prismaDbDeploymentContract.schemaExists}`);
@@ -11899,6 +12074,7 @@ function markdownReport(result) {
 
   lines.push("");
   lines.push("## Coverage");
+  lines.push("- D-057 Stripe Webhook Event Migration Required Contract: hard-requires the committed stripe_webhook_events migration to match Prisma schema, including StripeWebhookEventStatus, table columns, unique stripe_event_id, replay indexes, UUID/timestamptz field types, IF NOT EXISTS safety, schema mapping parity, and no literal Stripe secrets.");
   lines.push("- D-055 Prisma DB Deployment Contract: distinguishes Prisma Client generation from database deployment, verifies build/postinstall generate Prisma Client, blocks implicit db push/migrate deploy inside build, verifies PostgreSQL DATABASE_URL/DIRECT_URL datasource, checks StripeWebhookEvent schema/table mapping, and reports missing migration SQL as an explicit production deployment warning.");
   lines.push("- D-053 Stripe Webhook Replay Idempotency Contract: reports event-level Stripe webhook replay persistence as a warning when absent, and hard-fails partial implementations unless a StripeWebhookEvent model, unique stripeEventId, processing/processed/ignored/failed status, duplicate handling, event status updates, idempotent state upserts, and raw payload protection are complete.");
   lines.push("- D-052 Stripe Billing Environment Contract: verifies Stripe billing runtime environment documentation and route references for STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_BASIC, STRIPE_PRICE_PRO, app URL sources, live/test boundary, no literal Stripe live/webhook secrets in env docs, checkout production live-key guard, and webhook fail-closed behavior.");
