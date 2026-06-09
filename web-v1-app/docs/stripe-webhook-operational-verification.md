@@ -86,6 +86,50 @@ Expected result:
 
 In production, use Stripe Dashboard failed-event replay only after the application/database issue is fixed.
 
+
+## Stale processing and failed replay recovery
+
+A Stripe webhook event may be received and written to `stripe_webhook_events` with status `processing` before the request is fully handled.
+
+This can happen during a deploy interruption, process crash, transient database failure, or serverless timeout.
+
+The webhook recovery contract is:
+
+```text
+- status processed means the Stripe event id has already been handled
+- status ignored means the Stripe event id was accepted but did not require a local entitlement change
+- status failed means processing errored and the event may be replayed after the root cause is fixed
+- status processing younger than WEBHOOK_PROCESSING_STALE_AFTER_MS is treated as an active duplicate
+- status processing older than WEBHOOK_PROCESSING_STALE_AFTER_MS is stale and may be replayed
+- stale processing replay resets status to processing, clears processed_at, clears error_code, and continues normal handling
+- failed replay resets status to processing, clears processed_at, clears error_code, and continues normal handling
+```
+
+
+D-064 threshold evidence:
+
+```text
+WEBHOOK_PROCESSING_STALE_AFTER_MS is the replay recovery threshold.
+processing younger than the stale threshold is treated as an active duplicate.
+processing older than WEBHOOK_PROCESSING_STALE_AFTER_MS is treated as stale and may be replayed after inspection.
+```
+Operational verification steps:
+
+```text
+1. Find the Stripe event id in Stripe Dashboard.
+2. Inspect the matching stripe_webhook_events row by stripe_event_id.
+3. If status is processed or ignored, replay should return a safe 2xx acknowledgement without creating another row.
+4. If status is failed, inspect error_code and logs, fix the underlying issue, then replay from Stripe Dashboard.
+5. If status is processing, compare received_at with the stale threshold.
+6. If processing is younger than the stale threshold, do not replay repeatedly.
+7. If processing is older than WEBHOOK_PROCESSING_STALE_AFTER_MS, replay from Stripe Dashboard and confirm status becomes processed or ignored.
+8. Confirm replay logs mention only event id, event type, status, and safe operational context.
+```
+
+Do not log or copy raw Stripe event JSON, webhook secrets, or live/restricted Stripe key values during replay recovery.
+
+Do not manually delete `stripe_webhook_events` rows to force replay unless a documented database recovery procedure explicitly requires it.
+
 ## Security verification
 
 Confirm responses and logs never include:

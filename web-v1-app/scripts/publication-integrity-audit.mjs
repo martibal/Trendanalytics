@@ -12628,6 +12628,18 @@ function markdownReport(result) {
     lines.push(`Continues processing on reprocess: ${result.stripeWebhookStaleProcessingRecoveryContract.continuesProcessingOnReprocess}`);
     lines.push("");
   }
+  if (result.stripeWebhookReplayRecoveryRunbookContract) {
+    lines.push("## Stripe webhook replay recovery runbook contract");
+    lines.push("");
+    lines.push(`Document exists: ${result.stripeWebhookReplayRecoveryRunbookContract.documentExists}`);
+    lines.push(`Documents stale processing recovery: ${result.stripeWebhookReplayRecoveryRunbookContract.documentsStaleProcessingRecovery}`);
+    lines.push(`Documents status semantics: ${result.stripeWebhookReplayRecoveryRunbookContract.documentsStatusSemantics}`);
+    lines.push(`Documents stale threshold: ${result.stripeWebhookReplayRecoveryRunbookContract.documentsStaleThreshold}`);
+    lines.push(`Documents Stripe Dashboard replay: ${result.stripeWebhookReplayRecoveryRunbookContract.documentsDashboardReplayProcedure}`);
+    lines.push(`Documents DB inspection: ${result.stripeWebhookReplayRecoveryRunbookContract.documentsDatabaseInspection}`);
+    lines.push(`Documents safe logging boundary: ${result.stripeWebhookReplayRecoveryRunbookContract.documentsSafeLoggingBoundary}`);
+    lines.push("");
+  }
   lines.push("## Findings");
   lines.push("");
 
@@ -12806,6 +12818,112 @@ function evaluateStripeWebhookStaleProcessingRecoveryContract(findings) {
 
   return result;
 }
+function evaluateStripeWebhookReplayRecoveryRunbookContract(findings) {
+  const result = {
+    documentExists: fs.existsSync(stripeWebhookOperationalVerificationPath),
+    documentsStaleProcessingRecovery: false,
+    documentsStatusSemantics: false,
+    documentsStaleThreshold: false,
+    documentsDashboardReplayProcedure: false,
+    documentsDatabaseInspection: false,
+    documentsSafeLoggingBoundary: false,
+    documentsNoManualDeleteBoundary: false,
+    noLiteralSecretValues: false,
+  };
+
+  if (!result.documentExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-064",
+      "STRIPE_WEBHOOK_REPLAY_RECOVERY_RUNBOOK_MISSING",
+      path.relative(root, stripeWebhookOperationalVerificationPath),
+      "Stripe webhook operational verification document is missing."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(stripeWebhookOperationalVerificationPath, "utf8").replace(/^\uFEFF/u, "");
+
+  result.documentsStaleProcessingRecovery =
+    source.includes("## Stale processing and failed replay recovery") &&
+    source.includes("status `processing`") &&
+    source.includes("process crash") &&
+    source.includes("serverless timeout");
+
+  result.documentsStatusSemantics =
+    source.includes("status processed") &&
+    source.includes("status ignored") &&
+    source.includes("status failed") &&
+    source.includes("status processing") &&
+    source.includes("active duplicate") &&
+    source.includes("stale");
+
+  result.documentsStaleThreshold =
+    source.includes("WEBHOOK_PROCESSING_STALE_AFTER_MS") &&
+    (
+      source.includes("processing older than WEBHOOK_PROCESSING_STALE_AFTER_MS") ||
+      source.includes("processing is older than WEBHOOK_PROCESSING_STALE_AFTER_MS")
+    ) &&
+    (
+      source.includes("processing younger than the stale threshold") ||
+      source.includes("processing is younger than the stale threshold")
+    );
+
+  result.documentsDashboardReplayProcedure =
+    source.includes("Stripe Dashboard") &&
+    source.includes("replay from Stripe Dashboard") &&
+    source.includes("Find the Stripe event id");
+
+  result.documentsDatabaseInspection =
+    source.includes("stripe_webhook_events") &&
+    source.includes("stripe_event_id") &&
+    source.includes("processed_at") &&
+    source.includes("error_code") &&
+    source.includes("received_at");
+
+  result.documentsSafeLoggingBoundary =
+    source.includes("Confirm replay logs mention only event id, event type, status, and safe operational context.") &&
+    source.includes("Do not log or copy raw Stripe event JSON") &&
+    source.includes("webhook secrets") &&
+    source.includes("live/restricted Stripe key values");
+
+  result.documentsNoManualDeleteBoundary =
+    source.includes("Do not manually delete `stripe_webhook_events` rows") &&
+    source.includes("documented database recovery procedure");
+
+  result.noLiteralSecretValues =
+    !/sk_live_[A-Za-z0-9]{8,}/u.test(source) &&
+    !/rk_live_[A-Za-z0-9]{8,}/u.test(source) &&
+    !/whsec_[A-Za-z0-9]{8,}/u.test(source);
+
+  const checks = [
+    ["STRIPE_WEBHOOK_REPLAY_RECOVERY_RUNBOOK_STALE_RECOVERY_MISSING", result.documentsStaleProcessingRecovery, "Runbook must document stale processing recovery scenario."],
+    ["STRIPE_WEBHOOK_REPLAY_RECOVERY_RUNBOOK_STATUS_SEMANTICS_MISSING", result.documentsStatusSemantics, "Runbook must document processed/ignored/failed/processing replay semantics."],
+    ["STRIPE_WEBHOOK_REPLAY_RECOVERY_RUNBOOK_THRESHOLD_MISSING", result.documentsStaleThreshold, "Runbook must document WEBHOOK_PROCESSING_STALE_AFTER_MS and younger/older handling."],
+    ["STRIPE_WEBHOOK_REPLAY_RECOVERY_RUNBOOK_DASHBOARD_REPLAY_MISSING", result.documentsDashboardReplayProcedure, "Runbook must document Stripe Dashboard replay procedure."],
+    ["STRIPE_WEBHOOK_REPLAY_RECOVERY_RUNBOOK_DB_INSPECTION_MISSING", result.documentsDatabaseInspection, "Runbook must document stripe_webhook_events inspection fields."],
+    ["STRIPE_WEBHOOK_REPLAY_RECOVERY_RUNBOOK_LOGGING_BOUNDARY_MISSING", result.documentsSafeLoggingBoundary, "Runbook must document safe logging boundaries for replay recovery."],
+    ["STRIPE_WEBHOOK_REPLAY_RECOVERY_RUNBOOK_DELETE_BOUNDARY_MISSING", result.documentsNoManualDeleteBoundary, "Runbook must forbid manual event-row deletion outside documented recovery procedure."],
+    ["STRIPE_WEBHOOK_REPLAY_RECOVERY_RUNBOOK_SECRET_EXPOSURE_RISK", result.noLiteralSecretValues, "Runbook must not contain literal live/restricted/webhook secret values."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-064",
+        code,
+        path.relative(root, stripeWebhookOperationalVerificationPath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -12873,6 +12991,7 @@ function evaluate() {
   const stripeWebhookEventMigrationRequiredContract = typeof evaluateStripeWebhookEventMigrationRequiredContract === "function" ? evaluateStripeWebhookEventMigrationRequiredContract(findings) : {};
   const stripeWebhookDeploymentRunbookContract = typeof evaluateStripeWebhookDeploymentRunbookContract === "function" ? evaluateStripeWebhookDeploymentRunbookContract(findings) : {};
   const stripeWebhookOperationalVerificationContract = typeof evaluateStripeWebhookOperationalVerificationContract === "function" ? evaluateStripeWebhookOperationalVerificationContract(findings) : {};
+  const stripeWebhookReplayRecoveryRunbookContract = evaluateStripeWebhookReplayRecoveryRunbookContract(findings);
   const billingLaunchCommandContract = typeof evaluateBillingLaunchCommandContract === "function" ? evaluateBillingLaunchCommandContract(findings) : {};
   const billingLaunchChecklistContract = typeof evaluateBillingLaunchChecklistContract === "function" ? evaluateBillingLaunchChecklistContract(findings) : {};
   const billingLaunchRunnerContract = typeof evaluateBillingLaunchRunnerContract === "function" ? evaluateBillingLaunchRunnerContract(findings) : {};
@@ -12947,6 +13066,7 @@ function evaluate() {
     stripeWebhookEventMigrationRequiredContract,
     stripeWebhookDeploymentRunbookContract,
     stripeWebhookOperationalVerificationContract,
+    stripeWebhookReplayRecoveryRunbookContract,
     billingLaunchCommandContract,
     billingLaunchChecklistContract,
     billingLaunchRunnerContract,
