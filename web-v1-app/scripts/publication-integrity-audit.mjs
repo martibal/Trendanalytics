@@ -14168,6 +14168,97 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-071 Webhook checkout correlation consumption boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const checkoutCompletedHandlerExists =
+    webhookRouteSource.includes("async function syncCheckoutSessionCompleted") &&
+    webhookRouteSource.includes("session: Stripe.Checkout.Session");
+
+  const consumesClientReferenceOrMetadataAccount =
+    webhookRouteSource.includes("session.client_reference_id") &&
+    webhookRouteSource.includes("session.metadata?.account_id") &&
+    webhookRouteSource.includes("const accountId");
+
+  const consumesAuthProviderUserId =
+    webhookRouteSource.includes("session.metadata?.auth_provider_user_id") &&
+    webhookRouteSource.includes("const authProviderUserId");
+
+  const requiresLocalAccountBeforeSync =
+    webhookRouteSource.includes("!stripeCustomerId || !stripeSubscriptionId || !accountId") &&
+    webhookRouteSource.includes("checkout.session.completed missing required identifiers") &&
+    webhookRouteSource.includes("return \"ignored\"");
+
+  const bindsAccountUpdateToAuthProviderWhenPresent =
+    webhookRouteSource.includes("if (authProviderUserId)") &&
+    webhookRouteSource.includes("tx.account.updateMany") &&
+    webhookRouteSource.includes("id: accountId") &&
+    webhookRouteSource.includes("authProviderUserId,");
+
+  const createsSubscriptionWithLocalAccountId =
+    webhookRouteSource.includes("tx.subscription.upsert") &&
+    webhookRouteSource.includes("create:") &&
+    webhookRouteSource.includes("accountId,") &&
+    webhookRouteSource.includes("stripeCustomerId,") &&
+    webhookRouteSource.includes("stripeSubscriptionId,");
+
+  const webhookConsoleStatements = [];
+  const webhookRouteLines = webhookRouteSource.split(/\r?\n/u);
+
+  for (let index = 0; index < webhookRouteLines.length; index += 1) {
+    const line = webhookRouteLines[index];
+
+    if (!/console\.(?:debug|info|warn|error)\s*\(/u.test(line)) {
+      continue;
+    }
+
+    const statementLines = [line];
+
+    for (let cursor = index + 1; cursor < webhookRouteLines.length; cursor += 1) {
+      statementLines.push(webhookRouteLines[cursor]);
+
+      if (webhookRouteLines[cursor].includes(");")) {
+        index = cursor;
+        break;
+      }
+    }
+
+    webhookConsoleStatements.push(statementLines.join("\n"));
+  }
+
+  const doesNotLogAuthProviderUserId = !webhookConsoleStatements.some((statement) =>
+    /\bauthProviderUserId\b|auth_provider_user_id/u.test(statement)
+  );
+
+  const checks = [
+    ["WEBHOOK_CHECKOUT_COMPLETED_HANDLER_MISSING", checkoutCompletedHandlerExists, "Stripe webhook must have a checkout.session.completed sync handler."],
+    ["WEBHOOK_CHECKOUT_ACCOUNT_CORRELATION_MISSING", consumesClientReferenceOrMetadataAccount, "Webhook checkout sync must consume client_reference_id and metadata.account_id."],
+    ["WEBHOOK_CHECKOUT_AUTH_PROVIDER_CORRELATION_MISSING", consumesAuthProviderUserId, "Webhook checkout sync must consume metadata.auth_provider_user_id."],
+    ["WEBHOOK_CHECKOUT_REQUIRED_IDENTIFIERS_GUARD_MISSING", requiresLocalAccountBeforeSync, "Webhook checkout sync must ignore sessions missing customer/subscription/account identifiers."],
+    ["WEBHOOK_CHECKOUT_ACCOUNT_AUTH_BINDING_MISSING", bindsAccountUpdateToAuthProviderWhenPresent, "Webhook checkout sync must bind account update to authProviderUserId when present."],
+    ["WEBHOOK_CHECKOUT_SUBSCRIPTION_ACCOUNT_LINK_MISSING", createsSubscriptionWithLocalAccountId, "Webhook checkout sync must create subscription rows with local accountId."],
+    ["WEBHOOK_CHECKOUT_AUTH_PROVIDER_LOGGING_RISK", doesNotLogAuthProviderUserId, "Webhook logs must not emit auth provider user identifiers."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-071",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
