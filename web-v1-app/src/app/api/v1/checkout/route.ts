@@ -49,23 +49,6 @@ function getStripeClient(): { stripe: Stripe | null; keyMode: StripeKeyMode } {
   };
 }
 
-function getAppUrl(request: Request): string {
-  const configured =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.APP_URL?.trim() ||
-    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-
-  if (configured) {
-    const withProtocol = configured.startsWith("http")
-      ? configured
-      : `https://${configured}`;
-    return withProtocol.replace(/\/+$/, "");
-  }
-
-  const url = new URL(request.url);
-  return url.origin.replace(/\/+$/, "");
-}
-
 function isProductionCheckoutRequest(request: Request): boolean {
   const url = new URL(request.url);
   const host = url.hostname.toLowerCase();
@@ -77,6 +60,37 @@ function isProductionCheckoutRequest(request: Request): boolean {
   );
 }
 
+function getConfiguredAppUrl(): string | null {
+  const configured =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.APP_URL?.trim() ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+
+  if (!configured) {
+    return null;
+  }
+
+  const withProtocol = configured.startsWith("http")
+    ? configured
+    : `https://${configured}`;
+
+  return withProtocol.replace(/\/+$/, "");
+}
+
+function getAppUrl(request: Request): string | null {
+  const configured = getConfiguredAppUrl();
+
+  if (configured) {
+    return configured;
+  }
+
+  if (isProductionCheckoutRequest(request)) {
+    return null;
+  }
+
+  const url = new URL(request.url);
+  return url.origin.replace(/\/+$/, "");
+}
 function isProductionRuntime(): boolean {
   return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 }
@@ -340,6 +354,16 @@ async function handleCheckout(request: Request) {
       `Production checkout is using a ${keyMode} Stripe key at runtime. Expected STRIPE_SECRET_KEY to start with sk_live_.`
     );
   }
+  const appUrl = getAppUrl(request);
+
+  if (!appUrl) {
+    return jsonError(
+      503,
+      "checkout_not_configured",
+      "Production checkout redirect origin is not configured.",
+      "checkout_redirect_origin_not_configured"
+    );
+  }
 
   if (!priceId) {
     return jsonError(
@@ -367,8 +391,7 @@ async function handleCheckout(request: Request) {
   }
 
   if (!signedInUser) {
-    const appUrl = getAppUrl(request);
-    const returnUrl = `${appUrl}/api/v1/checkout?plan=${plan}`;
+      const returnUrl = `${appUrl}/api/v1/checkout?plan=${plan}`;
     const signInUrl = new URL("/sign-in", appUrl);
     signInUrl.searchParams.set("redirect_url", returnUrl);
 
@@ -393,7 +416,6 @@ async function handleCheckout(request: Request) {
     );
   }
 
-  const appUrl = getAppUrl(request);
   const metadata = checkoutMetadata({
     plan,
     accountId: account.id,

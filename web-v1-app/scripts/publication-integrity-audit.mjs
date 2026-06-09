@@ -14017,6 +14017,67 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-068 Checkout redirect URL boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasConfiguredAppUrlHelper =
+    checkoutRouteSource.includes("function getConfiguredAppUrl(): string | null") &&
+    checkoutRouteSource.includes("process.env.NEXT_PUBLIC_APP_URL") &&
+    checkoutRouteSource.includes("process.env.APP_URL") &&
+    checkoutRouteSource.includes("process.env.VERCEL_PROJECT_PRODUCTION_URL");
+
+  const getAppUrlIsNullable =
+    checkoutRouteSource.includes("function getAppUrl(request: Request): string | null") &&
+    checkoutRouteSource.includes("if (isProductionCheckoutRequest(request))") &&
+    checkoutRouteSource.includes("return null;");
+
+  const productionRejectsMissingRedirectOrigin =
+    checkoutRouteSource.includes("const appUrl = getAppUrl(request);") &&
+    checkoutRouteSource.includes("if (!appUrl)") &&
+    checkoutRouteSource.includes("Production checkout redirect origin is not configured.") &&
+    checkoutRouteSource.includes("checkout_redirect_origin_not_configured");
+
+  const redirectUrlsUseAppUrl =
+    checkoutRouteSource.includes("success_url") &&
+    checkoutRouteSource.includes("cancel_url") &&
+    checkoutRouteSource.includes("${appUrl}");
+
+  const envExampleSource = fs.existsSync(envExamplePath)
+    ? fs.readFileSync(envExamplePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const envDocumentsBoundary =
+    envExampleSource.includes("D-068 Checkout redirect URL boundary") &&
+    envExampleSource.includes("Production Stripe Checkout redirects must use an explicitly configured app URL.") &&
+    envExampleSource.includes("NEXT_PUBLIC_APP_URL") &&
+    envExampleSource.includes("APP_URL");
+
+  const checks = [
+    ["CHECKOUT_REDIRECT_CONFIGURED_APP_URL_HELPER_MISSING", hasConfiguredAppUrlHelper, "Checkout route must have a configured app URL helper."],
+    ["CHECKOUT_REDIRECT_PRODUCTION_FALLBACK_BLOCK_MISSING", getAppUrlIsNullable, "Production checkout must not fall back to request origin when app URL is missing."],
+    ["CHECKOUT_REDIRECT_MISSING_ORIGIN_REJECTION_MISSING", productionRejectsMissingRedirectOrigin, "Production checkout must reject missing redirect origin before creating Stripe session."],
+    ["CHECKOUT_REDIRECT_URLS_NOT_APP_URL_BASED", redirectUrlsUseAppUrl, "Stripe Checkout success_url and cancel_url must be based on appUrl."],
+    ["CHECKOUT_REDIRECT_ENV_DOCUMENTATION_MISSING", envDocumentsBoundary, ".env.example must document production checkout redirect URL boundary."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-068",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
