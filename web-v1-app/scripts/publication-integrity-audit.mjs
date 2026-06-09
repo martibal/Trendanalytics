@@ -14114,6 +14114,60 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-070 Checkout session correlation boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasCheckoutMetadataFactory =
+    checkoutRouteSource.includes("function checkoutMetadata") &&
+    checkoutRouteSource.includes("checkout_plan: params.plan") &&
+    checkoutRouteSource.includes("account_id: params.accountId") &&
+    checkoutRouteSource.includes("auth_provider_user_id: params.authProviderUserId");
+
+  const sessionUsesLocalAccountCorrelation =
+    checkoutRouteSource.includes("client_reference_id: account.id") &&
+    checkoutRouteSource.includes("metadata,") &&
+    checkoutRouteSource.includes("subscription_data:") &&
+    checkoutRouteSource.includes("metadata,");
+
+  const metadataBuiltFromResolvedAccount =
+    checkoutRouteSource.includes("const metadata = checkoutMetadata({") &&
+    checkoutRouteSource.includes("accountId: account.id") &&
+    checkoutRouteSource.includes("authProviderUserId: signedInUser.userId");
+
+  const checkoutSessionCreatedFromSessionParams =
+    checkoutRouteSource.includes("const sessionParams: Stripe.Checkout.SessionCreateParams") &&
+    checkoutRouteSource.includes("stripe.checkout.sessions.create(sessionParams)");
+
+  const noSensitiveUserMetadata =
+    !/metadata\s*:\s*\{[\s\S]*?(email|primaryEmailAddress|sessionClaims|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET)/u.test(checkoutRouteSource);
+
+  const checks = [
+    ["CHECKOUT_SESSION_METADATA_FACTORY_MISSING", hasCheckoutMetadataFactory, "Checkout route must build stable non-secret metadata with plan/account/auth-provider ids."],
+    ["CHECKOUT_SESSION_CLIENT_REFERENCE_ID_MISSING", sessionUsesLocalAccountCorrelation, "Stripe Checkout session must include client_reference_id: account.id and subscription metadata."],
+    ["CHECKOUT_SESSION_METADATA_ACCOUNT_SOURCE_INVALID", metadataBuiltFromResolvedAccount, "Checkout metadata must be built from the resolved local account and signed-in user id."],
+    ["CHECKOUT_SESSION_PARAMS_OBJECT_MISSING", checkoutSessionCreatedFromSessionParams, "Checkout route must create Stripe session from a typed sessionParams object."],
+    ["CHECKOUT_SESSION_METADATA_SECRET_OR_EMAIL_RISK", noSensitiveUserMetadata, "Checkout metadata must not include email, session claims, or secret values."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-070",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
