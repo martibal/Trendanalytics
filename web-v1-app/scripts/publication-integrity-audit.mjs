@@ -13971,6 +13971,52 @@ ensureReportDir();
   }
 }
 
+// D-067 Stripe webhook runtime boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasNodeRuntime = /export\s+const\s+runtime\s*=\s*["']nodejs["']\s*;/u.test(webhookRouteSource);
+  const hasForceDynamic = /export\s+const\s+dynamic\s*=\s*["']force-dynamic["']\s*;/u.test(webhookRouteSource);
+  const usesRawBodyVerification =
+    webhookRouteSource.includes("request.text()") &&
+    webhookRouteSource.includes("stripe-signature") &&
+    webhookRouteSource.includes("constructEvent");
+
+  const docFile = path.join(root, "docs", "stripe-webhook-operational-verification.md");
+  const docSource = fs.existsSync(docFile)
+    ? fs.readFileSync(docFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const runbookDocumentsRuntimeBoundary =
+    docSource.includes("D-067 Stripe webhook runtime boundary") &&
+    docSource.includes('export const runtime = "nodejs";') &&
+    docSource.includes('export const dynamic = "force-dynamic";') &&
+    docSource.includes("raw request body");
+
+  const checks = [
+    ["STRIPE_WEBHOOK_RUNTIME_NODEJS_MISSING", hasNodeRuntime, "Stripe webhook route must explicitly export runtime = nodejs."],
+    ["STRIPE_WEBHOOK_DYNAMIC_ROUTE_MISSING", hasForceDynamic, "Stripe webhook route must explicitly export dynamic = force-dynamic."],
+    ["STRIPE_WEBHOOK_RUNTIME_RAW_BODY_CONTEXT_MISSING", usesRawBodyVerification, "Stripe webhook route must keep raw body Stripe signature verification context."],
+    ["STRIPE_WEBHOOK_RUNTIME_RUNBOOK_MISSING", runbookDocumentsRuntimeBoundary, "Operational verification runbook must document the Stripe webhook runtime boundary."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-067",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 

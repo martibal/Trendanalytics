@@ -130,6 +130,44 @@ Do not log or copy raw Stripe event JSON, webhook secrets, or live/restricted St
 
 Do not manually delete `stripe_webhook_events` rows to force replay unless a documented database recovery procedure explicitly requires it.
 
+
+## D-066 Stripe webhook event livemode guard
+
+Production Stripe webhook handling must reject signed Stripe events where `event.livemode` is not `true`.
+
+The runtime rule is:
+
+```text
+- production webhook request + event.livemode=true -> continue normal replay/idempotency handling
+- production webhook request + event.livemode=false -> reject before replay persistence and before entitlement sync
+- local or preview webhook request -> allow Stripe test-mode verification for non-production testing
+```
+
+The guard must run after Stripe signature verification and before writing or updating `stripe_webhook_events`.
+
+Safe logging may include Stripe event id, event type, boolean livemode, and request host. It must not include raw event JSON, webhook secret, or Stripe key values.
+
+
+## D-067 Stripe webhook runtime boundary
+
+The active Stripe webhook route must explicitly run in the Next.js `nodejs` runtime.
+
+The route must also be dynamic and uncached:
+
+```text
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+```
+
+Operational reason:
+
+```text
+- Stripe signature verification depends on the raw request body.
+- The route uses the server-side Stripe SDK.
+- The route must not be treated as static or cached.
+- The route must not be moved to edge runtime without a separate signed-payload verification review.
+```
+
 ## Security verification
 
 Confirm responses and logs never include:

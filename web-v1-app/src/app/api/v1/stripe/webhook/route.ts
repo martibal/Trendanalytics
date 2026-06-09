@@ -6,6 +6,9 @@ import Stripe from "stripe";
 import type { ChainId } from "@/config/chains";
 import { db } from "@/lib/db";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 type CheckoutPlan = "basic" | "pro";
 type StripeKeyMode = "missing" | "test" | "live" | "restricted_test" | "restricted_live" | "unknown";
 
@@ -14,6 +17,7 @@ type WebhookJsonCode =
   | "ignored"
   | "not_configured"
   | "bad_signature"
+  | "mode_mismatch"
   | "webhook_error";
 
 const NO_STORE_HEADERS = {
@@ -529,6 +533,13 @@ async function markStripeWebhookEvent(
     },
   });
 }
+function validateWebhookLivemode(request: Request, event: Stripe.Event): boolean {
+  if (!isProductionWebhookRequest(request)) {
+    return true;
+  }
+
+  return event.livemode === true;
+}
 async function handleVerifiedEvent(stripe: Stripe, event: Stripe.Event): Promise<"ok" | "ignored"> {
   switch (event.type) {
     case "checkout.session.completed":
@@ -585,6 +596,17 @@ export async function POST(request: Request) {
     });
 
     return jsonResponse(400, "bad_signature", "Invalid Stripe signature.");
+  }
+
+  if (!validateWebhookLivemode(request, event)) {
+    console.warn("[stripe-webhook] production webhook rejected non-live Stripe event", {
+      stripeEventId: event.id,
+      type: event.type,
+      livemode: event.livemode,
+      requestHost: new URL(request.url).hostname,
+    });
+
+    return jsonResponse(400, "mode_mismatch", "Stripe webhook event mode does not match production.");
   }
 
   try {
