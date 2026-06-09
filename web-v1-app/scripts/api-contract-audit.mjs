@@ -178,14 +178,26 @@ const ENDPOINT_INVENTORY = [
   },
   {
     path: "/api/v1/webhook",
+    methods: ["GET", "POST"],
+    classification: "deprecated internal endpoint",
+    launchStatus: "deprecated",
+    stability: "legacy-compatible",
+    intendedUser: "legacy webhook callers",
+    primaryUseCase: "Return a stable 410 response directing Stripe delivery to /api/v1/stripe/webhook.",
+    dataReturned: "Deprecated endpoint JSON response.",
+    artifactSource: "route-level deprecation response",
+    authRequirement: "none; endpoint is deprecated and performs no billing mutation",
+  },
+  {
+    path: "/api/v1/stripe/webhook",
     methods: ["POST"],
     classification: "internal Stripe webhook endpoint",
     launchStatus: "stable",
     stability: "stable",
     intendedUser: "Stripe webhook delivery",
-    primaryUseCase: "Receive Stripe subscription lifecycle events and synchronize account entitlements.",
+    primaryUseCase: "Receive verified Stripe subscription lifecycle events and synchronize account entitlements.",
     dataReturned: "Webhook acknowledgement or stable error response.",
-    artifactSource: "Stripe event payload and application database",
+    artifactSource: "Stripe event payload, Stripe signature verification, and application database",
     authRequirement: "Stripe signature header",
   },
 ];
@@ -203,7 +215,8 @@ const DOCUMENTED_ENDPOINTS = [
   { path: "/api/v1/keys", methods: ["POST", "DELETE"], source: "src/app/api-docs/page.tsx AUTH_ENDPOINTS" },
   { path: "/api/v1/checkout", methods: ["GET", "POST"], source: "src/app/api-docs/page.tsx AUTH_ENDPOINTS plus route-level GET method_not_allowed contract" },
   { path: "/api/v1/checkout/portal", methods: ["POST"], source: "src/app/api-docs/page.tsx AUTH_ENDPOINTS" },
-  { path: "/api/v1/webhook", methods: ["POST"], source: "internal Stripe webhook contract" },
+  { path: "/api/v1/webhook", methods: ["GET", "POST"], source: "deprecated legacy webhook endpoint contract" },
+  { path: "/api/v1/stripe/webhook", methods: ["POST"], source: "internal Stripe webhook contract" },
 ];
 const RESPONSE_CONTRACTS = [
   {
@@ -417,18 +430,34 @@ const RESPONSE_CONTRACTS = [
   {
     path: "/api/v1/webhook",
     success: {
-      statuses: [200],
-      shape: "JSON object { received: true } after Stripe signature validation and event processing.",
-      requiredFields: ["received"],
+      statuses: [410],
+      shape: "JSON object with deprecated_webhook_endpoint code directing callers to /api/v1/stripe/webhook.",
+      requiredFields: ["code", "message"],
     },
     errors: {
-      statuses: [400, 429, 500, 503],
-      shape: "JSON object with code, message, and detail.",
-      codes: ["invalid_signature", "webhook_not_configured", "server_error", "rate_limited"],
+      statuses: [],
+      shape: "No operational webhook processing occurs on this deprecated endpoint.",
+      codes: [],
     },
-    cachePolicy: "no-store for error responses; webhook success is operational acknowledgement.",
-    rateLimit: "stripe-webhook pre-auth rate limit.",
-    authBoundary: "Requires Stripe signature verification; not a user-facing endpoint.",
+    cachePolicy: "no-store.",
+    rateLimit: "none; endpoint performs no billing mutation.",
+    authBoundary: "Deprecated endpoint; no Stripe payload is processed.",
+  },
+  {
+    path: "/api/v1/stripe/webhook",
+    success: {
+      statuses: [200],
+      shape: "JSON object acknowledgement after Stripe signature validation, replay persistence, and event processing.",
+      requiredFields: ["result or acknowledgement"],
+    },
+    errors: {
+      statuses: [400, 500, 503],
+      shape: "Stable JSON error object for missing configuration, bad signature, or processing failure.",
+      codes: ["not_configured", "bad_signature", "webhook_error"],
+    },
+    cachePolicy: "no-store for webhook responses.",
+    rateLimit: "none; Stripe webhooks are authenticated by provider signature, not browser pre-auth rate-limit.",
+    authBoundary: "Requires Stripe signature verification with stripe-signature header; not a user-facing endpoint.",
   },
 ];
 const REQUEST_CONTRACTS = [
@@ -598,6 +627,15 @@ const REQUEST_CONTRACTS = [
     path: "/api/v1/webhook",
     pathParams: [],
     queryParams: [],
+    requiredHeaders: [],
+    authInputs: [],
+    invalidInputCases: ["deprecated endpoint requested"],
+    staticIndicators: ["deprecated_webhook_endpoint", "status: 410", "Cache-Control"],
+  },
+  {
+    path: "/api/v1/stripe/webhook",
+    pathParams: [],
+    queryParams: [],
     requiredHeaders: ["stripe-signature"],
     authInputs: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "Stripe signature verification"],
     invalidInputCases: [
@@ -607,9 +645,15 @@ const REQUEST_CONTRACTS = [
       "invalid signature",
       "unsupported or malformed event payload",
       "server error during entitlement sync",
-      "rate limited",
+      "duplicate Stripe event id replay",
     ],
-    staticIndicators: ["stripe.webhooks.constructEvent", "stripe-signature", "STRIPE_WEBHOOK_SECRET", "enforcePreAuthRateLimit"],
+    staticIndicators: [
+      "stripe.webhooks.constructEvent",
+      "stripe-signature",
+      "STRIPE_WEBHOOK_SECRET",
+      "stripeWebhookEvent",
+      "handleVerifiedEvent",
+    ],
   },
 ];
 function walk(dir, out = []) {
