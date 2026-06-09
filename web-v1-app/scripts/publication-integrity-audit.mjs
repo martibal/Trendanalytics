@@ -14309,6 +14309,69 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-073 Stripe webhook no-store response boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasNoStoreHeaderConstant =
+    webhookRouteSource.includes("const NO_STORE_HEADERS") &&
+    webhookRouteSource.includes('"Cache-Control": "no-store"');
+
+  const jsonResponseUsesNoStoreHeaders =
+    webhookRouteSource.includes("function jsonResponse") &&
+    webhookRouteSource.includes("headers: NO_STORE_HEADERS");
+
+  const jsonResponseFunctionStart = webhookRouteSource.indexOf("function jsonResponse");
+  const jsonResponseFunctionEnd =
+    jsonResponseFunctionStart >= 0
+      ? webhookRouteSource.indexOf("\nfunction ", jsonResponseFunctionStart + "function jsonResponse".length)
+      : -1;
+
+  const webhookRouteOutsideJsonResponse =
+    jsonResponseFunctionStart >= 0
+      ? webhookRouteSource.slice(0, jsonResponseFunctionStart) +
+        webhookRouteSource.slice(jsonResponseFunctionEnd >= 0 ? jsonResponseFunctionEnd : webhookRouteSource.length)
+      : webhookRouteSource;
+
+  const webhookPostUsesJsonResponseOnly =
+    !/return\s+NextResponse\.json\s*\(/u.test(webhookRouteOutsideJsonResponse) &&
+    webhookRouteSource.includes("function jsonResponse") &&
+    webhookRouteSource.includes("return NextResponse.json(") &&
+    webhookRouteSource.includes("return jsonResponse(");
+
+  const allWebhookResponseCodesUseJsonResponse =
+    webhookRouteSource.includes('"ok"') &&
+    webhookRouteSource.includes('"ignored"') &&
+    webhookRouteSource.includes('"not_configured"') &&
+    webhookRouteSource.includes('"bad_signature"') &&
+    webhookRouteSource.includes('"webhook_error"') &&
+    webhookRouteSource.includes("jsonResponse(");
+
+  const checks = [
+    ["STRIPE_WEBHOOK_NO_STORE_HEADER_CONSTANT_MISSING", hasNoStoreHeaderConstant, "Stripe webhook route must define a no-store header constant."],
+    ["STRIPE_WEBHOOK_JSON_RESPONSE_NO_STORE_MISSING", jsonResponseUsesNoStoreHeaders, "Stripe webhook jsonResponse helper must include Cache-Control: no-store."],
+    ["STRIPE_WEBHOOK_DIRECT_NEXT_RESPONSE_JSON_RISK", webhookPostUsesJsonResponseOnly, "Stripe webhook route must not bypass jsonResponse with direct NextResponse.json returns."],
+    ["STRIPE_WEBHOOK_RESPONSE_CODE_ENVELOPE_MISSING", allWebhookResponseCodesUseJsonResponse, "Stripe webhook response codes must be handled through the no-store response envelope."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-073",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
