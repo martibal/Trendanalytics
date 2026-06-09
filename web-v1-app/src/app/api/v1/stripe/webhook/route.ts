@@ -7,6 +7,7 @@ import type { ChainId } from "@/config/chains";
 import { db } from "@/lib/db";
 
 type CheckoutPlan = "basic" | "pro";
+type StripeKeyMode = "missing" | "test" | "live" | "restricted_test" | "restricted_live" | "unknown";
 
 type WebhookJsonCode =
   | "ok"
@@ -35,6 +36,28 @@ function jsonResponse(status: number, code: WebhookJsonCode, message: string) {
   );
 }
 
+function detectStripeKeyMode(value: string | null | undefined): StripeKeyMode {
+  const key = value?.trim();
+
+  if (!key) return "missing";
+  if (key.startsWith("sk_test_")) return "test";
+  if (key.startsWith("sk_live_")) return "live";
+  if (key.startsWith("rk_test_")) return "restricted_test";
+  if (key.startsWith("rk_live_")) return "restricted_live";
+
+  return "unknown";
+}
+
+function isProductionWebhookRequest(request: Request): boolean {
+  const url = new URL(request.url);
+  const host = url.hostname.toLowerCase();
+
+  return (
+    process.env.VERCEL_ENV === "production" ||
+    host === "urdatlas.com" ||
+    host === "www.urdatlas.com"
+  );
+}
 function getStripeSecretKey(): string | null {
   const keyName = ["STRIPE", "SECRET", "KEY"].join("_");
   return process.env[keyName]?.trim() || null;
@@ -44,14 +67,21 @@ function getWebhookSecret(): string | null {
   return process.env.STRIPE_WEBHOOK_SECRET?.trim() || null;
 }
 
-function getStripeClient(): Stripe | null {
+function getStripeClient(): { stripe: Stripe | null; keyMode: StripeKeyMode } {
   const secretKey = getStripeSecretKey();
+  const keyMode = detectStripeKeyMode(secretKey);
 
   if (!secretKey) {
-    return null;
+    return {
+      stripe: null,
+      keyMode,
+    };
   }
 
-  return new Stripe(secretKey);
+  return {
+    stripe: new Stripe(secretKey),
+    keyMode,
+  };
 }
 
 function normalizeChain(value: unknown): ChainId | null {
@@ -516,7 +546,7 @@ async function handleVerifiedEvent(stripe: Stripe, event: Stripe.Event): Promise
 }
 
 export async function POST(request: Request) {
-  const stripe = getStripeClient();
+  const { stripe, keyMode } = getStripeClient();
   const webhookSecret = getWebhookSecret();
 
   if (!stripe || !webhookSecret) {
@@ -526,6 +556,15 @@ export async function POST(request: Request) {
     });
 
     return jsonResponse(503, "not_configured", "Stripe webhook is not configured.");
+  }
+
+  if (isProductionWebhookRequest(request) && keyMode !== "live") {
+    console.error("[stripe-webhook] production webhook rejected non-live Stripe key", {
+      stripeSecretMode: keyMode,
+      requestHost: new URL(request.url).hostname,
+    });
+
+    return jsonResponse(503, "not_configured", "Stripe webhook is not configured for production.");
   }
 
   const signature = request.headers.get("stripe-signature");

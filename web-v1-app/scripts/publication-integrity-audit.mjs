@@ -12640,6 +12640,17 @@ function markdownReport(result) {
     lines.push(`Documents safe logging boundary: ${result.stripeWebhookReplayRecoveryRunbookContract.documentsSafeLoggingBoundary}`);
     lines.push("");
   }
+  if (result.stripeBillingModeGuardContract) {
+    lines.push("## Stripe billing mode guard contract");
+    lines.push("");
+    lines.push(`Checkout detects key mode: ${result.stripeBillingModeGuardContract.checkoutDetectsStripeKeyMode}`);
+    lines.push(`Webhook detects key mode: ${result.stripeBillingModeGuardContract.webhookDetectsStripeKeyMode}`);
+    lines.push(`Checkout rejects non-live production key: ${result.stripeBillingModeGuardContract.checkoutRejectsNonLiveProductionKey}`);
+    lines.push(`Webhook rejects non-live production key: ${result.stripeBillingModeGuardContract.webhookRejectsNonLiveProductionKey}`);
+    lines.push(`Checkout/webhook production hosts consistent: ${result.stripeBillingModeGuardContract.checkoutAndWebhookUseSameProductionHosts}`);
+    lines.push(`Safe key-mode logging: ${result.stripeBillingModeGuardContract.safeLoggingOnlyKeyMode}`);
+    lines.push("");
+  }
   lines.push("## Findings");
   lines.push("");
 
@@ -12924,6 +12935,99 @@ function evaluateStripeWebhookReplayRecoveryRunbookContract(findings) {
 
   return result;
 }
+function evaluateStripeBillingModeGuardContract(findings) {
+  const result = {
+    checkoutRouteExists: fs.existsSync(checkoutRoutePath),
+    webhookRouteExists: fs.existsSync(stripeWebhookRoutePath),
+    checkoutDetectsStripeKeyMode: false,
+    webhookDetectsStripeKeyMode: false,
+    checkoutRejectsNonLiveProductionKey: false,
+    webhookRejectsNonLiveProductionKey: false,
+    checkoutAndWebhookUseSameProductionHosts: false,
+    safeLoggingOnlyKeyMode: false,
+    envExampleDocumentsModeGuard: false,
+  };
+
+  const checkoutSource = result.checkoutRouteExists
+    ? fs.readFileSync(checkoutRoutePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const webhookSource = result.webhookRouteExists
+    ? fs.readFileSync(stripeWebhookRoutePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  result.checkoutDetectsStripeKeyMode =
+    checkoutSource.includes('type StripeKeyMode = "missing" | "test" | "live" | "restricted_test" | "restricted_live" | "unknown";') &&
+    checkoutSource.includes("function detectStripeKeyMode") &&
+    checkoutSource.includes('key.startsWith("sk_live_")') &&
+    checkoutSource.includes('key.startsWith("sk_test_")');
+
+  result.webhookDetectsStripeKeyMode =
+    webhookSource.includes('type StripeKeyMode = "missing" | "test" | "live" | "restricted_test" | "restricted_live" | "unknown";') &&
+    webhookSource.includes("function detectStripeKeyMode") &&
+    webhookSource.includes('key.startsWith("sk_live_")') &&
+    webhookSource.includes('key.startsWith("sk_test_")');
+
+  result.checkoutRejectsNonLiveProductionKey =
+    checkoutSource.includes("isProductionCheckoutRequest(request) && keyMode !== \"live\"") &&
+    checkoutSource.includes("Production checkout is not configured correctly.") &&
+    checkoutSource.includes("stripeSecretMode: keyMode");
+
+  result.webhookRejectsNonLiveProductionKey =
+    webhookSource.includes("isProductionWebhookRequest(request) && keyMode !== \"live\"") &&
+    webhookSource.includes("[stripe-webhook] production webhook rejected non-live Stripe key") &&
+    webhookSource.includes("Stripe webhook is not configured for production.") &&
+    webhookSource.includes("stripeSecretMode: keyMode");
+
+  result.checkoutAndWebhookUseSameProductionHosts =
+    checkoutSource.includes('host === "urdatlas.com"') &&
+    checkoutSource.includes('host === "www.urdatlas.com"') &&
+    webhookSource.includes('host === "urdatlas.com"') &&
+    webhookSource.includes('host === "www.urdatlas.com"') &&
+    checkoutSource.includes('process.env.VERCEL_ENV === "production"') &&
+    webhookSource.includes('process.env.VERCEL_ENV === "production"');
+
+  const consoleLines = `${checkoutSource}\n${webhookSource}`
+    .split("\n")
+    .filter((line) => line.includes("console."))
+    .join("\n");
+
+  result.safeLoggingOnlyKeyMode =
+    consoleLines.includes("stripeSecretMode") &&
+    !/STRIPE_SECRET_KEY|sk_live_[A-Za-z0-9]{8,}|sk_test_[A-Za-z0-9]{8,}|rk_live_[A-Za-z0-9]{8,}|rk_test_[A-Za-z0-9]{8,}|whsec_[A-Za-z0-9]{8,}/u.test(consoleLines);
+
+  if (fs.existsSync(envExamplePath)) {
+    const envExample = fs.readFileSync(envExamplePath, "utf8").replace(/^\uFEFF/u, "");
+    result.envExampleDocumentsModeGuard =
+      envExample.includes("D-065 Stripe billing mode guard") &&
+      envExample.includes("Production checkout and production Stripe webhooks require STRIPE_SECRET_KEY to use live secret key mode.") &&
+      envExample.includes("Local and preview environments may use Stripe test key mode for verification.");
+  }
+
+  const checks = [
+    ["STRIPE_BILLING_MODE_CHECKOUT_DETECTION_MISSING", result.checkoutDetectsStripeKeyMode, "Checkout route must classify Stripe secret key mode."],
+    ["STRIPE_BILLING_MODE_WEBHOOK_DETECTION_MISSING", result.webhookDetectsStripeKeyMode, "Stripe webhook route must classify Stripe secret key mode."],
+    ["STRIPE_BILLING_MODE_CHECKOUT_PRODUCTION_GUARD_MISSING", result.checkoutRejectsNonLiveProductionKey, "Production checkout must reject non-live Stripe key mode."],
+    ["STRIPE_BILLING_MODE_WEBHOOK_PRODUCTION_GUARD_MISSING", result.webhookRejectsNonLiveProductionKey, "Production Stripe webhook must reject non-live Stripe key mode."],
+    ["STRIPE_BILLING_MODE_HOSTS_INCONSISTENT", result.checkoutAndWebhookUseSameProductionHosts, "Checkout and webhook must use the same production host/runtime criteria."],
+    ["STRIPE_BILLING_MODE_LOGGING_UNSAFE", result.safeLoggingOnlyKeyMode, "Billing mode logging must expose only key mode, never actual Stripe key values."],
+    ["STRIPE_BILLING_MODE_ENV_DOCUMENTATION_MISSING", result.envExampleDocumentsModeGuard, ".env.example must document production live-key guard and local/preview test-key allowance."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-065",
+        code,
+        path.relative(root, stripeWebhookRoutePath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -12985,6 +13089,7 @@ function evaluate() {
   const stripeWebhookRouteContract = typeof evaluateStripeWebhookRouteContract === "function" ? evaluateStripeWebhookRouteContract(findings) : {};
   const checkoutWebhookMetadataCouplingContract = typeof evaluateCheckoutWebhookMetadataCouplingContract === "function" ? evaluateCheckoutWebhookMetadataCouplingContract(findings) : {};
   const stripeBillingEnvContract = typeof evaluateStripeBillingEnvContract === "function" ? evaluateStripeBillingEnvContract(findings) : {};
+  const stripeBillingModeGuardContract = evaluateStripeBillingModeGuardContract(findings);
   const stripeWebhookReplayIdempotencyContract = typeof evaluateStripeWebhookReplayIdempotencyContract === "function" ? evaluateStripeWebhookReplayIdempotencyContract(findings) : {};
   const stripeWebhookStaleProcessingRecoveryContract = evaluateStripeWebhookStaleProcessingRecoveryContract(findings);
   const prismaDbDeploymentContract = typeof evaluatePrismaDbDeploymentContract === "function" ? evaluatePrismaDbDeploymentContract(findings) : {};
@@ -13060,6 +13165,7 @@ function evaluate() {
     stripeWebhookRouteContract,
     checkoutWebhookMetadataCouplingContract,
     stripeBillingEnvContract,
+    stripeBillingModeGuardContract,
     stripeWebhookReplayIdempotencyContract,
     stripeWebhookStaleProcessingRecoveryContract,
     prismaDbDeploymentContract,
