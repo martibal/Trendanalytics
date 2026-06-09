@@ -8,6 +8,8 @@ import { db } from "@/lib/db";
 
 import { validateSameOriginRequest } from "@/lib/security/origin";
 import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 type CheckoutPlan = "basic" | "pro";
 type StripeKeyMode = "missing" | "test" | "live" | "restricted_test" | "restricted_live" | "unknown";
 

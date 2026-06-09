@@ -14078,6 +14078,42 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-069 Checkout runtime boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasNodeRuntime = /export\s+const\s+runtime\s*=\s*["']nodejs["']\s*;/u.test(checkoutRouteSource);
+  const hasForceDynamic = /export\s+const\s+dynamic\s*=\s*["']force-dynamic["']\s*;/u.test(checkoutRouteSource);
+  const hasServerSideCheckoutContext =
+    checkoutRouteSource.includes("new Stripe(") &&
+    checkoutRouteSource.includes("auth()") &&
+    checkoutRouteSource.includes("db.account.upsert") &&
+    checkoutRouteSource.includes("stripe.checkout.sessions.create");
+
+  const checks = [
+    ["CHECKOUT_RUNTIME_NODEJS_MISSING", hasNodeRuntime, "Checkout route must explicitly export runtime = nodejs."],
+    ["CHECKOUT_DYNAMIC_ROUTE_MISSING", hasForceDynamic, "Checkout route must explicitly export dynamic = force-dynamic."],
+    ["CHECKOUT_RUNTIME_SERVER_CONTEXT_MISSING", hasServerSideCheckoutContext, "Checkout route must retain server-side Stripe/Auth/DB context."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-069",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
