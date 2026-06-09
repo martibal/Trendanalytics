@@ -12616,6 +12616,18 @@ function markdownReport(result) {
 
     lines.push("");
   }
+  if (result.stripeWebhookStaleProcessingRecoveryContract) {
+    lines.push("## Stripe webhook stale processing recovery contract");
+    lines.push("");
+    lines.push(`Defines stale processing window: ${result.stripeWebhookStaleProcessingRecoveryContract.definesStaleProcessingWindow}`);
+    lines.push(`Duplicate lookup reads status/receivedAt: ${result.stripeWebhookStaleProcessingRecoveryContract.duplicateLookupReadsStatusAndReceivedAt}`);
+    lines.push(`Accepts failed replay: ${result.stripeWebhookStaleProcessingRecoveryContract.acceptsFailedReplay}`);
+    lines.push(`Accepts stale processing replay: ${result.stripeWebhookStaleProcessingRecoveryContract.acceptsStaleProcessingReplay}`);
+    lines.push(`Rejects fresh processing duplicate: ${result.stripeWebhookStaleProcessingRecoveryContract.rejectsFreshProcessingDuplicate}`);
+    lines.push(`Resets processing state for replay: ${result.stripeWebhookStaleProcessingRecoveryContract.resetsProcessingStateForReplay}`);
+    lines.push(`Continues processing on reprocess: ${result.stripeWebhookStaleProcessingRecoveryContract.continuesProcessingOnReprocess}`);
+    lines.push("");
+  }
   lines.push("## Findings");
   lines.push("");
 
@@ -12691,6 +12703,109 @@ function markdownReport(result) {
   return `${lines.join("\n")}\n`;
 }
 
+function evaluateStripeWebhookStaleProcessingRecoveryContract(findings) {
+  const result = {
+    routeExists: fs.existsSync(stripeWebhookRoutePath),
+    definesStaleProcessingWindow: false,
+    duplicateLookupReadsStatusAndReceivedAt: false,
+    acceptsFailedReplay: false,
+    acceptsStaleProcessingReplay: false,
+    rejectsFreshProcessingDuplicate: false,
+    resetsProcessingStateForReplay: false,
+    continuesProcessingOnReprocess: false,
+    logsSafeReplayWarnings: false,
+  };
+
+  if (!result.routeExists) {
+    addFinding(
+      findings,
+      "fail",
+      "D-063",
+      "STRIPE_WEBHOOK_ROUTE_MISSING_FOR_STALE_PROCESSING",
+      path.relative(root, stripeWebhookRoutePath),
+      "Stripe webhook route is missing; stale processing recovery cannot be audited."
+    );
+
+    return result;
+  }
+
+  const source = fs.readFileSync(stripeWebhookRoutePath, "utf8").replace(/^\uFEFF/u, "");
+  const normalized = source.replace(/\r\n/gu, "\n");
+
+  result.definesStaleProcessingWindow =
+    normalized.includes("const WEBHOOK_PROCESSING_STALE_AFTER_MS = 15 * 60 * 1000;") &&
+    normalized.includes("function isWebhookProcessingStale(receivedAt: Date): boolean") &&
+    normalized.includes("receivedAt.getTime()");
+
+  result.duplicateLookupReadsStatusAndReceivedAt =
+    normalized.includes("const existing = await db.stripeWebhookEvent.findUnique({") &&
+    normalized.includes("stripeEventId: event.id") &&
+    normalized.includes("select: {") &&
+    normalized.includes("status: true") &&
+    normalized.includes("receivedAt: true");
+
+  result.acceptsFailedReplay =
+    normalized.includes('if (existing.status === "failed")') &&
+    normalized.includes('return "reprocess";');
+
+  result.acceptsStaleProcessingReplay =
+    normalized.includes('existing.status === "processing"') &&
+    normalized.includes("isWebhookProcessingStale(existing.receivedAt)") &&
+    normalized.includes('return "reprocess";');
+
+  result.rejectsFreshProcessingDuplicate =
+    normalized.includes("[stripe-webhook] duplicate event ignored") &&
+    normalized.includes('return "duplicate";') &&
+    normalized.includes("status: existing.status");
+
+  result.resetsProcessingStateForReplay =
+    normalized.includes("async function resetStripeWebhookEventForReplay(stripeEventId: string): Promise<void>") &&
+    normalized.includes("await db.stripeWebhookEvent.updateMany({") &&
+    normalized.includes("status: \"processing\"") &&
+    normalized.includes("processedAt: null") &&
+    normalized.includes("errorCode: null");
+
+  result.continuesProcessingOnReprocess =
+    normalized.includes('type WebhookReplayDecision = "created" | "duplicate" | "reprocess";') &&
+    normalized.includes('if (replayDecision === "duplicate")') &&
+    !normalized.includes('if (replayDecision === "reprocess") {\n      return');
+
+  const replayRecoveryConsoleLines = normalized
+    .split("\n")
+    .filter((line) => line.includes("console."))
+    .join("\n");
+
+  result.logsSafeReplayWarnings =
+    normalized.includes("[stripe-webhook] failed event replay accepted") &&
+    normalized.includes("[stripe-webhook] stale processing event replay accepted") &&
+    !/payload:\s*event|rawPayload|webhookSecret|STRIPE_WEBHOOK_SECRET|sk_live_|rk_live_|whsec_/u.test(replayRecoveryConsoleLines);
+
+  const checks = [
+    ["STRIPE_WEBHOOK_STALE_WINDOW_MISSING", result.definesStaleProcessingWindow, "Webhook route must define a bounded stale processing replay window."],
+    ["STRIPE_WEBHOOK_DUPLICATE_STATUS_LOOKUP_MISSING", result.duplicateLookupReadsStatusAndReceivedAt, "Duplicate Stripe events must read existing replay status and receivedAt."],
+    ["STRIPE_WEBHOOK_FAILED_REPLAY_NOT_RECOVERABLE", result.acceptsFailedReplay, "Failed Stripe webhook events must be recoverable by replay."],
+    ["STRIPE_WEBHOOK_STALE_PROCESSING_REPLAY_NOT_RECOVERABLE", result.acceptsStaleProcessingReplay, "Stale processing Stripe webhook events must be recoverable by replay."],
+    ["STRIPE_WEBHOOK_FRESH_PROCESSING_DUPLICATE_NOT_IGNORED", result.rejectsFreshProcessingDuplicate, "Fresh processing duplicates must remain ignored to avoid concurrent double processing."],
+    ["STRIPE_WEBHOOK_REPLAY_RESET_INVALID", result.resetsProcessingStateForReplay, "Recovered replay must reset status to processing and clear processedAt/errorCode."],
+    ["STRIPE_WEBHOOK_REPROCESS_FLOW_INVALID", result.continuesProcessingOnReprocess, "Reprocess decisions must continue into normal event handling instead of returning early."],
+    ["STRIPE_WEBHOOK_REPLAY_LOGGING_INVALID", result.logsSafeReplayWarnings, "Replay recovery must log safe operational warnings without secrets or raw payloads."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      addFinding(
+        findings,
+        "fail",
+        "D-063",
+        code,
+        path.relative(root, stripeWebhookRoutePath),
+        detail
+      );
+    }
+  }
+
+  return result;
+}
 function evaluate() {
   const findings = [];
 
@@ -12753,6 +12868,7 @@ function evaluate() {
   const checkoutWebhookMetadataCouplingContract = typeof evaluateCheckoutWebhookMetadataCouplingContract === "function" ? evaluateCheckoutWebhookMetadataCouplingContract(findings) : {};
   const stripeBillingEnvContract = typeof evaluateStripeBillingEnvContract === "function" ? evaluateStripeBillingEnvContract(findings) : {};
   const stripeWebhookReplayIdempotencyContract = typeof evaluateStripeWebhookReplayIdempotencyContract === "function" ? evaluateStripeWebhookReplayIdempotencyContract(findings) : {};
+  const stripeWebhookStaleProcessingRecoveryContract = evaluateStripeWebhookStaleProcessingRecoveryContract(findings);
   const prismaDbDeploymentContract = typeof evaluatePrismaDbDeploymentContract === "function" ? evaluatePrismaDbDeploymentContract(findings) : {};
   const stripeWebhookEventMigrationRequiredContract = typeof evaluateStripeWebhookEventMigrationRequiredContract === "function" ? evaluateStripeWebhookEventMigrationRequiredContract(findings) : {};
   const stripeWebhookDeploymentRunbookContract = typeof evaluateStripeWebhookDeploymentRunbookContract === "function" ? evaluateStripeWebhookDeploymentRunbookContract(findings) : {};
@@ -12826,6 +12942,7 @@ function evaluate() {
     checkoutWebhookMetadataCouplingContract,
     stripeBillingEnvContract,
     stripeWebhookReplayIdempotencyContract,
+    stripeWebhookStaleProcessingRecoveryContract,
     prismaDbDeploymentContract,
     stripeWebhookEventMigrationRequiredContract,
     stripeWebhookDeploymentRunbookContract,

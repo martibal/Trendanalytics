@@ -20,6 +20,7 @@ const NO_STORE_HEADERS = {
 };
 
 const SUPPORTED_CHAINS: ChainId[] = ["bitcoin", "ethereum", "arbitrum", "base"];
+const WEBHOOK_PROCESSING_STALE_AFTER_MS = 15 * 60 * 1000;
 
 function jsonResponse(status: number, code: WebhookJsonCode, message: string) {
   return NextResponse.json(
@@ -398,7 +399,27 @@ function isUniqueConstraintError(error: unknown): boolean {
   );
 }
 
-async function recordStripeWebhookEventReceived(event: Stripe.Event): Promise<"created" | "duplicate"> {
+
+type WebhookReplayDecision = "created" | "duplicate" | "reprocess";
+
+function isWebhookProcessingStale(receivedAt: Date): boolean {
+  return Date.now() - receivedAt.getTime() > WEBHOOK_PROCESSING_STALE_AFTER_MS;
+}
+
+async function resetStripeWebhookEventForReplay(stripeEventId: string): Promise<void> {
+  await db.stripeWebhookEvent.updateMany({
+    where: {
+      stripeEventId,
+    },
+    data: {
+      status: "processing",
+      processedAt: null,
+      errorCode: null,
+    },
+  });
+}
+
+async function recordStripeWebhookEventReceived(event: Stripe.Event): Promise<WebhookReplayDecision> {
   try {
     await db.stripeWebhookEvent.create({
       data: {
@@ -410,8 +431,22 @@ async function recordStripeWebhookEventReceived(event: Stripe.Event): Promise<"c
 
     return "created";
   } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      console.info("[stripe-webhook] duplicate event ignored", {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    const existing = await db.stripeWebhookEvent.findUnique({
+      where: {
+        stripeEventId: event.id,
+      },
+      select: {
+        status: true,
+        receivedAt: true,
+      },
+    });
+
+    if (!existing) {
+      console.info("[stripe-webhook] duplicate event race ignored", {
         stripeEventId: event.id,
         type: event.type,
       });
@@ -419,10 +454,35 @@ async function recordStripeWebhookEventReceived(event: Stripe.Event): Promise<"c
       return "duplicate";
     }
 
-    throw error;
+    if (existing.status === "failed") {
+      console.warn("[stripe-webhook] failed event replay accepted", {
+        stripeEventId: event.id,
+        type: event.type,
+      });
+
+      await resetStripeWebhookEventForReplay(event.id);
+      return "reprocess";
+    }
+
+    if (existing.status === "processing" && isWebhookProcessingStale(existing.receivedAt)) {
+      console.warn("[stripe-webhook] stale processing event replay accepted", {
+        stripeEventId: event.id,
+        type: event.type,
+      });
+
+      await resetStripeWebhookEventForReplay(event.id);
+      return "reprocess";
+    }
+
+    console.info("[stripe-webhook] duplicate event ignored", {
+      stripeEventId: event.id,
+      type: event.type,
+      status: existing.status,
+    });
+
+    return "duplicate";
   }
 }
-
 async function markStripeWebhookEvent(
   event: Stripe.Event,
   status: "processed" | "ignored" | "failed",
