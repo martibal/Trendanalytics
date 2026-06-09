@@ -14259,6 +14259,56 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-072 Checkout no-store response boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasNoStoreHeaderUsage =
+    checkoutRouteSource.includes('Cache-Control", "no-store"') ||
+    checkoutRouteSource.includes('"Cache-Control": "no-store"') ||
+    checkoutRouteSource.includes("'Cache-Control': 'no-store'");
+
+  const signInRedirectIsNoStore =
+    checkoutRouteSource.includes("NextResponse.redirect(signInUrl)") &&
+    /NextResponse\.redirect\(signInUrl\)[\s\S]*?headers\.set\(["']Cache-Control["'],\s*["']no-store["']\)/u.test(checkoutRouteSource);
+
+  const stripeRedirectIsNoStore =
+    checkoutRouteSource.includes("NextResponse.redirect(session.url") &&
+    /NextResponse\.redirect\(session\.url[\s\S]*?headers\.set\(["']Cache-Control["'],\s*["']no-store["']\)/u.test(checkoutRouteSource);
+
+  const getMethodRejectionIsNoStore =
+    /export\s+async\s+function\s+GET\s*\(\)[\s\S]*?Cache-Control["']?\s*:\s*["']no-store["']/u.test(checkoutRouteSource) ||
+    /export\s+async\s+function\s+GET\s*\(\)[\s\S]*?["']Cache-Control["']\s*,\s*["']no-store["']/u.test(checkoutRouteSource);
+
+  const noStoreAppearsAtLeastThreeTimes =
+    (checkoutRouteSource.match(/no-store/gu) ?? []).length >= 3;
+
+  const checks = [
+    ["CHECKOUT_NO_STORE_HEADER_USAGE_MISSING", hasNoStoreHeaderUsage, "Checkout route must set Cache-Control: no-store on checkout-related responses."],
+    ["CHECKOUT_SIGNIN_REDIRECT_NO_STORE_MISSING", signInRedirectIsNoStore, "Checkout sign-in redirect must set Cache-Control: no-store."],
+    ["CHECKOUT_STRIPE_REDIRECT_NO_STORE_MISSING", stripeRedirectIsNoStore, "Stripe Checkout redirect response must set Cache-Control: no-store."],
+    ["CHECKOUT_GET_REJECTION_NO_STORE_MISSING", getMethodRejectionIsNoStore, "Checkout GET rejection response must set Cache-Control: no-store."],
+    ["CHECKOUT_NO_STORE_COVERAGE_INSUFFICIENT", noStoreAppearsAtLeastThreeTimes, "Checkout route must have no-store coverage for auth redirect, Stripe redirect, and GET rejection."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-072",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
