@@ -14577,6 +14577,67 @@ ensureReportDir();
   }
 }
 
+// D-075 Stripe subscription lifecycle coverage boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasLifecycleDispatcher =
+    webhookRouteSource.includes("async function handleVerifiedEvent") &&
+    webhookRouteSource.includes("switch (event.type)");
+
+  const handlesCheckoutCompleted =
+    webhookRouteSource.includes('case "checkout.session.completed":') &&
+    webhookRouteSource.includes("syncCheckoutSessionCompleted(stripe, event.data.object as Stripe.Checkout.Session)");
+
+  const handlesSubscriptionUpdated =
+    webhookRouteSource.includes('case "customer.subscription.updated":') &&
+    webhookRouteSource.includes("syncSubscriptionEvent(event.data.object as Stripe.Subscription)");
+
+  const handlesSubscriptionDeletedAsInactive =
+    webhookRouteSource.includes('case "customer.subscription.deleted":') &&
+    webhookRouteSource.includes("syncSubscriptionEvent(event.data.object as Stripe.Subscription, SubscriptionStatus.inactive)");
+
+  const ignoresUnsupportedEvents =
+    webhookRouteSource.includes("default:") &&
+    webhookRouteSource.includes('return "ignored";');
+
+  const recordsProcessedOrIgnored =
+    webhookRouteSource.includes("const result = await handleVerifiedEvent(stripe, event);") &&
+    webhookRouteSource.includes("await markStripeWebhookEvent(") &&
+    webhookRouteSource.includes('result === "ok" ? "processed" : "ignored"');
+
+  const recordsProcessingFailures =
+    webhookRouteSource.includes('await markStripeWebhookEvent(event, "failed", "processing_failed")') &&
+    webhookRouteSource.includes('return jsonResponse(500, "webhook_error", "Stripe webhook processing failed.")');
+
+  const checks = [
+    ["STRIPE_WEBHOOK_LIFECYCLE_DISPATCHER_MISSING", hasLifecycleDispatcher, "Stripe webhook must dispatch verified events by event.type."],
+    ["STRIPE_WEBHOOK_CHECKOUT_COMPLETED_HANDLER_MISSING", handlesCheckoutCompleted, "Stripe webhook must handle checkout.session.completed."],
+    ["STRIPE_WEBHOOK_SUBSCRIPTION_UPDATED_HANDLER_MISSING", handlesSubscriptionUpdated, "Stripe webhook must handle customer.subscription.updated."],
+    ["STRIPE_WEBHOOK_SUBSCRIPTION_DELETED_INACTIVE_HANDLER_MISSING", handlesSubscriptionDeletedAsInactive, "Stripe webhook must handle customer.subscription.deleted by marking local subscription inactive."],
+    ["STRIPE_WEBHOOK_UNSUPPORTED_EVENT_IGNORE_MISSING", ignoresUnsupportedEvents, "Stripe webhook must ignore unsupported verified event types without failing the webhook."],
+    ["STRIPE_WEBHOOK_PROCESSED_IGNORED_MARKING_MISSING", recordsProcessedOrIgnored, "Stripe webhook must persist processed/ignored status after verified event handling."],
+    ["STRIPE_WEBHOOK_FAILED_MARKING_MISSING", recordsProcessingFailures, "Stripe webhook must persist failed status when processing throws."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-075",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
