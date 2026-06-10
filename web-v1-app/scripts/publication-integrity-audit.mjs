@@ -17404,6 +17404,292 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-098 Stripe subscription lookup isolation boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function extractTransactionBlock(source) {
+    const start = source.indexOf("await db.$transaction(async (tx)");
+    if (start < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", start);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(start, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const subscriptionSyncSource = extractFunctionSource(webhookRouteSource, "syncSubscriptionEvent");
+  const subscriptionTransactionBlock = extractTransactionBlock(subscriptionSyncSource);
+
+  const metadataAccountIdIsFallbackOnly =
+    subscriptionSyncSource.includes('const accountId = typeof metadata.account_id === "string" ? metadata.account_id : null');
+
+  const localBindingLookupExists =
+    subscriptionTransactionBlock.includes("const existing = await tx.subscription.findFirst") &&
+    subscriptionTransactionBlock.includes("OR:") &&
+    subscriptionTransactionBlock.includes("stripeSubscriptionId") &&
+    subscriptionTransactionBlock.includes("stripeCustomerId");
+
+  const localBindingSelectsAccountId =
+    subscriptionTransactionBlock.includes("select:") &&
+    subscriptionTransactionBlock.includes("id: true") &&
+    subscriptionTransactionBlock.includes("accountId: true");
+
+  const existingBindingPreferredOverMetadata =
+    subscriptionTransactionBlock.includes("const resolvedAccountId = existing?.accountId ?? accountId");
+
+  const resolvedAccountIdGuardBeforeUpsert =
+    subscriptionTransactionBlock.includes("if (!resolvedAccountId)") &&
+    subscriptionTransactionBlock.includes("await tx.subscription.upsert") &&
+    subscriptionTransactionBlock.indexOf("if (!resolvedAccountId)") <
+      subscriptionTransactionBlock.indexOf("await tx.subscription.upsert");
+
+  const unboundSubscriptionReturnsFromTransactionBeforeWrite =
+    subscriptionTransactionBlock.includes("if (!resolvedAccountId)") &&
+    subscriptionTransactionBlock.includes("return;") &&
+    subscriptionTransactionBlock.indexOf("if (!resolvedAccountId)") <
+      subscriptionTransactionBlock.indexOf("return;") &&
+    subscriptionTransactionBlock.indexOf("return;") <
+      subscriptionTransactionBlock.indexOf("await tx.subscription.upsert");
+
+  const createUsesResolvedAccountId =
+    subscriptionTransactionBlock.includes("create:") &&
+    subscriptionTransactionBlock.includes("accountId: resolvedAccountId");
+
+  const createDoesNotUseRawMetadataAccountId =
+    !/create:\s*\{[\s\S]*?\baccountId\s*:\s*accountId\b/u.test(subscriptionTransactionBlock);
+
+  function extractObjectBlockAfter(source, needle) {
+    const start = source.indexOf(needle);
+    if (start < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", start);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(open, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const subscriptionUpsertBlockForAccountAudit = extractObjectBlockAfter(
+    subscriptionTransactionBlock,
+    "await tx.subscription.upsert"
+  );
+  const subscriptionUpdateBlockForAccountAudit = extractObjectBlockAfter(
+    subscriptionUpsertBlockForAccountAudit,
+    "update:"
+  );
+
+  const updateDoesNotReassignAccountId =
+    subscriptionUpdateBlockForAccountAudit.length > 0 &&
+    !/\baccountId\s*:/u.test(subscriptionUpdateBlockForAccountAudit);
+  const upsertWhereUsesStripeCustomerId =
+    /where:\s*\{[\s\S]*?stripeCustomerId\s*,[\s\S]*?\}/u.test(subscriptionTransactionBlock);
+
+  const noAccountCreateInSubscriptionLifecycle =
+    !/\btx\.account\.(?:create|upsert|update|updateMany)\s*\(/u.test(subscriptionTransactionBlock) &&
+    !/\bdb\.account\.(?:create|upsert|update|updateMany)\s*\(/u.test(subscriptionSyncSource);
+
+  const noSubscriptionWriteBeforeBindingGuard =
+    subscriptionSyncSource.indexOf("await tx.subscription.upsert") >
+    subscriptionSyncSource.indexOf("if (!resolvedAccountId)");
+
+  const checks = [
+    ["STRIPE_SUBSCRIPTION_METADATA_ACCOUNT_FALLBACK_MISSING", metadataAccountIdIsFallbackOnly, "subscription lifecycle may read metadata.account_id only as a bounded fallback."],
+    ["STRIPE_SUBSCRIPTION_LOCAL_BINDING_LOOKUP_MISSING", localBindingLookupExists, "subscription lifecycle must look up existing local binding by Stripe subscription/customer ids."],
+    ["STRIPE_SUBSCRIPTION_LOCAL_BINDING_ACCOUNT_SELECT_MISSING", localBindingSelectsAccountId, "subscription lifecycle binding lookup must select local accountId."],
+    ["STRIPE_SUBSCRIPTION_EXISTING_BINDING_PRIORITY_MISSING", existingBindingPreferredOverMetadata, "existing local binding accountId must be preferred over metadata account_id."],
+    ["STRIPE_SUBSCRIPTION_RESOLVED_ACCOUNT_GUARD_BEFORE_WRITE_MISSING", resolvedAccountIdGuardBeforeUpsert, "subscription lifecycle must guard resolvedAccountId before upsert."],
+    ["STRIPE_SUBSCRIPTION_UNBOUND_RETURN_BEFORE_WRITE_MISSING", unboundSubscriptionReturnsFromTransactionBeforeWrite, "unbound subscription lifecycle event must return before write."],
+    ["STRIPE_SUBSCRIPTION_CREATE_RESOLVED_ACCOUNT_MISSING", createUsesResolvedAccountId, "subscription create path must use resolvedAccountId."],
+    ["STRIPE_SUBSCRIPTION_CREATE_RAW_METADATA_ACCOUNT_RISK", createDoesNotUseRawMetadataAccountId, "subscription create path must not directly use metadata-derived accountId."],
+    ["STRIPE_SUBSCRIPTION_UPDATE_ACCOUNT_REASSIGNMENT_RISK", updateDoesNotReassignAccountId, "subscription update path must not reassign accountId."],
+    ["STRIPE_SUBSCRIPTION_UPSERT_CUSTOMER_KEY_MISSING", upsertWhereUsesStripeCustomerId, "subscription upsert must use stripeCustomerId as the unique write key."],
+    ["STRIPE_SUBSCRIPTION_LIFECYCLE_ACCOUNT_WRITE_RISK", noAccountCreateInSubscriptionLifecycle, "subscription lifecycle sync must not create or mutate accounts."],
+    ["STRIPE_SUBSCRIPTION_WRITE_BEFORE_BINDING_GUARD_RISK", noSubscriptionWriteBeforeBindingGuard, "subscription lifecycle must not write subscription before resolved account guard."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-098",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
