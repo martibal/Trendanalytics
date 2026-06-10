@@ -283,6 +283,8 @@ async function resolveAccount(params: {
       },
       update: {
         email: params.email,
+        termsAcceptedAt: new Date(),
+        termsVersion: TERMS_VERSION,
       },
       create: {
         authProviderUserId: params.authProviderUserId,

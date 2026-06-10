@@ -14872,6 +14872,75 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-081 Checkout terms acceptance boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const resolveAccountStart = checkoutRouteSource.indexOf("async function resolveAccount");
+  const resolveAccountEnd =
+    resolveAccountStart >= 0
+      ? checkoutRouteSource.indexOf("\nasync function handleCheckout", resolveAccountStart)
+      : -1;
+
+  const resolveAccountSource =
+    resolveAccountStart >= 0
+      ? checkoutRouteSource.slice(
+          resolveAccountStart,
+          resolveAccountEnd >= 0 ? resolveAccountEnd : checkoutRouteSource.length
+        )
+      : "";
+
+  const hasTermsVersionConstant =
+    checkoutRouteSource.includes("TERMS_VERSION");
+
+  const accountUpsertUsesAuthProviderUserId =
+    resolveAccountSource.includes("db.account.upsert") &&
+    resolveAccountSource.includes("where:") &&
+    resolveAccountSource.includes("authProviderUserId: params.authProviderUserId");
+
+  const accountCreateSetsTerms =
+    /create:\s*\{[\s\S]*?termsAcceptedAt:\s*new Date\(\),[\s\S]*?termsVersion:\s*TERMS_VERSION/u.test(resolveAccountSource);
+
+  const accountUpdateSetsTerms =
+    /update:\s*\{[\s\S]*?termsAcceptedAt:\s*new Date\(\),[\s\S]*?termsVersion:\s*TERMS_VERSION/u.test(resolveAccountSource);
+
+  const checkoutRequiresSignedInUserBeforeResolveAccount =
+    checkoutRouteSource.indexOf("if (!signedInUser)") >= 0 &&
+    checkoutRouteSource.indexOf("await resolveAccount({") > checkoutRouteSource.indexOf("if (!signedInUser)") &&
+    checkoutRouteSource.includes("authProviderUserId: signedInUser.userId");
+
+  const checkoutStopsOnAccountPreparationFailure =
+    checkoutRouteSource.includes('"account_error"') &&
+    checkoutRouteSource.includes("Checkout account preparation failed.") &&
+    checkoutRouteSource.includes("return jsonError(");
+
+  const checks = [
+    ["CHECKOUT_TERMS_VERSION_CONSTANT_MISSING", hasTermsVersionConstant, "Checkout route must use a terms version constant."],
+    ["CHECKOUT_ACCOUNT_UPSERT_AUTH_BINDING_MISSING", accountUpsertUsesAuthProviderUserId, "Checkout account upsert must be keyed by authProviderUserId."],
+    ["CHECKOUT_ACCOUNT_CREATE_TERMS_ACCEPTANCE_MISSING", accountCreateSetsTerms, "Checkout account create must set termsAcceptedAt and termsVersion."],
+    ["CHECKOUT_ACCOUNT_UPDATE_TERMS_ACCEPTANCE_MISSING", accountUpdateSetsTerms, "Checkout account update must refresh termsAcceptedAt and termsVersion before checkout."],
+    ["CHECKOUT_TERMS_SIGNED_IN_USER_BINDING_MISSING", checkoutRequiresSignedInUserBeforeResolveAccount, "Checkout must resolve account only after signed-in user identity is known."],
+    ["CHECKOUT_ACCOUNT_ERROR_STOP_MISSING", checkoutStopsOnAccountPreparationFailure, "Checkout must stop before Stripe session creation if account preparation fails."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-081",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
