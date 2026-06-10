@@ -15812,6 +15812,233 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-089 Stripe webhook subscription account-binding boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const realStart =
+      start >= 0 && asyncStart >= 0
+        ? Math.min(start, asyncStart)
+        : start >= 0
+          ? start
+          : asyncStart;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const checkoutSyncSource = extractFunctionSource(webhookRouteSource, "syncCheckoutSessionCompleted");
+  const subscriptionSyncSource = extractFunctionSource(webhookRouteSource, "syncSubscriptionEvent");
+
+  const checkoutBindsAccountFromSession =
+    checkoutSyncSource.includes("const accountId = session.client_reference_id ?? session.metadata?.account_id ?? null");
+
+  const checkoutRequiresAccountBeforeWrite =
+    checkoutSyncSource.includes("if (!stripeCustomerId || !stripeSubscriptionId || !accountId)") &&
+    checkoutSyncSource.includes('return "ignored";') &&
+    checkoutSyncSource.indexOf("if (!stripeCustomerId || !stripeSubscriptionId || !accountId)") <
+      checkoutSyncSource.indexOf("await db.$transaction");
+
+  const checkoutCreateUsesBoundAccountId =
+    checkoutSyncSource.includes("create:") &&
+    checkoutSyncSource.includes("accountId,") &&
+    checkoutSyncSource.includes("stripeCustomerId,") &&
+    checkoutSyncSource.includes("stripeSubscriptionId,");
+
+  const subscriptionEventReadsMetadataAccountId =
+    subscriptionSyncSource.includes("const accountId = typeof metadata.account_id === \"string\" ? metadata.account_id : null") ||
+    subscriptionSyncSource.includes("const accountId = typeof metadata.account_id === 'string' ? metadata.account_id : null");
+
+  const subscriptionEventLooksUpExistingBinding =
+    subscriptionSyncSource.includes("const existing = await tx.subscription.findFirst") &&
+    subscriptionSyncSource.includes("OR:") &&
+    subscriptionSyncSource.includes("stripeSubscriptionId") &&
+    subscriptionSyncSource.includes("stripeCustomerId") &&
+    subscriptionSyncSource.includes("select:") &&
+    subscriptionSyncSource.includes("accountId: true");
+
+  const subscriptionEventResolvesAccountId =
+    subscriptionSyncSource.includes("const resolvedAccountId = existing?.accountId ?? accountId");
+
+  const subscriptionEventRejectsUnboundEvent =
+    subscriptionSyncSource.includes("if (!resolvedAccountId)") &&
+    subscriptionSyncSource.includes('return;') &&
+    subscriptionSyncSource.indexOf("if (!resolvedAccountId)") <
+      subscriptionSyncSource.indexOf("await tx.subscription.upsert");
+
+  const subscriptionCreateUsesResolvedAccountId =
+    subscriptionSyncSource.includes("create:") &&
+    subscriptionSyncSource.includes("accountId: resolvedAccountId") &&
+    subscriptionSyncSource.includes("stripeCustomerId,") &&
+    subscriptionSyncSource.includes("stripeSubscriptionId,");
+
+  function extractObjectBlockAfter(source, marker, propertyName) {
+    const markerIndex = source.indexOf(marker);
+    if (markerIndex < 0) {
+      return "";
+    }
+
+    const propertyIndex = source.indexOf(propertyName, markerIndex);
+    if (propertyIndex < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", propertyIndex);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(open, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const subscriptionUpsertUpdateBlock = extractObjectBlockAfter(
+    subscriptionSyncSource,
+    "await tx.subscription.upsert",
+    "update:"
+  );
+
+  const subscriptionUpdateDoesNotReassignAccountId =
+    subscriptionUpsertUpdateBlock.length > 0 &&
+    !/\baccountId\s*:/u.test(subscriptionUpsertUpdateBlock);
+  const unboundEventReturnsIgnored =
+    subscriptionSyncSource.includes("let synced = false") &&
+    subscriptionSyncSource.includes("if (!synced)") &&
+    subscriptionSyncSource.includes('return "ignored";');
+
+  const checks = [
+    ["STRIPE_CHECKOUT_ACCOUNT_BINDING_MISSING", checkoutBindsAccountFromSession, "checkout.session.completed must bind local account from client_reference_id or metadata.account_id."],
+    ["STRIPE_CHECKOUT_ACCOUNT_GUARD_MISSING", checkoutRequiresAccountBeforeWrite, "checkout.session.completed must stop before DB writes when local account id is missing."],
+    ["STRIPE_CHECKOUT_CREATE_ACCOUNT_ID_MISSING", checkoutCreateUsesBoundAccountId, "checkout.session.completed subscription create must use the bound local accountId."],
+    ["STRIPE_SUBSCRIPTION_METADATA_ACCOUNT_ID_MISSING", subscriptionEventReadsMetadataAccountId, "subscription lifecycle events must read metadata.account_id only as a string fallback."],
+    ["STRIPE_SUBSCRIPTION_EXISTING_ACCOUNT_LOOKUP_MISSING", subscriptionEventLooksUpExistingBinding, "subscription lifecycle events must look up existing local subscription/account binding."],
+    ["STRIPE_SUBSCRIPTION_RESOLVED_ACCOUNT_ID_MISSING", subscriptionEventResolvesAccountId, "subscription lifecycle events must resolve account id from existing binding before metadata fallback."],
+    ["STRIPE_SUBSCRIPTION_UNBOUND_GUARD_MISSING", subscriptionEventRejectsUnboundEvent, "subscription lifecycle events must not upsert when no local account binding is available."],
+    ["STRIPE_SUBSCRIPTION_CREATE_RESOLVED_ACCOUNT_ID_MISSING", subscriptionCreateUsesResolvedAccountId, "subscription lifecycle create must use resolvedAccountId."],
+    ["STRIPE_SUBSCRIPTION_UPDATE_ACCOUNT_REASSIGNMENT_RISK", subscriptionUpdateDoesNotReassignAccountId, "subscription lifecycle update must not reassign accountId."],
+    ["STRIPE_SUBSCRIPTION_UNBOUND_IGNORED_RESULT_MISSING", unboundEventReturnsIgnored, "unbound subscription lifecycle events must resolve as ignored."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-089",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
