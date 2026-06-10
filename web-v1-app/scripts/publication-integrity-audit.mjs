@@ -18655,6 +18655,262 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-104 Checkout local account preparation boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function extractObjectBlockAfter(source, needle) {
+    const start = source.indexOf(needle);
+    if (start < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", start);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(open, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const getSignedInUserSource = extractFunctionSource(checkoutRouteSource, "getSignedInUser");
+  const resolveAccountSource = extractFunctionSource(checkoutRouteSource, "resolveAccount");
+  const handleCheckoutSource = extractFunctionSource(checkoutRouteSource, "handleCheckout");
+
+  const updateBlock = extractObjectBlockAfter(resolveAccountSource, "update:");
+  const createBlock = extractObjectBlockAfter(resolveAccountSource, "create:");
+  const includeBlock = extractObjectBlockAfter(resolveAccountSource, "include:");
+
+  const signedInUserRequiresAuthUserId =
+    getSignedInUserSource.includes("const authState = await auth()") &&
+    getSignedInUserSource.includes("if (!authState.userId)") &&
+    getSignedInUserSource.includes("return null");
+
+  const signedInUserReturnsAuthProviderUserId =
+    getSignedInUserSource.includes("userId: authState.userId");
+
+  const signedInUserEmailIsBounded =
+    getSignedInUserSource.includes("const email =") &&
+    getSignedInUserSource.includes("primaryEmailAddress") &&
+    getSignedInUserSource.includes("sessionClaims") &&
+    !/\b(?:searchParams|formData|request\.json\(\)|body)\b[\s\S]{0,180}\bemail\b/u.test(getSignedInUserSource);
+
+  const resolveAccountAcceptsAuthProviderUserIdAndEmail =
+    resolveAccountSource.includes("authProviderUserId: string") &&
+    resolveAccountSource.includes("email: string | null");
+
+  const resolveAccountUpsertsByAuthProviderUserId =
+    checkoutRouteSource.includes("db.account.upsert") &&
+    checkoutRouteSource.includes("where:") &&
+    checkoutRouteSource.includes("authProviderUserId") &&
+    checkoutRouteSource.includes("params.authProviderUserId");
+
+  const accountUpdateStoresSignedInEmail =
+    /update:\s*\{[\s\S]*?email\s*:\s*params\.email/u.test(checkoutRouteSource);
+
+  const accountCreateStoresSignedInEmail =
+    /create:\s*\{[\s\S]*?email\s*:\s*params\.email/u.test(checkoutRouteSource);
+
+  const accountUpdateStoresTerms =
+    /update:\s*\{[\s\S]*?termsAcceptedAt\s*:\s*new Date\(\)[\s\S]*?termsVersion\s*:\s*TERMS_VERSION/u.test(checkoutRouteSource);
+
+  const accountCreateStoresTerms =
+    /create:\s*\{[\s\S]*?termsAcceptedAt\s*:\s*new Date\(\)[\s\S]*?termsVersion\s*:\s*TERMS_VERSION/u.test(checkoutRouteSource);
+
+  const latestSubscriptionIncludedForCustomerReuse =
+    checkoutRouteSource.includes("subscriptions:") &&
+    checkoutRouteSource.includes("orderBy:") &&
+    checkoutRouteSource.includes("updatedAt") &&
+    checkoutRouteSource.includes("desc") &&
+    checkoutRouteSource.includes("take: 1");
+  const handleCheckoutRequiresSignedInUserBeforeResolveAccount =
+    handleCheckoutSource.includes("signedInUser = await getSignedInUser()") &&
+    handleCheckoutSource.includes("if (!signedInUser)") &&
+    handleCheckoutSource.includes("account = await resolveAccount") &&
+    handleCheckoutSource.indexOf("if (!signedInUser)") <
+      handleCheckoutSource.indexOf("account = await resolveAccount");
+
+  const resolveAccountReceivesSignedInContext =
+    handleCheckoutSource.includes("account = await resolveAccount({") &&
+    handleCheckoutSource.includes("authProviderUserId: signedInUser.userId") &&
+    handleCheckoutSource.includes("email: signedInUser.email");
+
+  const metadataBuiltAfterAccountResolution =
+    handleCheckoutSource.includes("const metadata = checkoutMetadata({") &&
+    handleCheckoutSource.includes("accountId: account.id") &&
+    handleCheckoutSource.indexOf("account = await resolveAccount") <
+      handleCheckoutSource.indexOf("const metadata = checkoutMetadata({");
+
+  const customerReuseAfterAccountResolution =
+    handleCheckoutSource.includes("const existingStripeCustomerId") &&
+    handleCheckoutSource.includes("account.subscriptions") &&
+    handleCheckoutSource.indexOf("account = await resolveAccount") <
+      handleCheckoutSource.indexOf("const existingStripeCustomerId");
+
+  const stripeSessionCreateAfterAccountResolution =
+    handleCheckoutSource.includes("stripe.checkout.sessions.create(sessionParams)") &&
+    handleCheckoutSource.indexOf("account = await resolveAccount") <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)");
+
+  const accountResolutionFailureReturnsAccountError =
+    handleCheckoutSource.includes("catch (error)") &&
+    handleCheckoutSource.includes('"account_error"') &&
+    handleCheckoutSource.includes("Checkout account preparation failed.");
+
+  const noRawRequestAccountMutationInput =
+    !/\b(?:searchParams|formData|request\.json\(\)|body)\b[\s\S]{0,260}\b(?:accountId|account_id|authProviderUserId|userId|termsAcceptedAt|termsVersion)\b/u.test(
+      handleCheckoutSource
+    );
+
+  const checks = [
+    ["CHECKOUT_SIGNED_IN_USER_AUTH_GUARD_MISSING", signedInUserRequiresAuthUserId, "getSignedInUser must require authState.userId before returning a user."],
+    ["CHECKOUT_SIGNED_IN_USER_ID_RETURN_MISSING", signedInUserReturnsAuthProviderUserId, "getSignedInUser must return auth provider user id."],
+    ["CHECKOUT_SIGNED_IN_EMAIL_BOUNDARY_MISSING", signedInUserEmailIsBounded, "getSignedInUser email must come from Clerk context, not request input."],
+    ["CHECKOUT_RESOLVE_ACCOUNT_PARAMS_MISSING", resolveAccountAcceptsAuthProviderUserIdAndEmail, "resolveAccount must accept authProviderUserId and bounded email."],
+    ["CHECKOUT_ACCOUNT_UPSERT_AUTH_PROVIDER_KEY_MISSING", resolveAccountUpsertsByAuthProviderUserId, "resolveAccount must upsert account by authProviderUserId."],
+    ["CHECKOUT_ACCOUNT_UPDATE_EMAIL_MISSING", accountUpdateStoresSignedInEmail, "account update path must store signed-in email."],
+    ["CHECKOUT_ACCOUNT_CREATE_EMAIL_MISSING", accountCreateStoresSignedInEmail, "account create path must store signed-in email."],
+    ["CHECKOUT_ACCOUNT_UPDATE_TERMS_MISSING", accountUpdateStoresTerms, "account update path must set termsAcceptedAt and termsVersion."],
+    ["CHECKOUT_ACCOUNT_CREATE_TERMS_MISSING", accountCreateStoresTerms, "account create path must set termsAcceptedAt and termsVersion."],
+    ["CHECKOUT_LATEST_SUBSCRIPTION_INCLUDE_MISSING", latestSubscriptionIncludedForCustomerReuse, "resolveAccount must include latest subscription for Stripe customer reuse."],
+    ["CHECKOUT_SIGNED_IN_BEFORE_ACCOUNT_RESOLUTION_MISSING", handleCheckoutRequiresSignedInUserBeforeResolveAccount, "handleCheckout must require signed-in user before account resolution."],
+    ["CHECKOUT_RESOLVE_ACCOUNT_SIGNED_IN_CONTEXT_MISSING", resolveAccountReceivesSignedInContext, "handleCheckout must resolve account using signed-in user context."],
+    ["CHECKOUT_METADATA_AFTER_ACCOUNT_RESOLUTION_MISSING", metadataBuiltAfterAccountResolution, "checkout metadata must be built after local account resolution."],
+    ["CHECKOUT_CUSTOMER_REUSE_AFTER_ACCOUNT_RESOLUTION_MISSING", customerReuseAfterAccountResolution, "Stripe customer reuse decision must happen after account resolution."],
+    ["CHECKOUT_SESSION_CREATE_AFTER_ACCOUNT_RESOLUTION_MISSING", stripeSessionCreateAfterAccountResolution, "Stripe session must be created after account resolution."],
+    ["CHECKOUT_ACCOUNT_ERROR_BOUNDARY_MISSING", accountResolutionFailureReturnsAccountError, "account resolution failure must return account_error."],
+    ["CHECKOUT_RAW_REQUEST_ACCOUNT_MUTATION_RISK", noRawRequestAccountMutationInput, "checkout must not accept account mutation fields from request input."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-104",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
