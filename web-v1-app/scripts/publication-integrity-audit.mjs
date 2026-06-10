@@ -14756,6 +14756,66 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-079 Stripe Checkout customer reuse boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const readsExistingStripeCustomerId =
+    checkoutRouteSource.includes("const existingStripeCustomerId") &&
+    checkoutRouteSource.includes("account.subscriptions[0]?.stripeCustomerId") &&
+    checkoutRouteSource.includes("?? null");
+
+  const reusesExistingStripeCustomer =
+    checkoutRouteSource.includes("if (existingStripeCustomerId)") &&
+    checkoutRouteSource.includes("sessionParams.customer = existingStripeCustomerId");
+
+  const emailFallbackOnlyAfterCustomerReuse =
+    checkoutRouteSource.includes("} else if (signedInUser.email)") &&
+    checkoutRouteSource.includes("sessionParams.customer_email = signedInUser.email");
+
+  const customerAssignmentHappensBeforeSessionCreate =
+    checkoutRouteSource.indexOf("sessionParams.customer = existingStripeCustomerId") >= 0 &&
+    checkoutRouteSource.indexOf("stripe.checkout.sessions.create(sessionParams)") >
+      checkoutRouteSource.indexOf("sessionParams.customer = existingStripeCustomerId");
+
+  const sessionParamsDoesNotPresetCustomerEmail =
+    !/const\s+sessionParams[\s\S]*?customer_email\s*:/u.test(
+      checkoutRouteSource.slice(
+        checkoutRouteSource.indexOf("const sessionParams"),
+        checkoutRouteSource.indexOf("if (existingStripeCustomerId)")
+      )
+    );
+
+  const noHardcodedStripeCustomerIdsInRoute =
+    !/cus_[A-Za-z0-9]{8,}/u.test(checkoutRouteSource);
+
+  const checks = [
+    ["CHECKOUT_EXISTING_CUSTOMER_LOOKUP_MISSING", readsExistingStripeCustomerId, "Checkout route must read existing stripeCustomerId from the local account subscription state."],
+    ["CHECKOUT_EXISTING_CUSTOMER_REUSE_MISSING", reusesExistingStripeCustomer, "Checkout route must set sessionParams.customer when an existing Stripe customer id is known."],
+    ["CHECKOUT_CUSTOMER_EMAIL_FALLBACK_ORDER_INVALID", emailFallbackOnlyAfterCustomerReuse, "Checkout route must use customer_email only as fallback after existing customer reuse."],
+    ["CHECKOUT_CUSTOMER_ASSIGNMENT_AFTER_SESSION_CREATE_RISK", customerAssignmentHappensBeforeSessionCreate, "Checkout route must assign customer/customer_email before creating the Stripe session."],
+    ["CHECKOUT_CUSTOMER_EMAIL_PRESET_RISK", sessionParamsDoesNotPresetCustomerEmail, "Checkout route must not preset customer_email inside sessionParams before customer reuse logic."],
+    ["CHECKOUT_HARDCODED_CUSTOMER_ID_RISK", noHardcodedStripeCustomerIdsInRoute, "Checkout route must not hard-code concrete Stripe customer ids."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-079",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
