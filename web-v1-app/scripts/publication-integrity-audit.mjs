@@ -17690,6 +17690,164 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-099 Stripe checkout completed subscription retrieval boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const retrieveSource = extractFunctionSource(webhookRouteSource, "retrieveSubscriptionForCheckout");
+  const checkoutSyncSource = extractFunctionSource(webhookRouteSource, "syncCheckoutSessionCompleted");
+
+  const retrieveHelperExists =
+    retrieveSource.includes("async function retrieveSubscriptionForCheckout(") &&
+    retrieveSource.includes("stripe: Stripe") &&
+    retrieveSource.includes("subscriptionId: string | null") &&
+    retrieveSource.includes("Promise<Stripe.Subscription | null>");
+
+  const retrieveReturnsNullWithoutSubscriptionId =
+    retrieveSource.includes("if (!subscriptionId)") &&
+    retrieveSource.includes("return null");
+
+  const retrieveUsesStripeSubscriptionsRetrieve =
+    retrieveSource.includes("return await stripe.subscriptions.retrieve(subscriptionId)");
+
+  const retrieveFailureIsBoundedAndNonFatal =
+    retrieveSource.includes("catch (error)") &&
+    retrieveSource.includes('console.warn("[stripe-webhook] failed to retrieve subscription for checkout"') &&
+    retrieveSource.includes("return null");
+
+  const checkoutRetrievesUsingSessionSubscriptionId =
+    checkoutSyncSource.includes("const stripeSubscriptionId = getSubscriptionIdFromSession(session)") &&
+    checkoutSyncSource.includes("const retrievedSubscription = await retrieveSubscriptionForCheckout(stripe, stripeSubscriptionId)") &&
+    checkoutSyncSource.indexOf("const stripeSubscriptionId = getSubscriptionIdFromSession(session)") <
+      checkoutSyncSource.indexOf("const retrievedSubscription = await retrieveSubscriptionForCheckout(stripe, stripeSubscriptionId)");
+
+  const checkoutMetadataPrefersRetrievedSubscription =
+    checkoutSyncSource.includes("const metadata = retrievedSubscription ? getSubscriptionMetadata(retrievedSubscription) : (session.metadata ?? {})");
+
+  const checkoutHistoryUsesRetrievedMetadataWithSessionFallback =
+    checkoutSyncSource.includes("metadata.history_unlocked ?? session.metadata?.history_unlocked");
+
+  const checkoutStatusUsesRetrievedSubscriptionWithActiveFallback =
+    checkoutSyncSource.includes('const status = normalizeStripeSubscriptionStatus(retrievedSubscription?.status ?? "active")');
+
+  const checkoutCurrentPeriodEndUsesRetrievedSubscriptionOnly =
+    checkoutSyncSource.includes("const currentPeriodEnd = retrievedSubscription ? getSubscriptionCurrentPeriodEnd(retrievedSubscription) : null");
+
+  const checkoutEntitledChainUsesSessionCustomFieldBeforeMetadata =
+    checkoutSyncSource.includes("entitledChainFromSession(session) ?? normalizeChain(metadata.entitled_chain)");
+
+  const checkoutDoesNotReadSessionSubscriptionStatusDirectly =
+    !/\bsession\.(?:status|current_period_end|items|subscription\.status|subscription\.current_period_end)\b/u.test(checkoutSyncSource);
+
+  const checkoutDoesNotHardFailWhenRetrieveReturnsNull =
+    checkoutSyncSource.includes("const retrievedSubscription = await retrieveSubscriptionForCheckout(stripe, stripeSubscriptionId)") &&
+    checkoutSyncSource.includes('?? "active"') &&
+    checkoutSyncSource.includes(": null") &&
+    checkoutSyncSource.includes("await db.$transaction(async (tx)");
+
+  const noRawRetrieveErrorLeakInPublicResponse =
+    !/return\s+jsonResponse\([\s\S]{0,160}failed to retrieve subscription for checkout/u.test(webhookRouteSource) &&
+    !/return\s+jsonResponse\([\s\S]{0,160}subscriptionId/u.test(webhookRouteSource);
+
+  const checks = [
+    ["STRIPE_CHECKOUT_SUBSCRIPTION_RETRIEVE_HELPER_MISSING", retrieveHelperExists, "Webhook route must define retrieveSubscriptionForCheckout(stripe, subscriptionId)."],
+    ["STRIPE_CHECKOUT_SUBSCRIPTION_RETRIEVE_NULL_ID_GUARD_MISSING", retrieveReturnsNullWithoutSubscriptionId, "retrieveSubscriptionForCheckout must return null when subscriptionId is missing."],
+    ["STRIPE_CHECKOUT_SUBSCRIPTION_RETRIEVE_CALL_MISSING", retrieveUsesStripeSubscriptionsRetrieve, "retrieveSubscriptionForCheckout must call stripe.subscriptions.retrieve(subscriptionId)."],
+    ["STRIPE_CHECKOUT_SUBSCRIPTION_RETRIEVE_FAILURE_BOUNDARY_MISSING", retrieveFailureIsBoundedAndNonFatal, "subscription retrieve failure must be logged and return null, not crash checkout sync."],
+    ["STRIPE_CHECKOUT_RETRIEVE_FROM_SESSION_SUBSCRIPTION_MISSING", checkoutRetrievesUsingSessionSubscriptionId, "checkout sync must retrieve subscription using session.subscription-derived stripeSubscriptionId."],
+    ["STRIPE_CHECKOUT_METADATA_RETRIEVED_FIRST_MISSING", checkoutMetadataPrefersRetrievedSubscription, "checkout sync must prefer retrieved subscription metadata over session metadata fallback."],
+    ["STRIPE_CHECKOUT_HISTORY_RETRIEVED_METADATA_FALLBACK_MISSING", checkoutHistoryUsesRetrievedMetadataWithSessionFallback, "checkout historyUnlocked must use retrieved metadata with session metadata fallback."],
+    ["STRIPE_CHECKOUT_STATUS_RETRIEVED_SUBSCRIPTION_MISSING", checkoutStatusUsesRetrievedSubscriptionWithActiveFallback, "checkout status must use retrieved subscription status with active fallback."],
+    ["STRIPE_CHECKOUT_PERIOD_END_RETRIEVED_SUBSCRIPTION_MISSING", checkoutCurrentPeriodEndUsesRetrievedSubscriptionOnly, "checkout currentPeriodEnd must come only from retrieved subscription."],
+    ["STRIPE_CHECKOUT_CHAIN_CUSTOM_FIELD_PRIORITY_MISSING", checkoutEntitledChainUsesSessionCustomFieldBeforeMetadata, "checkout entitled chain must prefer session custom field before metadata fallback."],
+    ["STRIPE_CHECKOUT_SESSION_RAW_SUBSCRIPTION_STATE_RISK", checkoutDoesNotReadSessionSubscriptionStatusDirectly, "checkout sync must not infer status/current period from raw checkout session fields."],
+    ["STRIPE_CHECKOUT_RETRIEVE_NULL_CONTINUATION_MISSING", checkoutDoesNotHardFailWhenRetrieveReturnsNull, "checkout sync must continue with bounded fallbacks when subscription retrieval returns null."],
+    ["STRIPE_CHECKOUT_RETRIEVE_ERROR_PUBLIC_LEAK_RISK", noRawRetrieveErrorLeakInPublicResponse, "subscription retrieval failures must not be returned as detailed public JSON errors."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-099",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
