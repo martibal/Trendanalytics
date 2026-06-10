@@ -16223,6 +16223,159 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-091 Stripe subscription plan inference boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const realStart =
+      start >= 0 && asyncStart >= 0
+        ? Math.min(start, asyncStart)
+        : start >= 0
+          ? start
+          : asyncStart;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const subscriptionPlanSource = extractFunctionSource(webhookRouteSource, "subscriptionPlan");
+  const subscriptionSyncSource = extractFunctionSource(webhookRouteSource, "syncSubscriptionEvent");
+
+  const hasSubscriptionPlanHelper =
+    subscriptionPlanSource.includes("function subscriptionPlan(subscription: Stripe.Subscription): CheckoutPlan | null");
+
+  const metadataPlanIsNormalizedFirst =
+    subscriptionPlanSource.includes("const metadata = getSubscriptionMetadata(subscription)") &&
+    subscriptionPlanSource.includes("const fromMetadata = normalizePlan(metadata.checkout_plan)") &&
+    subscriptionPlanSource.includes("if (fromMetadata)") &&
+    subscriptionPlanSource.includes("return fromMetadata");
+
+  const priceIdsAreCollectedFromSubscriptionItems =
+    subscriptionPlanSource.includes("subscription.items.data") &&
+    subscriptionPlanSource.includes(".map((item) => item.price.id)") &&
+    subscriptionPlanSource.includes(".filter((id): id is string => typeof id === \"string\")");
+
+  const usesConfiguredBasicAndProPrices =
+    subscriptionPlanSource.includes("const basicPrice = process.env.STRIPE_PRICE_BASIC?.trim()") &&
+    subscriptionPlanSource.includes("const proPrice = process.env.STRIPE_PRICE_PRO?.trim()");
+
+  const basicPriceMapsToBasic =
+    subscriptionPlanSource.includes("if (basicPrice && priceIds.includes(basicPrice))") &&
+    subscriptionPlanSource.includes('return "basic"');
+
+  const proPriceMapsToPro =
+    subscriptionPlanSource.includes("if (proPrice && priceIds.includes(proPrice))") &&
+    subscriptionPlanSource.includes('return "pro"');
+
+  const unknownPlanReturnsNull =
+    subscriptionPlanSource.trimEnd().endsWith("return null;\n}") ||
+    subscriptionPlanSource.includes("\n  return null;\n}");
+
+  const noHardcodedPriceIds =
+    !/price_[A-Za-z0-9_]+/u.test(subscriptionPlanSource);
+
+  const noRawProductOrNicknamePlanInference =
+    !/\bproduct\b/u.test(subscriptionPlanSource) &&
+    !/\bnickname\b/u.test(subscriptionPlanSource) &&
+    !/\blookup_key\b/u.test(subscriptionPlanSource) &&
+    !/\bunit_amount\b/u.test(subscriptionPlanSource);
+
+  const subscriptionSyncUsesSubscriptionPlan =
+    subscriptionSyncSource.includes("const plan = subscriptionPlan(subscription)") &&
+    subscriptionSyncSource.includes("const tier = tierFromPlan(plan)");
+
+  const checkoutCompletedDoesNotUseSubscriptionPlanForCheckoutSession =
+    !extractFunctionSource(webhookRouteSource, "syncCheckoutSessionCompleted").includes("subscriptionPlan(");
+
+  const checks = [
+    ["STRIPE_SUBSCRIPTION_PLAN_HELPER_MISSING", hasSubscriptionPlanHelper, "Webhook route must define subscriptionPlan(subscription) returning CheckoutPlan | null."],
+    ["STRIPE_SUBSCRIPTION_METADATA_PLAN_NORMALIZATION_MISSING", metadataPlanIsNormalizedFirst, "subscriptionPlan must normalize metadata.checkout_plan before using it."],
+    ["STRIPE_SUBSCRIPTION_ITEM_PRICE_ID_COLLECTION_MISSING", priceIdsAreCollectedFromSubscriptionItems, "subscriptionPlan must collect price ids from subscription items."],
+    ["STRIPE_SUBSCRIPTION_CONFIGURED_PRICE_ENV_MISSING", usesConfiguredBasicAndProPrices, "subscriptionPlan must use configured STRIPE_PRICE_BASIC and STRIPE_PRICE_PRO values."],
+    ["STRIPE_SUBSCRIPTION_BASIC_PRICE_MAPPING_MISSING", basicPriceMapsToBasic, "subscriptionPlan must map configured Basic price id to basic plan."],
+    ["STRIPE_SUBSCRIPTION_PRO_PRICE_MAPPING_MISSING", proPriceMapsToPro, "subscriptionPlan must map configured Pro price id to pro plan."],
+    ["STRIPE_SUBSCRIPTION_UNKNOWN_PLAN_NULL_MISSING", unknownPlanReturnsNull, "subscriptionPlan must return null for unknown plans."],
+    ["STRIPE_SUBSCRIPTION_HARDCODED_PRICE_ID_RISK", noHardcodedPriceIds, "subscriptionPlan must not hardcode Stripe price_ identifiers."],
+    ["STRIPE_SUBSCRIPTION_PRODUCT_NAME_PLAN_RISK", noRawProductOrNicknamePlanInference, "subscriptionPlan must not infer plan from raw product/nickname/lookup_key/unit_amount fields."],
+    ["STRIPE_SUBSCRIPTION_SYNC_PLAN_HELPER_MISSING", subscriptionSyncUsesSubscriptionPlan, "subscription lifecycle sync must use subscriptionPlan before tierFromPlan."],
+    ["STRIPE_CHECKOUT_SYNC_SUBSCRIPTION_PLAN_RISK", checkoutCompletedDoesNotUseSubscriptionPlanForCheckoutSession, "checkout.session.completed must not infer initial plan from subscription items before checkout metadata is processed."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-091",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
