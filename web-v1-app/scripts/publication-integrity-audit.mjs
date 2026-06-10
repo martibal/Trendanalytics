@@ -16692,6 +16692,176 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-094 Stripe webhook event dispatch boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const realStart =
+      start >= 0 && asyncStart >= 0
+        ? Math.min(start, asyncStart)
+        : start >= 0
+          ? start
+          : asyncStart;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const handleVerifiedEventSource = extractFunctionSource(webhookRouteSource, "handleVerifiedEvent");
+  const postSource = webhookRouteSource.slice(webhookRouteSource.indexOf("export async function POST"));
+
+  const hasVerifiedEventDispatcher =
+    handleVerifiedEventSource.includes("async function handleVerifiedEvent(stripe: Stripe, event: Stripe.Event): Promise<\"ok\" | \"ignored\">") ||
+    handleVerifiedEventSource.includes("async function handleVerifiedEvent(stripe: Stripe, event: Stripe.Event): Promise<'ok' | 'ignored'>");
+
+  const checkoutCaseStart = handleVerifiedEventSource.indexOf('case "checkout.session.completed"');
+  const subscriptionUpdatedCaseStart = handleVerifiedEventSource.indexOf('case "customer.subscription.updated"');
+  const subscriptionDeletedCaseStart = handleVerifiedEventSource.indexOf('case "customer.subscription.deleted"');
+  const defaultCaseStart = handleVerifiedEventSource.indexOf("default:");
+
+  const checkoutCaseSource =
+    checkoutCaseStart >= 0 && subscriptionUpdatedCaseStart > checkoutCaseStart
+      ? handleVerifiedEventSource.slice(checkoutCaseStart, subscriptionUpdatedCaseStart)
+      : "";
+
+  const subscriptionUpdatedCaseSource =
+    subscriptionUpdatedCaseStart >= 0 && subscriptionDeletedCaseStart > subscriptionUpdatedCaseStart
+      ? handleVerifiedEventSource.slice(subscriptionUpdatedCaseStart, subscriptionDeletedCaseStart)
+      : "";
+
+  const subscriptionDeletedCaseSource =
+    subscriptionDeletedCaseStart >= 0 && defaultCaseStart > subscriptionDeletedCaseStart
+      ? handleVerifiedEventSource.slice(subscriptionDeletedCaseStart, defaultCaseStart)
+      : "";
+
+  const checkoutSessionCompletedDispatch =
+    checkoutCaseSource.includes('case "checkout.session.completed"') &&
+    checkoutCaseSource.includes("return syncCheckoutSessionCompleted(stripe, event.data.object as Stripe.Checkout.Session)");
+
+  const subscriptionUpdatedDispatch =
+    subscriptionUpdatedCaseSource.includes('case "customer.subscription.updated"') &&
+    subscriptionUpdatedCaseSource.includes("return syncSubscriptionEvent(event.data.object as Stripe.Subscription)");
+
+  const subscriptionDeletedDispatch =
+    subscriptionDeletedCaseSource.includes('case "customer.subscription.deleted"') &&
+    subscriptionDeletedCaseSource.includes("return syncSubscriptionEvent(event.data.object as Stripe.Subscription") &&
+    subscriptionDeletedCaseSource.includes("SubscriptionStatus.inactive");
+
+  const defaultEventsIgnored =
+    handleVerifiedEventSource.includes("default:") &&
+    handleVerifiedEventSource.includes('return "ignored";');
+
+  const noFullEventObjectPassedToSync =
+    !/syncCheckoutSessionCompleted\(\s*stripe\s*,\s*event\s*\)/u.test(handleVerifiedEventSource) &&
+    !/syncSubscriptionEvent\(\s*event\s*(?:,|\))/u.test(handleVerifiedEventSource);
+
+  const noCheckoutSessionCastForSubscriptionEvents =
+    !subscriptionUpdatedCaseSource.includes("Stripe.Checkout.Session") &&
+    !subscriptionDeletedCaseSource.includes("Stripe.Checkout.Session");
+
+  const noSubscriptionCastForCheckoutEvent =
+    !checkoutCaseSource.includes("Stripe.Subscription");
+  const postCallsHandleVerifiedEventAfterVerification =
+    postSource.includes("event = stripe.webhooks.constructEvent(payload, signature, webhookSecret)") &&
+    postSource.includes("const result = await handleVerifiedEvent(stripe, event)") &&
+    postSource.indexOf("stripe.webhooks.constructEvent(payload, signature, webhookSecret)") <
+      postSource.indexOf("const result = await handleVerifiedEvent(stripe, event)");
+
+  const postPersistsResultAfterDispatch =
+    postSource.includes("const result = await handleVerifiedEvent(stripe, event)") &&
+    postSource.includes("markStripeWebhookEvent(event") &&
+    postSource.includes('"processed"') &&
+    postSource.includes('"ignored"') &&
+    postSource.indexOf("const result = await handleVerifiedEvent(stripe, event)") <
+      postSource.indexOf("markStripeWebhookEvent(event");
+  const checks = [
+    ["STRIPE_WEBHOOK_VERIFIED_DISPATCHER_MISSING", hasVerifiedEventDispatcher, "Webhook route must dispatch verified Stripe events through handleVerifiedEvent."],
+    ["STRIPE_WEBHOOK_CHECKOUT_SESSION_DISPATCH_MISSING", checkoutSessionCompletedDispatch, "checkout.session.completed must dispatch Stripe.Checkout.Session to syncCheckoutSessionCompleted."],
+    ["STRIPE_WEBHOOK_SUBSCRIPTION_UPDATED_DISPATCH_MISSING", subscriptionUpdatedDispatch, "customer.subscription.updated must dispatch Stripe.Subscription to syncSubscriptionEvent."],
+    ["STRIPE_WEBHOOK_SUBSCRIPTION_DELETED_DISPATCH_MISSING", subscriptionDeletedDispatch, "customer.subscription.deleted must dispatch Stripe.Subscription with inactive status."],
+    ["STRIPE_WEBHOOK_UNKNOWN_EVENT_IGNORE_MISSING", defaultEventsIgnored, "Unknown Stripe webhook events must return ignored."],
+    ["STRIPE_WEBHOOK_FULL_EVENT_SYNC_RISK", noFullEventObjectPassedToSync, "Sync handlers must receive typed Stripe objects, not the full event object."],
+    ["STRIPE_WEBHOOK_SUBSCRIPTION_CAST_RISK", noCheckoutSessionCastForSubscriptionEvents, "Subscription lifecycle events must not be cast as Checkout.Session."],
+    ["STRIPE_WEBHOOK_CHECKOUT_CAST_RISK", noSubscriptionCastForCheckoutEvent, "Checkout session completed must not be cast as Subscription."],
+    ["STRIPE_WEBHOOK_DISPATCH_BEFORE_VERIFICATION_RISK", postCallsHandleVerifiedEventAfterVerification, "POST must call handleVerifiedEvent only after constructEvent verification."],
+    ["STRIPE_WEBHOOK_RESULT_PERSISTENCE_AFTER_DISPATCH_MISSING", postPersistsResultAfterDispatch, "POST must persist processed/ignored status after event dispatch."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-094",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
