@@ -14638,6 +14638,65 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-077 Stripe subscription period-end normalization boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasPeriodEndNormalizer =
+    webhookRouteSource.includes("function getSubscriptionCurrentPeriodEnd") &&
+    webhookRouteSource.includes("current_period_end") &&
+    webhookRouteSource.includes('typeof raw !== "number"') &&
+    webhookRouteSource.includes("Number.isFinite(raw)") &&
+    webhookRouteSource.includes("new Date(raw * 1000)");
+
+  const checkoutUsesPeriodEndNormalizer =
+    webhookRouteSource.includes("retrievedSubscription ? getSubscriptionCurrentPeriodEnd(retrievedSubscription) : null") ||
+    webhookRouteSource.includes("getSubscriptionCurrentPeriodEnd(retrievedSubscription)");
+
+  const subscriptionLifecycleUsesPeriodEndNormalizer =
+    webhookRouteSource.includes("const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(subscription)");
+
+  const persistsNormalizedCurrentPeriodEnd =
+    webhookRouteSource.includes("currentPeriodEnd,") &&
+    webhookRouteSource.includes("update:") &&
+    webhookRouteSource.includes("create:");
+
+  const noRawCurrentPeriodEndPersistence =
+    !/currentPeriodEnd\s*:\s*subscription\.current_period_end/u.test(webhookRouteSource) &&
+    !/currentPeriodEnd\s*:\s*retrievedSubscription\?\.current_period_end/u.test(webhookRouteSource) &&
+    !/currentPeriodEnd\s*:\s*\(.*current_period_end/u.test(webhookRouteSource);
+
+  const periodEndCanBeNullWhenUnavailable =
+    webhookRouteSource.includes("return null;") &&
+    webhookRouteSource.includes("const currentPeriodEnd");
+
+  const checks = [
+    ["STRIPE_PERIOD_END_NORMALIZER_MISSING", hasPeriodEndNormalizer, "Webhook route must convert Stripe current_period_end Unix seconds to a Date."],
+    ["STRIPE_CHECKOUT_PERIOD_END_NORMALIZATION_MISSING", checkoutUsesPeriodEndNormalizer, "checkout.session.completed sync must use getSubscriptionCurrentPeriodEnd for retrieved subscriptions."],
+    ["STRIPE_SUBSCRIPTION_EVENT_PERIOD_END_NORMALIZATION_MISSING", subscriptionLifecycleUsesPeriodEndNormalizer, "subscription lifecycle sync must use getSubscriptionCurrentPeriodEnd(subscription)."],
+    ["STRIPE_PERIOD_END_PERSISTENCE_MISSING", persistsNormalizedCurrentPeriodEnd, "Webhook subscription writes must persist the normalized currentPeriodEnd variable."],
+    ["STRIPE_RAW_PERIOD_END_PERSISTENCE_RISK", noRawCurrentPeriodEndPersistence, "Webhook route must not persist raw Stripe current_period_end values directly."],
+    ["STRIPE_PERIOD_END_NULL_FALLBACK_MISSING", periodEndCanBeNullWhenUnavailable, "Webhook route must tolerate unavailable current_period_end by storing null."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-077",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
