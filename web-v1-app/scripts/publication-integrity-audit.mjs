@@ -18064,6 +18064,214 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-101 Checkout session URL and redirect boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const handleCheckoutSource = extractFunctionSource(checkoutRouteSource, "handleCheckout");
+  const postSource = extractFunctionSource(checkoutRouteSource, "POST");
+
+  const appUrlUsedForCheckoutUrls =
+    handleCheckoutSource.includes("success_url:") &&
+    handleCheckoutSource.includes("cancel_url:") &&
+    handleCheckoutSource.includes("/dashboard?checkout=success") &&
+    handleCheckoutSource.includes("/#pricing") &&
+    !/success_url:\s*[^,\n]*request\.url/u.test(handleCheckoutSource) &&
+    !/cancel_url:\s*[^,\n]*request\.url/u.test(handleCheckoutSource) &&
+    !/success_url:\s*[^,\n]*new URL\(request\.url\)/u.test(handleCheckoutSource) &&
+    !/cancel_url:\s*[^,\n]*new URL\(request\.url\)/u.test(handleCheckoutSource);
+  const successUrlIsServerControlledDashboard =
+    handleCheckoutSource.includes("success_url:") &&
+    handleCheckoutSource.includes("${appUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}");
+
+  const cancelUrlIsServerControlledPricing =
+    handleCheckoutSource.includes("cancel_url:") &&
+    handleCheckoutSource.includes("${appUrl}/#pricing");
+
+  const rawRequestRedirectInputPattern =
+    /\b(?:searchParams|get\(|formData|request\.json\(\)|body)\b[\s\S]{0,260}\b(?:success_url|successUrl|cancel_url|cancelUrl|redirect_url|redirectUrl)\b/u;
+
+  const signInRedirectIsServerControlled =
+    handleCheckoutSource.includes("/sign-in") &&
+    handleCheckoutSource.includes("redirect_url") &&
+    handleCheckoutSource.includes("/api/v1/checkout?plan=${plan}");
+
+  const noRequestControlledCheckoutUrls =
+    !rawRequestRedirectInputPattern.test(handleCheckoutSource) ||
+    signInRedirectIsServerControlled;
+
+  const stripeSessionCreatedFromServerParams =
+    handleCheckoutSource.includes("const session = await stripe.checkout.sessions.create(sessionParams)");
+
+  const missingSessionUrlGuardExists =
+    (
+      handleCheckoutSource.includes("if (!session.url)") ||
+      handleCheckoutSource.includes("if (typeof session.url !== \"string\")") ||
+      handleCheckoutSource.includes("if (typeof session.url !== 'string')") ||
+      /if\s*\(\s*!session\.url\s*\|\|/u.test(handleCheckoutSource)
+    ) &&
+    (
+      handleCheckoutSource.includes('jsonError("stripe_error"') ||
+      handleCheckoutSource.includes("jsonError('stripe_error'") ||
+      handleCheckoutSource.includes('"stripe_error"') ||
+      handleCheckoutSource.includes("'stripe_error'")
+    );
+  const redirectUsesSessionUrl =
+    handleCheckoutSource.includes("const response = NextResponse.redirect(session.url, { status: 303 })") ||
+    handleCheckoutSource.includes("NextResponse.redirect(session.url, { status: 303 })") ||
+    handleCheckoutSource.includes("NextResponse.redirect(session.url") && handleCheckoutSource.includes("status: 303");
+
+  const redirectIsNoStore =
+    handleCheckoutSource.includes('response.headers.set("Cache-Control", "no-store")') ||
+    handleCheckoutSource.includes("no-store");
+
+  const missingSessionUrlGuardBeforeRedirect =
+    (
+      handleCheckoutSource.includes("if (!session.url)") ||
+      handleCheckoutSource.includes("if (typeof session.url !== \"string\")") ||
+      handleCheckoutSource.includes("if (typeof session.url !== 'string')") ||
+      /if\s*\(\s*!session\.url\s*\|\|/u.test(handleCheckoutSource)
+    ) &&
+    handleCheckoutSource.includes("NextResponse.redirect(session.url") &&
+    (
+      (
+        handleCheckoutSource.indexOf("if (!session.url)") >= 0 &&
+        handleCheckoutSource.indexOf("if (!session.url)") < handleCheckoutSource.indexOf("NextResponse.redirect(session.url")
+      ) ||
+      (
+        handleCheckoutSource.indexOf("if (typeof session.url !== \"string\")") >= 0 &&
+        handleCheckoutSource.indexOf("if (typeof session.url !== \"string\")") < handleCheckoutSource.indexOf("NextResponse.redirect(session.url")
+      ) ||
+      (
+        handleCheckoutSource.indexOf("if (typeof session.url !== 'string')") >= 0 &&
+        handleCheckoutSource.indexOf("if (typeof session.url !== 'string')") < handleCheckoutSource.indexOf("NextResponse.redirect(session.url")
+      ) ||
+      (
+        handleCheckoutSource.search(/if\s*\(\s*!session\.url\s*\|\|/u) >= 0 &&
+        handleCheckoutSource.search(/if\s*\(\s*!session\.url\s*\|\|/u) < handleCheckoutSource.indexOf("NextResponse.redirect(session.url")
+      )
+    );
+  const noSessionUrlJsonLeak =
+    !/NextResponse\.json\(\s*\{[\s\S]{0,180}(?:session\.url|url:\s*session\.url)/u.test(handleCheckoutSource) &&
+    !/return\s+jsonResponse\([\s\S]{0,180}(?:session\.url|url:\s*session\.url)/u.test(handleCheckoutSource);
+
+  const signedOutRedirectUsesInternalCheckoutUrl =
+    handleCheckoutSource.includes("/sign-in") &&
+    handleCheckoutSource.includes("redirect_url") &&
+    handleCheckoutSource.includes("/api/v1/checkout?plan=${plan}");
+
+  const postDoesNotHandleRedirectParameters =
+    !/\b(?:success_url|successUrl|cancel_url|cancelUrl)\b/u.test(postSource) &&
+    (
+      !/\b(?:redirect_url|redirectUrl)\b/u.test(postSource) ||
+      (
+        postSource.includes("/sign-in") &&
+        postSource.includes("/api/v1/checkout?plan=${plan}")
+      )
+    );
+  const checkoutDoesNotUseRawRequestUrlAsAppUrl =
+    !/new URL\(request\.url\)[\s\S]{0,120}(?:success_url|cancel_url|redirect_url)/u.test(handleCheckoutSource) &&
+    !/\brequest\.url\b[\s\S]{0,120}(?:success_url|cancel_url|redirect_url)/u.test(handleCheckoutSource);
+
+  const checks = [
+    ["CHECKOUT_APP_URL_SOURCE_MISSING", appUrlUsedForCheckoutUrls, "Checkout route must use requiredAppUrl for checkout URLs."],
+    ["CHECKOUT_SUCCESS_URL_SERVER_CONTROL_MISSING", successUrlIsServerControlledDashboard, "Checkout success_url must be server-controlled dashboard URL."],
+    ["CHECKOUT_CANCEL_URL_SERVER_CONTROL_MISSING", cancelUrlIsServerControlledPricing, "Checkout cancel_url must be server-controlled pricing URL."],
+    ["CHECKOUT_REQUEST_CONTROLLED_REDIRECT_RISK", noRequestControlledCheckoutUrls, "Checkout route must not accept success/cancel/redirect URLs from request input."],
+    ["CHECKOUT_SESSION_CREATE_PARAMS_MISSING", stripeSessionCreatedFromServerParams, "Checkout route must create Stripe session from server-built sessionParams."],
+    ["CHECKOUT_SESSION_URL_GUARD_MISSING", missingSessionUrlGuardExists, "Checkout route must guard missing session.url."],
+    ["CHECKOUT_SESSION_REDIRECT_303_MISSING", redirectUsesSessionUrl, "Checkout route must redirect to Stripe session.url with HTTP 303."],
+    ["CHECKOUT_REDIRECT_NO_STORE_MISSING", redirectIsNoStore, "Checkout redirect response must set no-store."],
+    ["CHECKOUT_SESSION_URL_GUARD_ORDER_RISK", missingSessionUrlGuardBeforeRedirect, "Missing session.url guard must run before redirect."],
+    ["CHECKOUT_SESSION_URL_JSON_LEAK_RISK", noSessionUrlJsonLeak, "Checkout route must not return Stripe session.url as JSON."],
+    ["CHECKOUT_SIGNIN_REDIRECT_INTERNAL_URL_MISSING", signedOutRedirectUsesInternalCheckoutUrl, "Signed-out checkout redirect must point back to internal checkout URL."],
+    ["CHECKOUT_POST_REDIRECT_PARAM_RISK", postDoesNotHandleRedirectParameters, "POST must not read redirect/success/cancel URL parameters."],
+    ["CHECKOUT_REQUEST_URL_APP_URL_RISK", checkoutDoesNotUseRawRequestUrlAsAppUrl, "Checkout route must not derive payment redirect URLs directly from request.url."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-101",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
