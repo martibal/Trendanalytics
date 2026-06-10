@@ -14697,6 +14697,65 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-078 Stripe Checkout price-id configuration boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasPlanPriceIdResolver =
+    checkoutRouteSource.includes("function priceIdForPlan") &&
+    checkoutRouteSource.includes("STRIPE_PRICE_BASIC") &&
+    checkoutRouteSource.includes("STRIPE_PRICE_PRO") &&
+    checkoutRouteSource.includes('plan === "basic"');
+
+  const checkoutReadsPriceIdFromPlan =
+    checkoutRouteSource.includes("const priceId = priceIdForPlan(plan);");
+
+  const missingPriceIdStopsBeforeSessionCreation =
+    checkoutRouteSource.includes("if (!priceId)") &&
+    checkoutRouteSource.includes('"checkout_not_configured"') &&
+    checkoutRouteSource.includes("Missing STRIPE_PRICE_BASIC") &&
+    checkoutRouteSource.includes("Missing STRIPE_PRICE_PRO");
+
+  const sessionLineItemUsesResolvedPriceId =
+    checkoutRouteSource.includes("const sessionParams: Stripe.Checkout.SessionCreateParams") &&
+    checkoutRouteSource.includes("line_items:") &&
+    checkoutRouteSource.includes("price: priceId") &&
+    checkoutRouteSource.includes("quantity: 1");
+
+  const stripeSessionCreatedAfterPriceCheck =
+    checkoutRouteSource.indexOf("if (!priceId)") >= 0 &&
+    checkoutRouteSource.indexOf("stripe.checkout.sessions.create(sessionParams)") > checkoutRouteSource.indexOf("if (!priceId)");
+
+  const noHardcodedStripePriceIdsInRoute =
+    !/price_[A-Za-z0-9]{8,}/u.test(checkoutRouteSource);
+
+  const checks = [
+    ["CHECKOUT_PRICE_ID_RESOLVER_MISSING", hasPlanPriceIdResolver, "Checkout route must resolve Stripe price ids from STRIPE_PRICE_BASIC / STRIPE_PRICE_PRO."],
+    ["CHECKOUT_PRICE_ID_PLAN_SELECTION_MISSING", checkoutReadsPriceIdFromPlan, "Checkout route must resolve priceId from the validated plan."],
+    ["CHECKOUT_MISSING_PRICE_ID_GUARD_MISSING", missingPriceIdStopsBeforeSessionCreation, "Checkout route must reject missing STRIPE_PRICE_BASIC / STRIPE_PRICE_PRO before creating a Stripe session."],
+    ["CHECKOUT_SESSION_LINE_ITEM_PRICE_ID_MISSING", sessionLineItemUsesResolvedPriceId, "Stripe Checkout line_items must use the resolved priceId."],
+    ["CHECKOUT_SESSION_CREATION_BEFORE_PRICE_GUARD_RISK", stripeSessionCreatedAfterPriceCheck, "Stripe session creation must happen after the missing price-id guard."],
+    ["CHECKOUT_HARDCODED_PRICE_ID_RISK", noHardcodedStripePriceIdsInRoute, "Checkout route must not hard-code concrete Stripe price ids."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-078",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
