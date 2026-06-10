@@ -15350,6 +15350,232 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-086 Stripe webhook logging and response boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    if (start < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", start);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(start, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function collectConsoleStatements(source) {
+    const statements = [];
+    const consolePattern = /console\.(?:log|info|warn|error)\s*\(/gu;
+    let match = null;
+
+    while ((match = consolePattern.exec(source)) !== null) {
+      const start = match.index;
+      let depth = 0;
+      let inString = false;
+      let stringChar = "";
+      let escape = false;
+
+      for (let index = source.indexOf("(", start); index < source.length; index += 1) {
+        const ch = source[index];
+
+        if (inString) {
+          if (escape) {
+            escape = false;
+            continue;
+          }
+
+          if (ch === "\\") {
+            escape = true;
+            continue;
+          }
+
+          if (ch === stringChar) {
+            inString = false;
+            stringChar = "";
+          }
+
+          continue;
+        }
+
+        if (ch === '"' || ch === "'" || ch === "`") {
+          inString = true;
+          stringChar = ch;
+          continue;
+        }
+
+        if (ch === "(") {
+          depth += 1;
+          continue;
+        }
+
+        if (ch === ")") {
+          depth -= 1;
+          if (depth === 0) {
+            statements.push(source.slice(start, index + 1));
+            break;
+          }
+        }
+      }
+    }
+
+    return statements;
+  }
+
+  const jsonResponseSource = extractFunctionSource(webhookRouteSource, "jsonResponse");
+  const consoleStatementList = collectConsoleStatements(webhookRouteSource);
+  const consoleStatements = consoleStatementList.join("\n");
+
+  const hasNoStoreResponseHelper =
+    webhookRouteSource.includes("const NO_STORE_HEADERS") &&
+    webhookRouteSource.includes('"Cache-Control": "no-store"') &&
+    jsonResponseSource.includes("NextResponse.json") &&
+    jsonResponseSource.includes("headers: NO_STORE_HEADERS");
+
+  const jsonResponseHasTypedCodes =
+    webhookRouteSource.includes("type WebhookJsonCode") &&
+    webhookRouteSource.includes('"ok"') &&
+    webhookRouteSource.includes('"ignored"') &&
+    webhookRouteSource.includes('"bad_signature"') &&
+    webhookRouteSource.includes('"webhook_error"') &&
+    webhookRouteSource.includes('"mode_mismatch"');
+
+  const postUsesJsonResponseForErrors =
+    webhookRouteSource.includes('return jsonResponse(503, "not_configured"') &&
+    webhookRouteSource.includes('return jsonResponse(400, "bad_signature"') &&
+    webhookRouteSource.includes('return jsonResponse(500, "webhook_error"');
+
+  const postUsesJsonResponseForSuccessAndIgnored =
+    webhookRouteSource.includes('return jsonResponse(200, "ignored"') &&
+    webhookRouteSource.includes("return jsonResponse(") &&
+    webhookRouteSource.includes('result === "ok" ? "Stripe webhook processed." : "Stripe webhook event ignored."');
+
+  const usesRawBodyOnlyForSignatureVerification =
+    webhookRouteSource.includes("const payload = await request.text();") &&
+    webhookRouteSource.includes("stripe.webhooks.constructEvent(payload, signature, webhookSecret)");
+
+  const doesNotLogRawPayload =
+    !/console\.(?:log|info|warn|error)[\s\S]{0,260}\bpayload\b/u.test(consoleStatements) &&
+    !/console\.(?:log|info|warn|error)[\s\S]{0,260}request\.text/u.test(consoleStatements);
+
+  const doesNotLogWebhookSecret =
+    !/console\.(?:log|info|warn|error)[\s\S]{0,260}\bwebhookSecret\b/u.test(
+      consoleStatements.replace(/hasWebhookSecret\s*:\s*Boolean\(webhookSecret\)/gu, "hasWebhookSecret: BOOLEAN")
+    ) &&
+    !/console\.(?:log|info|warn|error)[\s\S]{0,260}\bSTRIPE_WEBHOOK_SECRET\b/u.test(consoleStatements);
+
+  const doesNotLogStripeSignature =
+    !consoleStatementList.some((statement) => {
+      const normalized = statement
+        .replace(/missing stripe-signature header/gu, "missing-signature-header-message")
+        .replace(/invalid signature/gu, "invalid-signature-message")
+        .replace(/Stripe signature/gu, "Stripe-signature-message");
+
+      return (
+        /(?:^|[\s{,(])signature\s*:/u.test(normalized) ||
+        /(?:^|[\s{,(])signature\s*(?:,|\})/u.test(normalized) ||
+        /\bstripeSignature\b/u.test(normalized) ||
+        /headers\.get\(["']stripe-signature["']\)/u.test(normalized)
+      );
+    });
+
+  const doesNotLogFullStripeEventObject =
+    !consoleStatementList.some((statement) => {
+      const normalized = statement
+        .replace(/stripeEventId/gu, "stripeEventIdSafe")
+        .replace(/event\.type/gu, "eventTypeSafe")
+        .replace(/event\.id/gu, "eventIdSafe")
+        .replace(/event\.livemode/gu, "eventLivemodeSafe")
+        .replace(/event\.data\.object/gu, "eventDataObjectSafe")
+        .replace(/type:\s*eventTypeSafe/gu, "type: eventTypeSafe")
+        .replace(/livemode:\s*eventLivemodeSafe/gu, "livemode: eventLivemodeSafe");
+
+      return (
+        /(?:^|[\s{,(])event\s*:/u.test(normalized) ||
+        /(?:^|[\s{,(])event\s*(?:,|\})/u.test(normalized) ||
+        /console\.(?:log|info|warn|error)\s*\([^,]+,\s*event\s*[),]/u.test(normalized)
+      );
+    });
+  const checks = [
+    ["STRIPE_WEBHOOK_JSON_RESPONSE_NOSTORE_MISSING", hasNoStoreResponseHelper, "Stripe webhook responses must use jsonResponse with Cache-Control: no-store."],
+    ["STRIPE_WEBHOOK_TYPED_RESPONSE_CODES_MISSING", jsonResponseHasTypedCodes, "Stripe webhook must use a typed public response-code set."],
+    ["STRIPE_WEBHOOK_ERROR_JSON_RESPONSE_MISSING", postUsesJsonResponseForErrors, "Stripe webhook errors must be returned through jsonResponse."],
+    ["STRIPE_WEBHOOK_SUCCESS_JSON_RESPONSE_MISSING", postUsesJsonResponseForSuccessAndIgnored, "Stripe webhook success/ignored responses must be returned through jsonResponse."],
+    ["STRIPE_WEBHOOK_RAW_BODY_SIGNATURE_SCOPE_MISSING", usesRawBodyOnlyForSignatureVerification, "Stripe webhook raw body must be used only for Stripe signature verification."],
+    ["STRIPE_WEBHOOK_PAYLOAD_LOGGING_RISK", doesNotLogRawPayload, "Stripe webhook must not log raw request payload/body."],
+    ["STRIPE_WEBHOOK_SECRET_LOGGING_RISK", doesNotLogWebhookSecret, "Stripe webhook must not log webhook secret values."],
+    ["STRIPE_WEBHOOK_SIGNATURE_LOGGING_RISK", doesNotLogStripeSignature, "Stripe webhook must not log Stripe signature header values."],
+    ["STRIPE_WEBHOOK_EVENT_OBJECT_LOGGING_RISK", doesNotLogFullStripeEventObject, "Stripe webhook must not log the full Stripe event object."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-086",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
