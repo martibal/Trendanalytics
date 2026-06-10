@@ -17848,6 +17848,222 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-100 Checkout to webhook account correlation boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function sliceFrom(source, needle, length) {
+    const start = source.indexOf(needle);
+    if (start < 0) {
+      return "";
+    }
+
+    return source.slice(start, start + length);
+  }
+
+  const checkoutMetadataSource = extractFunctionSource(checkoutRouteSource, "checkoutMetadata");
+  const handleCheckoutSource = extractFunctionSource(checkoutRouteSource, "handleCheckout");
+  const checkoutSyncSource = extractFunctionSource(webhookRouteSource, "syncCheckoutSessionCompleted");
+
+  const checkoutMetadataHelperUsesAccountId =
+    (
+      checkoutRouteSource.includes("account_id") &&
+      checkoutRouteSource.includes("account.id")
+    ) ||
+    (
+      checkoutRouteSource.includes("accountId") &&
+      handleCheckoutSource.includes("accountId: account.id")
+    );
+
+  const checkoutMetadataHelperUsesAuthProviderUserId =
+    (
+      checkoutRouteSource.includes("auth_provider_user_id") &&
+      checkoutRouteSource.includes("signedInUser.userId")
+    ) ||
+    (
+      checkoutRouteSource.includes("authProviderUserId") &&
+      handleCheckoutSource.includes("authProviderUserId: signedInUser.userId")
+    );
+  const checkoutBuildsMetadataFromResolvedAccount =
+    (
+      handleCheckoutSource.includes("const metadata = checkoutMetadata({") &&
+      handleCheckoutSource.includes("accountId: account.id") &&
+      handleCheckoutSource.includes("authProviderUserId: signedInUser.userId")
+    ) ||
+    (
+      handleCheckoutSource.includes("const metadata =") &&
+      handleCheckoutSource.includes("account_id: account.id") &&
+      handleCheckoutSource.includes("auth_provider_user_id: signedInUser.userId")
+    );
+
+  const checkoutClientReferenceIsAccountId =
+    handleCheckoutSource.includes("client_reference_id: account.id");
+
+  const checkoutSessionMetadataUsesSharedObject =
+    (
+      handleCheckoutSource.includes("metadata,") &&
+      handleCheckoutSource.includes("subscription_data: { metadata }")
+    ) ||
+    (
+      handleCheckoutSource.includes("metadata: metadata") &&
+      /subscription_data:\s*\{[\s\S]{0,120}metadata\s*:\s*metadata[\s\S]{0,80}\}/u.test(handleCheckoutSource)
+    ) ||
+    (
+      handleCheckoutSource.includes("metadata") &&
+      handleCheckoutSource.includes("subscription_data") &&
+      handleCheckoutSource.indexOf("const metadata") < handleCheckoutSource.indexOf("subscription_data")
+    );
+  const checkoutDoesNotAcceptAccountIdFromRequest =
+    !/\b(?:searchParams|formData|request\.json\(\)|body)\b[\s\S]{0,260}\baccount_id\b/u.test(handleCheckoutSource) &&
+    !/\b(?:searchParams|formData|request\.json\(\)|body)\b[\s\S]{0,260}\baccountId\b/u.test(handleCheckoutSource);
+
+  const webhookPrefersClientReferenceIdForAccount =
+    checkoutSyncSource.includes("const accountId = session.client_reference_id ?? session.metadata?.account_id ?? null");
+
+  const webhookReadsAuthProviderUserIdFromMetadata =
+    checkoutSyncSource.includes("const authProviderUserId = session.metadata?.auth_provider_user_id ?? null");
+
+  const webhookRequiresAccountIdBeforeTransaction =
+    checkoutSyncSource.includes("if (!stripeCustomerId || !stripeSubscriptionId || !accountId)") &&
+    checkoutSyncSource.indexOf("if (!stripeCustomerId || !stripeSubscriptionId || !accountId)") <
+      checkoutSyncSource.indexOf("await db.$transaction(async (tx)");
+
+  const webhookAccountTermsUpdateRequiresAuthProviderUserId =
+    checkoutSyncSource.includes("if (authProviderUserId)") &&
+    checkoutSyncSource.includes("await tx.account.updateMany") &&
+    checkoutSyncSource.indexOf("if (authProviderUserId)") <
+      checkoutSyncSource.indexOf("await tx.account.updateMany");
+
+  const webhookAccountTermsUpdateGuardsLocalAccountAndProvider =
+    checkoutSyncSource.includes("where:") &&
+    checkoutSyncSource.includes("id: accountId") &&
+    checkoutSyncSource.includes("authProviderUserId");
+
+  const webhookDoesNotCreateAccountFromCheckout =
+    !/\btx\.account\.(?:create|upsert)\s*\(/u.test(checkoutSyncSource) &&
+    !/\bdb\.account\.(?:create|upsert)\s*\(/u.test(checkoutSyncSource);
+
+  const webhookSubscriptionCreateUsesCorrelatedAccountId =
+    /create:\s*\{[\s\S]*?\baccountId\s*,[\s\S]*?stripeCustomerId[\s\S]*?stripeSubscriptionId/u.test(checkoutSyncSource);
+
+  const webhookDoesNotUseMetadataAccountIdBeforeClientReference =
+    !/const\s+accountId\s*=\s*session\.metadata\?\.account_id\s*\?\?/u.test(checkoutSyncSource) &&
+    !/const\s+accountId\s*=\s*session\.metadata\?\.account_id\s*\|\|/u.test(checkoutSyncSource);
+
+  const checkoutMetadataNotHardcoded =
+    !/account_id:\s*["'][^"']+["']/u.test(checkoutMetadataSource) &&
+    !/auth_provider_user_id:\s*["'][^"']+["']/u.test(checkoutMetadataSource);
+
+  const missingAccountLogsWithoutLeakingMetadata =
+    sliceFrom(checkoutSyncSource, "if (!stripeCustomerId || !stripeSubscriptionId || !accountId)", 800).includes("hasAccountId: Boolean(accountId)") &&
+    !sliceFrom(checkoutSyncSource, "if (!stripeCustomerId || !stripeSubscriptionId || !accountId)", 800).includes("session.metadata");
+
+  const checks = [
+    ["CHECKOUT_METADATA_ACCOUNT_ID_HELPER_MISSING", checkoutMetadataHelperUsesAccountId, "checkoutMetadata must emit account_id from resolved local account id."],
+    ["CHECKOUT_METADATA_AUTH_PROVIDER_ID_HELPER_MISSING", checkoutMetadataHelperUsesAuthProviderUserId, "checkoutMetadata must emit auth_provider_user_id from signed-in user."],
+    ["CHECKOUT_METADATA_RESOLVED_ACCOUNT_SOURCE_MISSING", checkoutBuildsMetadataFromResolvedAccount, "Checkout metadata must be built from resolved account.id and signed-in user id."],
+    ["CHECKOUT_CLIENT_REFERENCE_ACCOUNT_ID_MISSING", checkoutClientReferenceIsAccountId, "Checkout session client_reference_id must be account.id."],
+    ["CHECKOUT_SUBSCRIPTION_METADATA_SHARED_OBJECT_MISSING", checkoutSessionMetadataUsesSharedObject, "Checkout session and subscription_data must share the same metadata object."],
+    ["CHECKOUT_REQUEST_ACCOUNT_ID_INJECTION_RISK", checkoutDoesNotAcceptAccountIdFromRequest, "Checkout route must not accept account_id/accountId from request input."],
+    ["WEBHOOK_CLIENT_REFERENCE_ACCOUNT_PRIORITY_MISSING", webhookPrefersClientReferenceIdForAccount, "Webhook checkout sync must prefer session.client_reference_id before metadata.account_id fallback."],
+    ["WEBHOOK_AUTH_PROVIDER_METADATA_MISSING", webhookReadsAuthProviderUserIdFromMetadata, "Webhook checkout sync must read auth_provider_user_id for guarded account update."],
+    ["WEBHOOK_ACCOUNT_ID_GUARD_BEFORE_TRANSACTION_MISSING", webhookRequiresAccountIdBeforeTransaction, "Webhook checkout sync must require accountId before transaction."],
+    ["WEBHOOK_ACCOUNT_TERMS_AUTH_GUARD_MISSING", webhookAccountTermsUpdateRequiresAuthProviderUserId, "Webhook account terms update must be gated by authProviderUserId."],
+    ["WEBHOOK_ACCOUNT_TERMS_PROVIDER_WHERE_MISSING", webhookAccountTermsUpdateGuardsLocalAccountAndProvider, "Webhook account terms update must guard by both accountId and authProviderUserId."],
+    ["WEBHOOK_CHECKOUT_ACCOUNT_CREATE_RISK", webhookDoesNotCreateAccountFromCheckout, "Webhook checkout sync must not create or upsert accounts."],
+    ["WEBHOOK_SUBSCRIPTION_CREATE_ACCOUNT_CORRELATION_MISSING", webhookSubscriptionCreateUsesCorrelatedAccountId, "Webhook subscription create must use the correlated accountId."],
+    ["WEBHOOK_METADATA_ACCOUNT_PRIORITY_RISK", webhookDoesNotUseMetadataAccountIdBeforeClientReference, "Webhook must not prefer metadata.account_id before client_reference_id."],
+    ["CHECKOUT_METADATA_HARDCODED_ID_RISK", checkoutMetadataNotHardcoded, "Checkout metadata helper must not hardcode account or auth provider identifiers."],
+    ["WEBHOOK_MISSING_ACCOUNT_LOG_METADATA_LEAK_RISK", missingAccountLogsWithoutLeakingMetadata, "Missing account log must expose booleans only, not raw session metadata."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-100",
+        code,
+        file: code.startsWith("CHECKOUT_") ? "src/app/api/v1/checkout/route.ts" : "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
