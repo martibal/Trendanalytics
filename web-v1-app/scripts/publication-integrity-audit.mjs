@@ -16039,6 +16039,190 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-090 Stripe entitlement normalization boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const realStart =
+      start >= 0 && asyncStart >= 0
+        ? Math.min(start, asyncStart)
+        : start >= 0
+          ? start
+          : asyncStart;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const normalizeChainSource = extractFunctionSource(webhookRouteSource, "normalizeChain");
+  const parseBooleanSource = extractFunctionSource(webhookRouteSource, "parseBoolean");
+  const normalizePlanSource = extractFunctionSource(webhookRouteSource, "normalizePlan");
+  const tierFromPlanSource = extractFunctionSource(webhookRouteSource, "tierFromPlan");
+  const historyUnlockedSource = extractFunctionSource(webhookRouteSource, "historyUnlockedFromPlan");
+  const checkoutSyncSource = extractFunctionSource(webhookRouteSource, "syncCheckoutSessionCompleted");
+  const subscriptionSyncSource = extractFunctionSource(webhookRouteSource, "syncSubscriptionEvent");
+
+  const normalizeChainUsesSupportedChains =
+    normalizeChainSource.includes("SUPPORTED_CHAINS.includes(value as ChainId)") &&
+    normalizeChainSource.includes("return null");
+
+  const parseBooleanIsBounded =
+    parseBooleanSource.includes("value === true") &&
+    parseBooleanSource.includes('value === "true"') &&
+    parseBooleanSource.includes('value === "1"');
+
+  const normalizePlanIsBounded =
+    normalizePlanSource.includes('return "basic"') &&
+    normalizePlanSource.includes('return "pro"') &&
+    normalizePlanSource.includes("return null");
+
+  const tierDerivedFromPlan =
+    tierFromPlanSource.includes("return plan === \"basic\" ? SubscriptionTier.basic : SubscriptionTier.pro") ||
+    tierFromPlanSource.includes("return plan === 'basic' ? SubscriptionTier.basic : SubscriptionTier.pro");
+
+  const historyUnlockDerivedFromPlanAndBoolean =
+    historyUnlockedSource.includes("parseBoolean(metadataValue)") &&
+    historyUnlockedSource.includes("return plan === \"pro\"") || 
+    historyUnlockedSource.includes("return plan === 'pro'");
+
+  const checkoutUsesNormalizedPlanTierHistory =
+    checkoutSyncSource.includes("const plan = normalizePlan(session.metadata?.checkout_plan)") &&
+    checkoutSyncSource.includes("const tier = tierFromPlan(plan)") &&
+    checkoutSyncSource.includes("const historyUnlocked = historyUnlockedFromPlan(");
+
+  const checkoutGatesBasicChainEntitlement =
+    checkoutSyncSource.includes("tier === SubscriptionTier.basic") &&
+    checkoutSyncSource.includes("entitledChainFromSession(session)") &&
+    checkoutSyncSource.includes(": null");
+
+  const checkoutPersistsNormalizedEntitlementFields =
+    checkoutSyncSource.includes("tier,") &&
+    checkoutSyncSource.includes("historyUnlocked,") &&
+    checkoutSyncSource.includes("entitledChain,") &&
+    checkoutSyncSource.includes("status,") &&
+    checkoutSyncSource.includes("currentPeriodEnd,");
+
+  const subscriptionUsesNormalizedPlanTierHistory =
+    subscriptionSyncSource.includes("const plan = subscriptionPlan(subscription)") &&
+    subscriptionSyncSource.includes("const tier = tierFromPlan(plan)") &&
+    subscriptionSyncSource.includes("const historyUnlocked = historyUnlockedFromPlan(plan, metadata.history_unlocked)");
+
+  const subscriptionGatesBasicChainEntitlement =
+    subscriptionSyncSource.includes("tier === SubscriptionTier.basic") &&
+    subscriptionSyncSource.includes("normalizeChain(metadata.entitled_chain)") &&
+    subscriptionSyncSource.includes(": null");
+
+  const subscriptionPersistsNormalizedEntitlementFields =
+    subscriptionSyncSource.includes("tier,") &&
+    subscriptionSyncSource.includes("historyUnlocked,") &&
+    subscriptionSyncSource.includes("entitledChain,") &&
+    subscriptionSyncSource.includes("status,") &&
+    subscriptionSyncSource.includes("currentPeriodEnd,");
+
+  const noRawTierMetadataPersistence =
+    !/tier\s*:\s*metadata\./u.test(checkoutSyncSource + "\n" + subscriptionSyncSource) &&
+    !/tier\s*:\s*session\.metadata/u.test(checkoutSyncSource + "\n" + subscriptionSyncSource);
+
+  const noRawHistoryMetadataPersistence =
+    !/historyUnlocked\s*:\s*metadata\.history_unlocked/u.test(checkoutSyncSource + "\n" + subscriptionSyncSource) &&
+    !/historyUnlocked\s*:\s*session\.metadata/u.test(checkoutSyncSource + "\n" + subscriptionSyncSource);
+
+  const noRawEntitledChainMetadataPersistence =
+    !/entitledChain\s*:\s*metadata\.entitled_chain/u.test(checkoutSyncSource + "\n" + subscriptionSyncSource) &&
+    !/entitledChain\s*:\s*session\.metadata/u.test(checkoutSyncSource + "\n" + subscriptionSyncSource);
+
+  const checks = [
+    ["STRIPE_NORMALIZE_CHAIN_ALLOWLIST_MISSING", normalizeChainUsesSupportedChains, "Stripe webhook must normalize chain values through SUPPORTED_CHAINS."],
+    ["STRIPE_PARSE_BOOLEAN_BOUNDED_MISSING", parseBooleanIsBounded, "Stripe webhook boolean parser must be bounded to true/'true'/'1'."],
+    ["STRIPE_NORMALIZE_PLAN_BOUNDED_MISSING", normalizePlanIsBounded, "Stripe webhook must normalize plan values to basic/pro/null."],
+    ["STRIPE_TIER_FROM_PLAN_MISSING", tierDerivedFromPlan, "Stripe webhook tier must be derived from normalized plan."],
+    ["STRIPE_HISTORY_FROM_PLAN_AND_BOOLEAN_MISSING", historyUnlockDerivedFromPlanAndBoolean, "Stripe webhook history unlock must be derived from normalized plan and bounded boolean parsing."],
+    ["STRIPE_CHECKOUT_NORMALIZED_ENTITLEMENTS_MISSING", checkoutUsesNormalizedPlanTierHistory, "checkout.session.completed must derive plan/tier/history via normalizers."],
+    ["STRIPE_CHECKOUT_BASIC_CHAIN_GATE_MISSING", checkoutGatesBasicChainEntitlement, "checkout.session.completed must only persist chain entitlement for Basic tier."],
+    ["STRIPE_CHECKOUT_ENTITLEMENT_FIELDS_MISSING", checkoutPersistsNormalizedEntitlementFields, "checkout.session.completed upsert must persist normalized entitlement fields."],
+    ["STRIPE_SUBSCRIPTION_NORMALIZED_ENTITLEMENTS_MISSING", subscriptionUsesNormalizedPlanTierHistory, "subscription lifecycle events must derive plan/tier/history via normalizers."],
+    ["STRIPE_SUBSCRIPTION_BASIC_CHAIN_GATE_MISSING", subscriptionGatesBasicChainEntitlement, "subscription lifecycle events must only persist chain entitlement for Basic tier."],
+    ["STRIPE_SUBSCRIPTION_ENTITLEMENT_FIELDS_MISSING", subscriptionPersistsNormalizedEntitlementFields, "subscription lifecycle upsert must persist normalized entitlement fields."],
+    ["STRIPE_RAW_TIER_METADATA_PERSISTENCE_RISK", noRawTierMetadataPersistence, "Stripe webhook must not persist raw metadata as tier."],
+    ["STRIPE_RAW_HISTORY_METADATA_PERSISTENCE_RISK", noRawHistoryMetadataPersistence, "Stripe webhook must not persist raw metadata as historyUnlocked."],
+    ["STRIPE_RAW_CHAIN_METADATA_PERSISTENCE_RISK", noRawEntitledChainMetadataPersistence, "Stripe webhook must not persist raw metadata as entitledChain."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-090",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
