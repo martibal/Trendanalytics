@@ -17238,6 +17238,172 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-097 Stripe webhook sync result semantics boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function sliceFrom(source, needle, length) {
+    const start = source.indexOf(needle);
+    if (start < 0) {
+      return "";
+    }
+
+    return source.slice(start, start + length);
+  }
+
+  const checkoutSyncSource = extractFunctionSource(webhookRouteSource, "syncCheckoutSessionCompleted");
+  const subscriptionSyncSource = extractFunctionSource(webhookRouteSource, "syncSubscriptionEvent");
+  const postSource = extractFunctionSource(webhookRouteSource, "POST");
+
+  const checkoutMissingIdentifiersReturnIgnored =
+    checkoutSyncSource.includes("if (!stripeCustomerId || !stripeSubscriptionId || !accountId)") &&
+    sliceFrom(checkoutSyncSource, "if (!stripeCustomerId || !stripeSubscriptionId || !accountId)", 700).includes('return "ignored"');
+
+  const checkoutTransactionBeforeOk =
+    checkoutSyncSource.includes("await db.$transaction(async (tx)") &&
+    checkoutSyncSource.includes('return "ok"') &&
+    checkoutSyncSource.indexOf("await db.$transaction(async (tx)") <
+      checkoutSyncSource.lastIndexOf('return "ok"');
+
+  const checkoutNoOkBeforeTransaction =
+    checkoutSyncSource.indexOf('return "ok"') > checkoutSyncSource.indexOf("await db.$transaction(async (tx)");
+
+  const subscriptionStartsUnsynced =
+    subscriptionSyncSource.includes("let synced = false");
+
+  const subscriptionSetsSyncedOnlyAfterUpsert =
+    subscriptionSyncSource.includes("await tx.subscription.upsert") &&
+    subscriptionSyncSource.includes("synced = true") &&
+    subscriptionSyncSource.indexOf("await tx.subscription.upsert") <
+      subscriptionSyncSource.indexOf("synced = true");
+
+  const subscriptionUnboundAccountDoesNotSetSynced =
+    subscriptionSyncSource.includes("if (!resolvedAccountId)") &&
+    sliceFrom(subscriptionSyncSource, "if (!resolvedAccountId)", 700).includes("return") &&
+    subscriptionSyncSource.indexOf("if (!resolvedAccountId)") <
+      subscriptionSyncSource.indexOf("synced = true");
+
+  const subscriptionUnsyncedReturnsIgnored =
+    subscriptionSyncSource.includes("if (!synced)") &&
+    sliceFrom(subscriptionSyncSource, "if (!synced)", 300).includes('return "ignored"');
+
+  const subscriptionOkOnlyAfterUnsyncedGuard =
+    subscriptionSyncSource.includes('return "ok"') &&
+    subscriptionSyncSource.includes("if (!synced)") &&
+    subscriptionSyncSource.indexOf("if (!synced)") <
+      subscriptionSyncSource.lastIndexOf('return "ok"');
+
+  const subscriptionMissingStripeIdsReturnIgnored =
+    subscriptionSyncSource.includes("if (!stripeCustomerId || !stripeSubscriptionId)") &&
+    sliceFrom(subscriptionSyncSource, "if (!stripeCustomerId || !stripeSubscriptionId)", 500).includes('return "ignored"');
+
+  const postMapsOnlyOkToProcessed =
+    postSource.includes("const result = await handleVerifiedEvent(stripe, event)") &&
+    postSource.includes('result === "ok"') &&
+    postSource.includes('"processed"') &&
+    postSource.includes('"ignored"');
+
+  const postDoesNotTreatIgnoredAsProcessed =
+    !/result\s*!==\s*["']failed["']\s*\?\s*["']processed["']/u.test(postSource) &&
+    !/result\s*\?\s*["']processed["']\s*:\s*["']ignored["']/u.test(postSource);
+
+  const checks = [
+    ["STRIPE_CHECKOUT_MISSING_IDENTIFIERS_IGNORED_MISSING", checkoutMissingIdentifiersReturnIgnored, "checkout.session.completed must return ignored when required identifiers are missing."],
+    ["STRIPE_CHECKOUT_OK_AFTER_TRANSACTION_MISSING", checkoutTransactionBeforeOk, "checkout.session.completed must return ok only after the DB transaction."],
+    ["STRIPE_CHECKOUT_OK_BEFORE_TRANSACTION_RISK", checkoutNoOkBeforeTransaction, "checkout.session.completed must not return ok before the DB transaction."],
+    ["STRIPE_SUBSCRIPTION_SYNCED_FALSE_MISSING", subscriptionStartsUnsynced, "subscription lifecycle sync must start with synced=false."],
+    ["STRIPE_SUBSCRIPTION_SYNCED_TRUE_AFTER_UPSERT_MISSING", subscriptionSetsSyncedOnlyAfterUpsert, "subscription lifecycle sync must set synced=true only after subscription upsert."],
+    ["STRIPE_SUBSCRIPTION_UNBOUND_ACCOUNT_SYNC_RISK", subscriptionUnboundAccountDoesNotSetSynced, "subscription lifecycle sync must not mark synced=true when no local account binding is resolved."],
+    ["STRIPE_SUBSCRIPTION_UNSYNCED_IGNORED_MISSING", subscriptionUnsyncedReturnsIgnored, "subscription lifecycle sync must return ignored when no write occurred."],
+    ["STRIPE_SUBSCRIPTION_OK_AFTER_UNSYNCED_GUARD_MISSING", subscriptionOkOnlyAfterUnsyncedGuard, "subscription lifecycle sync must return ok only after the unsynced guard."],
+    ["STRIPE_SUBSCRIPTION_MISSING_STRIPE_IDS_IGNORED_MISSING", subscriptionMissingStripeIdsReturnIgnored, "subscription lifecycle sync must return ignored when Stripe identifiers are missing."],
+    ["STRIPE_WEBHOOK_ONLY_OK_PROCESSED_MAPPING_MISSING", postMapsOnlyOkToProcessed, "POST must map only ok result to processed and otherwise ignored."],
+    ["STRIPE_WEBHOOK_IGNORED_AS_PROCESSED_RISK", postDoesNotTreatIgnoredAsProcessed, "POST must not treat any non-failed/non-empty result as processed."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-097",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
