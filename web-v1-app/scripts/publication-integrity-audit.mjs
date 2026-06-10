@@ -16862,6 +16862,168 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-095 Stripe webhook verification-before-persistence boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const postSource = extractFunctionSource(webhookRouteSource, "POST");
+
+  const signatureReadBeforePayload =
+    postSource.includes('const signature = request.headers.get("stripe-signature")') &&
+    postSource.includes("const payload = await request.text()") &&
+    postSource.indexOf('const signature = request.headers.get("stripe-signature")') <
+      postSource.indexOf("const payload = await request.text()");
+
+  const missingSignatureRejectedBeforePayloadRead =
+    postSource.includes("if (!signature)") &&
+    postSource.includes('return jsonResponse(400, "bad_signature"') &&
+    postSource.indexOf("if (!signature)") <
+      postSource.indexOf("const payload = await request.text()");
+
+  const constructEventVerifiesPayload =
+    postSource.includes("event = stripe.webhooks.constructEvent(payload, signature, webhookSecret)");
+
+  const invalidSignatureRejectedBeforeAnyEventPersistence =
+    postSource.includes("catch (error)") &&
+    postSource.includes('return jsonResponse(400, "bad_signature", "Invalid Stripe signature.")') &&
+    postSource.indexOf('return jsonResponse(400, "bad_signature", "Invalid Stripe signature.")') <
+      postSource.indexOf("recordStripeWebhookEventReceived(event)");
+
+  const livemodeGuardAfterConstructEvent =
+    postSource.includes("validateWebhookLivemode(request, event)") &&
+    postSource.indexOf("stripe.webhooks.constructEvent(payload, signature, webhookSecret)") <
+      postSource.indexOf("validateWebhookLivemode(request, event)");
+
+  const replayPersistenceAfterVerificationAndLivemode =
+    postSource.includes("recordStripeWebhookEventReceived(event)") &&
+    postSource.indexOf("stripe.webhooks.constructEvent(payload, signature, webhookSecret)") <
+      postSource.indexOf("recordStripeWebhookEventReceived(event)") &&
+    postSource.indexOf("validateWebhookLivemode(request, event)") <
+      postSource.indexOf("recordStripeWebhookEventReceived(event)");
+
+  const dispatchAfterReplayPersistence =
+    postSource.includes("const result = await handleVerifiedEvent(stripe, event)") &&
+    postSource.indexOf("recordStripeWebhookEventReceived(event)") <
+      postSource.indexOf("const result = await handleVerifiedEvent(stripe, event)");
+
+  const resultTrackingAfterDispatch =
+    postSource.includes("markStripeWebhookEvent(event") &&
+    postSource.indexOf("const result = await handleVerifiedEvent(stripe, event)") <
+      postSource.indexOf("markStripeWebhookEvent(event");
+
+  const failedTrackingAfterDispatchFailure =
+    postSource.includes("catch (error)") &&
+    postSource.includes('await markStripeWebhookEvent(event, "failed"') &&
+    postSource.indexOf("const result = await handleVerifiedEvent(stripe, event)") <
+      postSource.indexOf('await markStripeWebhookEvent(event, "failed"');
+
+  const noReplayPersistenceBeforeConstructEvent =
+    postSource.indexOf("recordStripeWebhookEventReceived(event)") > postSource.indexOf("stripe.webhooks.constructEvent(payload, signature, webhookSecret)");
+
+  const noEventDispatchBeforeConstructEvent =
+    postSource.indexOf("handleVerifiedEvent(stripe, event)") > postSource.indexOf("stripe.webhooks.constructEvent(payload, signature, webhookSecret)");
+
+  const noEventTrackingBeforeConstructEvent =
+    postSource.indexOf("markStripeWebhookEvent(event") > postSource.indexOf("stripe.webhooks.constructEvent(payload, signature, webhookSecret)");
+
+  const checks = [
+    ["STRIPE_WEBHOOK_SIGNATURE_READ_BEFORE_PAYLOAD_MISSING", signatureReadBeforePayload, "Webhook POST must read stripe-signature before reading raw payload."],
+    ["STRIPE_WEBHOOK_MISSING_SIGNATURE_GUARD_ORDER_MISSING", missingSignatureRejectedBeforePayloadRead, "Webhook POST must reject missing signature before reading raw payload."],
+    ["STRIPE_WEBHOOK_CONSTRUCT_EVENT_MISSING", constructEventVerifiesPayload, "Webhook POST must verify payload with stripe.webhooks.constructEvent."],
+    ["STRIPE_WEBHOOK_INVALID_SIGNATURE_ORDER_MISSING", invalidSignatureRejectedBeforeAnyEventPersistence, "Invalid signature must return before event replay persistence."],
+    ["STRIPE_WEBHOOK_LIVEMODE_AFTER_VERIFICATION_MISSING", livemodeGuardAfterConstructEvent, "Livemode validation must run after Stripe signature verification."],
+    ["STRIPE_WEBHOOK_REPLAY_AFTER_VERIFICATION_MISSING", replayPersistenceAfterVerificationAndLivemode, "Replay persistence must run only after signature and livemode validation."],
+    ["STRIPE_WEBHOOK_DISPATCH_AFTER_REPLAY_MISSING", dispatchAfterReplayPersistence, "Verified event dispatch must run after replay/idempotency persistence."],
+    ["STRIPE_WEBHOOK_RESULT_TRACKING_AFTER_DISPATCH_MISSING", resultTrackingAfterDispatch, "Processed/ignored tracking must run after dispatch result."],
+    ["STRIPE_WEBHOOK_FAILED_TRACKING_AFTER_DISPATCH_FAILURE_MISSING", failedTrackingAfterDispatchFailure, "Failed tracking must run after dispatch failure."],
+    ["STRIPE_WEBHOOK_REPLAY_BEFORE_VERIFY_RISK", noReplayPersistenceBeforeConstructEvent, "Webhook must not persist replay state before constructEvent verification."],
+    ["STRIPE_WEBHOOK_DISPATCH_BEFORE_VERIFY_RISK", noEventDispatchBeforeConstructEvent, "Webhook must not dispatch events before constructEvent verification."],
+    ["STRIPE_WEBHOOK_TRACKING_BEFORE_VERIFY_RISK", noEventTrackingBeforeConstructEvent, "Webhook must not mark event status before constructEvent verification."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-095",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
