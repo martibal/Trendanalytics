@@ -14816,6 +14816,62 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-080 Checkout auth redirect boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasSignedOutCheckoutBranch =
+    checkoutRouteSource.includes("if (!signedInUser)") &&
+    checkoutRouteSource.includes("NextResponse.redirect(signInUrl)");
+
+  const returnUrlIsInternalCheckoutUrl =
+    checkoutRouteSource.includes('const returnUrl = `${appUrl}/api/v1/checkout?plan=${plan}`') ||
+    checkoutRouteSource.includes("const returnUrl = `${appUrl}/api/v1/checkout?plan=${plan}`");
+
+  const signInUrlIsAppRelative =
+    checkoutRouteSource.includes('const signInUrl = new URL("/sign-in", appUrl)') ||
+    checkoutRouteSource.includes("const signInUrl = new URL('/sign-in', appUrl)");
+
+  const redirectUrlIsSetFromInternalReturnUrl =
+    checkoutRouteSource.includes('signInUrl.searchParams.set("redirect_url", returnUrl)') ||
+    checkoutRouteSource.includes("signInUrl.searchParams.set('redirect_url', returnUrl)");
+
+  const noUserSuppliedRedirectUrlInput =
+    !/searchParams\.get\(["']redirect_url["']\)/u.test(checkoutRouteSource) &&
+    !/searchParams\.get\(["']return_url["']\)/u.test(checkoutRouteSource) &&
+    !/searchParams\.get\(["']returnUrl["']\)/u.test(checkoutRouteSource) &&
+    !/request\.url[\s\S]{0,120}redirect_url/u.test(checkoutRouteSource);
+
+  const signInRedirectIsNoStore =
+    /NextResponse\.redirect\(signInUrl\)[\s\S]*?headers\.set\(["']Cache-Control["'],\s*["']no-store["']\)/u.test(checkoutRouteSource);
+
+  const checks = [
+    ["CHECKOUT_SIGNED_OUT_BRANCH_MISSING", hasSignedOutCheckoutBranch, "Checkout route must redirect signed-out users to sign-in."],
+    ["CHECKOUT_RETURN_URL_INTERNAL_MISSING", returnUrlIsInternalCheckoutUrl, "Checkout sign-in returnUrl must be the internal checkout route based on appUrl and validated plan."],
+    ["CHECKOUT_SIGNIN_URL_APP_RELATIVE_MISSING", signInUrlIsAppRelative, "Checkout sign-in URL must be built as /sign-in relative to appUrl."],
+    ["CHECKOUT_REDIRECT_URL_INTERNAL_SOURCE_MISSING", redirectUrlIsSetFromInternalReturnUrl, "Checkout sign-in redirect_url must be set from the internal returnUrl variable."],
+    ["CHECKOUT_USER_SUPPLIED_REDIRECT_URL_RISK", noUserSuppliedRedirectUrlInput, "Checkout route must not read redirect_url/return_url from the request to control auth redirect flow."],
+    ["CHECKOUT_SIGNIN_REDIRECT_NO_STORE_MISSING", signInRedirectIsNoStore, "Checkout sign-in redirect must set Cache-Control: no-store."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-080",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
