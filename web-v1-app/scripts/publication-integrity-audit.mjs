@@ -18272,6 +18272,197 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-102 Stripe checkout customer identity boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function sliceFrom(source, needle, length) {
+    const start = source.indexOf(needle);
+    if (start < 0) {
+      return "";
+    }
+
+    return source.slice(start, start + length);
+  }
+
+  const handleCheckoutSource = extractFunctionSource(checkoutRouteSource, "handleCheckout");
+
+  const existingStripeCustomerIdFromAccount =
+    handleCheckoutSource.includes("existingStripeCustomerId") &&
+    (
+      handleCheckoutSource.includes("account.subscriptions[0]?.stripeCustomerId") ||
+      handleCheckoutSource.includes("account.subscriptions?.[0]?.stripeCustomerId")
+    );
+
+  const existingCustomerReusedAsStripeCustomer =
+    handleCheckoutSource.includes("if (existingStripeCustomerId)") &&
+    sliceFrom(handleCheckoutSource, "if (existingStripeCustomerId)", 500).includes("sessionParams.customer = existingStripeCustomerId");
+
+  const customerEmailFallbackFromSignedInUser =
+    handleCheckoutSource.includes("else") &&
+    (
+      handleCheckoutSource.includes("sessionParams.customer_email = signedInUser.email") ||
+      handleCheckoutSource.includes("sessionParams.customer_email = signedInUser.emailAddress") ||
+      handleCheckoutSource.includes("sessionParams.customer_email = email") ||
+      handleCheckoutSource.includes("customer_email: signedInUser.email")
+    );
+
+  const customerAndCustomerEmailMutuallyExclusive =
+    handleCheckoutSource.includes("if (existingStripeCustomerId)") &&
+    handleCheckoutSource.includes("else") &&
+    handleCheckoutSource.indexOf("sessionParams.customer = existingStripeCustomerId") <
+      handleCheckoutSource.indexOf("sessionParams.customer_email");
+
+  const sessionClientReferenceStillAccountId =
+    handleCheckoutSource.includes("client_reference_id: account.id");
+
+  const customerSourceNotFromRequestInput =
+    !/\b(?:searchParams|formData|request\.json\(\)|body)\b[\s\S]{0,260}\b(?:customer|customer_id|customerId|stripeCustomerId|customer_email|customerEmail)\b/u.test(
+      handleCheckoutSource
+    );
+
+  const noHardcodedCustomerIds =
+    !/\bcus_[A-Za-z0-9_]+\b/u.test(handleCheckoutSource);
+
+  function firstPresentIndex(source, needles) {
+    const indexes = needles
+      .map((needle) => source.indexOf(needle))
+      .filter((index) => index >= 0);
+
+    return indexes.length > 0 ? Math.min(...indexes) : -1;
+  }
+
+  const accountResolutionIndexForCustomerAudit = firstPresentIndex(handleCheckoutSource, [
+    "await resolveAccount",
+    "resolveAccount(",
+    "const account = await",
+    "let account = await",
+  ]);
+
+  const customerChoiceIndexForCustomerAudit = firstPresentIndex(handleCheckoutSource, [
+    "const existingStripeCustomerId",
+    "existingStripeCustomerId",
+    "account.subscriptions",
+    "sessionParams.customer =",
+    "sessionParams.customer_email =",
+    "customer_email:",
+  ]);
+
+  const customerSetAfterAccountResolution =
+    accountResolutionIndexForCustomerAudit >= 0 &&
+    customerChoiceIndexForCustomerAudit >= 0 &&
+    accountResolutionIndexForCustomerAudit < customerChoiceIndexForCustomerAudit;
+  const stripeSessionCreateAfterCustomerAssignment =
+    handleCheckoutSource.includes("stripe.checkout.sessions.create(sessionParams)") &&
+    handleCheckoutSource.includes("sessionParams.customer") &&
+    handleCheckoutSource.indexOf("sessionParams.customer") <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)");
+
+  const customerEmailNotLogged =
+    !/console\.(?:info|warn|error)\([\s\S]{0,500}(?:customer_email|customerEmail|signedInUser\.email|emailAddress)/u.test(
+      handleCheckoutSource
+    );
+
+  const checkoutMetadataDoesNotUseCustomerAsAccountKey =
+    !/account_id\s*:\s*(?:existingStripeCustomerId|stripeCustomerId|customer)/u.test(handleCheckoutSource);
+
+  const checks = [
+    ["CHECKOUT_EXISTING_STRIPE_CUSTOMER_SOURCE_MISSING", existingStripeCustomerIdFromAccount, "Checkout must source existing Stripe customer id from the local account subscription record."],
+    ["CHECKOUT_EXISTING_CUSTOMER_REUSE_MISSING", existingCustomerReusedAsStripeCustomer, "Checkout must reuse existing Stripe customer via sessionParams.customer."],
+    ["CHECKOUT_CUSTOMER_EMAIL_FALLBACK_MISSING", customerEmailFallbackFromSignedInUser, "Checkout must use signed-in user's email only as customer_email fallback."],
+    ["CHECKOUT_CUSTOMER_AND_EMAIL_MUTUAL_EXCLUSION_MISSING", customerAndCustomerEmailMutuallyExclusive, "Checkout must not set both customer and customer_email in the same path."],
+    ["CHECKOUT_CLIENT_REFERENCE_ACCOUNT_ID_STILL_MISSING", sessionClientReferenceStillAccountId, "Checkout must keep client_reference_id bound to account.id."],
+    ["CHECKOUT_CUSTOMER_REQUEST_INPUT_RISK", customerSourceNotFromRequestInput, "Checkout must not accept Stripe customer identifiers or customer_email from request input."],
+    ["CHECKOUT_HARDCODED_CUSTOMER_ID_RISK", noHardcodedCustomerIds, "Checkout route must not hardcode Stripe cus_ identifiers."],
+    ["CHECKOUT_CUSTOMER_BEFORE_ACCOUNT_RESOLUTION_RISK", customerSetAfterAccountResolution, "Checkout must choose Stripe customer only after local account resolution."],
+    ["CHECKOUT_SESSION_CREATE_BEFORE_CUSTOMER_ASSIGNMENT_RISK", stripeSessionCreateAfterCustomerAssignment, "Stripe session creation must happen after customer/customer_email assignment."],
+    ["CHECKOUT_CUSTOMER_EMAIL_LOGGING_RISK", customerEmailNotLogged, "Checkout must not log customer email or customer_email fields."],
+    ["CHECKOUT_CUSTOMER_AS_ACCOUNT_KEY_RISK", checkoutMetadataDoesNotUseCustomerAsAccountKey, "Checkout metadata account_id must not be derived from Stripe customer id."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-102",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
