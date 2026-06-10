@@ -18463,6 +18463,198 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-103 Checkout customer email fallback boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function sliceFrom(source, needle, length) {
+    const start = source.indexOf(needle);
+    if (start < 0) {
+      return "";
+    }
+
+    return source.slice(start, start + length);
+  }
+
+  const getSignedInUserSource = extractFunctionSource(checkoutRouteSource, "getSignedInUser");
+  const handleCheckoutSource = extractFunctionSource(checkoutRouteSource, "handleCheckout");
+
+  const signedInUserEmailFromClerkContext =
+    getSignedInUserSource.includes("currentUser()") &&
+    getSignedInUserSource.includes("primaryEmailAddress") &&
+    (
+      getSignedInUserSource.includes("sessionClaims?.email") ||
+      getSignedInUserSource.includes("sessionClaims?.email_address")
+    );
+
+  const signedInUserReturnsBoundedEmail =
+    getSignedInUserSource.includes("return {") &&
+    getSignedInUserSource.includes("userId: authState.userId") &&
+    getSignedInUserSource.includes("email,");
+
+  const accountResolutionReceivesSignedInEmail =
+    handleCheckoutSource.includes("account = await resolveAccount({") &&
+    handleCheckoutSource.includes("authProviderUserId: signedInUser.userId") &&
+    handleCheckoutSource.includes("email: signedInUser.email");
+
+  const existingStripeCustomerIdFromLocalSubscription =
+    handleCheckoutSource.includes("const existingStripeCustomerId") &&
+    (
+      handleCheckoutSource.includes("account.subscriptions[0]?.stripeCustomerId") ||
+      handleCheckoutSource.includes("account.subscriptions?.[0]?.stripeCustomerId")
+    );
+
+  const existingStripeCustomerUsedFirst =
+    handleCheckoutSource.includes("if (existingStripeCustomerId)") &&
+    sliceFrom(handleCheckoutSource, "if (existingStripeCustomerId)", 240).includes("sessionParams.customer = existingStripeCustomerId");
+
+  const customerEmailIsElseIfFallback =
+    handleCheckoutSource.includes("} else if (signedInUser.email)") &&
+    sliceFrom(handleCheckoutSource, "} else if (signedInUser.email)", 240).includes("sessionParams.customer_email = signedInUser.email");
+
+  const customerEmailAssignments = Array.from(
+    handleCheckoutSource.matchAll(/sessionParams\.customer_email\s*=\s*([^;\n]+)/gu),
+    (match) => match[1].trim()
+  );
+
+  const noUnconditionalCustomerEmailAssignment =
+    customerEmailAssignments.length > 0 &&
+    customerEmailAssignments.every((assignment) => assignment === "signedInUser.email");
+  const customerEmailNotSetBeforeExistingCustomerBranch =
+    handleCheckoutSource.indexOf("sessionParams.customer_email") >
+    handleCheckoutSource.indexOf("if (existingStripeCustomerId)");
+
+  const customerAndCustomerEmailMutuallyExclusive =
+    handleCheckoutSource.indexOf("sessionParams.customer = existingStripeCustomerId") >= 0 &&
+    handleCheckoutSource.indexOf("sessionParams.customer_email = signedInUser.email") >
+      handleCheckoutSource.indexOf("sessionParams.customer = existingStripeCustomerId") &&
+    handleCheckoutSource.includes("} else if (signedInUser.email)");
+
+  const noCustomerFromRequestInput =
+    !/\b(?:searchParams|formData|request\.json\(\)|body)\b[\s\S]{0,260}\b(?:customer|customer_id|customerId|stripeCustomerId|customer_email|customerEmail|email)\b/u.test(
+      handleCheckoutSource
+    );
+
+  const noHardcodedCustomerId =
+    !/\bcus_[A-Za-z0-9_]+\b/u.test(handleCheckoutSource);
+
+  const noCustomerEmailLogging =
+    !/console\.(?:info|warn|error)\([\s\S]{0,500}(?:customer_email|customerEmail|signedInUser\.email|primaryEmailAddress|emailAddress)/u.test(
+      handleCheckoutSource
+    );
+
+  const stripeSessionCreateAfterCustomerFallbackDecision =
+    handleCheckoutSource.includes("stripe.checkout.sessions.create(sessionParams)") &&
+    handleCheckoutSource.includes("sessionParams.customer_email = signedInUser.email") &&
+    handleCheckoutSource.indexOf("sessionParams.customer_email = signedInUser.email") <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)");
+
+  const customerFallbackAfterSessionParamsCreated =
+    handleCheckoutSource.includes("const sessionParams: Stripe.Checkout.SessionCreateParams") &&
+    handleCheckoutSource.includes("sessionParams.customer_email = signedInUser.email") &&
+    handleCheckoutSource.indexOf("const sessionParams: Stripe.Checkout.SessionCreateParams") <
+      handleCheckoutSource.indexOf("sessionParams.customer_email = signedInUser.email");
+
+  const checks = [
+    ["CHECKOUT_SIGNED_IN_EMAIL_SOURCE_MISSING", signedInUserEmailFromClerkContext, "getSignedInUser must derive email from Clerk user/session context, not request input."],
+    ["CHECKOUT_SIGNED_IN_EMAIL_RETURN_MISSING", signedInUserReturnsBoundedEmail, "getSignedInUser must return bounded userId and email fields."],
+    ["CHECKOUT_ACCOUNT_EMAIL_SOURCE_MISSING", accountResolutionReceivesSignedInEmail, "resolveAccount must receive signedInUser.email from authenticated context."],
+    ["CHECKOUT_EXISTING_CUSTOMER_LOCAL_SOURCE_MISSING", existingStripeCustomerIdFromLocalSubscription, "existingStripeCustomerId must come from the local account subscription record."],
+    ["CHECKOUT_EXISTING_CUSTOMER_FIRST_MISSING", existingStripeCustomerUsedFirst, "existing Stripe customer must be preferred before customer_email fallback."],
+    ["CHECKOUT_CUSTOMER_EMAIL_ELSE_IF_FALLBACK_MISSING", customerEmailIsElseIfFallback, "customer_email must be set only in else-if fallback when signedInUser.email is present."],
+    ["CHECKOUT_UNBOUNDED_CUSTOMER_EMAIL_ASSIGNMENT_RISK", noUnconditionalCustomerEmailAssignment, "customer_email must not be assigned from anything other than signedInUser.email."],
+    ["CHECKOUT_CUSTOMER_EMAIL_BEFORE_CUSTOMER_BRANCH_RISK", customerEmailNotSetBeforeExistingCustomerBranch, "customer_email fallback must not run before existing customer reuse branch."],
+    ["CHECKOUT_CUSTOMER_EMAIL_MUTUAL_EXCLUSION_MISSING", customerAndCustomerEmailMutuallyExclusive, "customer and customer_email must be mutually exclusive."],
+    ["CHECKOUT_CUSTOMER_EMAIL_REQUEST_INPUT_RISK", noCustomerFromRequestInput, "customer/customer_email/email must not be read from request input for Stripe customer identity."],
+    ["CHECKOUT_HARDCODED_CUSTOMER_ID_RISK", noHardcodedCustomerId, "checkout route must not hardcode Stripe cus_ identifiers."],
+    ["CHECKOUT_CUSTOMER_EMAIL_LOGGING_RISK", noCustomerEmailLogging, "checkout route must not log customer email fields."],
+    ["CHECKOUT_SESSION_CREATE_BEFORE_CUSTOMER_FALLBACK_RISK", stripeSessionCreateAfterCustomerFallbackDecision, "Stripe session must be created after customer/customer_email fallback decision."],
+    ["CHECKOUT_CUSTOMER_FALLBACK_BEFORE_SESSION_PARAMS_RISK", customerFallbackAfterSessionParamsCreated, "customer/customer_email fallback must mutate server-built sessionParams, not raw request params."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-103",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
