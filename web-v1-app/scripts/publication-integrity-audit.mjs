@@ -15180,6 +15180,176 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-085 Checkout production logging and error redaction boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    if (start < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", start);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(start, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function extractProductionBranch(functionSource) {
+    const branchStart = functionSource.indexOf("if (isProductionRuntime())");
+    if (branchStart < 0) {
+      return "";
+    }
+
+    const returnIndex = functionSource.indexOf("\n    return;", branchStart);
+    if (returnIndex < 0) {
+      return functionSource.slice(branchStart);
+    }
+
+    return functionSource.slice(branchStart, returnIndex);
+  }
+
+  const logInfoSource = extractFunctionSource(checkoutRouteSource, "logCheckoutInfo");
+  const logInfoProductionBranch = extractProductionBranch(logInfoSource);
+
+  const logErrorSource = extractFunctionSource(checkoutRouteSource, "logCheckoutError");
+  const logErrorProductionBranch = extractProductionBranch(logErrorSource);
+
+  const publicErrorDetailSource = extractFunctionSource(checkoutRouteSource, "publicCheckoutErrorDetail");
+  const jsonErrorSource = extractFunctionSource(checkoutRouteSource, "jsonError");
+
+  const hasProductionRuntimeHelper =
+    checkoutRouteSource.includes("function isProductionRuntime") &&
+    checkoutRouteSource.includes('process.env.NODE_ENV === "production"') &&
+    checkoutRouteSource.includes('process.env.VERCEL_ENV === "production"');
+
+  const checkoutInfoUsesProductionRedaction =
+    logInfoProductionBranch.includes("console.info(message, {") &&
+    logInfoProductionBranch.includes("plan: data.plan ?? null") &&
+    logInfoProductionBranch.includes("requestHost: data.requestHost ?? null") &&
+    logInfoProductionBranch.includes("stripeSecretMode: data.stripeSecretMode ?? null") &&
+    logInfoProductionBranch.includes("hasBasicPrice: data.hasBasicPrice ?? null") &&
+    logInfoProductionBranch.includes("hasProPrice: data.hasProPrice ?? null") &&
+    !logInfoProductionBranch.includes("priceId") &&
+    !logInfoProductionBranch.includes("email") &&
+    !logInfoProductionBranch.includes("session");
+
+  const checkoutErrorUsesProductionRedaction =
+    logErrorProductionBranch.includes("console.error(message, {") &&
+    logErrorProductionBranch.includes("plan: data.plan ?? null") &&
+    logErrorProductionBranch.includes("requestHost: data.requestHost ?? null") &&
+    logErrorProductionBranch.includes("stripeSecretMode: data.stripeSecretMode ?? null") &&
+    logErrorProductionBranch.includes("name:") &&
+    !logErrorProductionBranch.includes("priceId") &&
+    !logErrorProductionBranch.includes("stack") &&
+    !logErrorProductionBranch.includes("message:") &&
+    !logErrorProductionBranch.includes("email") &&
+    !logErrorProductionBranch.includes("session");
+
+  const nonProductionCanLogFullDiagnosticData =
+    logInfoSource.includes("console.info(message, data);") &&
+    logErrorSource.includes("console.error(message, data);");
+
+  const hasPublicErrorDetailRedaction =
+    publicErrorDetailSource.includes("function publicCheckoutErrorDetail") &&
+    publicErrorDetailSource.includes('process.env.NODE_ENV !== "production"') &&
+    publicErrorDetailSource.includes('process.env.VERCEL_ENV !== "production"') &&
+    publicErrorDetailSource.includes('return detail ?? null') &&
+    publicErrorDetailSource.includes('return "server_error"') &&
+    publicErrorDetailSource.includes('return "checkout_not_configured"') &&
+    publicErrorDetailSource.includes('return "auth_required"') &&
+    publicErrorDetailSource.includes('return "invalid_plan"');
+
+  const jsonErrorUsesPublicErrorDetail =
+    jsonErrorSource.includes("detail: publicCheckoutErrorDetail(status, code, detail)") &&
+    jsonErrorSource.includes('"Cache-Control": "no-store"');
+
+  const noCheckoutConsoleLogsStripeSecrets =
+    !/console\.(?:log|info|warn|error)[\s\S]{0,240}STRIPE_SECRET_KEY/u.test(checkoutRouteSource) &&
+    !/console\.(?:log|info|warn|error)[\s\S]{0,240}sk_(?:live|test)_/u.test(checkoutRouteSource) &&
+    !/console\.(?:log|info|warn|error)[\s\S]{0,240}rk_(?:live|test)_/u.test(checkoutRouteSource);
+
+  const noCheckoutConsoleLogsSessionUrl =
+    !/console\.(?:log|info|warn|error)[\s\S]{0,240}session\.url/u.test(checkoutRouteSource);
+
+  const checks = [
+    ["CHECKOUT_PRODUCTION_RUNTIME_HELPER_MISSING", hasProductionRuntimeHelper, "Checkout route must have a production runtime helper for log/error redaction."],
+    ["CHECKOUT_INFO_PRODUCTION_REDACTION_MISSING", checkoutInfoUsesProductionRedaction, "Production checkout info logs must use a redacted allowlist."],
+    ["CHECKOUT_ERROR_PRODUCTION_REDACTION_MISSING", checkoutErrorUsesProductionRedaction, "Production checkout error logs must not include priceId, stack, message, email, or session data."],
+    ["CHECKOUT_NON_PRODUCTION_DIAGNOSTICS_MISSING", nonProductionCanLogFullDiagnosticData, "Non-production checkout logs may keep full diagnostic data for debugging."],
+    ["CHECKOUT_PUBLIC_ERROR_DETAIL_REDACTION_MISSING", hasPublicErrorDetailRedaction, "Production checkout error details must be reduced to public error codes."],
+    ["CHECKOUT_JSON_ERROR_PUBLIC_DETAIL_MISSING", jsonErrorUsesPublicErrorDetail, "jsonError must use publicCheckoutErrorDetail and no-store headers."],
+    ["CHECKOUT_CONSOLE_SECRET_LOGGING_RISK", noCheckoutConsoleLogsStripeSecrets, "Checkout route must not log Stripe secret key material."],
+    ["CHECKOUT_SESSION_URL_LOGGING_RISK", noCheckoutConsoleLogsSessionUrl, "Checkout route must not log Stripe session.url."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-085",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
