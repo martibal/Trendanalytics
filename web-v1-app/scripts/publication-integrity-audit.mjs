@@ -15109,6 +15109,77 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-084 Checkout request ingress boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasNodeRuntimeBoundary =
+    checkoutRouteSource.includes('export const runtime = "nodejs"') &&
+    checkoutRouteSource.includes('export const dynamic = "force-dynamic"');
+
+  const importsOriginGuard =
+    checkoutRouteSource.includes('import { validateSameOriginRequest } from "@/lib/security/origin"');
+
+  const importsPreAuthRateLimit =
+    checkoutRouteSource.includes('import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit"');
+
+  const postStart = checkoutRouteSource.indexOf("export async function POST(request: Request)");
+  const postSource = postStart >= 0 ? checkoutRouteSource.slice(postStart) : "";
+
+  const postUsesOriginGuard =
+    postSource.includes("const originGuard = validateSameOriginRequest(request);") &&
+    postSource.includes("if (!originGuard.ok)") &&
+    postSource.includes("return originGuard.response;");
+
+  const postUsesPreAuthRateLimit =
+    postSource.includes('const preAuthRateLimit = await enforcePreAuthRateLimit(request, "checkout-api");') &&
+    postSource.includes("if (!preAuthRateLimit.ok)") &&
+    postSource.includes("return preAuthRateLimit.response;");
+
+  const ingressOrderIsCorrect =
+    postSource.indexOf("validateSameOriginRequest(request)") >= 0 &&
+    postSource.indexOf("enforcePreAuthRateLimit(request") > postSource.indexOf("validateSameOriginRequest(request)") &&
+    postSource.indexOf("return handleCheckout(request)") > postSource.indexOf("enforcePreAuthRateLimit(request");
+
+  const handleCheckoutIsNotExported =
+    !/export\s+async\s+function\s+handleCheckout/u.test(checkoutRouteSource);
+
+  const getRejectsDirectCheckout =
+    checkoutRouteSource.includes("export async function GET()") &&
+    checkoutRouteSource.includes('"method_not_allowed"') &&
+    checkoutRouteSource.includes("Checkout must be started with POST.") &&
+    checkoutRouteSource.includes('Allow: "POST"') &&
+    checkoutRouteSource.includes('"Cache-Control": "no-store"');
+
+  const checks = [
+    ["CHECKOUT_RUNTIME_BOUNDARY_MISSING", hasNodeRuntimeBoundary, "Checkout route must run as a dynamic Node.js route."],
+    ["CHECKOUT_ORIGIN_GUARD_IMPORT_MISSING", importsOriginGuard, "Checkout route must import validateSameOriginRequest."],
+    ["CHECKOUT_PREAUTH_RATE_LIMIT_IMPORT_MISSING", importsPreAuthRateLimit, "Checkout route must import enforcePreAuthRateLimit."],
+    ["CHECKOUT_POST_ORIGIN_GUARD_MISSING", postUsesOriginGuard, "Checkout POST must validate same-origin request before checkout handling."],
+    ["CHECKOUT_POST_PREAUTH_RATE_LIMIT_MISSING", postUsesPreAuthRateLimit, "Checkout POST must enforce pre-auth rate limit before checkout handling."],
+    ["CHECKOUT_INGRESS_ORDER_INVALID", ingressOrderIsCorrect, "Checkout POST must run origin guard, then pre-auth rate limit, then handleCheckout."],
+    ["CHECKOUT_HANDLE_CHECKOUT_EXPORTED_RISK", handleCheckoutIsNotExported, "handleCheckout must remain an internal helper behind POST ingress guards."],
+    ["CHECKOUT_GET_METHOD_BOUNDARY_MISSING", getRejectsDirectCheckout, "Checkout GET must reject direct checkout start with POST-only/no-store response."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-084",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
