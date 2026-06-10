@@ -15020,6 +15020,95 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-083 Checkout subscription session boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const sessionParamsStart = checkoutRouteSource.indexOf("const sessionParams: Stripe.Checkout.SessionCreateParams");
+  const sessionParamsEnd =
+    sessionParamsStart >= 0
+      ? checkoutRouteSource.indexOf("\n\n  if (existingStripeCustomerId)", sessionParamsStart)
+      : -1;
+
+  const sessionParamsSource =
+    sessionParamsStart >= 0
+      ? checkoutRouteSource.slice(
+          sessionParamsStart,
+          sessionParamsEnd >= 0 ? sessionParamsEnd : checkoutRouteSource.length
+        )
+      : "";
+
+  const usesSubscriptionMode =
+    sessionParamsSource.includes('mode: "subscription"');
+
+  const usesResolvedPriceLineItem =
+    sessionParamsSource.includes("line_items:") &&
+    sessionParamsSource.includes("price: priceId") &&
+    sessionParamsSource.includes("quantity: 1");
+
+  const propagatesMetadataToSessionAndSubscription =
+    sessionParamsSource.includes("metadata,") &&
+    sessionParamsSource.includes("subscription_data:") &&
+    sessionParamsSource.includes("metadata,");
+
+  const usesClientReferenceAccountId =
+    sessionParamsSource.includes("client_reference_id: account.id");
+
+  const successUrlIsAppUrlBasedDashboard =
+    sessionParamsSource.includes("success_url:") &&
+    sessionParamsSource.includes("${appUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}");
+
+  const cancelUrlIsAppUrlBasedPricing =
+    sessionParamsSource.includes("cancel_url:") &&
+    sessionParamsSource.includes("${appUrl}/#pricing");
+
+  const createsStripeSessionFromSessionParams =
+    checkoutRouteSource.includes("const session = await stripe.checkout.sessions.create(sessionParams)");
+
+  const rejectsMissingSessionUrl =
+    checkoutRouteSource.includes("if (!session.url)") &&
+    checkoutRouteSource.includes('"stripe_error"') &&
+    checkoutRouteSource.includes("Stripe Checkout did not return a redirect URL.");
+
+  const redirectsToStripeSessionUrlNoStore =
+    checkoutRouteSource.includes("NextResponse.redirect(session.url, { status: 303 })") &&
+    checkoutRouteSource.includes('response.headers.set("Cache-Control", "no-store")');
+
+  const noPaymentModeCheckout =
+    !/mode\s*:\s*["']payment["']/u.test(checkoutRouteSource);
+
+  const checks = [
+    ["CHECKOUT_SESSION_PARAMS_MISSING", sessionParamsSource.length > 0, "Checkout route must build typed Stripe Checkout sessionParams."],
+    ["CHECKOUT_SUBSCRIPTION_MODE_MISSING", usesSubscriptionMode, "Checkout session must use Stripe subscription mode."],
+    ["CHECKOUT_RESOLVED_PRICE_LINE_ITEM_MISSING", usesResolvedPriceLineItem, "Checkout session line_items must use resolved priceId with quantity 1."],
+    ["CHECKOUT_SESSION_METADATA_PROPAGATION_MISSING", propagatesMetadataToSessionAndSubscription, "Checkout session must propagate metadata to both session and subscription_data."],
+    ["CHECKOUT_CLIENT_REFERENCE_ACCOUNT_ID_MISSING", usesClientReferenceAccountId, "Checkout session must bind client_reference_id to local account.id."],
+    ["CHECKOUT_SUCCESS_URL_APP_BOUNDARY_MISSING", successUrlIsAppUrlBasedDashboard, "Checkout success_url must be appUrl-based dashboard URL with session id placeholder."],
+    ["CHECKOUT_CANCEL_URL_APP_BOUNDARY_MISSING", cancelUrlIsAppUrlBasedPricing, "Checkout cancel_url must be appUrl-based pricing URL."],
+    ["CHECKOUT_SESSION_CREATE_PARAMS_MISSING", createsStripeSessionFromSessionParams, "Checkout route must create Stripe session from sessionParams."],
+    ["CHECKOUT_SESSION_URL_GUARD_MISSING", rejectsMissingSessionUrl, "Checkout route must reject missing Stripe session.url."],
+    ["CHECKOUT_STRIPE_REDIRECT_NO_STORE_MISSING", redirectsToStripeSessionUrlNoStore, "Checkout Stripe redirect must use 303 and Cache-Control: no-store."],
+    ["CHECKOUT_PAYMENT_MODE_RISK", noPaymentModeCheckout, "Checkout route must not use one-time payment mode."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-083",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
