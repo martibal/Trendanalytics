@@ -16538,6 +16538,160 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-093 Stripe subscription deletion deactivation boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const realStart =
+      start >= 0 && asyncStart >= 0
+        ? Math.min(start, asyncStart)
+        : start >= 0
+          ? start
+          : asyncStart;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const normalizeStatusSource = extractFunctionSource(webhookRouteSource, "normalizeStripeSubscriptionStatus");
+  const subscriptionSyncSource = extractFunctionSource(webhookRouteSource, "syncSubscriptionEvent");
+  const handleVerifiedEventSource = extractFunctionSource(webhookRouteSource, "handleVerifiedEvent");
+
+  const normalizeStatusOnlyAllowsActiveStates =
+    normalizeStatusSource.includes('value === "active"') &&
+    normalizeStatusSource.includes('value === "trialing"') &&
+    normalizeStatusSource.includes('value === "past_due"') &&
+    normalizeStatusSource.includes("return SubscriptionStatus.active") &&
+    normalizeStatusSource.includes("return SubscriptionStatus.inactive");
+
+  const syncSubscriptionAcceptsForcedStatus =
+    subscriptionSyncSource.includes("forcedStatus?: SubscriptionStatus");
+
+  const forcedStatusOverridesRawStripeStatus =
+    subscriptionSyncSource.includes("const status = forcedStatus ?? normalizeStripeSubscriptionStatus(subscription.status)");
+
+  const subscriptionSyncPersistsStatusInUpdateAndCreate =
+    /update:\s*\{[\s\S]*?\bstatus\s*,[\s\S]*?\}/u.test(subscriptionSyncSource) &&
+    /create:\s*\{[\s\S]*?\bstatus\s*,[\s\S]*?\}/u.test(subscriptionSyncSource);
+
+  const deletedEventHandledExplicitly =
+    handleVerifiedEventSource.includes('case "customer.subscription.deleted"');
+
+  const deletedEventForcesInactive =
+    handleVerifiedEventSource.includes('case "customer.subscription.deleted"') &&
+    handleVerifiedEventSource.includes("SubscriptionStatus.inactive") &&
+    handleVerifiedEventSource.indexOf('case "customer.subscription.deleted"') <
+      handleVerifiedEventSource.indexOf("SubscriptionStatus.inactive");
+
+  const updatedEventDoesNotForceInactive =
+    handleVerifiedEventSource.includes('case "customer.subscription.updated"') &&
+    handleVerifiedEventSource.includes("return syncSubscriptionEvent(event.data.object as Stripe.Subscription)") &&
+    handleVerifiedEventSource.indexOf('case "customer.subscription.updated"') <
+      handleVerifiedEventSource.indexOf('case "customer.subscription.deleted"');
+
+  const deletedEventUsesSubscriptionSync =
+    /case\s+["']customer\.subscription\.deleted["'][\s\S]{0,260}syncSubscriptionEvent\(\s*event\.data\.object\s+as\s+Stripe\.Subscription\s*,\s*SubscriptionStatus\.inactive\s*\)/u.test(
+      handleVerifiedEventSource
+    );
+
+  const noHardDeleteOnSubscriptionDeleted =
+    !/customer\.subscription\.deleted[\s\S]{0,600}\b(?:delete|deleteMany)\s*\(/u.test(handleVerifiedEventSource) &&
+    !/tx\.subscription\.(?:delete|deleteMany)\s*\(/u.test(subscriptionSyncSource) &&
+    !/db\.subscription\.(?:delete|deleteMany)\s*\(/u.test(subscriptionSyncSource);
+
+  const deletedEventResultStillAudited =
+    deletedEventHandledExplicitly &&
+    deletedEventForcesInactive &&
+    deletedEventUsesSubscriptionSync &&
+    noHardDeleteOnSubscriptionDeleted;
+  const checks = [
+    ["STRIPE_STATUS_NORMALIZER_INACTIVE_FALLBACK_MISSING", normalizeStatusOnlyAllowsActiveStates, "Stripe status normalizer must only allow active/trialing/past_due as active and otherwise return inactive."],
+    ["STRIPE_SUBSCRIPTION_FORCED_STATUS_PARAM_MISSING", syncSubscriptionAcceptsForcedStatus, "syncSubscriptionEvent must accept forcedStatus for lifecycle overrides."],
+    ["STRIPE_SUBSCRIPTION_FORCED_STATUS_OVERRIDE_MISSING", forcedStatusOverridesRawStripeStatus, "forcedStatus must override raw Stripe subscription.status."],
+    ["STRIPE_SUBSCRIPTION_STATUS_PERSISTENCE_MISSING", subscriptionSyncPersistsStatusInUpdateAndCreate, "syncSubscriptionEvent must persist normalized/forced status in both update and create."],
+    ["STRIPE_SUBSCRIPTION_DELETED_CASE_MISSING", deletedEventHandledExplicitly, "Webhook handler must explicitly handle customer.subscription.deleted."],
+    ["STRIPE_SUBSCRIPTION_DELETED_INACTIVE_MISSING", deletedEventForcesInactive, "customer.subscription.deleted must force SubscriptionStatus.inactive."],
+    ["STRIPE_SUBSCRIPTION_UPDATED_FORCED_INACTIVE_RISK", updatedEventDoesNotForceInactive, "customer.subscription.updated must use normal status normalization, not forced inactive."],
+    ["STRIPE_SUBSCRIPTION_DELETED_SYNC_CALL_MISSING", deletedEventUsesSubscriptionSync, "customer.subscription.deleted must call syncSubscriptionEvent with SubscriptionStatus.inactive."],
+    ["STRIPE_SUBSCRIPTION_HARD_DELETE_RISK", noHardDeleteOnSubscriptionDeleted, "Deleted Stripe subscriptions must deactivate, not hard-delete local subscription rows."],
+    ["STRIPE_SUBSCRIPTION_DELETED_AUDIT_RESULT_MISSING", deletedEventResultStillAudited, "Deleted subscription handling must still pass through webhook event processed/ignored tracking."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-093",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
