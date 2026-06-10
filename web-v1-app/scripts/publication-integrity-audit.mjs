@@ -15576,6 +15576,110 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-087 Checkout chain-selection custom field boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const chainOptionsStart = checkoutRouteSource.indexOf("const CHAIN_OPTIONS");
+  const chainOptionsEnd =
+    chainOptionsStart >= 0
+      ? checkoutRouteSource.indexOf("];", chainOptionsStart)
+      : -1;
+
+  const chainOptionsSource =
+    chainOptionsStart >= 0 && chainOptionsEnd >= 0
+      ? checkoutRouteSource.slice(chainOptionsStart, chainOptionsEnd + 2)
+      : "";
+
+  const customFieldStart = checkoutRouteSource.indexOf('if (plan === "basic")');
+  const customFieldEnd =
+    customFieldStart >= 0
+      ? checkoutRouteSource.indexOf("\n\n  try {", customFieldStart)
+      : -1;
+
+  const customFieldSource =
+    customFieldStart >= 0
+      ? checkoutRouteSource.slice(
+          customFieldStart,
+          customFieldEnd >= 0 ? customFieldEnd : checkoutRouteSource.length
+        )
+      : "";
+
+  const hasChainOptionsAllowlist =
+    chainOptionsSource.includes('value: "bitcoin"') &&
+    chainOptionsSource.includes('value: "ethereum"') &&
+    chainOptionsSource.includes('value: "arbitrum"') &&
+    chainOptionsSource.includes('value: "base"');
+
+  const basicOnlyCustomFieldBranch =
+    customFieldSource.includes('if (plan === "basic")') &&
+    customFieldSource.includes("sessionParams.custom_fields = [");
+
+  const customFieldUsesEntitledChainKey =
+    customFieldSource.includes('key: "entitled_chain"');
+
+  const customFieldIsDropdown =
+    customFieldSource.includes('type: "dropdown"') &&
+    customFieldSource.includes("dropdown:") &&
+    customFieldSource.includes("options:");
+
+  const dropdownOptionsComeFromAllowlist =
+    customFieldSource.includes("CHAIN_OPTIONS.map") &&
+    customFieldSource.includes("label: chain.label") &&
+    customFieldSource.includes("value: chain.value");
+
+  const customFieldBeforeStripeSessionCreate =
+    checkoutRouteSource.indexOf('if (plan === "basic")') >= 0 &&
+    checkoutRouteSource.indexOf("stripe.checkout.sessions.create(sessionParams)") >
+      checkoutRouteSource.indexOf('if (plan === "basic")');
+
+  const sessionParamsDoesNotPresetCustomFields =
+    checkoutRouteSource.indexOf("const sessionParams") >= 0 &&
+    checkoutRouteSource.indexOf('if (plan === "basic")') > checkoutRouteSource.indexOf("const sessionParams") &&
+    !checkoutRouteSource
+      .slice(
+        checkoutRouteSource.indexOf("const sessionParams"),
+        checkoutRouteSource.indexOf('if (plan === "basic")')
+      )
+      .includes("custom_fields:");
+
+  const noProCustomFieldBranch =
+    !/if\s*\(\s*plan\s*===\s*["']pro["']\s*\)[\s\S]{0,300}custom_fields/u.test(checkoutRouteSource) &&
+    !/else[\s\S]{0,300}custom_fields/u.test(customFieldSource);
+
+  const noFreeTextEntitledChainCustomField =
+    !/key:\s*["']entitled_chain["'][\s\S]{0,300}type:\s*["']text["']/u.test(customFieldSource);
+
+  const checks = [
+    ["CHECKOUT_CHAIN_OPTIONS_ALLOWLIST_MISSING", hasChainOptionsAllowlist, "Checkout route must define CHAIN_OPTIONS for bitcoin, ethereum, arbitrum, and base."],
+    ["CHECKOUT_BASIC_CHAIN_CUSTOM_FIELD_BRANCH_MISSING", basicOnlyCustomFieldBranch, "Checkout route must add chain custom_fields only inside the Basic plan branch."],
+    ["CHECKOUT_ENTITLED_CHAIN_CUSTOM_FIELD_KEY_MISSING", customFieldUsesEntitledChainKey, "Basic checkout custom field must use key: entitled_chain."],
+    ["CHECKOUT_ENTITLED_CHAIN_DROPDOWN_MISSING", customFieldIsDropdown, "Basic checkout entitled_chain field must be a dropdown."],
+    ["CHECKOUT_ENTITLED_CHAIN_ALLOWLIST_OPTIONS_MISSING", dropdownOptionsComeFromAllowlist, "Basic checkout chain dropdown options must be built from CHAIN_OPTIONS."],
+    ["CHECKOUT_CHAIN_CUSTOM_FIELD_AFTER_SESSION_CREATE_RISK", customFieldBeforeStripeSessionCreate, "Checkout chain custom_fields must be assigned before Stripe session creation."],
+    ["CHECKOUT_CUSTOM_FIELDS_PRESET_RISK", sessionParamsDoesNotPresetCustomFields, "Checkout sessionParams must not preset custom_fields before the Basic-only branch."],
+    ["CHECKOUT_PRO_CHAIN_CUSTOM_FIELD_RISK", noProCustomFieldBranch, "Pro checkout must not assign chain-selection custom_fields."],
+    ["CHECKOUT_ENTITLED_CHAIN_FREE_TEXT_RISK", noFreeTextEntitledChainCustomField, "Checkout entitled_chain field must not be a free-text field."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-087",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
