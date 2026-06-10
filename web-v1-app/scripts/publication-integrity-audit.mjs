@@ -17024,6 +17024,220 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-096 Stripe webhook DB transaction boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function extractTransactionBlock(source) {
+    const start = source.indexOf("await db.$transaction(async (tx)");
+    if (start < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", start);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(start, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const checkoutSyncSource = extractFunctionSource(webhookRouteSource, "syncCheckoutSessionCompleted");
+  const subscriptionSyncSource = extractFunctionSource(webhookRouteSource, "syncSubscriptionEvent");
+
+  const checkoutTransactionBlock = extractTransactionBlock(checkoutSyncSource);
+  const subscriptionTransactionBlock = extractTransactionBlock(subscriptionSyncSource);
+
+  const checkoutUsesTransaction =
+    checkoutTransactionBlock.includes("await db.$transaction(async (tx)");
+
+  const checkoutAccountTermsUpdateInsideTransaction =
+    checkoutTransactionBlock.includes("await tx.account.updateMany") &&
+    checkoutTransactionBlock.includes("termsAcceptedAt: new Date()");
+
+  const checkoutSubscriptionUpsertInsideTransaction =
+    checkoutTransactionBlock.includes("await tx.subscription.upsert") &&
+    checkoutTransactionBlock.includes("where:") &&
+    checkoutTransactionBlock.includes("stripeCustomerId");
+
+  const checkoutNoDirectDbSubscriptionWrite =
+    !/\bdb\.subscription\.(?:create|update|updateMany|upsert|delete|deleteMany)\s*\(/u.test(checkoutSyncSource);
+
+  const checkoutTransactionAfterRequiredIdentifierGuard =
+    checkoutSyncSource.includes("if (!stripeCustomerId || !stripeSubscriptionId || !accountId)") &&
+    checkoutSyncSource.indexOf("if (!stripeCustomerId || !stripeSubscriptionId || !accountId)") <
+      checkoutSyncSource.indexOf("await db.$transaction(async (tx)");
+
+  const subscriptionUsesTransaction =
+    subscriptionTransactionBlock.includes("await db.$transaction(async (tx)");
+
+  const subscriptionBindingLookupInsideTransaction =
+    subscriptionTransactionBlock.includes("const existing = await tx.subscription.findFirst") &&
+    subscriptionTransactionBlock.includes("accountId: true");
+
+  const subscriptionResolvedAccountGuardInsideTransaction =
+    subscriptionTransactionBlock.includes("const resolvedAccountId = existing?.accountId ?? accountId") &&
+    subscriptionTransactionBlock.includes("if (!resolvedAccountId)");
+
+  const subscriptionUpsertInsideTransaction =
+    subscriptionTransactionBlock.includes("await tx.subscription.upsert") &&
+    subscriptionTransactionBlock.includes("accountId: resolvedAccountId");
+
+  const subscriptionSyncedFlagSetInsideTransaction =
+    subscriptionTransactionBlock.includes("synced = true");
+
+  const subscriptionNoDirectDbSubscriptionWrite =
+    !/\bdb\.subscription\.(?:create|update|updateMany|upsert|delete|deleteMany|findFirst)\s*\(/u.test(subscriptionSyncSource);
+
+  const subscriptionTransactionAfterStripeIdentifierGuard =
+    subscriptionSyncSource.includes("if (!stripeCustomerId || !stripeSubscriptionId)") &&
+    subscriptionSyncSource.indexOf("if (!stripeCustomerId || !stripeSubscriptionId)") <
+      subscriptionSyncSource.indexOf("await db.$transaction(async (tx)");
+
+  const checks = [
+    ["STRIPE_CHECKOUT_TRANSACTION_MISSING", checkoutUsesTransaction, "checkout.session.completed sync must use db.$transaction."],
+    ["STRIPE_CHECKOUT_ACCOUNT_TERMS_UPDATE_TRANSACTION_MISSING", checkoutAccountTermsUpdateInsideTransaction, "checkout account terms update must be inside the checkout transaction."],
+    ["STRIPE_CHECKOUT_SUBSCRIPTION_UPSERT_TRANSACTION_MISSING", checkoutSubscriptionUpsertInsideTransaction, "checkout subscription upsert must be inside the checkout transaction."],
+    ["STRIPE_CHECKOUT_DIRECT_SUBSCRIPTION_WRITE_RISK", checkoutNoDirectDbSubscriptionWrite, "checkout sync must not write subscription records directly through db.subscription outside tx."],
+    ["STRIPE_CHECKOUT_TRANSACTION_BEFORE_IDENTIFIER_GUARD_RISK", checkoutTransactionAfterRequiredIdentifierGuard, "checkout transaction must run only after required identifier guards."],
+    ["STRIPE_SUBSCRIPTION_TRANSACTION_MISSING", subscriptionUsesTransaction, "subscription lifecycle sync must use db.$transaction."],
+    ["STRIPE_SUBSCRIPTION_BINDING_LOOKUP_TRANSACTION_MISSING", subscriptionBindingLookupInsideTransaction, "subscription binding lookup must be inside the transaction."],
+    ["STRIPE_SUBSCRIPTION_RESOLVED_ACCOUNT_GUARD_TRANSACTION_MISSING", subscriptionResolvedAccountGuardInsideTransaction, "subscription resolvedAccountId guard must be inside the transaction."],
+    ["STRIPE_SUBSCRIPTION_UPSERT_TRANSACTION_MISSING", subscriptionUpsertInsideTransaction, "subscription upsert must be inside the transaction."],
+    ["STRIPE_SUBSCRIPTION_SYNCED_FLAG_TRANSACTION_MISSING", subscriptionSyncedFlagSetInsideTransaction, "subscription sync result flag must be set inside the transaction after upsert."],
+    ["STRIPE_SUBSCRIPTION_DIRECT_DB_WRITE_RISK", subscriptionNoDirectDbSubscriptionWrite, "subscription sync must not use db.subscription directly outside tx for lifecycle writes/lookups."],
+    ["STRIPE_SUBSCRIPTION_TRANSACTION_BEFORE_IDENTIFIER_GUARD_RISK", subscriptionTransactionAfterStripeIdentifierGuard, "subscription transaction must run only after required Stripe identifier guards."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-096",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
