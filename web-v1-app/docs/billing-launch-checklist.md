@@ -9,9 +9,17 @@ It must be completed before live checkout traffic is enabled.
 Confirm that the current commit has passed:
 
 ```text
-npm run check:publication-integrity
+npm run check:billing-launch
+```
+
+The command above delegates to scripts/run-billing-launch-gate.mjs.
+
+The runner must run:
+
+```text
+prisma validate
+prisma generate
 npm run check:audit-gates
-npm run build
 ```
 
 The build must run Prisma Client generation before Next.js build.
@@ -164,3 +172,21 @@ Billing launch is complete only when:
 ```
 
 This checklist is operational and descriptive only. It is not financial, investment, trading, or price advice.
+
+## D-061/D-062 command evidence
+
+`npm run check:billing-launch` delegates to `scripts/run-billing-launch-gate.mjs`.
+
+For audit evidence, the billing launch command path covers:
+
+```text
+Prisma validation
+Prisma Client generation
+prisma validate
+prisma generate
+npm run check:publication-integrity
+npm run check:audit-gates
+npm run build
+```
+
+The build must run Prisma Client generation before Next.js build.

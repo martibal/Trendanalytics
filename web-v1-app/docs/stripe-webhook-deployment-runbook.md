@@ -96,3 +96,8 @@ If webhook processing fails after code deploy:
 ```
 
 If the database migration has not been applied, do not enable live webhook traffic.
+
+
+## Webhook secret source
+
+STRIPE_WEBHOOK_SECRET must come from the Stripe Dashboard webhook endpoint configuration. Do not reuse webhook secrets across unrelated endpoints.

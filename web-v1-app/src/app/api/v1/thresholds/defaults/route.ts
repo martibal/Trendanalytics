@@ -39,7 +39,7 @@ export async function GET(request: Request) {
           interpretation:
             "Higher values indicate stronger descriptive confidence in the currently published state. Lower values indicate more caution should be applied.",
           notes:
-            "This is not a forecast, not a probability of future price movement, and not an action signal.",
+            "This is not a forward-looking estimate, not a probability of future price movement, and not an action cue.",
         },
         {
           field: "confidence.lag_days_vs_utc_today",
@@ -60,9 +60,9 @@ export async function GET(request: Request) {
           field: "status.label",
           purpose: "Expose the current published regime or state label.",
           interpretation:
-            "The label describes current published conditions, not a recommendation or prediction.",
+            "The label describes current published conditions, not an instruction or forward-looking claim.",
           notes:
-            "Users should read regime labels together with confidence, lag, scorecard, and drivers.",
+            "Users are intended to read regime labels together with confidence, lag, scorecard, and drivers.",
         },
         {
           field: "status.one_liner",
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
           interpretation:
             "This is explanatory product text that summarizes the visible state in plain language.",
           notes:
-            "The one-liner remains descriptive and should not contain advisory or normative language.",
+            "The one-liner remains descriptive and must stay non-instructive and non-normative.",
         },
       ],
     },
@@ -83,7 +83,7 @@ export async function GET(request: Request) {
           field: "scorecard.dimensions.*.score",
           purpose: "Provide descriptive dimension-level score context.",
           interpretation:
-            "Scores should be read as current methodology-specific state summaries, not absolute rankings.",
+            "Scores are intended to be read as current methodology-specific state summaries, not absolute rankings.",
           notes:
             "Dimension scores remain traceable to the published meta artifact and current methodology version.",
         },
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
           interpretation:
             "Lower effective confidence indicates greater caution in reading that dimension's score.",
           notes:
-            "This is interpretive metadata and not a predictive confidence statement.",
+            "This is interpretive metadata and not a future-outcome confidence statement.",
         },
       ],
     },
@@ -108,7 +108,7 @@ export async function GET(request: Request) {
           interpretation:
             "Larger absolute values indicate stronger unusualness relative to the reference context.",
           notes:
-            "Unusualness is descriptive historical context only and should not be treated as a signal.",
+            "Unusualness is descriptive historical context only and must not be treated as an action cue.",
         },
         {
           field: "regime.drivers[].pct_90d",
@@ -116,7 +116,7 @@ export async function GET(request: Request) {
           interpretation:
             "Higher or lower percentile placement shows where the current metric sits relative to recent history.",
           notes:
-            "Percentile position is contextual and should be combined with other published fields.",
+            "Percentile position is contextual and is designed to be read together with other published fields.",
         },
         {
           field: "regime.drivers[].momentum_7d_vs_30d",
@@ -124,7 +124,7 @@ export async function GET(request: Request) {
           interpretation:
             "This helps users compare short-horizon movement to a longer context window.",
           notes:
-            "This remains descriptive and should not be reframed as a forecast.",
+            "This remains descriptive and must not be reframed as a forward-looking estimate.",
         },
       ],
     },
@@ -139,7 +139,7 @@ export async function GET(request: Request) {
           interpretation:
             "MA7 helps the user compare the current raw value with a short smoothing window.",
           notes:
-            "This is a descriptive support field, not a trading indicator.",
+            "This is a descriptive support field, not an action indicator.",
         },
         {
           field: "derived.<metric>__ma30",
