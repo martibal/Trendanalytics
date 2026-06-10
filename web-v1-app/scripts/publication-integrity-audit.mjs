@@ -16376,6 +16376,168 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-092 Stripe identifier source boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const realStart =
+      start >= 0 && asyncStart >= 0
+        ? Math.min(start, asyncStart)
+        : start >= 0
+          ? start
+          : asyncStart;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const objectIdSource = extractFunctionSource(webhookRouteSource, "getStripeObjectId");
+  const sessionSubscriptionSource = extractFunctionSource(webhookRouteSource, "getSubscriptionIdFromSession");
+  const sessionCustomerSource = extractFunctionSource(webhookRouteSource, "getCustomerIdFromSession");
+  const subscriptionCustomerSource = extractFunctionSource(webhookRouteSource, "getCustomerIdFromSubscription");
+  const checkoutSyncSource = extractFunctionSource(webhookRouteSource, "syncCheckoutSessionCompleted");
+  const subscriptionSyncSource = extractFunctionSource(webhookRouteSource, "syncSubscriptionEvent");
+
+  const hasSafeStripeObjectIdHelper =
+    objectIdSource.includes("function getStripeObjectId(value: unknown): string | null") &&
+    objectIdSource.includes('if (typeof value === "string")') &&
+    objectIdSource.includes('typeof id === "string" ? id : null') &&
+    objectIdSource.includes("return null");
+
+  const sessionSubscriptionIdUsesStripeObject =
+    sessionSubscriptionSource.includes("return getStripeObjectId(session.subscription)");
+
+  const sessionCustomerIdUsesStripeObject =
+    sessionCustomerSource.includes("return getStripeObjectId(session.customer)");
+
+  const subscriptionCustomerIdUsesStripeObject =
+    subscriptionCustomerSource.includes("return getStripeObjectId(subscription.customer)");
+
+  const checkoutSyncUsesObjectDerivedIds =
+    checkoutSyncSource.includes("const stripeCustomerId = getCustomerIdFromSession(session)") &&
+    checkoutSyncSource.includes("const stripeSubscriptionId = getSubscriptionIdFromSession(session)");
+
+  const subscriptionSyncUsesObjectDerivedIds =
+    subscriptionSyncSource.includes("const stripeSubscriptionId = subscription.id") &&
+    subscriptionSyncSource.includes("const stripeCustomerId = getCustomerIdFromSubscription(subscription)");
+
+  const checkoutRequiresBothStripeIdsBeforeWrite =
+    checkoutSyncSource.includes("if (!stripeCustomerId || !stripeSubscriptionId || !accountId)") &&
+    checkoutSyncSource.indexOf("if (!stripeCustomerId || !stripeSubscriptionId || !accountId)") <
+      checkoutSyncSource.indexOf("await db.$transaction");
+
+  const subscriptionRequiresBothStripeIdsBeforeWrite =
+    subscriptionSyncSource.includes("if (!stripeCustomerId || !stripeSubscriptionId)") &&
+    subscriptionSyncSource.indexOf("if (!stripeCustomerId || !stripeSubscriptionId)") <
+      subscriptionSyncSource.indexOf("await db.$transaction");
+
+  const noMetadataStripeIdentifierSource =
+    !/\bmetadata\.(?:stripeCustomerId|stripe_customer_id|customer|stripeSubscriptionId|stripe_subscription_id|subscription)\b/u.test(
+      checkoutSyncSource + "\n" + subscriptionSyncSource
+    ) &&
+    !/\bsession\.metadata\?\.(?:stripeCustomerId|stripe_customer_id|customer|stripeSubscriptionId|stripe_subscription_id|subscription)\b/u.test(
+      checkoutSyncSource + "\n" + subscriptionSyncSource
+    );
+
+  const dbWritesUseDerivedVariables =
+    checkoutSyncSource.includes("stripeCustomerId,") &&
+    checkoutSyncSource.includes("stripeSubscriptionId,") &&
+    subscriptionSyncSource.includes("stripeCustomerId,") &&
+    subscriptionSyncSource.includes("stripeSubscriptionId,");
+
+  const noHardcodedStripeCustomerOrSubscriptionIds =
+    !/\bcus_[A-Za-z0-9_]+\b/u.test(webhookRouteSource) &&
+    !/\bsub_[A-Za-z0-9_]+\b/u.test(webhookRouteSource);
+
+  const checks = [
+    ["STRIPE_OBJECT_ID_HELPER_MISSING", hasSafeStripeObjectIdHelper, "Webhook route must use a safe getStripeObjectId helper for string/object-id extraction."],
+    ["STRIPE_SESSION_SUBSCRIPTION_ID_SOURCE_MISSING", sessionSubscriptionIdUsesStripeObject, "Checkout session subscription id must come from session.subscription."],
+    ["STRIPE_SESSION_CUSTOMER_ID_SOURCE_MISSING", sessionCustomerIdUsesStripeObject, "Checkout session customer id must come from session.customer."],
+    ["STRIPE_SUBSCRIPTION_CUSTOMER_ID_SOURCE_MISSING", subscriptionCustomerIdUsesStripeObject, "Subscription customer id must come from subscription.customer."],
+    ["STRIPE_CHECKOUT_SYNC_DERIVED_ID_SOURCE_MISSING", checkoutSyncUsesObjectDerivedIds, "checkout.session.completed sync must use object-derived Stripe identifiers."],
+    ["STRIPE_SUBSCRIPTION_SYNC_DERIVED_ID_SOURCE_MISSING", subscriptionSyncUsesObjectDerivedIds, "subscription lifecycle sync must use subscription.id and object-derived customer id."],
+    ["STRIPE_CHECKOUT_STRIPE_ID_GUARD_MISSING", checkoutRequiresBothStripeIdsBeforeWrite, "checkout.session.completed must require both Stripe customer and subscription ids before DB writes."],
+    ["STRIPE_SUBSCRIPTION_STRIPE_ID_GUARD_MISSING", subscriptionRequiresBothStripeIdsBeforeWrite, "subscription lifecycle sync must require both Stripe customer and subscription ids before DB writes."],
+    ["STRIPE_METADATA_IDENTIFIER_SOURCE_RISK", noMetadataStripeIdentifierSource, "Webhook route must not source Stripe identifiers from metadata."],
+    ["STRIPE_DB_WRITE_DERIVED_ID_MISSING", dbWritesUseDerivedVariables, "Webhook DB writes must persist the derived stripeCustomerId and stripeSubscriptionId variables."],
+    ["STRIPE_HARDCODED_CUSTOMER_OR_SUBSCRIPTION_ID_RISK", noHardcodedStripeCustomerOrSubscriptionIds, "Webhook route must not hardcode Stripe customer or subscription ids."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-092",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
