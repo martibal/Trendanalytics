@@ -14941,6 +14941,85 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-082 Checkout plan validation boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const hasNarrowCheckoutPlanType =
+    /type\s+CheckoutPlan\s*=\s*["']basic["']\s*\|\s*["']pro["']/u.test(checkoutRouteSource);
+
+  const hasPlanNormalizer =
+    checkoutRouteSource.includes("function normalizePlan") &&
+    checkoutRouteSource.includes('value === "basic"') &&
+    checkoutRouteSource.includes('value === "pro"') &&
+    checkoutRouteSource.includes('return "basic"') &&
+    checkoutRouteSource.includes('return "pro"') &&
+    checkoutRouteSource.includes("return null;");
+
+  const readPlanUsesNormalizerForAllInputs =
+    checkoutRouteSource.includes("async function readPlan") &&
+    checkoutRouteSource.includes('url.searchParams.get("plan")') &&
+    checkoutRouteSource.includes("normalizePlan(url.searchParams.get") &&
+    checkoutRouteSource.includes("await request.json()") &&
+    checkoutRouteSource.includes("normalizePlan(typeof body.plan") &&
+    checkoutRouteSource.includes("await request.formData()") &&
+    checkoutRouteSource.includes("normalizePlan(typeof plan");
+
+  const invalidPlanStopsBeforePriceId =
+    checkoutRouteSource.includes("if (!plan)") &&
+    checkoutRouteSource.includes('"invalid_plan"') &&
+    checkoutRouteSource.includes("Expected plan=basic or plan=pro.") &&
+    checkoutRouteSource.indexOf("if (!plan)") >= 0 &&
+    checkoutRouteSource.indexOf("const priceId = priceIdForPlan(plan);") > checkoutRouteSource.indexOf("if (!plan)");
+
+  const priceIdUsesValidatedPlan =
+    checkoutRouteSource.includes("const priceId = priceIdForPlan(plan);") &&
+    checkoutRouteSource.includes("function priceIdForPlan(plan: CheckoutPlan)");
+
+  const metadataUsesValidatedPlanVariable =
+    checkoutRouteSource.includes("const metadata = checkoutMetadata({") &&
+    checkoutRouteSource.includes("plan,") &&
+    checkoutRouteSource.includes("checkout_plan: params.plan");
+
+  const stripeSessionCreationAfterPlanValidation =
+    checkoutRouteSource.indexOf("stripe.checkout.sessions.create(sessionParams)") >
+    checkoutRouteSource.indexOf("if (!plan)");
+
+  const noRawPlanPassthroughToStripe =
+    !/checkout_plan\s*:\s*body\.plan/u.test(checkoutRouteSource) &&
+    !/checkout_plan\s*:\s*url\.searchParams/u.test(checkoutRouteSource) &&
+    !/priceIdForPlan\(\s*body\.plan/u.test(checkoutRouteSource) &&
+    !/priceIdForPlan\(\s*url\.searchParams/u.test(checkoutRouteSource);
+
+  const checks = [
+    ["CHECKOUT_PLAN_TYPE_NARROWING_MISSING", hasNarrowCheckoutPlanType, "Checkout route must use a narrow CheckoutPlan union."],
+    ["CHECKOUT_PLAN_NORMALIZER_MISSING", hasPlanNormalizer, "Checkout route must normalize supported plan names and reject unknown values."],
+    ["CHECKOUT_PLAN_INPUT_NORMALIZATION_MISSING", readPlanUsesNormalizerForAllInputs, "Checkout route must normalize plan input from query, JSON, and form data."],
+    ["CHECKOUT_INVALID_PLAN_GUARD_MISSING", invalidPlanStopsBeforePriceId, "Invalid checkout plan must stop before price-id resolution."],
+    ["CHECKOUT_PRICE_ID_VALIDATED_PLAN_MISSING", priceIdUsesValidatedPlan, "Stripe price id must be resolved from the validated plan variable."],
+    ["CHECKOUT_METADATA_VALIDATED_PLAN_MISSING", metadataUsesValidatedPlanVariable, "Stripe metadata must use the validated plan variable."],
+    ["CHECKOUT_SESSION_BEFORE_PLAN_VALIDATION_RISK", stripeSessionCreationAfterPlanValidation, "Stripe session creation must happen after plan validation."],
+    ["CHECKOUT_RAW_PLAN_PASSTHROUGH_RISK", noRawPlanPassthroughToStripe, "Checkout route must not pass raw request plan values into Stripe price or metadata fields."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-082",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
