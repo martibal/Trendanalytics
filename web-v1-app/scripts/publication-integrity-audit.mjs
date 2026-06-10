@@ -15680,6 +15680,138 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-088 Stripe selected-chain extraction boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    if (start < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", start);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(start, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const entitledChainSource = extractFunctionSource(webhookRouteSource, "entitledChainFromSession");
+
+  const hasEntitledChainExtractor =
+    entitledChainSource.includes("function entitledChainFromSession") &&
+    entitledChainSource.includes("session: Stripe.Checkout.Session");
+
+  const readsCustomFieldsSafely =
+    entitledChainSource.includes("Array.isArray(session.custom_fields)") &&
+    entitledChainSource.includes("const customFields");
+
+  const selectsEntitledChainField =
+    entitledChainSource.includes('field.key !== "entitled_chain"') &&
+    entitledChainSource.includes("continue;");
+
+  const readsDropdownValue =
+    entitledChainSource.includes("const value = field.dropdown?.value");
+
+  const normalizesDropdownValue =
+    entitledChainSource.includes("const chain = normalizeChain(value)") &&
+    entitledChainSource.includes("if (chain)") &&
+    entitledChainSource.includes("return chain;");
+
+  const customFieldsBeforeMetadataFallback =
+    entitledChainSource.indexOf("Array.isArray(session.custom_fields)") >= 0 &&
+    entitledChainSource.indexOf("return normalizeChain(session.metadata?.entitled_chain)") >
+      entitledChainSource.indexOf("Array.isArray(session.custom_fields)");
+
+  const metadataFallbackIsNormalized =
+    entitledChainSource.includes("return normalizeChain(session.metadata?.entitled_chain);");
+
+  const noRawMetadataChainReturn =
+    !/return\s+session\.metadata\?\.entitled_chain/u.test(entitledChainSource) &&
+    !/return\s+metadata\.entitled_chain/u.test(entitledChainSource);
+
+  const checkoutSyncUsesExtractorForBasic =
+    webhookRouteSource.includes("tier === SubscriptionTier.basic") &&
+    webhookRouteSource.includes("entitledChainFromSession(session)");
+
+  const checks = [
+    ["STRIPE_ENTITLED_CHAIN_EXTRACTOR_MISSING", hasEntitledChainExtractor, "Webhook route must provide entitledChainFromSession for checkout sessions."],
+    ["STRIPE_ENTITLED_CHAIN_CUSTOM_FIELDS_READ_MISSING", readsCustomFieldsSafely, "Webhook route must read session.custom_fields safely."],
+    ["STRIPE_ENTITLED_CHAIN_FIELD_SELECTION_MISSING", selectsEntitledChainField, "Webhook route must select the entitled_chain custom field by key."],
+    ["STRIPE_ENTITLED_CHAIN_DROPDOWN_VALUE_MISSING", readsDropdownValue, "Webhook route must read entitled_chain from dropdown.value."],
+    ["STRIPE_ENTITLED_CHAIN_DROPDOWN_NORMALIZATION_MISSING", normalizesDropdownValue, "Webhook route must normalize dropdown.value before returning a chain."],
+    ["STRIPE_ENTITLED_CHAIN_CUSTOM_FIELD_PRIORITY_MISSING", customFieldsBeforeMetadataFallback, "Webhook route must prioritize Stripe custom_fields before metadata fallback."],
+    ["STRIPE_ENTITLED_CHAIN_METADATA_FALLBACK_UNNORMALIZED_RISK", metadataFallbackIsNormalized, "Webhook route metadata fallback must use normalizeChain."],
+    ["STRIPE_ENTITLED_CHAIN_RAW_RETURN_RISK", noRawMetadataChainReturn, "Webhook route must not return raw metadata entitled_chain values."],
+    ["STRIPE_ENTITLED_CHAIN_BASIC_SYNC_MISSING", checkoutSyncUsesExtractorForBasic, "checkout.session.completed sync must use entitledChainFromSession for Basic entitlements."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-088",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 

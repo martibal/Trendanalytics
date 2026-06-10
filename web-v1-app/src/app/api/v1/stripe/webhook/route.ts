@@ -135,12 +135,6 @@ function historyUnlockedFromPlan(plan: CheckoutPlan | null, metadataValue: unkno
 }
 
 function entitledChainFromSession(session: Stripe.Checkout.Session): ChainId | null {
-  const metadataChain = normalizeChain(session.metadata?.entitled_chain);
-
-  if (metadataChain) {
-    return metadataChain;
-  }
-
   const customFields = Array.isArray(session.custom_fields) ? session.custom_fields : [];
 
   for (const field of customFields) {
@@ -156,7 +150,7 @@ function entitledChainFromSession(session: Stripe.Checkout.Session): ChainId | n
     }
   }
 
-  return null;
+  return normalizeChain(session.metadata?.entitled_chain);
 }
 
 function getStripeObjectId(value: unknown): string | null {
