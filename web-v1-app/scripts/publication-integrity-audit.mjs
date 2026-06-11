@@ -19588,6 +19588,236 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-108 Checkout public error response boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const jsonErrorSource = extractFunctionSource(checkoutRouteSource, "jsonError");
+  const publicCheckoutErrorDetailSource = extractFunctionSource(checkoutRouteSource, "publicCheckoutErrorDetail");
+  const logCheckoutErrorSource = extractFunctionSource(checkoutRouteSource, "logCheckoutError");
+  const handleCheckoutSource = extractFunctionSource(checkoutRouteSource, "handleCheckout");
+  const getSource = extractFunctionSource(checkoutRouteSource, "GET");
+
+  const jsonErrorUsesNextResponseJson =
+    jsonErrorSource.includes("NextResponse.json") &&
+    jsonErrorSource.includes("code,") &&
+    jsonErrorSource.includes("message,") &&
+    jsonErrorSource.includes("detail: publicCheckoutErrorDetail(status, code, detail)");
+
+  const jsonErrorAlwaysNoStore =
+    jsonErrorSource.includes('"Cache-Control"') &&
+    jsonErrorSource.includes('"no-store"');
+
+  const publicErrorDetailIsEnvironmentBounded =
+    publicCheckoutErrorDetailSource.includes("process.env.NODE_ENV") &&
+    publicCheckoutErrorDetailSource.includes("process.env.VERCEL_ENV") &&
+    publicCheckoutErrorDetailSource.includes("production");
+
+  const productionPublicErrorsAreBoundedCodes =
+    publicCheckoutErrorDetailSource.includes("invalid_plan") &&
+    publicCheckoutErrorDetailSource.includes("auth_required") &&
+    publicCheckoutErrorDetailSource.includes("checkout_not_configured") &&
+    publicCheckoutErrorDetailSource.includes("server_error");
+
+  const accountAndStripeErrorsMapToServerError =
+    publicCheckoutErrorDetailSource.includes('code === "account_error"') &&
+    publicCheckoutErrorDetailSource.includes('code === "stripe_error"') &&
+    publicCheckoutErrorDetailSource.includes("return \"server_error\"");
+
+  const handleCheckoutUsesJsonErrorForConfigAndValidation =
+    handleCheckoutSource.includes('jsonError(') &&
+    handleCheckoutSource.includes('"checkout_not_configured"') &&
+    handleCheckoutSource.includes('"invalid_plan"') &&
+    handleCheckoutSource.includes('"auth_required"');
+
+  const handleCheckoutUsesJsonErrorForAccountAndStripeFailures =
+    handleCheckoutSource.includes('"account_error"') &&
+    handleCheckoutSource.includes('"stripe_error"') &&
+    handleCheckoutSource.includes("Checkout account preparation failed.") &&
+    handleCheckoutSource.includes("Stripe Checkout session creation failed.");
+
+  const missingSessionUrlUsesStripeError =
+    handleCheckoutSource.includes("if (!session.url)") &&
+    handleCheckoutSource.includes('"stripe_error"') &&
+    handleCheckoutSource.includes("Stripe Checkout did not return a redirect URL.");
+
+  const stripeCreateCatchLogsInternallyAndReturnsJsonError =
+    handleCheckoutSource.includes("logCheckoutError(\"[checkout] Stripe session creation failed\"") &&
+    handleCheckoutSource.includes("return jsonError(") &&
+    handleCheckoutSource.includes('"stripe_error"');
+
+  const productionLogBranchForAudit = (() => {
+    const start = logCheckoutErrorSource.indexOf("if (isProductionRuntime())");
+    if (start < 0) return "";
+
+    const end = logCheckoutErrorSource.indexOf("return;", start);
+    if (end > start) {
+      return logCheckoutErrorSource.slice(start, end + "return;".length);
+    }
+
+    return logCheckoutErrorSource.slice(start, start + 900);
+  })();
+
+  const productionLogErrorIsRedacted =
+    productionLogBranchForAudit.includes("console.error(message") &&
+    productionLogBranchForAudit.includes("name") &&
+    !/\b(?:stack\s*:|message\s*:|error\.stack|error\.message)\b/u.test(productionLogBranchForAudit);
+  function containsSessionUrlInNextResponseJson(source) {
+    let searchFrom = 0;
+
+    while (true) {
+      const start = source.indexOf("NextResponse.json", searchFrom);
+      if (start < 0) {
+        return false;
+      }
+
+      const nextJson = source.indexOf("NextResponse.json", start + 1);
+      const nextRedirect = source.indexOf("NextResponse.redirect", start + 1);
+      const nextFunction = source.indexOf("function ", start + 1);
+      const nextExport = source.indexOf("export ", start + 1);
+
+      const candidates = [nextJson, nextRedirect, nextFunction, nextExport]
+        .filter((value) => value > start)
+        .sort((a, b) => a - b);
+
+      const end = candidates.length > 0 ? candidates[0] : Math.min(source.length, start + 700);
+      const jsonSnippet = source.slice(start, end);
+
+      if (jsonSnippet.includes("session.url")) {
+        return true;
+      }
+
+      searchFrom = start + "NextResponse.json".length;
+    }
+  }
+
+  const noPublicJsonLeaksStripeSessionUrl =
+    !containsSessionUrlInNextResponseJson(handleCheckoutSource);
+  const noPublicJsonLeaksSecretsOrIds =
+    !/NextResponse\.json\(\s*\{[\s\S]{0,700}(?:STRIPE_SECRET_KEY|sk_live_|sk_test_|rk_live_|rk_test_|price_|cus_|sub_|customer_email|stripeCustomerId|stripeSubscriptionId)/u.test(
+      checkoutRouteSource
+    );
+
+  const getMethodNotAllowedNoStore =
+    getSource.includes("NextResponse.json") &&
+    getSource.includes("method_not_allowed") &&
+    getSource.includes("Allow") &&
+    getSource.includes("POST") &&
+    getSource.includes('"Cache-Control"') &&
+    getSource.includes('"no-store"');
+
+  const productionCheckoutConfigErrorsDoNotExposeRawEnvNamesAsPublicDetail =
+    publicCheckoutErrorDetailSource.includes("checkout_not_configured") &&
+    publicCheckoutErrorDetailSource.includes("return \"checkout_not_configured\"") &&
+    !/return\s+detail\b/u.test(
+      publicCheckoutErrorDetailSource.replace(/process\.env\.NODE_ENV !== "production"[\s\S]*?return detail \?\? null;/u, "")
+    );
+
+  const jsonErrorStatusIsExplicit =
+    jsonErrorSource.includes("status,") &&
+    jsonErrorSource.includes("headers:");
+
+  const checks = [
+    ["CHECKOUT_JSON_ERROR_HELPER_MISSING", jsonErrorUsesNextResponseJson, "checkout must use jsonError helper for structured public errors."],
+    ["CHECKOUT_JSON_ERROR_NO_STORE_MISSING", jsonErrorAlwaysNoStore, "jsonError must set Cache-Control no-store."],
+    ["CHECKOUT_PUBLIC_ERROR_ENV_BOUNDARY_MISSING", publicErrorDetailIsEnvironmentBounded, "public error detail must distinguish production from nonproduction."],
+    ["CHECKOUT_PUBLIC_ERROR_BOUNDED_CODES_MISSING", productionPublicErrorsAreBoundedCodes, "production public error detail must use bounded codes."],
+    ["CHECKOUT_ACCOUNT_STRIPE_ERROR_REDACTION_MISSING", accountAndStripeErrorsMapToServerError, "account_error and stripe_error must map to server_error in production."],
+    ["CHECKOUT_CONFIG_VALIDATION_JSON_ERROR_MISSING", handleCheckoutUsesJsonErrorForConfigAndValidation, "config/auth/plan validation must return jsonError."],
+    ["CHECKOUT_ACCOUNT_STRIPE_JSON_ERROR_MISSING", handleCheckoutUsesJsonErrorForAccountAndStripeFailures, "account and Stripe failures must return jsonError."],
+    ["CHECKOUT_MISSING_SESSION_URL_ERROR_MISSING", missingSessionUrlUsesStripeError, "missing Stripe session.url must return stripe_error."],
+    ["CHECKOUT_STRIPE_CATCH_BOUNDARY_MISSING", stripeCreateCatchLogsInternallyAndReturnsJsonError, "Stripe session creation catch must log internally and return jsonError."],
+    ["CHECKOUT_PRODUCTION_ERROR_LOG_REDACTION_MISSING", productionLogErrorIsRedacted, "production checkout error logs must redact message/stack and keep error name only."],
+    ["CHECKOUT_SESSION_URL_PUBLIC_JSON_LEAK_RISK", noPublicJsonLeaksStripeSessionUrl, "checkout must not expose Stripe session.url in public JSON."],
+    ["CHECKOUT_PUBLIC_JSON_SECRET_OR_ID_LEAK_RISK", noPublicJsonLeaksSecretsOrIds, "checkout public JSON must not expose secrets, Stripe ids, or customer email."],
+    ["CHECKOUT_GET_METHOD_NOT_ALLOWED_BOUNDARY_MISSING", getMethodNotAllowedNoStore, "GET must return method_not_allowed with Allow POST and no-store."],
+    ["CHECKOUT_CONFIG_PUBLIC_DETAIL_ENV_LEAK_RISK", productionCheckoutConfigErrorsDoNotExposeRawEnvNamesAsPublicDetail, "production config errors must not expose raw env names in public detail."],
+    ["CHECKOUT_JSON_ERROR_STATUS_BOUNDARY_MISSING", jsonErrorStatusIsExplicit, "jsonError must pass explicit HTTP status and headers."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-108",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
