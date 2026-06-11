@@ -20704,6 +20704,164 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-114 Billing runtime environment contract boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+
+  const checkoutSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const webhookSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const combinedBillingSource = `${checkoutSource}\n${webhookSource}`;
+
+  const checkoutUsesServerStripeSecret =
+    checkoutSource.includes("STRIPE_SECRET_KEY") &&
+    checkoutSource.includes("process.env.STRIPE_SECRET_KEY") &&
+    !checkoutSource.includes("NEXT_PUBLIC_STRIPE_SECRET_KEY");
+
+  const checkoutDetectsStripeKeyMode =
+    checkoutSource.includes("detectStripeKeyMode") &&
+    checkoutSource.includes("sk_test") &&
+    checkoutSource.includes("sk_live") &&
+    checkoutSource.includes("rk_test") &&
+    checkoutSource.includes("rk_live");
+
+  const checkoutProductionRequiresLiveKey =
+    checkoutSource.includes("isProductionCheckoutRequest") &&
+    checkoutSource.includes("stripeSecretMode") &&
+    checkoutSource.includes("live") &&
+    checkoutSource.includes("checkout_not_configured");
+
+  const checkoutHasBasicPriceEnv =
+    checkoutSource.includes("STRIPE_PRICE_BASIC") ||
+    checkoutSource.includes("STRIPE_PRICE_ID_BASIC") ||
+    checkoutSource.includes("STRIPE_BASIC_PRICE_ID") ||
+    checkoutSource.includes("BASIC_STRIPE_PRICE_ID");
+
+  const checkoutHasProPriceEnv =
+    checkoutSource.includes("STRIPE_PRICE_PRO") ||
+    checkoutSource.includes("STRIPE_PRICE_ID_PRO") ||
+    checkoutSource.includes("STRIPE_PRO_PRICE_ID") ||
+    checkoutSource.includes("PRO_STRIPE_PRICE_ID");
+
+  const checkoutUsesExplicitPriceEnv =
+    checkoutHasBasicPriceEnv &&
+    checkoutHasProPriceEnv &&
+    (
+      checkoutSource.includes("priceIdForPlan") ||
+      checkoutSource.includes("priceForPlan") ||
+      checkoutSource.includes("planPrice") ||
+      checkoutSource.includes("line_items")
+    ) &&
+    (
+      checkoutSource.includes("checkout_price_not_configured") ||
+      checkoutSource.includes("checkout_not_configured") ||
+      checkoutSource.includes("price_not_configured")
+    );
+  const checkoutUsesAppUrlContract =
+    checkoutSource.includes("NEXT_PUBLIC_APP_URL") &&
+    checkoutSource.includes("APP_URL") &&
+    checkoutSource.includes("VERCEL_PROJECT_PRODUCTION_URL") &&
+    checkoutSource.includes("getAppUrl") &&
+    checkoutSource.includes("checkout_redirect_origin_not_configured");
+
+  const checkoutRedirectUrlsUseConfiguredOrigin =
+    checkoutSource.includes("success_url") &&
+    checkoutSource.includes("cancel_url") &&
+    checkoutSource.includes("appUrl") &&
+    checkoutSource.includes("CHECKOUT_SESSION_ID");
+
+  const webhookUsesWebhookSecret =
+    webhookSource.includes("STRIPE_WEBHOOK_SECRET") &&
+    webhookSource.includes("process.env.STRIPE_WEBHOOK_SECRET") &&
+    !webhookSource.includes("NEXT_PUBLIC_STRIPE_WEBHOOK_SECRET");
+
+  const webhookUsesServerStripeSecret =
+    !webhookSource.includes("NEXT_PUBLIC_STRIPE_SECRET_KEY") &&
+    (
+      webhookSource.includes("process.env.STRIPE_SECRET_KEY") ||
+      webhookSource.includes("STRIPE_SECRET_KEY") ||
+      webhookSource.includes("getStripeClient") ||
+      webhookSource.includes("retrieveSubscriptionForCheckout") ||
+      webhookSource.includes("syncSubscriptionEvent")
+    );
+  const webhookConstructsVerifiedEvent =
+    webhookSource.includes("constructEvent") &&
+    webhookSource.includes("stripe-signature") &&
+    webhookSource.includes("bad_signature");
+
+  const webhookHasModeGuard =
+    webhookSource.includes("livemode") &&
+    webhookSource.includes("mode_mismatch") &&
+    (
+      webhookSource.includes("STRIPE_BILLING_MODE") ||
+      webhookSource.includes("detectStripeKeyMode") ||
+      webhookSource.includes("keyMode")
+    );
+
+  const checkoutRuntimePinnedToNode =
+    checkoutSource.includes('runtime = "nodejs"') ||
+    checkoutSource.includes("runtime = 'nodejs'");
+
+  const webhookRuntimePinnedToNode =
+    webhookSource.includes('runtime = "nodejs"') ||
+    webhookSource.includes("runtime = 'nodejs'");
+
+  const checkoutDynamicNoStaticCaching =
+    checkoutSource.includes('dynamic = "force-dynamic"') ||
+    checkoutSource.includes("dynamic = 'force-dynamic'");
+
+  const webhookDynamicNoStaticCaching =
+    webhookSource.includes('dynamic = "force-dynamic"') ||
+    webhookSource.includes("dynamic = 'force-dynamic'");
+
+  const noPublicSecretEnvNames =
+    !/\bNEXT_PUBLIC_(?:STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|DATABASE_URL|CLERK_SECRET_KEY)\b/u.test(
+      combinedBillingSource
+    );
+
+  const noHardcodedStripeSecrets =
+    !/\b(?:sk_live_|sk_test_|rk_live_|rk_test_|whsec_)[A-Za-z0-9_]{8,}\b/u.test(combinedBillingSource);
+
+  const checks = [
+    ["CHECKOUT_SERVER_STRIPE_SECRET_ENV_MISSING", checkoutUsesServerStripeSecret, "checkout must use server-side STRIPE_SECRET_KEY only."],
+    ["CHECKOUT_STRIPE_KEY_MODE_DETECTION_MISSING", checkoutDetectsStripeKeyMode, "checkout must classify Stripe key mode."],
+    ["CHECKOUT_PRODUCTION_LIVE_KEY_GUARD_MISSING", checkoutProductionRequiresLiveKey, "checkout production runtime must require a live Stripe key."],
+    ["CHECKOUT_PRICE_ENV_CONTRACT_MISSING", checkoutUsesExplicitPriceEnv, "checkout must use explicit STRIPE_PRICE_BASIC and STRIPE_PRICE_PRO env vars."],
+    ["CHECKOUT_APP_URL_CONTRACT_MISSING", checkoutUsesAppUrlContract, "checkout must use app-url env contract and fail closed in production."],
+    ["CHECKOUT_REDIRECT_URL_CONTRACT_MISSING", checkoutRedirectUrlsUseConfiguredOrigin, "checkout success/cancel URLs must derive from configured app origin."],
+    ["WEBHOOK_SECRET_ENV_CONTRACT_MISSING", webhookUsesWebhookSecret, "webhook must use server-side STRIPE_WEBHOOK_SECRET only."],
+    ["WEBHOOK_SERVER_STRIPE_SECRET_ENV_MISSING", webhookUsesServerStripeSecret, "webhook must use server-side STRIPE_SECRET_KEY only."],
+    ["WEBHOOK_SIGNATURE_VERIFICATION_CONTRACT_MISSING", webhookConstructsVerifiedEvent, "webhook must construct verified events from stripe-signature."],
+    ["WEBHOOK_STRIPE_MODE_GUARD_MISSING", webhookHasModeGuard, "webhook must guard test/live mode mismatch."],
+    ["CHECKOUT_NODE_RUNTIME_MISSING", checkoutRuntimePinnedToNode, "checkout route must be pinned to nodejs runtime."],
+    ["WEBHOOK_NODE_RUNTIME_MISSING", webhookRuntimePinnedToNode, "webhook route must be pinned to nodejs runtime."],
+    ["CHECKOUT_DYNAMIC_ROUTE_MISSING", checkoutDynamicNoStaticCaching, "checkout route must force dynamic runtime behavior."],
+    ["WEBHOOK_DYNAMIC_ROUTE_MISSING", webhookDynamicNoStaticCaching, "webhook route must force dynamic runtime behavior."],
+    ["PUBLIC_SECRET_ENV_NAME_RISK", noPublicSecretEnvNames, "billing code must not use NEXT_PUBLIC_* names for server secrets."],
+    ["HARDCODED_STRIPE_SECRET_RISK", noHardcodedStripeSecrets, "billing code must not contain hardcoded Stripe secret/webhook values."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-114",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
