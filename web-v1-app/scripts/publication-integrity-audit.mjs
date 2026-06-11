@@ -20592,6 +20592,118 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-113 Billing launch gate read-only boundary final audit
+{
+  const packageJsonPath = path.join(root, "package.json");
+  const billingGatePath = path.join(root, "scripts", "run-billing-launch-gate.mjs");
+  const auditGatePath = path.join(root, "scripts", "run-audit-gates.mjs");
+
+  const packageJsonSource = fs.existsSync(packageJsonPath)
+    ? fs.readFileSync(packageJsonPath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const billingGateSource = fs.existsSync(billingGatePath)
+    ? fs.readFileSync(billingGatePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const auditGateSource = fs.existsSync(auditGatePath)
+    ? fs.readFileSync(auditGatePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const gateSources = `${packageJsonSource}\n${billingGateSource}\n${auditGateSource}`;
+
+  const noGitCommitOrPush =
+    !/\bgit\s+(?:commit|push|tag|merge|rebase|reset|checkout|switch)\b/u.test(gateSources);
+
+  const noProductionDeployCommand =
+    !/\bvercel\s+(?:deploy\s+)?--prod\b/u.test(gateSources) &&
+    !/\bvercel\s+deploy\b[\s\S]{0,160}\bproduction\b/u.test(gateSources) &&
+    !/\bnetlify\s+deploy\b[\s\S]{0,160}\bprod\b/u.test(gateSources);
+
+  const noStripeOperationalTrigger =
+    !/\bstripe\s+(?:listen|trigger|events|fixtures|subscriptions|customers|checkout)\b/u.test(gateSources);
+
+  const noDatabaseMigrationOrPush =
+    !/\bprisma\s+(?:migrate\s+deploy|migrate\s+reset|db\s+push)\b/u.test(gateSources);
+
+  const noEnvFileMutation =
+    !/\b(?:Set-Content|Add-Content|Out-File|New-Item)\b[\s\S]{0,120}\.env/u.test(gateSources) &&
+    !/\bfs\.writeFile(?:Sync)?\b[\s\S]{0,160}\.env/u.test(gateSources) &&
+    !/\bprocess\.env\.[A-Z0-9_]+\s*=/u.test(gateSources);
+
+  const noLiveTrafficEnablement =
+    !/\b(?:ENABLE_LIVE_CHECKOUT|LIVE_CHECKOUT_ENABLED|STRIPE_LIVE_MODE|ENABLE_PRODUCTION_CHECKOUT)\b[\s\S]{0,120}(?:true|1|enabled)/iu.test(
+      gateSources
+    );
+
+  const noRemoteMutationViaCurl =
+    !/\b(?:curl|Invoke-WebRequest|fetch)\b[\s\S]{0,220}(?:vercel|stripe|github|api\.github|hooks\.slack|deploy)/iu.test(
+      gateSources
+    );
+
+  const noSecretPrinting =
+    !/\b(?:console\.log|Write-Host|echo)\b[\s\S]{0,180}(?:STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|DATABASE_URL|CLERK_SECRET_KEY|NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)/u.test(
+      gateSources
+    );
+
+  const billingGateStillReadOnlyValidation =
+    billingGateSource.includes("prisma validate") ||
+    (
+      billingGateSource.includes("prisma") &&
+      billingGateSource.includes("validate")
+    );
+
+  const billingGateAllowedGenerateOnly =
+    billingGateSource.includes("prisma generate") ||
+    (
+      billingGateSource.includes("prisma") &&
+      billingGateSource.includes("generate")
+    );
+
+  const auditGateStillRunsBuildButDoesNotDeploy =
+    (
+      auditGateSource.includes("npm run build") ||
+      auditGateSource.includes("next build") ||
+      auditGateSource.includes("Production build") ||
+      auditGateSource.includes("Build step")
+    ) &&
+    noProductionDeployCommand;
+
+  const noPackageScriptBypassesReadOnly =
+    !/"check:(?:billing-launch|audit-gates|publication-integrity)"\s*:\s*"[^"]*(?:git\s+push|git\s+commit|vercel\s+deploy|stripe\s+trigger|prisma\s+migrate\s+deploy|prisma\s+db\s+push)/u.test(
+      packageJsonSource
+    );
+
+  const checks = [
+    ["BILLING_GATE_GIT_MUTATION_RISK", noGitCommitOrPush, "billing/audit gates must not commit, push, tag, merge, rebase, reset, checkout, or switch branches."],
+    ["BILLING_GATE_PRODUCTION_DEPLOY_RISK", noProductionDeployCommand, "billing/audit gates must not deploy production."],
+    ["BILLING_GATE_STRIPE_OPERATIONAL_TRIGGER_RISK", noStripeOperationalTrigger, "billing/audit gates must not trigger Stripe operational commands."],
+    ["BILLING_GATE_DB_MIGRATION_MUTATION_RISK", noDatabaseMigrationOrPush, "billing/audit gates must not run Prisma migrate deploy/reset or db push."],
+    ["BILLING_GATE_ENV_FILE_MUTATION_RISK", noEnvFileMutation, "billing/audit gates must not write env files or mutate process.env."],
+    ["BILLING_GATE_LIVE_TRAFFIC_ENABLEMENT_RISK", noLiveTrafficEnablement, "billing/audit gates must not enable live checkout traffic."],
+    ["BILLING_GATE_REMOTE_MUTATION_RISK", noRemoteMutationViaCurl, "billing/audit gates must not call remote deploy/payment/GitHub mutation endpoints."],
+    ["BILLING_GATE_SECRET_PRINT_RISK", noSecretPrinting, "billing/audit gates must not print secrets or secret env variable names."],
+    ["BILLING_GATE_PRISMA_VALIDATE_REMOVED", billingGateStillReadOnlyValidation, "billing launch gate must retain Prisma validate."],
+    ["BILLING_GATE_PRISMA_GENERATE_REMOVED", billingGateAllowedGenerateOnly, "billing launch gate must retain Prisma generate as the only allowed Prisma write-like operation."],
+    ["AUDIT_GATE_BUILD_WITHOUT_DEPLOY_MISSING", auditGateStillRunsBuildButDoesNotDeploy, "audit gate must build but not deploy."],
+    ["PACKAGE_SCRIPT_READ_ONLY_BYPASS_RISK", noPackageScriptBypassesReadOnly, "package scripts for audit/billing gates must not perform mutation/deploy commands."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-113",
+        code,
+        file: "scripts/run-billing-launch-gate.mjs",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
