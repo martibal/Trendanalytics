@@ -20336,6 +20336,123 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-111 Audit suppressor exactness boundary final audit
+{
+  const auditScriptFile = path.join(root, "scripts", "publication-integrity-audit.mjs");
+  const auditSource = fs.existsSync(auditScriptFile)
+    ? fs.readFileSync(auditScriptFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function suppressorRegion(markerText, fallbackLength = 1800) {
+    const start = auditSource.indexOf(markerText);
+    if (start < 0) return "";
+
+    const writeIndex = auditSource.indexOf("writeJson(reportJsonPath, result);", start);
+    const nextMarker = auditSource.indexOf("// D-", start + markerText.length);
+
+    const candidates = [writeIndex, nextMarker]
+      .filter((index) => index > start)
+      .sort((a, b) => a - b);
+
+    const end = candidates.length > 0 ? candidates[0] : Math.min(auditSource.length, start + fallbackLength);
+    return auditSource.slice(start, end);
+  }
+
+  const d109SuppressorRegion = suppressorRegion(
+    "D-109 exact suppressor for defective webhook_not_configured public leak false positive"
+  );
+
+  const d110SuppressorRegion = suppressorRegion(
+    "D-110 exact suppressor for defective webhook public status derivation false positive"
+  );
+
+  const noGlobalFindingsClear =
+    !/result\.findings\s*=\s*\[\s*\]/u.test(auditSource);
+
+  const noGenericFailureRemoval =
+    !/result\.findings\s*=\s*result\.findings\.filter\([\s\S]{0,260}finding\.severity\s*!==\s*["']fail["']/u.test(
+      auditSource
+    ) &&
+    !/result\.findings\s*=\s*result\.findings\.filter\([\s\S]{0,260}finding\.severity\s*===\s*["']pass["']/u.test(
+      auditSource
+    );
+
+  const d109SuppressorIsExact =
+    d109SuppressorRegion.includes('finding.auditItem === "D-109"') &&
+    d109SuppressorRegion.includes('finding.code === "STRIPE_WEBHOOK_NOT_CONFIGURED_PUBLIC_LEAK_RISK"') &&
+    !d109SuppressorRegion.includes("finding.code.startsWith") &&
+    !d109SuppressorRegion.includes('finding.code === "*"') &&
+    !d109SuppressorRegion.includes("finding.auditItem.startsWith");
+
+  const d110SuppressorIsExact =
+    d110SuppressorRegion.includes('finding.auditItem === "D-110"') &&
+    d110SuppressorRegion.includes('finding.code === "STRIPE_WEBHOOK_PUBLIC_STATUS_DERIVATION_RISK"') &&
+    !d110SuppressorRegion.includes("finding.code.startsWith") &&
+    !d110SuppressorRegion.includes('finding.code === "*"') &&
+    !d110SuppressorRegion.includes("finding.auditItem.startsWith");
+
+  const exactSuppressorsDoNotRemoveWholeAuditItems =
+    d109SuppressorIsExact &&
+    d110SuppressorIsExact &&
+    !/finding\.auditItem\s*===\s*["']D-109["'][\s\S]{0,160}\)\s*$/u.test(
+      d109SuppressorRegion.replace('finding.code === "STRIPE_WEBHOOK_NOT_CONFIGURED_PUBLIC_LEAK_RISK"', "EXACT_CODE_CHECK")
+    ) &&
+    !/finding\.auditItem\s*===\s*["']D-110["'][\s\S]{0,160}\)\s*$/u.test(
+      d110SuppressorRegion.replace('finding.code === "STRIPE_WEBHOOK_PUBLIC_STATUS_DERIVATION_RISK"', "EXACT_CODE_CHECK")
+    );
+
+  const webhookLeakChecksStillPresent =
+    auditSource.includes("STRIPE_WEBHOOK_PUBLIC_JSON_UNSAFE_RUNTIME_LEAK_RISK") &&
+    auditSource.includes("STRIPE_WEBHOOK_PUBLIC_JSON_SECRET_OR_ID_LEAK_RISK") &&
+    auditSource.includes("STRIPE_WEBHOOK_PUBLIC_JSON_RAW_BODY_LEAK_RISK") &&
+    auditSource.includes("STRIPE_WEBHOOK_RAW_NEXT_RESPONSE_JSON_RISK");
+
+  const webhookIdempotencyChecksStillPresent =
+    auditSource.includes("STRIPE_WEBHOOK_EVENT_PERSISTENCE_MISSING") &&
+    auditSource.includes("STRIPE_WEBHOOK_DUPLICATE_REPLAY_DETECTION_MISSING") &&
+    auditSource.includes("STRIPE_WEBHOOK_BUSINESS_SYNC_BEFORE_REPLAY_RISK") &&
+    auditSource.includes("STRIPE_WEBHOOK_REPLAY_BEFORE_ACCOUNT_MUTATION_MISSING");
+
+  const suppressedCodesAreDocumented =
+    auditSource.includes("defective webhook_not_configured public leak false positive") &&
+    auditSource.includes("defective webhook public status derivation false positive");
+
+  const noWildcardCodeSuppressor =
+    ![d109SuppressorRegion, d110SuppressorRegion].some((region) =>
+      region.includes('finding.code === "*"') ||
+      region.includes("finding.code === '*'") ||
+      region.includes("finding.code.startsWith(") ||
+      region.includes("finding.auditItem.startsWith(") ||
+      region.includes("finding.code !==") ||
+      region.includes("finding.auditItem !==")
+    );
+  const checks = [
+    ["AUDIT_SUPPRESSOR_GLOBAL_FINDINGS_CLEAR_RISK", noGlobalFindingsClear, "audit script must not globally clear result.findings."],
+    ["AUDIT_SUPPRESSOR_GENERIC_FAILURE_REMOVAL_RISK", noGenericFailureRemoval, "audit script must not remove failures generically."],
+    ["AUDIT_SUPPRESSOR_BROAD_AUDIT_ITEM_RISK", exactSuppressorsDoNotRemoveWholeAuditItems, "audit suppressors must not suppress an entire audit item."],
+    ["AUDIT_D109_SUPPRESSOR_NOT_EXACT", d109SuppressorIsExact, "D-109 suppressor must be exact to auditItem and code."],
+    ["AUDIT_D110_SUPPRESSOR_NOT_EXACT", d110SuppressorIsExact, "D-110 suppressor must be exact to auditItem and code."],
+    ["AUDIT_WEBHOOK_LEAK_CHECKS_REMOVED", webhookLeakChecksStillPresent, "webhook leak checks must remain present after suppressors."],
+    ["AUDIT_WEBHOOK_IDEMPOTENCY_CHECKS_REMOVED", webhookIdempotencyChecksStillPresent, "webhook idempotency checks must remain present after suppressors."],
+    ["AUDIT_SUPPRESSED_CODES_NOT_DOCUMENTED", suppressedCodesAreDocumented, "suppressed false positives must be documented by exact reason."],
+    ["AUDIT_WILDCARD_CODE_SUPPRESSOR_RISK", noWildcardCodeSuppressor, "audit suppressors must not use wildcard or prefix-based code suppression."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-111",
+        code,
+        file: "scripts/publication-integrity-audit.mjs",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
