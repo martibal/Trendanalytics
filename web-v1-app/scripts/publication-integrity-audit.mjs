@@ -19349,6 +19349,245 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-107 Checkout plan, price, and metadata consistency boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function regionBetween(source, startNeedle, endNeedle, fallbackLength = 1800) {
+    const start = source.indexOf(startNeedle);
+    if (start < 0) return "";
+
+    const end = source.indexOf(endNeedle, start + startNeedle.length);
+    if (end > start) {
+      return source.slice(start, end);
+    }
+
+    return source.slice(start, start + fallbackLength);
+  }
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const normalizePlanRegion = regionBetween(
+    checkoutRouteSource,
+    "function normalizePlan",
+    "async function readPlan",
+    1800
+  );
+
+  const readPlanRegion = regionBetween(
+    checkoutRouteSource,
+    "async function readPlan",
+    "function priceIdForPlan",
+    2600
+  );
+
+  const priceIdForPlanRegion = regionBetween(
+    checkoutRouteSource,
+    "function priceIdForPlan",
+    "function checkoutMetadata",
+    1600
+  );
+
+  const checkoutMetadataRegion = regionBetween(
+    checkoutRouteSource,
+    "function checkoutMetadata",
+    "async function getSignedInUser",
+    2200
+  );
+
+  const handleCheckoutSource = extractFunctionSource(checkoutRouteSource, "handleCheckout");
+
+  const checkoutPlanTypeIsNarrow =
+    checkoutRouteSource.includes('type CheckoutPlan = "basic" | "pro"') ||
+    checkoutRouteSource.includes("type CheckoutPlan = 'basic' | 'pro'");
+
+  const normalizePlanAllowsOnlyBasicAndPro =
+    normalizePlanRegion.includes('value === "basic"') &&
+    normalizePlanRegion.includes('return "basic"') &&
+    normalizePlanRegion.includes('value === "pro"') &&
+    normalizePlanRegion.includes('return "pro"') &&
+    normalizePlanRegion.includes("return null");
+
+  const normalizePlanSupportsLegacyAliases =
+    normalizePlanRegion.includes("single-chain") &&
+    normalizePlanRegion.includes("single_chain") &&
+    normalizePlanRegion.includes("research");
+
+  const readPlanUsesNormalizePlanForEveryInput =
+    readPlanRegion.includes("normalizePlan(url.searchParams.get(\"plan\"))") &&
+    readPlanRegion.includes("normalizePlan(typeof body.plan === \"string\" ? body.plan : null)") &&
+    readPlanRegion.includes("normalizePlan(typeof plan === \"string\" ? plan : null)");
+
+  const readPlanOnlyReadsPlanField =
+    readPlanRegion.includes('url.searchParams.get("plan")') &&
+    readPlanRegion.includes('formData.get("plan")') &&
+    !/\b(?:price|priceId|tier|entitlement|history_unlocked|entitled_chain)\b/u.test(readPlanRegion.replace(/plan/g, ""));
+
+  const priceIdForPlanMapsBasicAndProEnv =
+    priceIdForPlanRegion.includes('plan === "basic"') &&
+    priceIdForPlanRegion.includes("process.env.STRIPE_PRICE_BASIC") &&
+    priceIdForPlanRegion.includes("process.env.STRIPE_PRICE_PRO") &&
+    priceIdForPlanRegion.includes("value?.trim() || null");
+
+  const handleCheckoutReadsPlanBeforePrice =
+    handleCheckoutSource.includes("const plan = await readPlan(request)") &&
+    handleCheckoutSource.includes("const priceId = priceIdForPlan(plan)") &&
+    handleCheckoutSource.indexOf("const plan = await readPlan(request)") <
+      handleCheckoutSource.indexOf("const priceId = priceIdForPlan(plan)");
+
+  const invalidPlanStopsBeforePriceAndSession =
+    handleCheckoutSource.includes("if (!plan)") &&
+    handleCheckoutSource.includes('"invalid_plan"') &&
+    handleCheckoutSource.indexOf("if (!plan)") <
+      handleCheckoutSource.indexOf("const priceId = priceIdForPlan(plan)") &&
+    handleCheckoutSource.indexOf("if (!plan)") <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)");
+
+  const priceIdGuardStopsBeforeSession =
+    handleCheckoutSource.includes("if (!priceId)") &&
+    handleCheckoutSource.includes('"checkout_not_configured"') &&
+    handleCheckoutSource.indexOf("if (!priceId)") <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)");
+
+  const metadataUsesSameNormalizedPlan =
+    handleCheckoutSource.includes("const metadata = checkoutMetadata({") &&
+    handleCheckoutSource.includes("plan,") &&
+    checkoutMetadataRegion.includes("checkout_plan: params.plan");
+
+  const lineItemsUseComputedPriceId =
+    handleCheckoutSource.includes("line_items:") &&
+    handleCheckoutSource.includes("price: priceId") &&
+    handleCheckoutSource.includes("quantity: 1");
+
+  const sessionDoesNotAcceptRequestPrice =
+    !/\b(?:searchParams|formData|request\.json\(\)|body)\b[\s\S]{0,260}\b(?:price|priceId|price_id|STRIPE_PRICE_BASIC|STRIPE_PRICE_PRO)\b/u.test(
+      handleCheckoutSource
+    );
+
+  const checkoutDoesNotHardcodeStripePriceIds =
+    !/\bprice_[A-Za-z0-9_]+\b/u.test(checkoutRouteSource);
+
+  const basicPlanGetsChainDropdown =
+    handleCheckoutSource.includes('if (plan === "basic")') &&
+    handleCheckoutSource.includes("sessionParams.custom_fields") &&
+    handleCheckoutSource.includes('key: "entitled_chain"') &&
+    handleCheckoutSource.includes("CHAIN_OPTIONS.map");
+
+  const proPlanDoesNotGetChainDropdown =
+    handleCheckoutSource.includes('if (plan === "basic")') &&
+    handleCheckoutSource.indexOf('if (plan === "basic")') <
+      handleCheckoutSource.indexOf("sessionParams.custom_fields") &&
+    !/if\s*\(\s*plan\s*===\s*["']pro["']\s*\)[\s\S]{0,400}custom_fields/u.test(handleCheckoutSource);
+
+  const sessionCreateAfterPlanPriceMetadataAndCustomFieldLogic =
+    handleCheckoutSource.includes("stripe.checkout.sessions.create(sessionParams)") &&
+    handleCheckoutSource.indexOf("const priceId = priceIdForPlan(plan)") <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)") &&
+    handleCheckoutSource.indexOf("const metadata = checkoutMetadata({") <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)") &&
+    handleCheckoutSource.indexOf('if (plan === "basic")') <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)");
+
+  const checks = [
+    ["CHECKOUT_PLAN_TYPE_NOT_NARROW", checkoutPlanTypeIsNarrow, "CheckoutPlan must be narrowed to basic/pro."],
+    ["CHECKOUT_PLAN_NORMALIZATION_MISSING", normalizePlanAllowsOnlyBasicAndPro, "normalizePlan must map valid inputs to basic/pro and reject unknown values."],
+    ["CHECKOUT_PLAN_ALIAS_COMPATIBILITY_MISSING", normalizePlanSupportsLegacyAliases, "normalizePlan must preserve legacy single-chain/research aliases."],
+    ["CHECKOUT_READ_PLAN_NORMALIZATION_MISSING", readPlanUsesNormalizePlanForEveryInput, "readPlan must normalize query/json/form plan input."],
+    ["CHECKOUT_READ_PLAN_OVERBROAD_INPUT_RISK", readPlanOnlyReadsPlanField, "readPlan must only read plan, not price/tier/entitlement fields."],
+    ["CHECKOUT_PRICE_ID_PLAN_MAPPING_MISSING", priceIdForPlanMapsBasicAndProEnv, "priceIdForPlan must map basic/pro to STRIPE_PRICE_BASIC/PRO."],
+    ["CHECKOUT_PLAN_BEFORE_PRICE_MISSING", handleCheckoutReadsPlanBeforePrice, "handleCheckout must read normalized plan before priceId lookup."],
+    ["CHECKOUT_INVALID_PLAN_GUARD_ORDER_RISK", invalidPlanStopsBeforePriceAndSession, "invalid plan must stop before price lookup or Stripe session creation."],
+    ["CHECKOUT_PRICE_ID_GUARD_ORDER_RISK", priceIdGuardStopsBeforeSession, "missing priceId must stop before Stripe session creation."],
+    ["CHECKOUT_METADATA_PLAN_CONSISTENCY_MISSING", metadataUsesSameNormalizedPlan, "checkout metadata must use the same normalized plan."],
+    ["CHECKOUT_LINE_ITEMS_PRICE_ID_MISSING", lineItemsUseComputedPriceId, "Stripe line_items must use computed priceId with quantity 1."],
+    ["CHECKOUT_REQUEST_PRICE_INPUT_RISK", sessionDoesNotAcceptRequestPrice, "checkout must not accept price/priceId from request input."],
+    ["CHECKOUT_HARDCODED_PRICE_ID_RISK", checkoutDoesNotHardcodeStripePriceIds, "checkout route must not hardcode Stripe price_ identifiers."],
+    ["CHECKOUT_BASIC_CHAIN_DROPDOWN_MISSING", basicPlanGetsChainDropdown, "Basic checkout must include entitled_chain dropdown."],
+    ["CHECKOUT_PRO_CHAIN_DROPDOWN_RISK", proPlanDoesNotGetChainDropdown, "Pro checkout must not include chain dropdown custom fields."],
+    ["CHECKOUT_SESSION_CREATE_PLAN_ORDER_RISK", sessionCreateAfterPlanPriceMetadataAndCustomFieldLogic, "Stripe session creation must happen after plan/price/metadata/custom-field decisions."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-107",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
