@@ -18911,6 +18911,444 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-105 Checkout runtime configuration boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const detectStripeKeyModeSource = extractFunctionSource(checkoutRouteSource, "detectStripeKeyMode");
+  const getStripeClientSource = extractFunctionSource(checkoutRouteSource, "getStripeClient");
+  const getConfiguredAppUrlSource = extractFunctionSource(checkoutRouteSource, "getConfiguredAppUrl");
+  const getAppUrlSource = extractFunctionSource(checkoutRouteSource, "getAppUrl");
+  const priceIdForPlanSource = extractFunctionSource(checkoutRouteSource, "priceIdForPlan");
+  const jsonErrorSource = extractFunctionSource(checkoutRouteSource, "jsonError");
+  const publicCheckoutErrorDetailSource = extractFunctionSource(checkoutRouteSource, "publicCheckoutErrorDetail");
+  const handleCheckoutSource = extractFunctionSource(checkoutRouteSource, "handleCheckout");
+
+  const stripeKeyModeClassifiesMissingTestLive =
+    detectStripeKeyModeSource.includes('return "missing"') &&
+    detectStripeKeyModeSource.includes('key.startsWith("sk_test_")') &&
+    detectStripeKeyModeSource.includes('key.startsWith("sk_live_")') &&
+    detectStripeKeyModeSource.includes('key.startsWith("rk_test_")') &&
+    detectStripeKeyModeSource.includes('key.startsWith("rk_live_")');
+
+  const stripeSecretSourceForAudit = getStripeClientSource || checkoutRouteSource;
+
+  const getStripeClientRegionForAudit = (() => {
+    const start = checkoutRouteSource.indexOf("function getStripeClient");
+    if (start < 0) return "";
+
+    const nextFunction = checkoutRouteSource.indexOf("function isProductionCheckoutRequest", start);
+    if (nextFunction > start) {
+      return checkoutRouteSource.slice(start, nextFunction);
+    }
+
+    return checkoutRouteSource.slice(start, start + 1200);
+  })();
+
+  const stripeClientReadsSecretKeyOnlyFromEnv =
+    getStripeClientRegionForAudit.includes("process.env.STRIPE_SECRET_KEY") &&
+    getStripeClientRegionForAudit.includes("new Stripe(") &&
+    !/\b(?:request|searchParams|formData|body|headers)\b[\s\S]{0,220}\b(?:STRIPE_SECRET_KEY|secretKey|stripeSecret|stripe_secret)\b/u.test(
+      getStripeClientRegionForAudit
+    ) &&
+    !/\b(?:STRIPE_SECRET_KEY|stripeSecret|stripe_secret)\b[\s\S]{0,220}\b(?:request|searchParams|formData|body|headers)\b/u.test(
+      getStripeClientRegionForAudit
+    ) &&
+    !/\b(?:sk|rk)_(?:test|live)_[A-Za-z0-9_]+\b/u.test(getStripeClientRegionForAudit);
+  const missingStripeSecretReturnsNullClient =
+    (
+      /if\s*\(\s*!\s*[A-Za-z_$][A-Za-z0-9_$]*\s*\)\s*\{[\s\S]{0,260}stripe\s*:\s*null[\s\S]{0,260}keyMode/u.test(
+        getStripeClientSource
+      ) ||
+      /if\s*\(\s*!\s*[A-Za-z_$][A-Za-z0-9_$]*\s*\)\s*\{[\s\S]{0,260}stripe\s*:\s*null[\s\S]{0,260}keyMode/u.test(
+        checkoutRouteSource
+      )
+    );
+  const priceIdsReadFromEnvByPlan =
+    priceIdForPlanSource.includes("process.env.STRIPE_PRICE_BASIC") &&
+    priceIdForPlanSource.includes("process.env.STRIPE_PRICE_PRO") &&
+    priceIdForPlanSource.includes("value?.trim() || null");
+
+  const appUrlConfiguredFromEnv =
+    getConfiguredAppUrlSource.includes("process.env.NEXT_PUBLIC_APP_URL?.trim()") &&
+    getConfiguredAppUrlSource.includes("process.env.APP_URL?.trim()") &&
+    getConfiguredAppUrlSource.includes("process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim()");
+
+  const appUrlNormalizesProtocolAndTrailingSlash =
+    getConfiguredAppUrlSource.includes('configured.startsWith("http")') &&
+    getConfiguredAppUrlSource.includes("https://") &&
+    getConfiguredAppUrlSource.includes("replace(/\\/+$/, \"\")");
+
+  const productionRequestCannotFallbackToRequestOrigin =
+    getAppUrlSource.includes("if (isProductionCheckoutRequest(request))") &&
+    getAppUrlSource.includes("return null") &&
+    getAppUrlSource.includes("return url.origin.replace(/\\/+$/, \"\")");
+
+  const missingStripeClientStopsBeforePlanWork =
+    handleCheckoutSource.includes("if (!stripe)") &&
+    handleCheckoutSource.includes('"checkout_not_configured"') &&
+    handleCheckoutSource.includes("Missing STRIPE_SECRET_KEY.") &&
+    handleCheckoutSource.indexOf("if (!stripe)") < handleCheckoutSource.indexOf("const plan = await readPlan(request)");
+
+  const productionRequiresLiveStripeSecret =
+    handleCheckoutSource.includes("isProductionCheckoutRequest(request)") &&
+    handleCheckoutSource.includes('keyMode !== "live"') &&
+    handleCheckoutSource.includes("Expected STRIPE_SECRET_KEY to start with sk_live_.");
+
+  const appUrlRequiredBeforeSessionParams =
+    handleCheckoutSource.includes("const appUrl = getAppUrl(request)") &&
+    handleCheckoutSource.includes("if (!appUrl)") &&
+    handleCheckoutSource.includes("checkout_redirect_origin_not_configured") &&
+    handleCheckoutSource.indexOf("if (!appUrl)") < handleCheckoutSource.indexOf("const sessionParams");
+
+  const priceIdRequiredBeforeSessionParams =
+    handleCheckoutSource.includes("const priceId = priceIdForPlan(plan)") &&
+    handleCheckoutSource.includes("if (!priceId)") &&
+    handleCheckoutSource.includes("Missing STRIPE_PRICE_BASIC.") &&
+    handleCheckoutSource.includes("Missing STRIPE_PRICE_PRO.") &&
+    handleCheckoutSource.indexOf("if (!priceId)") < handleCheckoutSource.indexOf("const sessionParams");
+
+  const configErrorsUseNoStoreJsonError =
+    jsonErrorSource.includes("NextResponse.json") &&
+    jsonErrorSource.includes('"Cache-Control"') &&
+    jsonErrorSource.includes('"no-store"');
+
+  const productionConfigErrorsAreRedacted =
+    publicCheckoutErrorDetailSource.includes("checkout_not_configured") &&
+    publicCheckoutErrorDetailSource.includes("server_error") &&
+    handleCheckoutSource.includes('"checkout_not_configured"');
+
+  const stripeSessionCreateAfterAllConfigGuards =
+    handleCheckoutSource.includes("stripe.checkout.sessions.create(sessionParams)") &&
+    handleCheckoutSource.indexOf("if (!stripe)") <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)") &&
+    handleCheckoutSource.indexOf('keyMode !== "live"') <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)") &&
+    handleCheckoutSource.indexOf("if (!appUrl)") <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)") &&
+    handleCheckoutSource.indexOf("if (!priceId)") <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create(sessionParams)");
+
+  const noHardcodedStripeSecretsOrPrices =
+    !/\bsk_(?:test|live)_[A-Za-z0-9_]+\b/u.test(checkoutRouteSource) &&
+    !/\brk_(?:test|live)_[A-Za-z0-9_]+\b/u.test(checkoutRouteSource) &&
+    !/\bprice_[A-Za-z0-9_]+\b/u.test(checkoutRouteSource);
+
+  const runtimePinnedToNode =
+    checkoutRouteSource.includes('export const runtime = "nodejs"') ||
+    checkoutRouteSource.includes("export const runtime = 'nodejs'");
+
+  const dynamicPinned =
+    checkoutRouteSource.includes('export const dynamic = "force-dynamic"') ||
+    checkoutRouteSource.includes("export const dynamic = 'force-dynamic'");
+
+  const checks = [
+    ["CHECKOUT_STRIPE_KEY_MODE_CLASSIFICATION_MISSING", stripeKeyModeClassifiesMissingTestLive, "checkout must classify missing/test/live/restricted Stripe key modes."],
+    ["CHECKOUT_STRIPE_SECRET_ENV_SOURCE_MISSING", stripeClientReadsSecretKeyOnlyFromEnv, "checkout must source STRIPE_SECRET_KEY only from environment."],
+    ["CHECKOUT_MISSING_SECRET_NULL_CLIENT_MISSING", missingStripeSecretReturnsNullClient, "missing STRIPE_SECRET_KEY must produce null Stripe client."],
+    ["CHECKOUT_PRICE_ID_ENV_SOURCE_MISSING", priceIdsReadFromEnvByPlan, "checkout price ids must be read from STRIPE_PRICE_BASIC/PRO by normalized plan."],
+    ["CHECKOUT_APP_URL_ENV_SOURCE_MISSING", appUrlConfiguredFromEnv, "checkout app URL must use configured env URL sources."],
+    ["CHECKOUT_APP_URL_NORMALIZATION_MISSING", appUrlNormalizesProtocolAndTrailingSlash, "configured app URL must normalize protocol and trailing slash."],
+    ["CHECKOUT_PRODUCTION_ORIGIN_FALLBACK_RISK", productionRequestCannotFallbackToRequestOrigin, "production checkout must not fall back to request origin when app URL is missing."],
+    ["CHECKOUT_MISSING_STRIPE_CLIENT_GUARD_MISSING", missingStripeClientStopsBeforePlanWork, "missing Stripe client must stop checkout before plan/session work."],
+    ["CHECKOUT_PRODUCTION_LIVE_SECRET_GUARD_MISSING", productionRequiresLiveStripeSecret, "production checkout must require live Stripe secret key."],
+    ["CHECKOUT_APP_URL_REQUIRED_BEFORE_SESSION_MISSING", appUrlRequiredBeforeSessionParams, "checkout must require appUrl before building Stripe session params."],
+    ["CHECKOUT_PRICE_ID_REQUIRED_BEFORE_SESSION_MISSING", priceIdRequiredBeforeSessionParams, "checkout must require priceId before building Stripe session params."],
+    ["CHECKOUT_CONFIG_ERROR_NO_STORE_MISSING", configErrorsUseNoStoreJsonError, "checkout config errors must use no-store JSON error response."],
+    ["CHECKOUT_PRODUCTION_CONFIG_ERROR_REDACTION_MISSING", productionConfigErrorsAreRedacted, "production checkout config errors must be bounded/redacted."],
+    ["CHECKOUT_SESSION_CREATE_BEFORE_CONFIG_GUARDS_RISK", stripeSessionCreateAfterAllConfigGuards, "Stripe session must be created only after config guards pass."],
+    ["CHECKOUT_HARDCODED_STRIPE_SECRET_OR_PRICE_RISK", noHardcodedStripeSecretsOrPrices, "checkout route must not hardcode Stripe secret or price identifiers."],
+    ["CHECKOUT_RUNTIME_NODE_MISSING", runtimePinnedToNode, "checkout route must pin runtime to nodejs for Stripe server SDK."],
+    ["CHECKOUT_DYNAMIC_RUNTIME_MISSING", dynamicPinned, "checkout route must be force-dynamic for authenticated checkout."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-105",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
+// D-106 Stripe checkout metadata minimization boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutRouteSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function regionBetween(source, startNeedle, endNeedle, fallbackLength = 1800) {
+    const start = source.indexOf(startNeedle);
+    if (start < 0) return "";
+
+    const end = source.indexOf(endNeedle, start + startNeedle.length);
+    if (end > start) {
+      return source.slice(start, end);
+    }
+
+    return source.slice(start, start + fallbackLength);
+  }
+
+  function extractFunctionSource(source, functionName) {
+    const start = source.indexOf(`function ${functionName}`);
+    const asyncStart = source.indexOf(`async function ${functionName}`);
+    const exportAsyncStart = source.indexOf(`export async function ${functionName}`);
+    const starts = [start, asyncStart, exportAsyncStart].filter((value) => value >= 0);
+    const realStart = starts.length > 0 ? Math.min(...starts) : -1;
+
+    if (realStart < 0) {
+      return "";
+    }
+
+    const open = source.indexOf("{", realStart);
+    if (open < 0) {
+      return "";
+    }
+
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escape = false;
+
+    for (let index = open; index < source.length; index += 1) {
+      const ch = source[index];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (ch === stringChar) {
+          inString = false;
+          stringChar = "";
+        }
+
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return source.slice(realStart, index + 1);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  const checkoutMetadataRegion = regionBetween(
+    checkoutRouteSource,
+    "function checkoutMetadata",
+    "async function getSignedInUser",
+    2200
+  );
+
+  const handleCheckoutSource = extractFunctionSource(checkoutRouteSource, "handleCheckout");
+
+  const metadataIncludesExpectedIdentityFields =
+    checkoutMetadataRegion.includes("checkout_plan:") &&
+    checkoutMetadataRegion.includes("account_id:") &&
+    checkoutMetadataRegion.includes("auth_provider_user_id:") &&
+    checkoutMetadataRegion.includes("entitled_chain:") &&
+    checkoutMetadataRegion.includes("history_unlocked:");
+
+  const metadataPlanFromNormalizedPlanParam =
+    checkoutMetadataRegion.includes("checkout_plan: params.plan") ||
+    checkoutMetadataRegion.includes("checkout_plan: plan");
+
+  const metadataAccountIdFromLocalAccountParam =
+    checkoutMetadataRegion.includes("account_id: params.accountId") ||
+    checkoutMetadataRegion.includes("account_id: accountId");
+
+  const metadataAuthProviderIdFromSignedInParam =
+    checkoutMetadataRegion.includes("auth_provider_user_id: params.authProviderUserId") ||
+    checkoutMetadataRegion.includes("auth_provider_user_id: authProviderUserId");
+
+  const metadataDoesNotContainEmail =
+    !/\b(?:customer_email|customerEmail|emailAddress|primaryEmailAddress)\b/u.test(checkoutMetadataRegion);
+
+  const metadataDoesNotContainStripeCustomerOrSubscriptionIds =
+    !/\b(?:stripeCustomerId|customer_id|customerId|stripeSubscriptionId|subscription_id|subscriptionId)\b/u.test(
+      checkoutMetadataRegion
+    );
+
+  const metadataDoesNotContainPriceOrPlanSecretValues =
+    !/\b(?:priceId|STRIPE_PRICE_BASIC|STRIPE_PRICE_PRO|price_)\b/u.test(checkoutMetadataRegion);
+
+  const metadataDoesNotContainSecretsOrApiKeys =
+    !/\b(?:secret|token|apiKey|api_key|STRIPE_SECRET_KEY|CLERK_SECRET_KEY|DATABASE_URL|UPSTASH_REDIS_REST_TOKEN)\b/u.test(
+      checkoutMetadataRegion
+    );
+
+  const metadataDoesNotContainRedirectUrls =
+    !/\b(?:success_url|successUrl|cancel_url|cancelUrl|redirect_url|redirectUrl|session\.url|request\.url|appUrl)\b/u.test(
+      checkoutMetadataRegion
+    );
+
+  const metadataBuiltOnceFromHelper =
+    handleCheckoutSource.includes("const metadata = checkoutMetadata({") &&
+    handleCheckoutSource.includes("plan,") &&
+    handleCheckoutSource.includes("accountId: account.id") &&
+    handleCheckoutSource.includes("authProviderUserId: signedInUser.userId");
+
+  const metadataSharedToSessionAndSubscription =
+    handleCheckoutSource.includes("metadata,") &&
+    handleCheckoutSource.includes("subscription_data:") &&
+    handleCheckoutSource.includes("metadata,");
+
+  const sessionParamsDoesNotInlineSensitiveMetadata =
+    !/metadata:\s*\{[\s\S]{0,500}(?:emailAddress|customer_email|customerEmail|priceId|session\.url|request\.url|STRIPE_SECRET_KEY|secret|token|apiKey|api_key)/u.test(
+      handleCheckoutSource
+    ) &&
+    !/subscription_data:\s*\{[\s\S]{0,700}metadata:\s*\{[\s\S]{0,500}(?:emailAddress|customer_email|customerEmail|priceId|session\.url|request\.url|STRIPE_SECRET_KEY|secret|token|apiKey|api_key)/u.test(
+      handleCheckoutSource
+    );
+
+  const basicEntitledChainIsSelectionPlaceholder =
+    checkoutMetadataRegion.includes("params.plan === \"basic\"") &&
+    checkoutMetadataRegion.includes("checkout_selection");
+
+  const proEntitledChainIsBlank =
+    checkoutMetadataRegion.includes("entitled_chain") &&
+    (checkoutMetadataRegion.includes(": \"\"") || checkoutMetadataRegion.includes(": ''"));
+
+  const historyUnlockedDefaultsFalse =
+    checkoutMetadataRegion.includes("history_unlocked: \"false\"") ||
+    checkoutMetadataRegion.includes("history_unlocked: 'false'");
+
+  const metadataCreatedAfterAccountResolution =
+    handleCheckoutSource.includes("account = await resolveAccount") &&
+    handleCheckoutSource.includes("const metadata = checkoutMetadata({") &&
+    handleCheckoutSource.indexOf("account = await resolveAccount") <
+      handleCheckoutSource.indexOf("const metadata = checkoutMetadata({");
+
+  const checks = [
+    ["CHECKOUT_METADATA_EXPECTED_FIELDS_MISSING", metadataIncludesExpectedIdentityFields, "checkout metadata must include the bounded expected metadata keys."],
+    ["CHECKOUT_METADATA_PLAN_SOURCE_MISSING", metadataPlanFromNormalizedPlanParam, "checkout_plan metadata must come from normalized plan param."],
+    ["CHECKOUT_METADATA_ACCOUNT_ID_SOURCE_MISSING", metadataAccountIdFromLocalAccountParam, "account_id metadata must come from local account id param."],
+    ["CHECKOUT_METADATA_AUTH_PROVIDER_ID_SOURCE_MISSING", metadataAuthProviderIdFromSignedInParam, "auth_provider_user_id metadata must come from signed-in user id param."],
+    ["CHECKOUT_METADATA_EMAIL_LEAK_RISK", metadataDoesNotContainEmail, "checkout metadata must not include email fields."],
+    ["CHECKOUT_METADATA_STRIPE_ID_LEAK_RISK", metadataDoesNotContainStripeCustomerOrSubscriptionIds, "checkout metadata must not include Stripe customer/subscription ids."],
+    ["CHECKOUT_METADATA_PRICE_ID_LEAK_RISK", metadataDoesNotContainPriceOrPlanSecretValues, "checkout metadata must not include price ids or price env names."],
+    ["CHECKOUT_METADATA_SECRET_LEAK_RISK", metadataDoesNotContainSecretsOrApiKeys, "checkout metadata must not include secrets, tokens, or API keys."],
+    ["CHECKOUT_METADATA_REDIRECT_URL_LEAK_RISK", metadataDoesNotContainRedirectUrls, "checkout metadata must not include redirect/session/request URLs."],
+    ["CHECKOUT_METADATA_HELPER_USAGE_MISSING", metadataBuiltOnceFromHelper, "checkout metadata must be built once from local account and signed-in user context."],
+    ["CHECKOUT_METADATA_SHARED_OBJECT_MISSING", metadataSharedToSessionAndSubscription, "Checkout Session and subscription_data must share the same metadata object."],
+    ["CHECKOUT_METADATA_INLINE_SENSITIVE_RISK", sessionParamsDoesNotInlineSensitiveMetadata, "sessionParams must not inline sensitive metadata payloads."],
+    ["CHECKOUT_METADATA_BASIC_CHAIN_PLACEHOLDER_MISSING", basicEntitledChainIsSelectionPlaceholder, "Basic checkout metadata must use checkout_selection placeholder before webhook reads custom field."],
+    ["CHECKOUT_METADATA_PRO_CHAIN_BLANK_MISSING", proEntitledChainIsBlank, "Pro checkout metadata must not preselect an entitled chain."],
+    ["CHECKOUT_METADATA_HISTORY_DEFAULT_MISSING", historyUnlockedDefaultsFalse, "checkout metadata must default history_unlocked to false."],
+    ["CHECKOUT_METADATA_ORDER_AFTER_ACCOUNT_MISSING", metadataCreatedAfterAccountResolution, "checkout metadata must be created after account resolution."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-106",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
