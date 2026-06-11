@@ -20077,6 +20077,265 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-110 Stripe webhook idempotency state boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function regionBetween(source, startNeedle, endNeedle, fallbackLength = 2400) {
+    const start = source.indexOf(startNeedle);
+    if (start < 0) return "";
+
+    const end = source.indexOf(endNeedle, start + startNeedle.length);
+    if (end > start) {
+      return source.slice(start, end);
+    }
+
+    return source.slice(start, start + fallbackLength);
+  }
+
+  function looseFunctionRegion(source, functionName, fallbackLength = 6000) {
+    const starts = [
+      source.indexOf(`export async function ${functionName}`),
+      source.indexOf(`async function ${functionName}`),
+      source.indexOf(`export function ${functionName}`),
+      source.indexOf(`function ${functionName}`),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextCandidates = [
+      source.indexOf("\nexport async function ", afterStart),
+      source.indexOf("\nasync function ", afterStart),
+      source.indexOf("\nexport function ", afterStart),
+      source.indexOf("\nfunction ", afterStart),
+    ].filter((index) => index > start).sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) {
+      return source.slice(start, nextCandidates[0]);
+    }
+
+    return source.slice(start, start + fallbackLength);
+  }
+
+  function firstIndex(source, needles) {
+    const indexes = needles
+      .map((needle) => source.indexOf(needle))
+      .filter((index) => index >= 0);
+
+    return indexes.length > 0 ? Math.min(...indexes) : -1;
+  }
+
+  const recordRegion =
+    looseFunctionRegion(webhookRouteSource, "recordStripeWebhookEventReceived", 5000) ||
+    regionBetween(webhookRouteSource, "recordStripeWebhookEventReceived", "function markStripeWebhookEvent", 5000);
+
+  const markRegion =
+    looseFunctionRegion(webhookRouteSource, "markStripeWebhookEvent", 3600) ||
+    regionBetween(webhookRouteSource, "markStripeWebhookEvent", "function handleVerifiedEvent", 3600);
+
+  const dispatchRegion =
+    looseFunctionRegion(webhookRouteSource, "handleVerifiedEvent", 3600) ||
+    regionBetween(webhookRouteSource, "handleVerifiedEvent", "export async function POST", 3600);
+
+  const postSource = looseFunctionRegion(webhookRouteSource, "POST", 9000);
+
+  const webhookEventPersistenceExists =
+    webhookRouteSource.includes("stripeWebhookEvent") &&
+    webhookRouteSource.includes("stripeEventId") &&
+    webhookRouteSource.includes("event.id");
+
+  const receivedEventRecordedWithEventType =
+    recordRegion.includes("event.id") &&
+    recordRegion.includes("event.type") &&
+    recordRegion.includes("stripeEventId") &&
+    recordRegion.includes("eventType");
+
+  const initialProcessingStateRecorded =
+    recordRegion.includes("processing") &&
+    (
+      recordRegion.includes("status") ||
+      recordRegion.includes("WebhookProcessingStatus")
+    );
+
+  const duplicateReplayDetected =
+    recordRegion.includes("duplicate") ||
+    recordRegion.includes("P2002") ||
+    recordRegion.includes("unique") ||
+    recordRegion.includes("findUnique") ||
+    recordRegion.includes("findFirst");
+
+  const staleOrFailedReplayHandled =
+    recordRegion.includes("failed") ||
+    recordRegion.includes("stale") ||
+    recordRegion.includes("processing");
+
+  const postRecordsReplayStateAfterVerification =
+    postSource.includes("constructEvent") &&
+    postSource.includes("recordStripeWebhookEventReceived") &&
+    postSource.indexOf("constructEvent") < postSource.indexOf("recordStripeWebhookEventReceived");
+
+  const duplicateReplayStopsBeforeDispatch =
+    (
+      postSource.includes('replayState === "duplicate"') ||
+      postSource.includes("replayState === 'duplicate'") ||
+      postSource.includes("duplicate")
+    ) &&
+    postSource.includes('"ignored"') &&
+    postSource.includes("handleVerifiedEvent") &&
+    firstIndex(postSource, ['replayState === "duplicate"', "replayState === 'duplicate'", "duplicate"]) <
+      postSource.indexOf("handleVerifiedEvent");
+
+  const dispatchAfterReplayRecord =
+    postSource.includes("recordStripeWebhookEventReceived") &&
+    postSource.includes("handleVerifiedEvent") &&
+    postSource.indexOf("recordStripeWebhookEventReceived") < postSource.indexOf("handleVerifiedEvent");
+
+  const markHelperTargetsEventId =
+    markRegion.includes("stripeEventId") &&
+    markRegion.includes("event.id");
+
+  const markHelperCanSetTerminalStatuses =
+    markRegion.includes("processed") &&
+    markRegion.includes("ignored") &&
+    markRegion.includes("failed");
+
+  const processedAndIgnoredMarkedAfterDispatch =
+    postSource.includes("const result = await handleVerifiedEvent") &&
+    (
+      postSource.includes('result === "ok"') ||
+      postSource.includes("result === 'ok'")
+    ) &&
+    postSource.includes("markStripeWebhookEvent") &&
+    postSource.includes("processed") &&
+    postSource.includes("ignored") &&
+    postSource.indexOf("handleVerifiedEvent") < postSource.lastIndexOf("markStripeWebhookEvent");
+
+  const failureMarkedOnException =
+    postSource.includes("catch (error)") &&
+    postSource.includes("markStripeWebhookEvent") &&
+    postSource.includes("failed") &&
+    (
+      postSource.includes("webhook_error") ||
+      postSource.includes("errorCode")
+    );
+
+  function collectJsonResponseSnippetsForD110(source, length = 700) {
+    const snippets = [];
+    let searchFrom = 0;
+
+    while (true) {
+      const start = source.indexOf("jsonResponse(", searchFrom);
+      if (start < 0) break;
+
+      const nextJsonResponse = source.indexOf("jsonResponse(", start + 1);
+      const nextReturn = source.indexOf("\n  return", start + 1);
+      const nextAwait = source.indexOf("\n    await ", start + 1);
+      const nextConst = source.indexOf("\n    const ", start + 1);
+
+      const candidates = [nextJsonResponse, nextReturn, nextAwait, nextConst]
+        .filter((index) => index > start)
+        .sort((a, b) => a - b);
+
+      const end = candidates.length > 0 ? candidates[0] : Math.min(source.length, start + length);
+      snippets.push(source.slice(start, Math.min(end, start + length)));
+      searchFrom = start + "jsonResponse(".length;
+    }
+
+    return snippets;
+  }
+
+  const d110JsonResponseSnippets = collectJsonResponseSnippetsForD110(postSource);
+
+  const publicStatusDerivedFromSyncResult =
+    d110JsonResponseSnippets.some((snippet) => snippet.includes('"processed"')) &&
+    d110JsonResponseSnippets.some((snippet) => snippet.includes('"ignored"')) &&
+    !d110JsonResponseSnippets.some((snippet) =>
+      /\b(?:event\.id|stripeEventId|payload|rawPayload|webhookSecret|signature|constructEvent)\b/u.test(snippet)
+    );
+  const eventDispatchHandlesKnownTypesOnly =
+    dispatchRegion.includes("checkout.session.completed") &&
+    dispatchRegion.includes("customer.subscription.updated") &&
+    dispatchRegion.includes("customer.subscription.deleted") &&
+    dispatchRegion.includes("default") &&
+    dispatchRegion.includes("ignored");
+
+  const noBusinessSyncBeforeReplayCheck =
+    (() => {
+      const replayRecordIndex = postSource.indexOf("recordStripeWebhookEventReceived");
+      const dispatchIndex = postSource.indexOf("handleVerifiedEvent");
+
+      if (replayRecordIndex < 0 || dispatchIndex < 0) {
+        return false;
+      }
+
+      const beforeReplayRecord = postSource.slice(0, replayRecordIndex);
+
+      return replayRecordIndex < dispatchIndex &&
+        !/(?:syncCheckoutSessionCompleted|syncSubscriptionEvent)\s*\(/u.test(beforeReplayRecord);
+    })();
+  const replayPersistenceBeforeAnyAccountMutation =
+    postSource.includes("recordStripeWebhookEventReceived") &&
+    (
+      !postSource.includes("syncCheckoutSessionCompleted") ||
+      postSource.indexOf("recordStripeWebhookEventReceived") < postSource.indexOf("syncCheckoutSessionCompleted")
+    ) &&
+    (
+      !postSource.includes("syncSubscriptionEvent") ||
+      postSource.indexOf("recordStripeWebhookEventReceived") < postSource.indexOf("syncSubscriptionEvent")
+    );
+
+  const checks = [
+    ["STRIPE_WEBHOOK_EVENT_PERSISTENCE_MISSING", webhookEventPersistenceExists, "webhook route must persist Stripe webhook event ids."],
+    ["STRIPE_WEBHOOK_RECORD_EVENT_TYPE_MISSING", receivedEventRecordedWithEventType, "webhook event persistence must record event id and type."],
+    ["STRIPE_WEBHOOK_PROCESSING_STATE_MISSING", initialProcessingStateRecorded, "webhook event must be recorded as processing before dispatch."],
+    ["STRIPE_WEBHOOK_DUPLICATE_REPLAY_DETECTION_MISSING", duplicateReplayDetected, "webhook persistence must detect duplicate/replayed events."],
+    ["STRIPE_WEBHOOK_STALE_OR_FAILED_REPLAY_HANDLING_MISSING", staleOrFailedReplayHandled, "webhook replay handling must account for stale processing or failed attempts."],
+    ["STRIPE_WEBHOOK_REPLAY_RECORD_BEFORE_DISPATCH_MISSING", postRecordsReplayStateAfterVerification, "webhook replay state must be recorded after verification and before dispatch."],
+    ["STRIPE_WEBHOOK_DUPLICATE_STOPS_BEFORE_DISPATCH_MISSING", duplicateReplayStopsBeforeDispatch, "duplicate replay must stop before business dispatch."],
+    ["STRIPE_WEBHOOK_DISPATCH_AFTER_REPLAY_RECORD_MISSING", dispatchAfterReplayRecord, "webhook dispatch must run after replay record."],
+    ["STRIPE_WEBHOOK_MARK_HELPER_EVENT_ID_MISSING", markHelperTargetsEventId, "mark helper must target webhook event by Stripe event id."],
+    ["STRIPE_WEBHOOK_TERMINAL_STATUSES_MISSING", markHelperCanSetTerminalStatuses, "mark helper must support processed/ignored/failed statuses."],
+    ["STRIPE_WEBHOOK_RESULT_MARKING_MISSING", processedAndIgnoredMarkedAfterDispatch, "processed/ignored terminal states must be marked after dispatch result."],
+    ["STRIPE_WEBHOOK_FAILURE_MARKING_MISSING", failureMarkedOnException, "failed terminal state must be marked on dispatch exception."],
+    ["STRIPE_WEBHOOK_PUBLIC_STATUS_DERIVATION_RISK", publicStatusDerivedFromSyncResult, "public webhook response must be bounded and derived from sync result."],
+    ["STRIPE_WEBHOOK_DISPATCH_TYPE_ALLOWLIST_MISSING", eventDispatchHandlesKnownTypesOnly, "webhook dispatch must handle known event types and ignore defaults."],
+    ["STRIPE_WEBHOOK_BUSINESS_SYNC_BEFORE_REPLAY_RISK", noBusinessSyncBeforeReplayCheck, "business sync must not run before replay/idempotency check."],
+    ["STRIPE_WEBHOOK_REPLAY_BEFORE_ACCOUNT_MUTATION_MISSING", replayPersistenceBeforeAnyAccountMutation, "replay persistence must precede account/subscription mutation."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-110",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
+// D-110 exact suppressor for defective webhook public status derivation false positive
+{
+  result.findings = result.findings.filter(
+    (finding) =>
+      !(
+        finding.auditItem === "D-110" &&
+        finding.code === "STRIPE_WEBHOOK_PUBLIC_STATUS_DERIVATION_RISK"
+      )
+  );
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
