@@ -20453,6 +20453,145 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-112 Billing launch gate coverage boundary final audit
+{
+  const packageJsonPath = path.join(root, "package.json");
+  const billingGatePath = path.join(root, "scripts", "run-billing-launch-gate.mjs");
+  const auditGatePath = path.join(root, "scripts", "run-audit-gates.mjs");
+
+  const packageJsonSource = fs.existsSync(packageJsonPath)
+    ? fs.readFileSync(packageJsonPath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const billingGateSource = fs.existsSync(billingGatePath)
+    ? fs.readFileSync(billingGatePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const auditGateSource = fs.existsSync(auditGatePath)
+    ? fs.readFileSync(auditGatePath, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const billingLaunchScriptExists =
+    packageJsonSource.includes('"check:billing-launch"') &&
+    packageJsonSource.includes("run-billing-launch-gate.mjs");
+
+  const auditGatesScriptExists =
+    packageJsonSource.includes('"check:audit-gates"') &&
+    packageJsonSource.includes("run-audit-gates.mjs");
+
+  const publicationIntegrityScriptExists =
+    packageJsonSource.includes('"check:publication-integrity"') &&
+    packageJsonSource.includes("publication-integrity-audit.mjs");
+
+  const billingGateRunnerExists =
+    billingGateSource.includes("Billing launch gate") ||
+    billingGateSource.includes("run-billing-launch-gate");
+
+  const billingGateValidatesPrisma =
+    billingGateSource.includes("prisma validate") ||
+    (
+      billingGateSource.includes("prisma") &&
+      billingGateSource.includes("validate")
+    );
+
+  const billingGateGeneratesPrismaClient =
+    billingGateSource.includes("prisma generate") ||
+    (
+      billingGateSource.includes("prisma") &&
+      billingGateSource.includes("generate")
+    );
+
+  const billingGateRunsAuditGates =
+    billingGateSource.includes("check:audit-gates") ||
+    billingGateSource.includes("run-audit-gates.mjs");
+
+  const auditGateRunnerExists =
+    auditGateSource.includes("Audit gate runner") ||
+    auditGateSource.includes("check:audit-gates");
+
+  const auditGateRunsPublicCopy =
+    auditGateSource.includes("check:public-copy-guard") ||
+    auditGateSource.includes("public-copy-guard") ||
+    auditGateSource.includes("Product boundary audit");
+
+  const auditGateRunsApiContract =
+    auditGateSource.includes("check:api-contract") ||
+    auditGateSource.includes("api-contract-audit") ||
+    auditGateSource.includes("API contract audit");
+
+  const auditGateRunsCalculationCorrectness =
+    auditGateSource.includes("check:calculation-correctness") ||
+    auditGateSource.includes("calculation-correctness-audit") ||
+    auditGateSource.includes("Calculation correctness audit");
+
+  const auditGateRunsPublicationIntegrity =
+    auditGateSource.includes("check:publication-integrity") ||
+    auditGateSource.includes("publication-integrity-audit") ||
+    auditGateSource.includes("Publication integrity audit");
+
+  const auditGateRunsBuild =
+    auditGateSource.includes("npm run build") ||
+    auditGateSource.includes("next build") ||
+    auditGateSource.includes("Production build") ||
+    auditGateSource.includes("Build step");
+
+  const auditGateStopsOnRedGate =
+    auditGateSource.includes("process.exitCode") ||
+    auditGateSource.includes("process.exit(") ||
+    auditGateSource.includes("throw new Error") ||
+    auditGateSource.includes("stopped at red gate");
+
+  const billingGateStopsOnRedGate =
+    billingGateSource.includes("process.exitCode") ||
+    billingGateSource.includes("process.exit(") ||
+    billingGateSource.includes("throw new Error") ||
+    billingGateSource.includes("stopped at red gate");
+
+  const noObviousAuditBypass =
+    !/\b(?:AUDIT_BYPASS|SKIP_AUDIT_GATES|DISABLE_AUDIT_GATES|PUBLICATION_INTEGRITY_BYPASS)\b/u.test(
+      `${packageJsonSource}\n${billingGateSource}\n${auditGateSource}`
+    );
+
+  const noShellIgnoreFailures =
+    !/\bcheck:(?:audit-gates|publication-integrity|billing-launch)["']?\s*[:=]\s*["'][^"']*(?:\|\|\s*true|;\s*exit\s+0)/u.test(
+      packageJsonSource
+    );
+
+  const checks = [
+    ["BILLING_LAUNCH_SCRIPT_MISSING", billingLaunchScriptExists, "package.json must expose check:billing-launch."],
+    ["AUDIT_GATES_SCRIPT_MISSING", auditGatesScriptExists, "package.json must expose check:audit-gates."],
+    ["PUBLICATION_INTEGRITY_SCRIPT_MISSING", publicationIntegrityScriptExists, "package.json must expose check:publication-integrity."],
+    ["BILLING_GATE_RUNNER_MISSING", billingGateRunnerExists, "billing launch gate runner must exist."],
+    ["BILLING_GATE_PRISMA_VALIDATE_MISSING", billingGateValidatesPrisma, "billing launch gate must validate Prisma schema."],
+    ["BILLING_GATE_PRISMA_GENERATE_MISSING", billingGateGeneratesPrismaClient, "billing launch gate must generate Prisma client."],
+    ["BILLING_GATE_AUDIT_GATES_MISSING", billingGateRunsAuditGates, "billing launch gate must run audit gates."],
+    ["AUDIT_GATE_RUNNER_MISSING", auditGateRunnerExists, "audit gate runner must exist."],
+    ["AUDIT_GATE_PUBLIC_COPY_MISSING", auditGateRunsPublicCopy, "audit gate runner must include product/public-copy boundary audit."],
+    ["AUDIT_GATE_API_CONTRACT_MISSING", auditGateRunsApiContract, "audit gate runner must include API contract audit."],
+    ["AUDIT_GATE_CALCULATION_CORRECTNESS_MISSING", auditGateRunsCalculationCorrectness, "audit gate runner must include calculation correctness audit."],
+    ["AUDIT_GATE_PUBLICATION_INTEGRITY_MISSING", auditGateRunsPublicationIntegrity, "audit gate runner must include publication integrity audit."],
+    ["AUDIT_GATE_BUILD_STEP_MISSING", auditGateRunsBuild, "audit gate runner must include production build step."],
+    ["AUDIT_GATE_RED_GATE_STOP_MISSING", auditGateStopsOnRedGate, "audit gate runner must stop on red gate."],
+    ["BILLING_GATE_RED_GATE_STOP_MISSING", billingGateStopsOnRedGate, "billing launch gate must stop on red gate."],
+    ["AUDIT_GATE_BYPASS_ENV_RISK", noObviousAuditBypass, "audit/billing gates must not expose obvious bypass environment switches."],
+    ["AUDIT_GATE_SHELL_IGNORE_FAILURE_RISK", noShellIgnoreFailures, "audit/billing npm scripts must not ignore failures with || true or exit 0."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-112",
+        code,
+        file: "scripts/run-billing-launch-gate.mjs",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
