@@ -20862,6 +20862,211 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-115 Checkout request ingress boundary final audit
+{
+  const checkoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const checkoutSource = fs.existsSync(checkoutRouteFile)
+    ? fs.readFileSync(checkoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function looseFunctionRegion(source, functionName, fallbackLength = 7000) {
+    const starts = [
+      source.indexOf(`export async function ${functionName}`),
+      source.indexOf(`async function ${functionName}`),
+      source.indexOf(`export function ${functionName}`),
+      source.indexOf(`function ${functionName}`),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextCandidates = [
+      source.indexOf("\nexport async function ", afterStart),
+      source.indexOf("\nasync function ", afterStart),
+      source.indexOf("\nexport function ", afterStart),
+      source.indexOf("\nfunction ", afterStart),
+    ].filter((index) => index > start).sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) {
+      return source.slice(start, nextCandidates[0]);
+    }
+
+    return source.slice(start, start + fallbackLength);
+  }
+
+  function indexOfAny(source, needles) {
+    const matches = needles
+      .map((needle) => source.indexOf(needle))
+      .filter((index) => index >= 0)
+      .sort((a, b) => a - b);
+
+    return matches.length > 0 ? matches[0] : -1;
+  }
+
+  const getSource = looseFunctionRegion(checkoutSource, "GET", 2200);
+  const postSource = looseFunctionRegion(checkoutSource, "POST", 3800);
+  const handleCheckoutSource = looseFunctionRegion(checkoutSource, "handleCheckout", 12000);
+
+  const checkoutRouteExists =
+    checkoutSource.includes("api/v1/checkout") ||
+    checkoutSource.includes("stripe.checkout.sessions.create") ||
+    checkoutSource.includes("handleCheckout");
+
+  const postOnlyCheckout =
+    checkoutSource.includes("export async function POST") &&
+    checkoutSource.includes("export async function GET") &&
+    getSource.includes("method_not_allowed") &&
+    getSource.includes("405") &&
+    getSource.includes("Allow");
+
+  const getIsNoStore =
+    getSource.includes("Cache-Control") &&
+    getSource.includes("no-store");
+
+  const sameOriginBeforeHandleCheckout =
+    postSource.includes("validateSameOriginRequest") &&
+    postSource.includes("handleCheckout") &&
+    postSource.indexOf("validateSameOriginRequest") < postSource.indexOf("handleCheckout");
+
+  const preAuthRateLimitBeforeHandleCheckout =
+    postSource.includes("enforcePreAuthRateLimit") &&
+    postSource.includes("handleCheckout") &&
+    postSource.indexOf("enforcePreAuthRateLimit") < postSource.indexOf("handleCheckout");
+
+  const invalidOriginFailsClosed =
+    postSource.includes("invalid_origin") ||
+    postSource.includes("same_origin_required") ||
+    postSource.includes("forbidden") ||
+    postSource.includes("validateSameOriginRequest");
+
+  const rateLimitFailsClosed =
+    postSource.includes("rate_limited") ||
+    postSource.includes("too_many_requests") ||
+    postSource.includes("429") ||
+    postSource.includes("enforcePreAuthRateLimit");
+
+  const handleCheckoutCalledOnlyAfterIngressChecks =
+    sameOriginBeforeHandleCheckout &&
+    preAuthRateLimitBeforeHandleCheckout &&
+    postSource.indexOf("handleCheckout") > Math.max(
+      postSource.indexOf("validateSameOriginRequest"),
+      postSource.indexOf("enforcePreAuthRateLimit")
+    );
+
+  const authBeforeStripeSessionCreation =
+    handleCheckoutSource.includes("getSignedInUser") &&
+    handleCheckoutSource.includes("stripe.checkout.sessions.create") &&
+    handleCheckoutSource.indexOf("getSignedInUser") < handleCheckoutSource.indexOf("stripe.checkout.sessions.create");
+
+  const unauthenticatedCannotCreateSession =
+    handleCheckoutSource.includes("auth_required") ||
+    handleCheckoutSource.includes("sign-in") ||
+    handleCheckoutSource.includes("redirect_url");
+
+  const planValidationIndex = indexOfAny(handleCheckoutSource, [
+    "readPlan",
+    "normalizePlan",
+    "const plan",
+    "let plan",
+    "plan ="
+  ]);
+
+  const planInvalidIndex = indexOfAny(handleCheckoutSource, [
+    "invalid_plan",
+    "checkout_invalid_plan",
+    "unsupported_plan",
+    "plan_required"
+  ]);
+
+  const sessionCreateIndex = handleCheckoutSource.indexOf("stripe.checkout.sessions.create");
+
+  const planValidationBeforeStripeSessionCreation =
+    sessionCreateIndex >= 0 &&
+    (
+      planValidationIndex >= 0 ||
+      checkoutSource.includes("function readPlan") ||
+      checkoutSource.includes("function normalizePlan")
+    ) &&
+    (
+      planValidationIndex < 0 ||
+      planValidationIndex < sessionCreateIndex
+    ) &&
+    (
+      planInvalidIndex < 0 ||
+      planInvalidIndex < sessionCreateIndex
+    );
+  const priceValidationBeforeStripeSessionCreation =
+    (
+      handleCheckoutSource.includes("priceIdForPlan") ||
+      handleCheckoutSource.includes("priceId")
+    ) &&
+    handleCheckoutSource.includes("stripe.checkout.sessions.create") &&
+    indexOfAny(handleCheckoutSource, ["priceIdForPlan", "priceId"]) <
+      handleCheckoutSource.indexOf("stripe.checkout.sessions.create");
+
+  const appUrlValidationBeforeStripeSessionCreation =
+    handleCheckoutSource.includes("getAppUrl") &&
+    handleCheckoutSource.includes("stripe.checkout.sessions.create") &&
+    handleCheckoutSource.indexOf("getAppUrl") < handleCheckoutSource.indexOf("stripe.checkout.sessions.create");
+
+  const accountResolutionBeforeStripeSessionCreation =
+    handleCheckoutSource.includes("resolveAccount") &&
+    handleCheckoutSource.includes("stripe.checkout.sessions.create") &&
+    handleCheckoutSource.indexOf("resolveAccount") < handleCheckoutSource.indexOf("stripe.checkout.sessions.create");
+
+  const noStripeSessionCreationInPostIngressWrapper =
+    !postSource.includes("stripe.checkout.sessions.create");
+
+  const noRawRequestBodyLeakInIngressErrors =
+    !/jsonError\([\s\S]{0,500}(?:request\.text\(\)|request\.json\(\)|body|payload|rawBody)/u.test(postSource);
+
+  const noSecretsInIngressResponses =
+    !/jsonError\([\s\S]{0,500}(?:STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|DATABASE_URL|CLERK_SECRET_KEY|sk_live_|sk_test_|rk_live_|rk_test_|whsec_)/u.test(
+      `${postSource}\n${getSource}`
+    );
+
+  const checkoutIngressUsesNoStoreErrors =
+    checkoutSource.includes("function jsonError") &&
+    checkoutSource.includes("Cache-Control") &&
+    checkoutSource.includes("no-store");
+
+  const checks = [
+    ["CHECKOUT_ROUTE_MISSING", checkoutRouteExists, "checkout route must exist."],
+    ["CHECKOUT_POST_ONLY_BOUNDARY_MISSING", postOnlyCheckout, "checkout must expose POST and reject GET with method_not_allowed."],
+    ["CHECKOUT_GET_NO_STORE_MISSING", getIsNoStore, "checkout GET method_not_allowed response must be no-store."],
+    ["CHECKOUT_SAME_ORIGIN_BEFORE_HANDLE_MISSING", sameOriginBeforeHandleCheckout, "checkout POST must validate same-origin before handleCheckout."],
+    ["CHECKOUT_PRE_AUTH_RATE_LIMIT_BEFORE_HANDLE_MISSING", preAuthRateLimitBeforeHandleCheckout, "checkout POST must enforce pre-auth rate limit before handleCheckout."],
+    ["CHECKOUT_INVALID_ORIGIN_FAIL_CLOSED_MISSING", invalidOriginFailsClosed, "checkout invalid origin path must fail closed."],
+    ["CHECKOUT_RATE_LIMIT_FAIL_CLOSED_MISSING", rateLimitFailsClosed, "checkout rate limit path must fail closed."],
+    ["CHECKOUT_HANDLE_AFTER_INGRESS_CHECKS_MISSING", handleCheckoutCalledOnlyAfterIngressChecks, "handleCheckout must run only after ingress checks."],
+    ["CHECKOUT_AUTH_BEFORE_STRIPE_SESSION_MISSING", authBeforeStripeSessionCreation, "auth/user resolution must happen before Stripe Checkout session creation."],
+    ["CHECKOUT_UNAUTHENTICATED_SESSION_CREATION_RISK", unauthenticatedCannotCreateSession, "unauthenticated users must not create Stripe sessions."],
+    ["CHECKOUT_PLAN_VALIDATION_BEFORE_SESSION_MISSING", planValidationBeforeStripeSessionCreation, "plan validation must happen before Stripe session creation."],
+    ["CHECKOUT_PRICE_VALIDATION_BEFORE_SESSION_MISSING", priceValidationBeforeStripeSessionCreation, "price validation must happen before Stripe session creation."],
+    ["CHECKOUT_APP_URL_VALIDATION_BEFORE_SESSION_MISSING", appUrlValidationBeforeStripeSessionCreation, "app URL validation must happen before Stripe session creation."],
+    ["CHECKOUT_ACCOUNT_RESOLUTION_BEFORE_SESSION_MISSING", accountResolutionBeforeStripeSessionCreation, "account resolution must happen before Stripe session creation."],
+    ["CHECKOUT_POST_WRAPPER_SESSION_CREATION_RISK", noStripeSessionCreationInPostIngressWrapper, "POST wrapper must not create Stripe sessions directly."],
+    ["CHECKOUT_INGRESS_RAW_BODY_LEAK_RISK", noRawRequestBodyLeakInIngressErrors, "checkout ingress errors must not expose raw request body."],
+    ["CHECKOUT_INGRESS_SECRET_LEAK_RISK", noSecretsInIngressResponses, "checkout ingress responses must not expose secrets."],
+    ["CHECKOUT_INGRESS_ERROR_NO_STORE_MISSING", checkoutIngressUsesNoStoreErrors, "checkout ingress error helper must use no-store."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-115",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
