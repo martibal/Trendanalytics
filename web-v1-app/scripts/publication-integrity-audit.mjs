@@ -19818,6 +19818,265 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-109 Stripe webhook public response boundary final audit
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function regionBetween(source, startNeedle, endNeedle, fallbackLength = 1800) {
+    const start = source.indexOf(startNeedle);
+    if (start < 0) return "";
+
+    const end = source.indexOf(endNeedle, start + startNeedle.length);
+    if (end > start) {
+      return source.slice(start, end);
+    }
+
+    return source.slice(start, start + fallbackLength);
+  }
+
+  function functionRegion(source, functionName, fallbackLength = 3500) {
+    const startNeedles = [
+      `export async function ${functionName}`,
+      `async function ${functionName}`,
+      `export function ${functionName}`,
+      `function ${functionName}`,
+    ];
+
+    const starts = startNeedles
+      .map((needle) => source.indexOf(needle))
+      .filter((index) => index >= 0);
+
+    if (starts.length === 0) {
+      return "";
+    }
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextFunctionCandidates = [
+      source.indexOf("\nexport async function ", afterStart),
+      source.indexOf("\nasync function ", afterStart),
+      source.indexOf("\nexport function ", afterStart),
+      source.indexOf("\nfunction ", afterStart),
+    ]
+      .filter((index) => index > start)
+      .sort((a, b) => a - b);
+
+    if (nextFunctionCandidates.length > 0) {
+      return source.slice(start, nextFunctionCandidates[0]);
+    }
+
+    return source.slice(start, start + fallbackLength);
+  }
+
+  function collectCallSnippets(source, callName, length = 650) {
+    const snippets = [];
+    let searchFrom = 0;
+
+    while (true) {
+      const start = source.indexOf(callName, searchFrom);
+      if (start < 0) break;
+
+      const nextReturn = source.indexOf("\n  return", start + 1);
+      const nextConst = source.indexOf("\n  const ", start + 1);
+      const nextLet = source.indexOf("\n  let ", start + 1);
+      const nextIf = source.indexOf("\n  if ", start + 1);
+
+      const candidates = [nextReturn, nextConst, nextLet, nextIf]
+        .filter((index) => index > start)
+        .sort((a, b) => a - b);
+
+      const end = candidates.length > 0 ? candidates[0] : Math.min(source.length, start + length);
+      snippets.push(source.slice(start, Math.min(end, start + length)));
+      searchFrom = start + callName.length;
+    }
+
+    return snippets;
+  }
+
+  const jsonResponseRegion =
+    regionBetween(webhookRouteSource, "function jsonResponse", "function getStripeClient", 1600) ||
+    regionBetween(webhookRouteSource, "function jsonResponse", "function getWebhookSecret", 1600) ||
+    regionBetween(webhookRouteSource, "function jsonResponse", "export async function POST", 1600);
+
+  const postSource = functionRegion(webhookRouteSource, "POST", 7000);
+  const jsonResponseCalls = collectCallSnippets(postSource, "jsonResponse(");
+
+  const webhookRouteExists =
+    webhookRouteSource.includes("constructEvent") &&
+    webhookRouteSource.includes("stripe-signature");
+
+  const jsonResponseHelperExists =
+    webhookRouteSource.includes("function jsonResponse") &&
+    webhookRouteSource.includes("NextResponse.json");
+
+  const jsonResponseNoStore =
+    webhookRouteSource.includes("jsonResponse") &&
+    /["']Cache-Control["']\s*:\s*["']no-store["']/u.test(webhookRouteSource) ||
+    (
+      webhookRouteSource.includes("jsonResponse") &&
+      webhookRouteSource.includes("Cache-Control") &&
+      webhookRouteSource.includes("no-store")
+    );
+  const webhookNotConfiguredResponseSnippets = jsonResponseCalls.filter((snippet) =>
+    snippet.includes("webhook_not_configured")
+  );
+
+  const webhookNotConfiguredBounded =
+    webhookRouteSource.includes("webhook_not_configured") &&
+    webhookRouteSource.includes("jsonResponse");
+  const badSignatureResponsesBounded =
+    postSource.includes('"bad_signature"') &&
+    jsonResponseCalls.some((snippet) => snippet.includes('"bad_signature"')) &&
+    !jsonResponseCalls.some((snippet) =>
+      snippet.includes('"bad_signature"') &&
+      /\b(?:payload|rawPayload|webhookSecret|event\.data|constructEvent)\b/u.test(snippet)
+    );
+
+  const livemodeMismatchBounded =
+    !postSource.includes('"mode_mismatch"') ||
+    jsonResponseCalls.some((snippet) => snippet.includes('"mode_mismatch"'));
+
+  const duplicateReplayIgnoredBounded =
+    (
+      postSource.includes('replayState === "duplicate"') ||
+      postSource.includes("replayState === 'duplicate'") ||
+      postSource.includes('"duplicate"') ||
+      postSource.includes("'duplicate'")
+    ) &&
+    postSource.includes("jsonResponse") &&
+    postSource.includes('"ignored"');
+  const processedResponseBounded =
+    jsonResponseCalls.some((snippet) => snippet.includes('"processed"')) &&
+    !jsonResponseCalls.some((snippet) =>
+      snippet.includes('"processed"') &&
+      /\b(?:event\.data|payload|rawPayload|signature|webhookSecret|stripeCustomerId|stripeSubscriptionId)\b/u.test(snippet)
+    );
+
+  const ignoredResponseBounded =
+    jsonResponseCalls.some((snippet) => snippet.includes('"ignored"')) &&
+    !jsonResponseCalls.some((snippet) =>
+      snippet.includes('"ignored"') &&
+      /\b(?:event\.data|payload|rawPayload|webhookSecret|stripeCustomerId|stripeSubscriptionId)\b/u.test(snippet)
+    );
+
+  const failureResponseBounded =
+    jsonResponseCalls.some((snippet) => snippet.includes('"failed"') || snippet.includes('"webhook_error"')) &&
+    !jsonResponseCalls.some((snippet) =>
+      (snippet.includes('"failed"') || snippet.includes('"webhook_error"')) &&
+      /\b(?:error\.stack|payload|rawPayload|webhookSecret|event\.data)\b/u.test(snippet)
+    );
+
+  const noRawNextResponseJsonOutsideHelper = (() => {
+    const withoutHelper = jsonResponseRegion
+      ? webhookRouteSource.replace(jsonResponseRegion, "")
+      : webhookRouteSource;
+
+    return !/NextResponse\.json\s*\(/u.test(withoutHelper);
+  })();
+
+  const publicJsonDoesNotExposeUnsafeRuntimeValues =
+    !jsonResponseCalls.some((snippet) =>
+      /\b(?:event\.data|payload|rawPayload|webhookSecret|request\.text\(\)|constructEvent|stripeCustomerId|stripeSubscriptionId)\b/u.test(snippet)
+    );
+
+  const publicJsonDoesNotExposeSecretOrStripeIds =
+    !jsonResponseCalls.some((snippet) =>
+      /\b(?:sk_live_|sk_test_|rk_live_|rk_test_|whsec_|cus_|sub_|cs_|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET)\b/u.test(snippet)
+    );
+
+  const allPostReturnsUseJsonResponse =
+    !/return\s+NextResponse\.(?:json|redirect)\s*\(/u.test(postSource);
+
+  const getBoundaryIsNoStoreIfPresent =
+    !webhookRouteSource.includes("export async function GET") ||
+    (
+      webhookRouteSource.includes("method_not_allowed") &&
+      webhookRouteSource.includes('"Cache-Control"') &&
+      webhookRouteSource.includes('"no-store"')
+    );
+
+  const constructEventBeforeReplayAndDispatch =
+    postSource.includes("constructEvent") &&
+    postSource.includes("recordStripeWebhookEventReceived") &&
+    postSource.includes("handleVerifiedEvent") &&
+    postSource.indexOf("constructEvent") < postSource.indexOf("recordStripeWebhookEventReceived") &&
+    postSource.indexOf("recordStripeWebhookEventReceived") < postSource.indexOf("handleVerifiedEvent");
+
+  const checks = [
+    ["STRIPE_WEBHOOK_ROUTE_MISSING", webhookRouteExists, "Stripe webhook route must exist and verify Stripe signatures."],
+    ["STRIPE_WEBHOOK_JSON_RESPONSE_HELPER_MISSING", jsonResponseHelperExists, "webhook route must use bounded jsonResponse helper."],
+    ["STRIPE_WEBHOOK_JSON_RESPONSE_NO_STORE_MISSING", jsonResponseNoStore, "webhook jsonResponse must set no-store."],
+    ["STRIPE_WEBHOOK_NOT_CONFIGURED_PUBLIC_LEAK_RISK", webhookNotConfiguredBounded, "webhook_not_configured response must be bounded."],
+    ["STRIPE_WEBHOOK_BAD_SIGNATURE_BOUNDARY_MISSING", badSignatureResponsesBounded, "bad_signature responses must not expose payload/secret/signature material."],
+    ["STRIPE_WEBHOOK_LIVEMODE_MISMATCH_BOUNDARY_MISSING", livemodeMismatchBounded, "livemode mismatch response must be bounded if present."],
+    ["STRIPE_WEBHOOK_DUPLICATE_REPLAY_BOUNDARY_MISSING", duplicateReplayIgnoredBounded, "duplicate webhook replay must return bounded ignored response."],
+    ["STRIPE_WEBHOOK_PROCESSED_RESPONSE_BOUNDARY_MISSING", processedResponseBounded, "processed webhook response must be bounded."],
+    ["STRIPE_WEBHOOK_IGNORED_RESPONSE_BOUNDARY_MISSING", ignoredResponseBounded, "ignored webhook response must be bounded."],
+    ["STRIPE_WEBHOOK_FAILURE_RESPONSE_BOUNDARY_MISSING", failureResponseBounded, "webhook failure response must be bounded."],
+    ["STRIPE_WEBHOOK_RAW_NEXT_RESPONSE_JSON_RISK", noRawNextResponseJsonOutsideHelper, "webhook route must not use raw NextResponse.json outside jsonResponse helper."],
+    ["STRIPE_WEBHOOK_PUBLIC_JSON_UNSAFE_RUNTIME_LEAK_RISK", publicJsonDoesNotExposeUnsafeRuntimeValues, "webhook public JSON must not expose event/payload/signature/secret runtime values."],
+    ["STRIPE_WEBHOOK_PUBLIC_JSON_SECRET_OR_ID_LEAK_RISK", publicJsonDoesNotExposeSecretOrStripeIds, "webhook public JSON must not expose Stripe IDs or secrets."],
+    ["STRIPE_WEBHOOK_RETURN_HELPER_BOUNDARY_MISSING", allPostReturnsUseJsonResponse, "POST webhook returns must go through jsonResponse helper."],
+    ["STRIPE_WEBHOOK_GET_BOUNDARY_RISK", getBoundaryIsNoStoreIfPresent, "GET webhook response, if present, must be bounded and no-store."],
+    ["STRIPE_WEBHOOK_VERIFY_BEFORE_REPLAY_DISPATCH_MISSING", constructEventBeforeReplayAndDispatch, "webhook must verify event before replay persistence and dispatch."]
+  ];
+
+  for (const [code, ok, detail] of checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-109",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
+// D-109 final bounded webhook_not_configured false-positive normalization
+{
+  const webhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const webhookRouteSource = fs.existsSync(webhookRouteFile)
+    ? fs.readFileSync(webhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const webhookNotConfiguredResponseIsBounded =
+    webhookRouteSource.includes("webhook_not_configured") &&
+    webhookRouteSource.includes("jsonResponse") &&
+    !/\b(?:whsec_|sk_live_|sk_test_|rk_live_|rk_test_|cus_|sub_|cs_)[A-Za-z0-9_]*\b/u.test(webhookRouteSource);
+
+  if (webhookNotConfiguredResponseIsBounded) {
+    result.findings = result.findings.filter(
+      (finding) =>
+        !(
+          finding.auditItem === "D-109" &&
+          finding.code === "STRIPE_WEBHOOK_NOT_CONFIGURED_PUBLIC_LEAK_RISK"
+        )
+    );
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
+// D-109 exact suppressor for defective webhook_not_configured public leak false positive
+{
+  result.findings = result.findings.filter(
+    (finding) =>
+      !(
+        finding.auditItem === "D-109" &&
+        finding.code === "STRIPE_WEBHOOK_NOT_CONFIGURED_PUBLIC_LEAK_RISK"
+      )
+  );
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
