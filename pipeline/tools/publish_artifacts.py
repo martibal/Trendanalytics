@@ -29,7 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -192,6 +192,270 @@ def _copy_chain_files(src_chain: Path, dst_chain: Path) -> Tuple[int, str]:
 
     return copied, asof
 
+
+# D-129 published-derived-from-gold harmonization
+BASE_DERIVED_GOLD_METRICS = [
+    "tx_count_daily",
+    "unique_active_addresses",
+    "value_transferred_native",
+    "median_tx_value_native",
+    "median_tx_fee_native",
+    "failed_tx_rate",
+    "gas_utilization_pct",
+    "avg_block_time_sec",
+    "block_count_daily",
+]
+
+
+def _first_dict(candidates: List[Any]) -> Dict[str, Any]:
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            return candidate
+    return {}
+
+
+def _extract_published_gold_metrics(obj: Any) -> Dict[str, Any]:
+    if not isinstance(obj, dict):
+        return {}
+
+    gold = obj.get("gold")
+    metrics = obj.get("metrics")
+
+    return _first_dict(
+        [
+            gold.get("metrics") if isinstance(gold, dict) else None,
+            metrics if isinstance(metrics, dict) else None,
+            gold if isinstance(gold, dict) else None,
+            obj,
+        ]
+    )
+
+
+def _numeric_gold_metric(metrics: Dict[str, Any], key: str) -> Any:
+    value = metrics.get(key)
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and math.isfinite(float(value)):
+        return float(value)
+    return None
+
+
+def _iso_day_shift(day: str, delta_days: int) -> str:
+    parsed = datetime.strptime(day, "%Y-%m-%d").date()
+    return (parsed + timedelta(days=delta_days)).isoformat()
+
+
+def _published_gold_rolling_mean(
+    gold_by_date: Dict[str, Dict[str, Any]],
+    metric: str,
+    day: str,
+    window_days: int,
+) -> Any:
+    values: List[float] = []
+
+    for offset in range(window_days - 1, -1, -1):
+        window_day = _iso_day_shift(day, -offset)
+        metrics = gold_by_date.get(window_day)
+
+        if not isinstance(metrics, dict):
+            continue
+
+        value = _numeric_gold_metric(metrics, metric)
+
+        if value is not None:
+            values.append(value)
+
+    if not values:
+        return None
+
+    return sum(values) / len(values)
+
+
+def _load_existing_derived_meta_confidence(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+
+    try:
+        existing = _read_json(path)
+    except Exception:
+        return {}
+
+    if not isinstance(existing, dict):
+        return {}
+
+    derived = existing.get("derived")
+    if not isinstance(derived, dict):
+        return {}
+
+    meta_confidence = derived.get("meta_confidence")
+    return meta_confidence if isinstance(meta_confidence, dict) else {}
+
+
+def _materialize_calendar_windows_from_day_files(chain_dir: Path, windows: List[int]) -> None:
+    records: List[Dict[str, Any]] = []
+
+    for fp in sorted(chain_dir.glob("????-??-??.json")):
+        try:
+            obj = _read_json(fp)
+        except Exception:
+            continue
+
+        if isinstance(obj, dict):
+            records.append(obj)
+
+    if not records:
+        return
+
+    _write_json(chain_dir / "latest.json", records[-1])
+
+    latest_day = _normalize_iso_day(records[-1].get("date"))
+    if not latest_day:
+        for window in windows:
+            chunk = records[-window:] if len(records) >= window else records
+            _write_json(chain_dir / f"last{window}d.json", chunk)
+        return
+
+    for window in windows:
+        cutoff = _iso_day_shift(latest_day, -1 * (window - 1))
+        chunk = [record for record in records if _normalize_iso_day(record.get("date")) >= cutoff]
+        _write_json(chain_dir / f"last{window}d.json", chunk)
+
+
+def _harmonize_published_derived_from_published_gold(
+    published_root: Path,
+    chains: List[str],
+    windows: List[int],
+    dataset_id: str,
+    revision_id: int,
+    computed_at_utc: str,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    D-129: Make published DERIVED canonical to the final published GOLD layer.
+
+    The daily workflow runs calculation-correctness after publish. That gate recomputes
+    rolling windows from data/published/v1/gold. Therefore the final publish boundary
+    must ensure data/published/v1/derived is recomputed from the same final GOLD files,
+    not from a shorter or stale intermediate calculated directory.
+    """
+    result: Dict[str, Dict[str, Any]] = {}
+    gold_root = published_root / "gold"
+    derived_root = published_root / "derived"
+    _ensure_dir(derived_root)
+
+    for chain in chains:
+        gold_chain = gold_root / chain
+        derived_chain = derived_root / chain
+        _ensure_dir(derived_chain)
+
+        gold_files = sorted(gold_chain.glob("????-??-??.json"))
+        if not gold_files:
+            result[chain] = {"days": 0, "from": "", "to": "", "copied": 0}
+            continue
+
+        gold_by_date: Dict[str, Dict[str, Any]] = {}
+        ordered_days: List[str] = []
+
+        for fp in gold_files:
+            try:
+                gold_obj = _read_json(fp)
+            except Exception:
+                continue
+
+            if not isinstance(gold_obj, dict):
+                continue
+
+            day = _normalize_iso_day(gold_obj.get("date")) or fp.stem
+            if not day:
+                continue
+
+            gold_by_date[day] = _extract_published_gold_metrics(gold_obj)
+            ordered_days.append(day)
+
+        ordered_days = sorted(set(ordered_days))
+        copied = 0
+
+        for day in ordered_days:
+            metrics = gold_by_date.get(day, {})
+            metric_cols = [
+                metric
+                for metric in BASE_DERIVED_GOLD_METRICS
+                if _numeric_gold_metric(metrics, metric) is not None
+            ]
+
+            derived_metrics: Dict[str, Any] = {}
+            for metric in metric_cols:
+                derived_metrics[f"{metric}__ma7"] = _published_gold_rolling_mean(
+                    gold_by_date,
+                    metric,
+                    day,
+                    7,
+                )
+                derived_metrics[f"{metric}__ma30"] = _published_gold_rolling_mean(
+                    gold_by_date,
+                    metric,
+                    day,
+                    30,
+                )
+
+            target = derived_chain / f"{day}.json"
+            existing_meta_confidence = _load_existing_derived_meta_confidence(target)
+
+            record: Dict[str, Any] = {
+                "chain": chain,
+                "date": day,
+                "derived": {
+                    "context_blocks": [],
+                    "meta_confidence": existing_meta_confidence,
+                    "metrics": derived_metrics,
+                    "source": {
+                        "producer": "published-derived-from-gold-v1",
+                        "formula": "calendar rolling mean over final data/published/v1/gold rows; min_periods=1 over available finite values",
+                        "chain": chain,
+                        "date": day,
+                        "gold_source": f"data/published/v1/gold/{chain}",
+                        "metric_columns": metric_cols,
+                        "rolling_windows": [7, 30],
+                    },
+                },
+            }
+
+            _write_json(target, record)
+            copied += 1
+
+        _materialize_calendar_windows_from_day_files(derived_chain, windows)
+
+        available_days = _collect_days(derived_chain)
+        manifest = {
+            "dataset_id": dataset_id,
+            "revision_id": revision_id,
+            "computed_at_utc": computed_at_utc,
+            "genre": "derived",
+            "chain": chain,
+            "schema_version": _schema_version("derived"),
+            "methodology_version": "v1",
+            "asof": available_days[-1] if available_days else "",
+            "available_days_count": len(available_days),
+            "available_days": available_days,
+            "windows_supported": windows,
+            "files": {
+                "latest": "latest.json" if (derived_chain / "latest.json").exists() else None,
+                "windows": {
+                    window: f"last{window}d.json"
+                    for window in windows
+                    if (derived_chain / f"last{window}d.json").exists()
+                },
+            },
+        }
+        _write_json(derived_chain / "manifest.json", manifest)
+
+        result[chain] = {
+            "days": len(available_days),
+            "from": available_days[0] if available_days else "",
+            "to": available_days[-1] if available_days else "",
+            "copied": copied,
+        }
+
+    return result
 
 def _compute_dataset_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d.%H%M%S")
@@ -739,6 +1003,24 @@ def main() -> int:
                 coverage[chain][genre]["to"] = ""
                 coverage[chain][genre]["asof"] = ""
 
+    if "gold" in genres and "derived" in genres:
+        derived_harmonized = _harmonize_published_derived_from_published_gold(
+            published_root=published,
+            chains=chains,
+            windows=windows,
+            dataset_id=dataset_id,
+            revision_id=revision_id,
+            computed_at_utc=computed_at_utc,
+        )
+
+        for chain, info in derived_harmonized.items():
+            days = int(info.get("days", 0) or 0)
+            coverage[chain]["derived"]["days"] = days
+            coverage[chain]["derived"]["from"] = str(info.get("from", ""))
+            coverage[chain]["derived"]["to"] = str(info.get("to", ""))
+            coverage[chain]["derived"]["asof"] = str(info.get("to", ""))
+            asof_by_genre_chain["derived"][chain] = str(info.get("to", ""))
+            copied_counts["derived"][chain] = int(info.get("copied", 0) or 0)
     derived_definition = {
         "schema_version": "derived_definition.v1",
         "method": "rolling_mean",
