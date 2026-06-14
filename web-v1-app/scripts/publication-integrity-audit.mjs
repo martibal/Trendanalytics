@@ -14744,6 +14744,263 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-119 Stripe webhook response status-code semantics final audit
+{
+  const d119WebhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const d119WebhookSource = fs.existsSync(d119WebhookRouteFile)
+    ? fs.readFileSync(d119WebhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function d119LooseFunctionRegion(sourceText, functionName, fallbackLength = 12000) {
+    const starts = [
+      sourceText.indexOf("export async function " + functionName),
+      sourceText.indexOf("async function " + functionName),
+      sourceText.indexOf("export function " + functionName),
+      sourceText.indexOf("function " + functionName),
+      sourceText.indexOf("const " + functionName + " ="),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextNeedles = [
+      "\nexport async function ",
+      "\nasync function ",
+      "\nexport function ",
+      "\nfunction ",
+      "\nconst ",
+    ];
+    const nextCandidates = nextNeedles
+      .map((needle) => sourceText.indexOf(needle, afterStart))
+      .filter((index) => index > start)
+      .sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) {
+      return sourceText.slice(start, nextCandidates[0]);
+    }
+
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  const d119PostRegion = d119LooseFunctionRegion(d119WebhookSource, "POST", 22000);
+  const d119JsonResponseRegion = d119LooseFunctionRegion(d119WebhookSource, "jsonResponse", 3600);
+
+  const d119WebhookRouteExists = d119WebhookSource.length > 0;
+
+  const d119JsonResponseIsNoStore =
+    d119WebhookSource.includes("jsonResponse") &&
+    d119WebhookSource.includes("NextResponse.json") &&
+    d119WebhookSource.includes("Cache-Control") &&
+    d119WebhookSource.includes("no-store");
+
+  const d119PostUsesJsonResponse =
+    d119PostRegion.includes("jsonResponse(");
+
+  const d119NoRawNextJsonInWebhookPost =
+    !/NextResponse\.json\s*\(/u.test(
+      d119PostRegion.replace(d119JsonResponseRegion, "")
+    );
+
+  const d119NoPublicCacheDirectives =
+    !/\bCache-Control["']?\s*:\s*["'][^"']*(?:public|s-maxage|max-age|immutable|stale-while-revalidate)/iu.test(
+      d119WebhookSource
+    );
+
+  const d119SignatureFailureStatus =
+    (
+      d119WebhookSource.includes("stripe-signature") ||
+      d119WebhookSource.includes("constructEvent") ||
+      d119WebhookSource.includes("webhookSecret")
+    ) &&
+    (
+      /jsonResponse\s*\(\s*400\s*,\s*["']bad_signature["']/u.test(d119PostRegion) ||
+      /bad_signature[\s\S]{0,240}jsonResponse\s*\(\s*400/u.test(d119PostRegion) ||
+      /status\s*:\s*400/u.test(d119PostRegion)
+    );
+
+  const d119MissingSecretStatus =
+    (
+      d119WebhookSource.includes("getWebhookSecret") ||
+      d119WebhookSource.includes("STRIPE_WEBHOOK_SECRET") ||
+      d119WebhookSource.includes("webhookSecret")
+    ) &&
+    (
+      /jsonResponse\s*\(\s*(?:400|500|503)\s*,\s*["']not_configured["']/u.test(d119PostRegion) ||
+      /not_configured[\s\S]{0,260}jsonResponse\s*\(\s*(?:400|500|503)/u.test(d119PostRegion)
+    );
+
+  const d119ReplaySignals =
+    d119WebhookSource.includes("replayDecision") ||
+    d119WebhookSource.includes("duplicate") ||
+    d119WebhookSource.includes("already processed") ||
+    d119WebhookSource.includes("recordStripeWebhookEventReceived");
+
+  const d119ReplayStatus2xx =
+    d119ReplaySignals &&
+    (
+      /replayDecision\s*===\s*["']duplicate["'][\s\S]{0,420}jsonResponse\s*\(\s*200\s*,\s*["']ignored["']/u.test(d119PostRegion) ||
+      /jsonResponse\s*\(\s*200\s*,\s*["']ignored["'][\s\S]{0,260}already processed/u.test(d119PostRegion) ||
+      /duplicate[\s\S]{0,520}jsonResponse\s*\(\s*200/u.test(d119PostRegion)
+    );
+
+  const d119IgnoredEventStatus2xx =
+    d119WebhookSource.includes("default:") &&
+    d119WebhookSource.includes("return \"ignored\"") &&
+    (
+      /jsonResponse\s*\(\s*200\s*,\s*result\s*,/u.test(d119PostRegion) ||
+      /jsonResponse\s*\(\s*200\s*,\s*["']ignored["']/u.test(d119PostRegion)
+    ) &&
+    (
+      d119PostRegion.includes("Stripe webhook event ignored.") ||
+      d119PostRegion.includes("ignored")
+    );
+
+  const d119ProcessingFailureStatus =
+    (
+      d119PostRegion.includes("processing failed") ||
+      d119PostRegion.includes("replay persistence failed") ||
+      d119PostRegion.includes("markStripeWebhookEvent")
+    ) &&
+    (
+      /jsonResponse\s*\(\s*5\d\d\s*,\s*["']webhook_error["']/u.test(d119PostRegion) ||
+      /jsonResponse\s*\(\s*(?:500|503)\s*,\s*["']webhook_error["']/u.test(d119PostRegion)
+    ) &&
+    d119WebhookSource.includes("\"failed\"");
+
+  const d119StatusNoStoreBoundary =
+    d119JsonResponseIsNoStore &&
+    d119PostUsesJsonResponse &&
+    d119NoRawNextJsonInWebhookPost &&
+    d119NoPublicCacheDirectives;
+
+  function d119JsonResponseCalls(sourceText) {
+    const calls = [];
+    const needle = "jsonResponse(";
+    let cursor = 0;
+
+    while (cursor < sourceText.length) {
+      const start = sourceText.indexOf(needle, cursor);
+
+      if (start < 0) {
+        break;
+      }
+
+      let depth = 0;
+      let quote = null;
+      let escaped = false;
+      let end = -1;
+
+      for (let index = start; index < sourceText.length; index += 1) {
+        const ch = sourceText[index];
+
+        if (quote) {
+          if (escaped) {
+            escaped = false;
+          } else if (ch === "\\") {
+            escaped = true;
+          } else if (ch === quote) {
+            quote = null;
+          }
+
+          continue;
+        }
+
+        if (ch === '"' || ch === "'") {
+          quote = ch;
+          continue;
+        }
+
+        if (ch === "(") {
+          depth += 1;
+          continue;
+        }
+
+        if (ch === ")") {
+          depth -= 1;
+
+          if (depth === 0) {
+            end = index + 1;
+            break;
+          }
+        }
+      }
+
+      if (end < 0) {
+        break;
+      }
+
+      calls.push(sourceText.slice(start, end));
+      cursor = end;
+    }
+
+    return calls;
+  }
+
+  function d119StripQuotedLiterals(value) {
+    return value.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/gu, "\"\"");
+  }
+
+  const d119PublicJsonResponseCalls = d119JsonResponseCalls(d119PostRegion);
+
+  const d119PublicStatusCallsUseExplicitStatus =
+    d119PublicJsonResponseCalls.length > 0 &&
+    d119PublicJsonResponseCalls.every((call) =>
+      /jsonResponse\s*\(\s*(?:200|400|500|503)\s*,/u.test(call)
+    );
+
+  const d119PublicResponseCallHasForbiddenArgument =
+    d119PublicJsonResponseCalls.some((call) => {
+      const strippedCall = d119StripQuotedLiterals(call);
+
+      return (
+        /\b(?:event|stripeEvent|payload|rawBody|signature|session|subscription|customer|invoice|stripeCustomerId|stripeSubscriptionId|error|cause)\b\s*(?:[)\]},.]|$)/u.test(strippedCall) ||
+        /\b(?:STRIPE_[A-Z0-9_]*|DATABASE_URL|CLERK_[A-Z0-9_]*)\b/u.test(call)
+      );
+    });
+
+  const d119PublicStatusBodyMinimal =
+    d119PostUsesJsonResponse &&
+    d119PublicStatusCallsUseExplicitStatus &&
+    !d119PublicResponseCallHasForbiddenArgument &&
+    (
+      d119WebhookSource.includes("ok") ||
+      d119WebhookSource.includes("ignored") ||
+      d119WebhookSource.includes("webhook_error") ||
+      d119WebhookSource.includes("bad_signature")
+    );
+  const d119RetrySemantics =
+    d119SignatureFailureStatus &&
+    d119ReplayStatus2xx &&
+    d119IgnoredEventStatus2xx &&
+    d119ProcessingFailureStatus;
+
+  const d119Checks = [
+    ["STRIPE_WEBHOOK_ROUTE_MISSING_FOR_STATUS_AUDIT", d119WebhookRouteExists, "Stripe webhook route must exist before status-code semantics audit can run."],
+    ["STRIPE_WEBHOOK_SIGNATURE_FAILURE_STATUS_MISSING", d119SignatureFailureStatus, "Stripe webhook signature failures must return a fail-closed non-2xx status, normally 400."],
+    ["STRIPE_WEBHOOK_MISSING_SECRET_STATUS_MISSING", d119MissingSecretStatus, "Stripe webhook missing-secret/configuration failures must return a safe non-success status."],
+    ["STRIPE_WEBHOOK_REPLAY_STATUS_2XX_MISSING", d119ReplayStatus2xx, "Stripe webhook duplicate/replayed events must return 2xx to prevent unnecessary Stripe retries."],
+    ["STRIPE_WEBHOOK_IGNORED_EVENT_STATUS_2XX_MISSING", d119IgnoredEventStatus2xx, "Stripe webhook ignored or unsupported verified events must return 2xx with a minimal response."],
+    ["STRIPE_WEBHOOK_PROCESSING_FAILURE_STATUS_MISSING", d119ProcessingFailureStatus, "Stripe webhook processing or persistence failures must return non-success status so retry semantics are preserved."],
+    ["STRIPE_WEBHOOK_STATUS_NO_STORE_BOUNDARY_MISSING", d119StatusNoStoreBoundary, "Stripe webhook status responses must use the no-store jsonResponse boundary."],
+    ["STRIPE_WEBHOOK_PUBLIC_STATUS_BODY_MINIMAL_MISSING", d119PublicStatusBodyMinimal, "Stripe webhook public status responses must be minimal and must not expose raw events, Stripe objects, signatures, payloads, or raw errors."],
+    ["STRIPE_WEBHOOK_RETRY_SEMANTICS_MISSING", d119RetrySemantics, "Stripe webhook must distinguish fail-closed signature errors, safe 2xx duplicate/ignored events, and retryable processing failures."]
+  ];
+
+  for (const [code, ok, detail] of d119Checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-119",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
