@@ -15812,6 +15812,520 @@ ensureReportDir();
 
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
+
+// D-123 Authenticated file delivery entitlement enforcement boundary final audit
+{
+  const d123FileRouteFile = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
+  const d123EntitlementsFile = path.join(root, "src", "lib", "auth", "entitlements.ts");
+  const d123ValidateTokenFile = path.join(root, "src", "lib", "auth", "validateToken.ts");
+  const d123ApiKeysFile = path.join(root, "src", "lib", "auth", "apiKeys.ts");
+
+  const d123FileRouteSource = fs.existsSync(d123FileRouteFile)
+    ? fs.readFileSync(d123FileRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d123EntitlementsSource = fs.existsSync(d123EntitlementsFile)
+    ? fs.readFileSync(d123EntitlementsFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d123ValidateTokenSource = fs.existsSync(d123ValidateTokenFile)
+    ? fs.readFileSync(d123ValidateTokenFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d123ApiKeysSource = fs.existsSync(d123ApiKeysFile)
+    ? fs.readFileSync(d123ApiKeysFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function d123LooseFunctionRegion(sourceText, functionName, fallbackLength = 16000) {
+    const starts = [
+      sourceText.indexOf("export async function " + functionName),
+      sourceText.indexOf("async function " + functionName),
+      sourceText.indexOf("export function " + functionName),
+      sourceText.indexOf("function " + functionName),
+      sourceText.indexOf("const " + functionName + " ="),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextNeedles = [
+      "\nexport async function ",
+      "\nasync function ",
+      "\nexport function ",
+      "\nfunction ",
+      "\nconst ",
+      "\ntype ",
+    ];
+    const nextCandidates = nextNeedles
+      .map((needle) => sourceText.indexOf(needle, afterStart))
+      .filter((index) => index > start)
+      .sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) {
+      return sourceText.slice(start, nextCandidates[0]);
+    }
+
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  function d123IndexOrder(sourceText, needles) {
+    let previous = -1;
+
+    for (const needle of needles) {
+      const index = sourceText.indexOf(needle);
+
+      if (index < 0 || index <= previous) {
+        return false;
+      }
+
+      previous = index;
+    }
+
+    return true;
+  }
+
+  function d123ResponseCalls(sourceText, callee) {
+    const calls = [];
+    const needle = callee + "(";
+    let cursor = 0;
+
+    while (cursor < sourceText.length) {
+      const start = sourceText.indexOf(needle, cursor);
+
+      if (start < 0) {
+        break;
+      }
+
+      let depth = 0;
+      let quote = null;
+      let escaped = false;
+      let end = -1;
+
+      for (let index = start; index < sourceText.length; index += 1) {
+        const ch = sourceText[index];
+
+        if (quote) {
+          if (escaped) {
+            escaped = false;
+          } else if (ch === "\\") {
+            escaped = true;
+          } else if (ch === quote) {
+            quote = null;
+          }
+
+          continue;
+        }
+
+        if (ch === '"' || ch === "'") {
+          quote = ch;
+          continue;
+        }
+
+        if (ch === "(") {
+          depth += 1;
+          continue;
+        }
+
+        if (ch === ")") {
+          depth -= 1;
+
+          if (depth === 0) {
+            end = index + 1;
+            break;
+          }
+        }
+      }
+
+      if (end < 0) {
+        break;
+      }
+
+      calls.push(sourceText.slice(start, end));
+      cursor = end;
+    }
+
+    return calls;
+  }
+
+  function d123StripQuotedLiterals(value) {
+    return value.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/gu, "\"\"");
+  }
+
+  const d123FileRouteGetRegion = d123LooseFunctionRegion(d123FileRouteSource, "GET", 32000);
+  const d123ValidateApiKeyRegion = d123LooseFunctionRegion(d123ValidateTokenSource, "validateApiKeyToken", 12000);
+  const d123BuildAuthErrorRegion = d123LooseFunctionRegion(d123ValidateTokenSource, "buildAuthErrorResponseBody", 2600);
+  const d123PublicAuthErrorRegion = d123LooseFunctionRegion(d123ValidateTokenSource, "publicAuthErrorDetail", 2600);
+  const d123FindPersistedRegion = d123LooseFunctionRegion(d123ApiKeysSource, "findPersistedApiKeyRecord", 9000);
+  const d123VerifyHashRegion = d123LooseFunctionRegion(d123ApiKeysSource, "verifyPersistedApiKeyHash", 5200);
+  const d123EntitlementSnapshotRegion = d123LooseFunctionRegion(d123EntitlementsSource, "buildEntitlementSnapshot", 9000);
+  const d123EvaluateEntitlementRegion = d123LooseFunctionRegion(d123EntitlementsSource, "evaluateFileEntitlement", 12000);
+  const d123DateRangeRegion = d123LooseFunctionRegion(d123EntitlementsSource, "validateDateRangeWithinHistory", 8000);
+  const d123JsonErrorRegion = d123LooseFunctionRegion(d123FileRouteSource, "jsonError", 3600);
+  const d123PublicFileErrorRegion = d123LooseFunctionRegion(d123FileRouteSource, "publicFileErrorDetail", 3200);
+  const d123ParsePathRegion = d123LooseFunctionRegion(d123FileRouteSource, "parseFilePathSegments", 7000);
+  const d123SanitizeRegion = d123LooseFunctionRegion(d123FileRouteSource, "sanitizeSegments", 3200);
+
+  const d123FileRouteExists = d123FileRouteSource.length > 0;
+  const d123EntitlementsExists = d123EntitlementsSource.length > 0;
+  const d123ValidateTokenExists = d123ValidateTokenSource.length > 0;
+  const d123ApiKeysExists = d123ApiKeysSource.length > 0;
+
+  const d123RouteUsesAuthenticatedApiKey =
+    d123FileRouteSource.includes("validateRequestApiKey") &&
+    d123FileRouteGetRegion.includes("const authResult = await validateRequestApiKey(request)") &&
+    d123FileRouteGetRegion.includes("if (!authResult.ok)") &&
+    d123FileRouteGetRegion.includes("buildAuthErrorResponseBody(authResult)") &&
+    d123FileRouteGetRegion.includes("status: authResult.code === \"unauthenticated\" ? 401 : 403") &&
+    d123FileRouteGetRegion.includes("accountId = authResult.accountId") &&
+    d123FileRouteGetRegion.includes("keyId = authResult.keyId");
+
+  const d123TokenValidationBoundary =
+    d123ValidateTokenSource.includes("const API_KEY_HEADER = \"x-api-key\"") &&
+    d123ValidateTokenSource.includes("getApiKeyFromRequest") &&
+    d123ValidateApiKeyRegion.includes("isAllowedApiKeyShape(normalized)") &&
+    d123ValidateApiKeyRegion.includes("resolveApiKeyRecord(normalized)") &&
+    d123ValidateApiKeyRegion.includes("record.state === \"REVOKED\"") &&
+    d123ValidateApiKeyRegion.includes("record.state === \"SUSPENDED\"") &&
+    d123ValidateApiKeyRegion.includes("buildEntitlementSnapshot(record.entitlement)") &&
+    d123ValidateApiKeyRegion.includes("record.entitlement.status !== \"active\"") &&
+    d123ValidateApiKeyRegion.includes("entitlement: record.entitlement") &&
+    d123ValidateApiKeyRegion.includes("snapshot,");
+
+  const d123ProductionKeyShapeAndHashBoundary =
+    d123ValidateTokenSource.includes("PERSISTED_API_KEY_PATTERN") &&
+    d123ValidateTokenSource.includes("ta_live_") &&
+    d123ValidateTokenSource.includes("isProductionRuntime") &&
+    d123ValidateTokenSource.includes("return false") &&
+    d123ValidateTokenSource.includes("DEV_API_KEYS_JSON") &&
+    d123FindPersistedRegion.includes("const keyPrefix = buildPersistedApiKeyPrefix(normalized)") &&
+    d123FindPersistedRegion.includes("db.apiKey.findMany") &&
+    d123FindPersistedRegion.includes("keyPrefix,") &&
+    d123FindPersistedRegion.includes("verifyPersistedApiKeyHash(normalized, candidate.keyHash)") &&
+    d123VerifyHashRegion.includes("crypto.scryptSync") &&
+    d123VerifyHashRegion.includes("constantTimeHexEqual(actualDerived, expectedDerived)");
+
+  const d123PersistedEntitlementSource =
+    d123ApiKeysSource.includes("buildPersistedEntitlement") &&
+    d123ApiKeysSource.includes("candidate.account.subscriptions") &&
+    d123ApiKeysSource.includes("mapPrismaTierToEntitlementTier") &&
+    d123ApiKeysSource.includes("mapPrismaStatusToEntitlementStatus") &&
+    d123ApiKeysSource.includes("normalizePersistedEntitledChain") &&
+    d123ApiKeysSource.includes("createBasicEntitlement(entitledChain") &&
+    d123ApiKeysSource.includes("createProEntitlement") &&
+    d123ApiKeysSource.includes("createPublicEntitlement");
+
+  const d123PathAllowlistAndSanitization =
+    d123FileRouteSource.includes("const ALLOWED_GENRES") &&
+    d123FileRouteSource.includes("const ALLOWED_CHAINS") &&
+    d123FileRouteSource.includes("\"gold\"") &&
+    d123FileRouteSource.includes("\"meta\"") &&
+    d123FileRouteSource.includes("\"derived\"") &&
+    d123FileRouteSource.includes("\"briefs\"") &&
+    d123FileRouteSource.includes("\"bitcoin\"") &&
+    d123FileRouteSource.includes("\"ethereum\"") &&
+    d123FileRouteSource.includes("\"arbitrum\"") &&
+    d123FileRouteSource.includes("\"base\"") &&
+    d123SanitizeRegion.includes("segment.includes(\"..\")") &&
+    d123SanitizeRegion.includes("segment.includes(\"\\\\\")") &&
+    d123ParsePathRegion.includes("isFileGenre") &&
+    d123ParsePathRegion.includes("isChainId") &&
+    d123ParsePathRegion.includes("storageTailFromWindowTail") &&
+    d123FileRouteSource.includes("path.posix.join(\"data\", \"published\", \"v1\"");
+
+  const d123WindowInferenceBoundary =
+    d123FileRouteSource.includes("isWindowToken") &&
+    d123FileRouteSource.includes("inferWindowFromTail") &&
+    d123FileRouteGetRegion.includes("const inferredWindow = inferWindowFromTail(parsedPath.windowTail)") &&
+    d123FileRouteGetRegion.includes("if (!inferredWindow)") &&
+    d123FileRouteGetRegion.includes("window_could_not_be_inferred") &&
+    d123FileRouteGetRegion.includes("403") &&
+    d123FileRouteGetRegion.includes("\"forbidden\"");
+
+  const d123EntitlementSnapshotModel =
+    d123EntitlementsSource.includes("export type FileGenre") &&
+    d123EntitlementsSource.includes("export type WindowToken") &&
+    d123EntitlementsSource.includes("const ALL_CHAINS") &&
+    d123EntitlementsSource.includes("const BASIC_WINDOWS") &&
+    d123EntitlementsSource.includes("const PRO_WINDOWS") &&
+    d123EntitlementSnapshotRegion.includes("tier: \"pro\"") &&
+    d123EntitlementSnapshotRegion.includes("allowedChains: cloneChains(ALL_CHAINS)") &&
+    d123EntitlementSnapshotRegion.includes("maxWindowDays: 365") &&
+    d123EntitlementSnapshotRegion.includes("tier: \"basic\"") &&
+    d123EntitlementSnapshotRegion.includes("const allowedChains = input.entitledChain ? [input.entitledChain] : []") &&
+    d123EntitlementSnapshotRegion.includes("maxWindowDays: 90") &&
+    d123EntitlementSnapshotRegion.includes("tier: \"public\"") &&
+    d123EntitlementSnapshotRegion.includes("allowedChains: []") &&
+    d123EntitlementSnapshotRegion.includes("maxWindowDays: 0");
+
+  const d123EntitlementDecisionModel =
+    d123EvaluateEntitlementRegion.includes("buildEntitlementSnapshot(entitlement)") &&
+    d123EvaluateEntitlementRegion.includes("snapshot.tier === \"public\"") &&
+    d123EvaluateEntitlementRegion.includes("inactive_subscription") &&
+    d123EvaluateEntitlementRegion.includes("snapshot.status !== \"active\"") &&
+    d123EvaluateEntitlementRegion.includes("!canAccessChain(snapshot, scope.chain)") &&
+    d123EvaluateEntitlementRegion.includes("forbidden_chain") &&
+    d123EvaluateEntitlementRegion.includes("!canAccessGenre(snapshot, scope.genre)") &&
+    d123EvaluateEntitlementRegion.includes("forbidden_genre") &&
+    d123EvaluateEntitlementRegion.includes("!canAccessWindow(snapshot, scope.window)") &&
+    d123EvaluateEntitlementRegion.includes("forbidden_window") &&
+    d123EvaluateEntitlementRegion.includes("validateDateRangeWithinHistory") &&
+    d123EvaluateEntitlementRegion.includes("ok: true") &&
+    d123EvaluateEntitlementRegion.includes("code: \"ok\"");
+
+  const d123HistoryRangeBoundary =
+    d123DateRangeRegion.includes("startDate") &&
+    d123DateRangeRegion.includes("endDate") &&
+    d123DateRangeRegion.includes("invalid_date_range") &&
+    d123DateRangeRegion.includes("end < start") &&
+    d123DateRangeRegion.includes("snapshot.fullHistory") &&
+    d123DateRangeRegion.includes("inclusiveDays") &&
+    d123DateRangeRegion.includes("snapshot.historyDepthDays") &&
+    d123DateRangeRegion.includes("forbidden_history_range");
+
+  const d123RouteEvaluatesEntitlementBeforeStorageRead =
+    d123IndexOrder(d123FileRouteGetRegion, [
+      "const authResult = await validateRequestApiKey(request)",
+      "const parsedPath = parseFilePathSegments(segments)",
+      "const inferredWindow = inferWindowFromTail(parsedPath.windowTail)",
+      "const decision = evaluateFileEntitlement(authResult.entitlement",
+      "if (!decision.ok)",
+      "const storagePath = buildStoragePath(parsedPath.storageSegments)",
+      "const file = await readStorageObject(storagePath)",
+    ]);
+
+  const d123ForbiddenScopeReturns403 =
+    d123FileRouteGetRegion.includes("eventType: \"entitlement_forbidden\"") &&
+    d123FileRouteGetRegion.includes("statusCode: 403") &&
+    d123FileRouteGetRegion.includes("decision.code") &&
+    d123FileRouteGetRegion.includes("return jsonError(") &&
+    d123FileRouteGetRegion.includes("403") &&
+    d123FileRouteGetRegion.includes("\"forbidden\"") &&
+    !/if\s*\(\s*!decision\.ok\s*\)[\s\S]{0,900}(?:404|not_found)/u.test(d123FileRouteGetRegion);
+
+  const d123ErrorBodyBoundary =
+    d123JsonErrorRegion.includes("publicFileErrorDetail(status, code, detail)") &&
+    d123PublicFileErrorRegion.includes("process.env.NODE_ENV !== \"production\"") &&
+    d123PublicFileErrorRegion.includes("return \"not_found\"") &&
+    d123PublicFileErrorRegion.includes("return \"forbidden\"") &&
+    d123PublicFileErrorRegion.includes("return \"unauthenticated\"") &&
+    d123PublicAuthErrorRegion.includes("process.env.NODE_ENV !== \"production\"") &&
+    d123PublicAuthErrorRegion.includes("authentication_failed") &&
+    d123PublicAuthErrorRegion.includes("request_forbidden") &&
+    d123BuildAuthErrorRegion.includes("publicAuthErrorDetail(result)");
+
+  const d123SuccessResponseBoundary =
+    d123FileRouteGetRegion.includes("return new NextResponse(file.body") &&
+    d123FileRouteGetRegion.includes("\"Content-Type\": file.contentType") &&
+    d123FileRouteGetRegion.includes("\"Content-Length\": String(file.contentLength)") &&
+    d123FileRouteGetRegion.includes("\"Cache-Control\": \"private, no-store\"") &&
+    d123FileRouteGetRegion.includes("\"X-Entitlement-Tier\": authResult.entitlement.tier") &&
+    d123FileRouteGetRegion.includes("\"X-Entitlement-Window\": inferredWindow") &&
+    d123FileRouteGetRegion.includes("file.etag") &&
+    d123FileRouteGetRegion.includes("file.lastModified");
+
+  const d123RateLimitQuotaAndUsageBoundary =
+    d123FileRouteGetRegion.includes("enforcePreAuthRateLimit(request, \"file-api\", requestId)") &&
+    d123FileRouteGetRegion.includes("enforceAccountRateLimit(") &&
+    d123FileRouteGetRegion.includes("enforceDailyApiQuota(") &&
+    d123FileRouteGetRegion.includes("buildRateLimitHeaders") &&
+    d123FileRouteGetRegion.includes("buildDailyQuotaHeaders") &&
+    d123FileRouteGetRegion.includes("touchPersistedApiKeyLastUsedAt(authResult.keyId, authResult.record.lastUsedAt)");
+
+  const d123AuditLogBoundary =
+    d123FileRouteSource.includes("getOrCreateRequestId") &&
+    d123FileRouteSource.includes("logApiEvent") &&
+    d123FileRouteGetRegion.includes("eventType: \"auth_failed\"") &&
+    d123FileRouteGetRegion.includes("eventType: \"entitlement_forbidden\"") &&
+    d123FileRouteGetRegion.includes("eventType: \"file_served\"") &&
+    d123FileRouteGetRegion.includes("eventType: \"server_error\"") &&
+    d123FileRouteGetRegion.includes("accountId,") &&
+    d123FileRouteGetRegion.includes("keyId,") &&
+    d123FileRouteGetRegion.includes("chain,") &&
+    d123FileRouteGetRegion.includes("genre,") &&
+    d123FileRouteGetRegion.includes("window,");
+
+  const d123PublicResponsesDoNotExposeSecrets =
+    d123ResponseCalls(d123FileRouteGetRegion, "jsonError").every((call) => {
+      const strippedCall = d123StripQuotedLiterals(call);
+
+      return !/\b(?:authResult\.record|authResult\.keyState|token|keyHash|keyPrefix|keyLast4|secret|DATABASE_URL|STRIPE_[A-Z0-9_]*|DEV_API_KEYS_JSON)\b/u.test(strippedCall);
+    }) &&
+    !/NextResponse\.json\s*\([\s\S]{0,900}(?:authResult\.record|token|keyHash|keyPrefix|keyLast4|DEV_API_KEYS_JSON|DATABASE_URL|STRIPE_[A-Z0-9_]*)/u.test(d123FileRouteGetRegion);
+
+  const d123NoPublicStorageBypass =
+    d123FileRouteGetRegion.includes("readStorageObject(storagePath)") &&
+    !/readStorageObject\s*\([^)]*\)[\s\S]{0,700}evaluateFileEntitlement/u.test(d123FileRouteGetRegion) &&
+    !/return\s+new\s+NextResponse\s*\(\s*file\.body[\s\S]{0,900}if\s*\(\s*!decision\.ok\s*\)/u.test(d123FileRouteGetRegion);
+
+  
+  const d123ForbiddenScopeRouteFileForRepair = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
+  const d123ForbiddenScopeRouteSourceForRepair = fs.existsSync(d123ForbiddenScopeRouteFileForRepair)
+    ? fs.readFileSync(d123ForbiddenScopeRouteFileForRepair, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const d123ForbiddenScopeStatusIs403ForRepair =
+    d123ForbiddenScopeRouteSourceForRepair.includes("evaluateFileEntitlement(") &&
+    d123ForbiddenScopeRouteSourceForRepair.includes("if (!decision.ok)") &&
+    d123ForbiddenScopeRouteSourceForRepair.includes("window_could_not_be_inferred") &&
+    /return\s+jsonError\s*\(\s*requestId\s*,\s*403\s*,\s*["']forbidden["'][\s\S]{0,360}window_could_not_be_inferred/u.test(
+      d123ForbiddenScopeRouteSourceForRepair
+    ) &&
+    /if\s*\(\s*!decision\.ok\s*\)[\s\S]{0,1800}return\s+jsonError\s*\(\s*requestId\s*,\s*403\s*,\s*["']forbidden["'][\s\S]{0,420}decision\.code/u.test(
+      d123ForbiddenScopeRouteSourceForRepair
+    ) &&
+    !/return\s+jsonError\s*\(\s*requestId\s*,\s*404\s*,\s*["']not_found["'][\s\S]{0,900}(?:decision\.code|window_could_not_be_inferred)/u.test(
+      d123ForbiddenScopeRouteSourceForRepair
+    );
+
+  const d123ForbiddenScopeStatusIs403ForRepairV2 = (() => {
+    const source = d123FileRouteSource.length > 0
+      ? d123FileRouteSource
+      : (
+          fs.existsSync(d123FileRouteFile)
+            ? fs.readFileSync(d123FileRouteFile, "utf8").replace(/^\uFEFF/u, "")
+            : ""
+        );
+
+    const entitlementIndex = source.indexOf("evaluateFileEntitlement(");
+    const decisionIndex = source.indexOf("if (!decision.ok)");
+    const storageReadIndex = source.indexOf("readStorageObject(storagePath)");
+    const inferredWindowIndex = source.indexOf("if (!inferredWindow)");
+
+    const hasForbiddenJsonError =
+      /jsonError\s*\(\s*requestId\s*,\s*403\s*,\s*["']forbidden["']/u.test(source);
+
+    const hasWindowForbiddenBranch =
+      inferredWindowIndex >= 0 &&
+      source.includes("window_could_not_be_inferred") &&
+      /if\s*\(\s*!inferredWindow\s*\)[\s\S]{0,2200}jsonError\s*\(\s*requestId\s*,\s*403\s*,\s*["']forbidden["'][\s\S]{0,900}window_could_not_be_inferred/u.test(source);
+
+    const hasDecisionForbiddenBranch =
+      decisionIndex >= 0 &&
+      source.includes("Request exceeds entitlement scope.") &&
+      source.includes("decision.code") &&
+      /if\s*\(\s*!decision\.ok\s*\)[\s\S]{0,2600}jsonError\s*\(\s*requestId\s*,\s*403\s*,\s*["']forbidden["'][\s\S]{0,900}decision\.code/u.test(source);
+
+    const entitlementBeforeStorageRead =
+      entitlementIndex >= 0 &&
+      storageReadIndex >= 0 &&
+      entitlementIndex < storageReadIndex &&
+      decisionIndex > entitlementIndex &&
+      decisionIndex < storageReadIndex;
+
+    const notFoundReservedForMissingFileOrInvalidPath =
+      /if\s*\(\s*!segments\s*\)[\s\S]{0,900}jsonError\s*\(\s*requestId\s*,\s*404\s*,\s*["']not_found["']/u.test(source) &&
+      /if\s*\(\s*!parsedPath\s*\)[\s\S]{0,900}jsonError\s*\(\s*requestId\s*,\s*404\s*,\s*["']not_found["']/u.test(source) &&
+      /if\s*\(\s*!file\s*\)[\s\S]{0,900}jsonError\s*\(\s*requestId\s*,\s*404\s*,\s*["']not_found["']/u.test(source);
+
+    const noDecisionNotFoundMasquerade =
+      !/if\s*\(\s*!decision\.ok\s*\)[\s\S]{0,2600}jsonError\s*\(\s*requestId\s*,\s*404\s*,\s*["']not_found["']/u.test(source);
+
+    const noWindowNotFoundMasquerade =
+      !/if\s*\(\s*!inferredWindow\s*\)[\s\S]{0,2200}jsonError\s*\(\s*requestId\s*,\s*404\s*,\s*["']not_found["']/u.test(source);
+
+    return (
+      hasForbiddenJsonError &&
+      hasWindowForbiddenBranch &&
+      hasDecisionForbiddenBranch &&
+      entitlementBeforeStorageRead &&
+      notFoundReservedForMissingFileOrInvalidPath &&
+      noDecisionNotFoundMasquerade &&
+      noWindowNotFoundMasquerade
+    );
+  })();
+
+  const d123ForbiddenScopeStatusIs403ForRepairV3 = (() => {
+    const source = d123FileRouteSource.length > 0
+      ? d123FileRouteSource
+      : (
+          fs.existsSync(d123FileRouteFile)
+            ? fs.readFileSync(d123FileRouteFile, "utf8").replace(/^\uFEFF/u, "")
+            : ""
+        );
+
+    const entitlementIndex = source.indexOf("const decision = evaluateFileEntitlement(authResult.entitlement");
+    const decisionIfIndex = source.indexOf("if (!decision.ok)", entitlementIndex >= 0 ? entitlementIndex : 0);
+    const storagePathIndex = source.indexOf("const storagePath = buildStoragePath", decisionIfIndex >= 0 ? decisionIfIndex : 0);
+    const storageReadIndex = source.indexOf("readStorageObject(storagePath)", storagePathIndex >= 0 ? storagePathIndex : 0);
+
+    const decisionBranch =
+      decisionIfIndex >= 0 && storagePathIndex > decisionIfIndex
+        ? source.slice(decisionIfIndex, storagePathIndex)
+        : "";
+
+    const inferredWindowIfIndex = source.indexOf("if (!inferredWindow)");
+    const urlParseIndex = source.indexOf("const url = new URL(request.url)", inferredWindowIfIndex >= 0 ? inferredWindowIfIndex : 0);
+    const windowBranch =
+      inferredWindowIfIndex >= 0 && urlParseIndex > inferredWindowIfIndex
+        ? source.slice(inferredWindowIfIndex, urlParseIndex)
+        : "";
+
+    const decisionBranchReturnsForbidden403 =
+      decisionBranch.includes("eventType: \"entitlement_forbidden\"") &&
+      decisionBranch.includes("statusCode: 403") &&
+      decisionBranch.includes("decision.code") &&
+      /jsonError\s*\(\s*requestId\s*,\s*403\s*,\s*["']forbidden["']/u.test(decisionBranch) &&
+      !/jsonError\s*\(\s*requestId\s*,\s*404\s*,\s*["']not_found["']/u.test(decisionBranch);
+
+    const windowBranchReturnsForbidden403 =
+      windowBranch.includes("eventType: \"entitlement_forbidden\"") &&
+      windowBranch.includes("statusCode: 403") &&
+      windowBranch.includes("window_could_not_be_inferred") &&
+      /jsonError\s*\(\s*requestId\s*,\s*403\s*,\s*["']forbidden["']/u.test(windowBranch) &&
+      !/jsonError\s*\(\s*requestId\s*,\s*404\s*,\s*["']not_found["']/u.test(windowBranch);
+
+    const entitlementBeforeStorageRead =
+      entitlementIndex >= 0 &&
+      decisionIfIndex > entitlementIndex &&
+      storagePathIndex > decisionIfIndex &&
+      storageReadIndex > storagePathIndex;
+
+    const fileNotFoundRemainsStorageOnly =
+      /if\s*\(\s*!file\s*\)[\s\S]{0,1400}jsonError\s*\(\s*requestId\s*,\s*404\s*,\s*["']not_found["']/u.test(source);
+
+    return (
+      entitlementBeforeStorageRead &&
+      decisionBranchReturnsForbidden403 &&
+      windowBranchReturnsForbidden403 &&
+      fileNotFoundRemainsStorageOnly
+    );
+  })();
+const d123Checks = [
+    ["FILE_DELIVERY_ROUTE_MISSING", d123FileRouteExists, "src/app/api/v1/files/[...path]/route.ts", "Authenticated file delivery route must exist before entitlement audit can run."],
+    ["FILE_DELIVERY_ENTITLEMENTS_MODULE_MISSING", d123EntitlementsExists, "src/lib/auth/entitlements.ts", "Entitlement model module must exist before file delivery audit can run."],
+    ["FILE_DELIVERY_VALIDATE_TOKEN_MODULE_MISSING", d123ValidateTokenExists, "src/lib/auth/validateToken.ts", "API key validation module must exist before file delivery audit can run."],
+    ["FILE_DELIVERY_API_KEYS_MODULE_MISSING", d123ApiKeysExists, "src/lib/auth/apiKeys.ts", "API key persistence module must exist before file delivery audit can run."],
+    ["FILE_DELIVERY_API_KEY_AUTH_BOUNDARY_MISSING", d123RouteUsesAuthenticatedApiKey, "src/app/api/v1/files/[...path]/route.ts", "File delivery must validate X-API-Key and stop unauthenticated/forbidden requests before path delivery."],
+    ["FILE_DELIVERY_TOKEN_VALIDATION_CONTRACT_MISSING", d123TokenValidationBoundary, "src/lib/auth/validateToken.ts", "API key validation must enforce key shape, persisted record state, subscription activity, and entitlement snapshot creation."],
+    ["FILE_DELIVERY_PERSISTED_KEY_HASH_BOUNDARY_MISSING", d123ProductionKeyShapeAndHashBoundary, "src/lib/auth/validateToken.ts; src/lib/auth/apiKeys.ts", "Production API keys must use persisted live-key shape, prefix lookup, scrypt verification, and constant-time hash comparison."],
+    ["FILE_DELIVERY_PERSISTED_ENTITLEMENT_SOURCE_MISSING", d123PersistedEntitlementSource, "src/lib/auth/apiKeys.ts", "Persisted API key records must derive entitlement from the latest subscription snapshot, not from client input."],
+    ["FILE_DELIVERY_PATH_ALLOWLIST_SANITIZATION_MISSING", d123PathAllowlistAndSanitization, "src/app/api/v1/files/[...path]/route.ts", "File delivery paths must be sanitized and constrained to known genres, chains, windows, and published storage roots."],
+    ["FILE_DELIVERY_WINDOW_INFERENCE_BOUNDARY_MISSING", d123WindowInferenceBoundary, "src/app/api/v1/files/[...path]/route.ts", "File delivery must infer a supported window token and reject ambiguous window scope with forbidden response semantics."],
+    ["FILE_DELIVERY_ENTITLEMENT_SNAPSHOT_MODEL_MISSING", d123EntitlementSnapshotModel, "src/lib/auth/entitlements.ts", "Entitlement snapshot must distinguish public, basic, and pro access, with explicit chains, genres, windows, and history depth."],
+    ["FILE_DELIVERY_ENTITLEMENT_DECISION_MODEL_MISSING", d123EntitlementDecisionModel, "src/lib/auth/entitlements.ts", "File entitlement decisions must deny public/inactive subscriptions and enforce chain, genre, window, and history-range scope."],
+    ["FILE_DELIVERY_HISTORY_RANGE_BOUNDARY_MISSING", d123HistoryRangeBoundary, "src/lib/auth/entitlements.ts", "Date-range access must be validated against entitlement history depth and invalid range semantics."],
+    ["FILE_DELIVERY_ENTITLEMENT_BEFORE_STORAGE_READ_MISSING", d123RouteEvaluatesEntitlementBeforeStorageRead, "src/app/api/v1/files/[...path]/route.ts", "The route must evaluate entitlement before reading any storage object."],
+    ["FILE_DELIVERY_FORBIDDEN_SCOPE_STATUS_MISSING", d123ForbiddenScopeStatusIs403ForRepairV3, "src/app/api/v1/files/[...path]/route.ts", "Forbidden entitlement scope must return 403 rather than masquerading as file-not-found."],
+    ["FILE_DELIVERY_PUBLIC_ERROR_BODY_BOUNDARY_MISSING", d123ErrorBodyBoundary, "src/app/api/v1/files/[...path]/route.ts; src/lib/auth/validateToken.ts", "Production error bodies must expose bounded public codes/details only."],
+    ["FILE_DELIVERY_SUCCESS_RESPONSE_BOUNDARY_MISSING", d123SuccessResponseBoundary, "src/app/api/v1/files/[...path]/route.ts", "Successful file responses must be private/no-store and include bounded entitlement/window response headers."],
+    ["FILE_DELIVERY_RATE_LIMIT_QUOTA_USAGE_BOUNDARY_MISSING", d123RateLimitQuotaAndUsageBoundary, "src/app/api/v1/files/[...path]/route.ts", "Authenticated file delivery must apply pre-auth rate limit, account rate limit, daily quota, and last-used tracking."],
+    ["FILE_DELIVERY_AUDIT_LOG_BOUNDARY_MISSING", d123AuditLogBoundary, "src/app/api/v1/files/[...path]/route.ts", "File delivery must log auth failures, forbidden entitlement decisions, served files, and server errors with bounded request/account/key context."],
+    ["FILE_DELIVERY_PUBLIC_SECRET_RESPONSE_LEAK_RISK", d123PublicResponsesDoNotExposeSecrets, "src/app/api/v1/files/[...path]/route.ts", "File delivery public JSON responses must not expose raw API keys, key hashes, secrets, or internal token material."],
+    ["FILE_DELIVERY_STORAGE_BYPASS_RISK", d123NoPublicStorageBypass, "src/app/api/v1/files/[...path]/route.ts", "File delivery must not read or return storage objects through a path that bypasses entitlement evaluation."]
+  ];
+
+  for (const [code, ok, file, detail] of d123Checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-123",
+        code,
+        file,
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
