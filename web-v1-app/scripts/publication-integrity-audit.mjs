@@ -15427,6 +15427,391 @@ ensureReportDir();
 
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
+// D-122 Account/dashboard subscription display boundary final audit
+{
+  const d122DashboardPageFile = path.join(root, "src", "app", "dashboard", "page.tsx");
+  const d122AccountFile = path.join(root, "src", "lib", "auth", "account.ts");
+  const d122PortalRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "portal", "route.ts");
+
+  const d122DashboardSource = fs.existsSync(d122DashboardPageFile)
+    ? fs.readFileSync(d122DashboardPageFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d122AccountSource = fs.existsSync(d122AccountFile)
+    ? fs.readFileSync(d122AccountFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d122PortalSource = fs.existsSync(d122PortalRouteFile)
+    ? fs.readFileSync(d122PortalRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function d122LooseFunctionRegion(sourceText, functionName, fallbackLength = 12000) {
+    const starts = [
+      sourceText.indexOf("export async function " + functionName),
+      sourceText.indexOf("async function " + functionName),
+      sourceText.indexOf("export function " + functionName),
+      sourceText.indexOf("function " + functionName),
+      sourceText.indexOf("const " + functionName + " ="),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextNeedles = [
+      "\nexport async function ",
+      "\nasync function ",
+      "\nexport function ",
+      "\nfunction ",
+      "\nconst ",
+      "\ntype ",
+    ];
+    const nextCandidates = nextNeedles
+      .map((needle) => sourceText.indexOf(needle, afterStart))
+      .filter((index) => index > start)
+      .sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) {
+      return sourceText.slice(start, nextCandidates[0]);
+    }
+
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  function d122StripQuotedLiterals(value) {
+    return value.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/gu, "\"\"");
+  }
+
+  function d122CallExpressions(sourceText, callee) {
+    const calls = [];
+    const needle = callee + "(";
+    let cursor = 0;
+
+    while (cursor < sourceText.length) {
+      const start = sourceText.indexOf(needle, cursor);
+
+      if (start < 0) {
+        break;
+      }
+
+      let depth = 0;
+      let quote = null;
+      let escaped = false;
+      let end = -1;
+
+      for (let index = start; index < sourceText.length; index += 1) {
+        const ch = sourceText[index];
+
+        if (quote) {
+          if (escaped) {
+            escaped = false;
+          } else if (ch === "\\") {
+            escaped = true;
+          } else if (ch === quote) {
+            quote = null;
+          }
+
+          continue;
+        }
+
+        if (ch === '"' || ch === "'") {
+          quote = ch;
+          continue;
+        }
+
+        if (ch === "(") {
+          depth += 1;
+          continue;
+        }
+
+        if (ch === ")") {
+          depth -= 1;
+
+          if (depth === 0) {
+            end = index + 1;
+            break;
+          }
+        }
+      }
+
+      if (end < 0) {
+        break;
+      }
+
+      calls.push(sourceText.slice(start, end));
+      cursor = end;
+    }
+
+    return calls;
+  }
+
+  function d122JsxSelfClosingTags(sourceText, tagName) {
+    const tags = [];
+    const needle = "<" + tagName;
+    let cursor = 0;
+
+    while (cursor < sourceText.length) {
+      const start = sourceText.indexOf(needle, cursor);
+
+      if (start < 0) {
+        break;
+      }
+
+      let braceDepth = 0;
+      let quote = null;
+      let escaped = false;
+      let end = -1;
+
+      for (let index = start; index < sourceText.length; index += 1) {
+        const ch = sourceText[index];
+
+        if (quote) {
+          if (escaped) {
+            escaped = false;
+          } else if (ch === "\\") {
+            escaped = true;
+          } else if (ch === quote) {
+            quote = null;
+          }
+
+          continue;
+        }
+
+        if (ch === '"' || ch === "'") {
+          quote = ch;
+          continue;
+        }
+
+        if (ch === "{") {
+          braceDepth += 1;
+          continue;
+        }
+
+        if (ch === "}") {
+          braceDepth -= 1;
+          continue;
+        }
+
+        if (braceDepth === 0 && ch === "/" && sourceText[index + 1] === ">") {
+          end = index + 2;
+          break;
+        }
+      }
+
+      if (end < 0) {
+        break;
+      }
+
+      tags.push(sourceText.slice(start, end));
+      cursor = end;
+    }
+
+    return tags;
+  }
+
+  const d122DashboardPageRegion = d122LooseFunctionRegion(d122DashboardSource, "DashboardPage", 36000);
+  const d122SubscriptionStateRegion = d122LooseFunctionRegion(d122DashboardSource, "deriveSubscriptionState", 2600);
+  const d122LifecycleStateRegion = d122LooseFunctionRegion(d122DashboardSource, "deriveLifecycleState", 5200);
+  const d122PortalPostRegion = d122LooseFunctionRegion(d122PortalSource, "POST", 12000);
+  const d122PortalJsonErrorRegion = d122LooseFunctionRegion(d122PortalSource, "jsonError", 3200);
+  const d122PortalPublicDetailRegion = d122LooseFunctionRegion(d122PortalSource, "publicPortalErrorDetail", 2600);
+  const d122GetCurrentAccountViewRegion = d122LooseFunctionRegion(d122AccountSource, "getCurrentAccountView", 22000);
+  const d122LogAccountErrorRegion = d122LooseFunctionRegion(d122AccountSource, "logAccountError", 3600);
+  const d122DataRows = d122JsxSelfClosingTags(d122DashboardSource, "DataRow");
+
+  const d122DashboardRouteExists = d122DashboardSource.length > 0;
+  const d122AccountViewExists = d122AccountSource.length > 0;
+  const d122PortalRouteExists = d122PortalSource.length > 0;
+
+  const d122DashboardUsesServerAccountView =
+    d122DashboardSource.includes("getCurrentAccountView") &&
+    d122DashboardPageRegion.includes("await getCurrentAccountView()") &&
+    !/use(?:Effect|Memo|State|SWR)\s*\(/u.test(d122DashboardSource) &&
+    !/fetch\s*\(\s*["']\/api\/v1\/(?:account|me|subscription|billing)/u.test(d122DashboardSource);
+
+  const d122DashboardSubscriptionStateBoundary =
+    d122SubscriptionStateRegion.includes("authConfigured") &&
+    d122SubscriptionStateRegion.includes("isAuthenticated") &&
+    d122SubscriptionStateRegion.includes("tier === \"public\"") &&
+    d122SubscriptionStateRegion.includes("status !== \"active\"") &&
+    d122DashboardPageRegion.includes("const subscriptionState = deriveSubscriptionState({") &&
+    d122DashboardPageRegion.includes("accountView.snapshot.tier") &&
+    d122DashboardPageRegion.includes("accountView.snapshot.status");
+
+  const d122DashboardLifecycleDisplay =
+    d122LifecycleStateRegion.includes("accountId") &&
+    d122LifecycleStateRegion.includes("stripeCustomerId") &&
+    d122LifecycleStateRegion.includes("stripeSubscriptionId") &&
+    d122DashboardSource.includes("Account state") &&
+    d122DashboardSource.includes("Billing linkage") &&
+    d122DashboardSource.includes("Stripe customer and subscription linked") &&
+    d122DashboardSource.includes("Billing linkage incomplete");
+
+  const d122DashboardEntitlementDisplay =
+    d122DashboardSource.includes("Delivery scope") &&
+    d122DashboardSource.includes("accountView.tierLabel") &&
+    d122DashboardSource.includes("accountView.snapshot.entitledChain") &&
+    d122DashboardSource.includes("accountView.snapshot.allowedChains") &&
+    d122DashboardSource.includes("accountView.snapshot.maxWindowDays") &&
+    d122DashboardSource.includes("accountView.historyDepthLabel") &&
+    d122DashboardSource.includes("CHAIN_LIST.map");
+
+  const d122DashboardApiKeyBoundary =
+    d122DashboardSource.includes("ApiKeyManagerClient") &&
+    d122DashboardSource.includes("getPersistedApiKeyDisplayRows") &&
+    d122DashboardSource.includes("Only partial identifiers are shown after creation") &&
+    d122DashboardSource.includes("prefix: keyRow.prefix") &&
+    d122DashboardSource.includes("last4: keyRow.last4") &&
+    d122DashboardSource.includes("status:") &&
+    !/\b(?:keyHash|rawKey|hashedKey|secretKey)\b/u.test(d122DashboardSource);
+
+  const d122DashboardBillingPortalBoundary =
+    d122DashboardSource.includes("hasBillingPortalAccess") &&
+    d122DashboardSource.includes("action=\"/api/v1/checkout/portal\"") &&
+    d122DashboardSource.includes("Manage subscription") &&
+    d122DashboardSource.includes("Stripe remains source of truth") &&
+    d122DashboardSource.includes("webhook-synced entitlements") &&
+    d122DashboardSource.includes("formatDateTime(accountView.account?.currentPeriodEnd)");
+
+  const d122RawStripeIdValuePattern =
+    /value\s*=\s*\{\s*accountView\.account\?\.(?:stripeCustomerId|stripeSubscriptionId)(?:\?\.trim\s*\(\s*\))?(?:\s*\?\?\s*["'][^"']*["'])?\s*\}/u;
+
+  const d122RawStripeIdChildPattern =
+    />\s*\{\s*accountView\.account\?\.(?:stripeCustomerId|stripeSubscriptionId)(?:\?\.trim\s*\(\s*\))?(?:\s*\?\?\s*["'][^"']*["'])?\s*\}\s*</u;
+
+  const d122RawStripeIdTemplateDisplayPattern =
+    /`[^`]*\$\{\s*accountView\.account\?\.(?:stripeCustomerId|stripeSubscriptionId)[^}]*\}[^`]*`/u;
+
+  const d122DashboardDataRowsDoNotDisplayRawStripeIds =
+    d122DataRows.length > 0 &&
+    d122DataRows.every((row) => {
+      const strippedRow = d122StripQuotedLiterals(row);
+
+      return (
+        !d122RawStripeIdValuePattern.test(row) &&
+        !d122RawStripeIdChildPattern.test(row) &&
+        !d122RawStripeIdTemplateDisplayPattern.test(row) &&
+        !/value\s*=\s*\{\s*(?:stripeCustomerId|stripeSubscriptionId)\b/u.test(strippedRow)
+      );
+    });
+
+  const d122AccountServerOnlyBoundary =
+    d122AccountSource.includes("import \"server-only\"") &&
+    d122AccountSource.includes("auth()") &&
+    d122AccountSource.includes("db.account.findUnique") &&
+    d122AccountSource.includes("include: ACCOUNT_INCLUDE") &&
+    d122AccountSource.includes("subscriptions:") &&
+    d122AccountSource.includes("take: 1");
+
+  const d122AccountSubscriptionSnapshotBoundary =
+    d122AccountSource.includes("buildEntitlementSnapshot") &&
+    d122AccountSource.includes("buildEntitlementInput") &&
+    d122AccountSource.includes("mapSubscriptionTier") &&
+    d122AccountSource.includes("mapSubscriptionStatus") &&
+    d122GetCurrentAccountViewRegion.includes("const subscription = account.subscriptions[0] ?? null") &&
+    d122GetCurrentAccountViewRegion.includes("historyUnlocked") &&
+    d122GetCurrentAccountViewRegion.includes("allowedChains") &&
+    d122GetCurrentAccountViewRegion.includes("maxWindowDays");
+
+  const d122AccountPublicFallbackBoundary =
+    d122AccountSource.includes("buildPublicSnapshot") &&
+    d122AccountSource.includes("tier: \"public\"") &&
+    d122AccountSource.includes("status: \"inactive\"") &&
+    d122GetCurrentAccountViewRegion.includes("authConfigured: false") &&
+    d122GetCurrentAccountViewRegion.includes("isAuthenticated: false") &&
+    d122GetCurrentAccountViewRegion.includes("account: null");
+
+  const d122AccountProductionLoggingBoundary =
+    d122AccountSource.includes("shouldLogAccountDebug") &&
+    d122AccountSource.includes("process.env.NODE_ENV !== \"production\"") &&
+    d122AccountSource.includes("process.env.VERCEL_ENV !== \"production\"") &&
+    d122LogAccountErrorRegion.includes("hasUserId: Boolean(data?.userId)") &&
+    d122LogAccountErrorRegion.includes("hasEmail: Boolean(data?.email)") &&
+    d122LogAccountErrorRegion.includes("expectedTermsVersion") &&
+    d122LogAccountErrorRegion.includes("name: (error as { name?: unknown }).name") &&
+    !/console\.(?:info|warn|error)\s*\([\s\S]{0,900}(?:stripeCustomerId\s*[:,]|stripeSubscriptionId\s*[:,]|authProviderUserId\s*[:,]|email\s*:\s*data\?\.email|userId\s*:\s*data\?\.userId)/u.test(
+      d122LogAccountErrorRegion
+    );
+
+  const d122PortalAuthBoundary =
+    d122PortalSource.includes("getCurrentAccountView") &&
+    d122PortalPostRegion.includes("validateSameOriginRequest") &&
+    d122PortalPostRegion.includes("enforcePreAuthRateLimit") &&
+    d122PortalPostRegion.includes("await getCurrentAccountView()") &&
+    d122PortalPostRegion.includes("!accountView.isAuthenticated") &&
+    /jsonError\s*\(\s*401\s*,\s*["']unauthenticated["']/u.test(d122PortalPostRegion);
+
+  const d122PortalNoStoreBoundary =
+    d122PortalJsonErrorRegion.includes("Cache-Control") &&
+    d122PortalJsonErrorRegion.includes("no-store") &&
+    d122PortalPostRegion.includes("response.headers.set(\"Cache-Control\", \"no-store\")");
+
+  const d122PortalDirectJsonCalls = d122CallExpressions(d122PortalPostRegion, "NextResponse.json");
+  const d122PortalJsonErrorCalls = d122CallExpressions(d122PortalPostRegion, "jsonError");
+
+  const d122PortalCustomerServerSideUse =
+    d122PortalPostRegion.includes("const stripeCustomerId = accountView.account?.stripeCustomerId?.trim() ?? \"\"") &&
+    d122PortalPostRegion.includes("customer: stripeCustomerId") &&
+    d122PortalPostRegion.includes("stripe.billingPortal.sessions.create") &&
+    d122PortalPostRegion.includes("NextResponse.redirect(portalSession.url") &&
+    d122PortalDirectJsonCalls.length === 0 &&
+    d122PortalJsonErrorCalls.every((call) =>
+      !/\b(?:stripeCustomerId|stripeSubscriptionId|portalSession|customer\s*:|subscription\s*:)\b/u.test(
+        d122StripQuotedLiterals(call)
+      )
+    );
+
+  const d122PortalRawStripeResponseBoundary =
+    d122PortalPublicDetailRegion.includes("publicPortalErrorDetail") &&
+    d122PortalPublicDetailRegion.includes("portal_not_configured") &&
+    d122PortalPublicDetailRegion.includes("subscription_not_connected") &&
+    d122PortalJsonErrorRegion.includes("code,") &&
+    d122PortalJsonErrorRegion.includes("message,") &&
+    d122PortalJsonErrorRegion.includes("detail: publicPortalErrorDetail") &&
+    d122PortalDirectJsonCalls.length === 0 &&
+    d122PortalPostRegion.includes("NextResponse.redirect(portalSession.url") &&
+    !/return\s+(?:portalSession|portalSession\.url|stripeCustomerId|stripeSubscriptionId)\b/u.test(
+      d122StripQuotedLiterals(d122PortalPostRegion)
+    ) &&
+    d122PortalJsonErrorCalls.every((call) =>
+      !/\b(?:portalSession|portalSession\.url|stripeCustomerId|stripeSubscriptionId|customer\s*:|subscription\s*:)\b/u.test(
+        d122StripQuotedLiterals(call)
+      )
+    );
+
+  const d122Checks = [
+    ["ACCOUNT_DASHBOARD_ROUTE_MISSING", d122DashboardRouteExists, "Dashboard page must exist before account display audit can run."],
+    ["ACCOUNT_VIEW_ROUTE_MISSING", d122AccountViewExists, "Server-side account view helper must exist before account display audit can run."],
+    ["ACCOUNT_PORTAL_ROUTE_MISSING", d122PortalRouteExists, "Billing portal route must exist before account display audit can run."],
+    ["ACCOUNT_DASHBOARD_SERVER_ACCOUNT_VIEW_MISSING", d122DashboardUsesServerAccountView, "Dashboard must use the server-side account view rather than client-side subscription fetches."],
+    ["ACCOUNT_DASHBOARD_SUBSCRIPTION_STATE_BOUNDARY_MISSING", d122DashboardSubscriptionStateBoundary, "Dashboard must derive active/inactive/not-connected subscription state from auth, tier, and status."],
+    ["ACCOUNT_DASHBOARD_LIFECYCLE_DISPLAY_MISSING", d122DashboardLifecycleDisplay, "Dashboard must show account lifecycle and billing linkage as bounded labels, not raw identifiers."],
+    ["ACCOUNT_DASHBOARD_ENTITLEMENT_DISPLAY_MISSING", d122DashboardEntitlementDisplay, "Dashboard must display entitlement scope from the account snapshot."],
+    ["ACCOUNT_DASHBOARD_API_KEY_BOUNDARY_MISSING", d122DashboardApiKeyBoundary, "Dashboard must show only bounded API key metadata such as prefix/last4 and status."],
+    ["ACCOUNT_DASHBOARD_BILLING_PORTAL_BOUNDARY_MISSING", d122DashboardBillingPortalBoundary, "Dashboard must expose billing management as a hosted portal action, not raw billing state."],
+    ["ACCOUNT_DASHBOARD_STRIPE_ID_DISPLAY_RISK", d122DashboardDataRowsDoNotDisplayRawStripeIds, "Dashboard must not render raw Stripe customer or subscription identifiers as UI values."],
+    ["ACCOUNT_VIEW_SERVER_ONLY_BOUNDARY_MISSING", d122AccountServerOnlyBoundary, "Account display state must be resolved server-side from auth and database relations."],
+    ["ACCOUNT_VIEW_SUBSCRIPTION_SNAPSHOT_MISSING", d122AccountSubscriptionSnapshotBoundary, "Account display state must use the shared entitlement snapshot for tier, status, chain, and window depth."],
+    ["ACCOUNT_VIEW_PUBLIC_FALLBACK_MISSING", d122AccountPublicFallbackBoundary, "Account view must have a safe public/inactive fallback when auth is absent or unavailable."],
+    ["ACCOUNT_DISPLAY_PRODUCTION_LOGGING_BOUNDARY_MISSING", d122AccountProductionLoggingBoundary, "Account display logs must be bounded and must not log raw auth, billing, secret, or account identifiers in production."],
+    ["ACCOUNT_PORTAL_AUTH_BOUNDARY_MISSING", d122PortalAuthBoundary, "Billing portal route must require same-origin, rate limit, and authenticated account state."],
+    ["ACCOUNT_PORTAL_NO_STORE_BOUNDARY_MISSING", d122PortalNoStoreBoundary, "Billing portal route must use no-store for JSON errors and redirects."],
+    ["ACCOUNT_PORTAL_STRIPE_CUSTOMER_SERVER_SIDE_USE_MISSING", d122PortalCustomerServerSideUse, "Stripe customer id may be used server-side for portal creation but must not be public response data."],
+    ["ACCOUNT_PORTAL_RAW_STRIPE_RESPONSE_LEAK_RISK", d122PortalRawStripeResponseBoundary, "Billing portal route must not return raw Stripe portal sessions, URLs, or customer/subscription ids in JSON."]
+  ];
+
+  for (const [code, ok, detail] of d122Checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-122",
+        code,
+        file: "src/app/dashboard/page.tsx; src/lib/auth/account.ts; src/app/api/v1/checkout/portal/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
