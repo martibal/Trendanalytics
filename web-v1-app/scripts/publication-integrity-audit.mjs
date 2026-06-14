@@ -14410,6 +14410,146 @@ ensureReportDir();
 }
 
 
+// D-117 Checkout session output boundary final audit
+{
+  const d117CheckoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const d117CheckoutSource = fs.existsSync(d117CheckoutRouteFile)
+    ? fs.readFileSync(d117CheckoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function d117LooseFunctionRegion(sourceText, functionName, fallbackLength = 9000) {
+    const starts = [
+      sourceText.indexOf("export async function " + functionName),
+      sourceText.indexOf("async function " + functionName),
+      sourceText.indexOf("export function " + functionName),
+      sourceText.indexOf("function " + functionName),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextCandidates = [
+      sourceText.indexOf("\nexport async function ", afterStart),
+      sourceText.indexOf("\nasync function ", afterStart),
+      sourceText.indexOf("\nexport function ", afterStart),
+      sourceText.indexOf("\nfunction ", afterStart),
+    ].filter((index) => index > start).sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) {
+      return sourceText.slice(start, nextCandidates[0]);
+    }
+
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  const d117HandleRegion = d117LooseFunctionRegion(d117CheckoutSource, "handleCheckout", 14000);
+
+  const d117CheckoutRouteExists = d117CheckoutSource.length > 0;
+
+  const d117SessionCreationExists =
+    d117HandleRegion.includes("stripe.checkout.sessions.create");
+
+  const d117SessionModeSubscription =
+    /mode\s*:\s*["']subscription["']/u.test(d117HandleRegion);
+
+  const d117SessionUsesLineItems =
+    d117HandleRegion.includes("line_items") &&
+    d117HandleRegion.includes("price") &&
+    d117HandleRegion.includes("quantity");
+
+  const d117MetadataMirroredToSessionAndSubscription =
+    d117HandleRegion.includes("metadata") &&
+    d117HandleRegion.includes("subscription_data") &&
+    (
+      d117HandleRegion.includes("checkoutMetadata") ||
+      d117HandleRegion.includes("checkout_plan") ||
+      d117HandleRegion.includes("account_id")
+    );
+
+  const d117SuccessUrlUsesPlaceholder =
+    d117HandleRegion.includes("success_url") &&
+    d117HandleRegion.includes("CHECKOUT_SESSION_ID");
+
+  const d117SuccessUrlDoesNotUseActualSessionId =
+    !/success_url[\s\S]{0,700}session\.id/u.test(d117HandleRegion);
+
+  const d117SessionUrlGuardedBeforeRedirect =
+    (
+      d117HandleRegion.includes("!session.url") ||
+      /if\s*\(\s*!\s*session\.url\s*\)/u.test(d117HandleRegion)
+    ) &&
+    d117HandleRegion.includes("stripe_error");
+
+  const d117RedirectsToStripeSessionUrl =
+    d117HandleRegion.includes("NextResponse.redirect") &&
+    d117HandleRegion.includes("session.url");
+
+  const d117StripeRedirectUses303 =
+    d117RedirectsToStripeSessionUrl &&
+    (
+      d117HandleRegion.includes("status: 303") ||
+      d117HandleRegion.includes("303")
+    );
+
+  const d117StripeRedirectIsNoStore =
+    d117RedirectsToStripeSessionUrl &&
+    d117HandleRegion.includes("Cache-Control") &&
+    d117HandleRegion.includes("no-store");
+
+  const d117NoSessionObjectReturnedAsJson =
+    !/NextResponse\.json\s*\(\s*session\b/u.test(d117CheckoutSource);
+
+  const d117NoSessionUrlReturnedAsJson =
+    !/NextResponse\.json\s*\([\s\S]{0,700}(?:url|checkoutUrl|sessionUrl)\s*:\s*session\.url/u.test(d117CheckoutSource);
+
+  const d117NoSessionIdReturnedAsJson =
+    !/NextResponse\.json\s*\([\s\S]{0,700}(?:id|sessionId|session_id)\s*:\s*session\.id/u.test(d117CheckoutSource);
+
+  const d117NoCustomerOrSubscriptionReturnedAsJson =
+    !/NextResponse\.json\s*\([\s\S]{0,900}session\.(?:customer|subscription)/u.test(d117CheckoutSource);
+
+  const d117NoJsonErrorContainsSessionFields =
+    !/jsonError\s*\(\s*session\.(?:url|id|customer|subscription)\b/u.test(d117CheckoutSource) &&
+    !/jsonError\s*\([\s\S]{0,360}(?:url|checkoutUrl|sessionUrl|id|sessionId|session_id|customer|subscription)\s*:\s*session\.(?:url|id|customer|subscription)\b/u.test(d117CheckoutSource);
+  const d117NoSensitiveStripeIdentifiersInPublicJson =
+    !/NextResponse\.json\s*\([\s\S]{0,900}(?:stripeCustomerId|stripeSubscriptionId|STRIPE_SECRET_KEY|STRIPE_PRICE_)/u.test(d117CheckoutSource);
+
+  const d117Checks = [
+    ["CHECKOUT_ROUTE_MISSING_FOR_SESSION_OUTPUT_AUDIT", d117CheckoutRouteExists, "checkout route must exist before session output audit can run."],
+    ["CHECKOUT_SESSION_CREATE_MISSING", d117SessionCreationExists, "checkout route must create a Stripe Checkout session."],
+    ["CHECKOUT_SESSION_MODE_SUBSCRIPTION_MISSING", d117SessionModeSubscription, "checkout session must use subscription mode."],
+    ["CHECKOUT_SESSION_LINE_ITEMS_MISSING", d117SessionUsesLineItems, "checkout session must use line_items with price and quantity."],
+    ["CHECKOUT_SESSION_METADATA_MIRRORING_MISSING", d117MetadataMirroredToSessionAndSubscription, "checkout metadata must be mirrored to session and subscription_data."],
+    ["CHECKOUT_SUCCESS_URL_SESSION_PLACEHOLDER_MISSING", d117SuccessUrlUsesPlaceholder, "success_url must use CHECKOUT_SESSION_ID placeholder."],
+    ["CHECKOUT_SUCCESS_URL_ACTUAL_SESSION_ID_RISK", d117SuccessUrlDoesNotUseActualSessionId, "success_url must not use actual session.id at creation time."],
+    ["CHECKOUT_SESSION_URL_GUARD_MISSING", d117SessionUrlGuardedBeforeRedirect, "checkout route must guard missing session.url before redirect."],
+    ["CHECKOUT_SESSION_REDIRECT_MISSING", d117RedirectsToStripeSessionUrl, "checkout route must redirect to session.url instead of returning JSON."],
+    ["CHECKOUT_SESSION_REDIRECT_STATUS_MISSING", d117StripeRedirectUses303, "checkout session redirect must use 303."],
+    ["CHECKOUT_SESSION_REDIRECT_NO_STORE_MISSING", d117StripeRedirectIsNoStore, "checkout session redirect must set no-store."],
+    ["CHECKOUT_SESSION_OBJECT_JSON_LEAK_RISK", d117NoSessionObjectReturnedAsJson, "checkout route must not return session object as JSON."],
+    ["CHECKOUT_SESSION_URL_JSON_LEAK_RISK", d117NoSessionUrlReturnedAsJson, "checkout route must not return session.url as JSON."],
+    ["CHECKOUT_SESSION_ID_JSON_LEAK_RISK", d117NoSessionIdReturnedAsJson, "checkout route must not return session.id as JSON."],
+    ["CHECKOUT_SESSION_CUSTOMER_SUBSCRIPTION_JSON_LEAK_RISK", d117NoCustomerOrSubscriptionReturnedAsJson, "checkout route must not return Stripe customer/subscription from session as JSON."],
+    ["CHECKOUT_JSON_ERROR_SESSION_FIELD_LEAK_RISK", d117NoJsonErrorContainsSessionFields, "checkout jsonError calls must not include session fields."],
+    ["CHECKOUT_PUBLIC_JSON_STRIPE_IDENTIFIER_LEAK_RISK", d117NoSensitiveStripeIdentifiersInPublicJson, "checkout public JSON must not include Stripe identifiers or secret env names."]
+  ];
+
+  for (const [code, ok, detail] of d117Checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-117",
+        code,
+        file: "src/app/api/v1/checkout/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
