@@ -15001,6 +15001,169 @@ ensureReportDir();
 
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
+
+// D-120 Stripe webhook stale-processing recovery contract final audit
+{
+  const d120WebhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const d120WebhookSource = fs.existsSync(d120WebhookRouteFile)
+    ? fs.readFileSync(d120WebhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function d120LooseFunctionRegion(sourceText, functionName, fallbackLength = 12000) {
+    const starts = [
+      sourceText.indexOf("export async function " + functionName),
+      sourceText.indexOf("async function " + functionName),
+      sourceText.indexOf("export function " + functionName),
+      sourceText.indexOf("function " + functionName),
+      sourceText.indexOf("const " + functionName + " ="),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextNeedles = [
+      "\nexport async function ",
+      "\nasync function ",
+      "\nexport function ",
+      "\nfunction ",
+      "\nconst ",
+      "\ntype ",
+    ];
+    const nextCandidates = nextNeedles
+      .map((needle) => sourceText.indexOf(needle, afterStart))
+      .filter((index) => index > start)
+      .sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) {
+      return sourceText.slice(start, nextCandidates[0]);
+    }
+
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  const d120RecordRegion = d120LooseFunctionRegion(d120WebhookSource, "recordStripeWebhookEventReceived", 12000);
+  const d120ResetRegion = d120LooseFunctionRegion(d120WebhookSource, "resetStripeWebhookEventForReplay", 4200);
+  const d120StaleRegion = d120LooseFunctionRegion(d120WebhookSource, "isWebhookProcessingStale", 1800);
+  const d120PostRegion = d120LooseFunctionRegion(d120WebhookSource, "POST", 26000);
+
+  const d120WebhookRouteExists =
+    d120WebhookSource.length > 0;
+
+  const d120HasReplayDecisionContract =
+    d120WebhookSource.includes("WebhookReplayDecision") &&
+    d120WebhookSource.includes("\"created\"") &&
+    d120WebhookSource.includes("\"duplicate\"") &&
+    d120WebhookSource.includes("\"reprocess\"");
+
+  const d120HasStaleThreshold =
+    d120WebhookSource.includes("WEBHOOK_PROCESSING_STALE_AFTER_MS") &&
+    (
+      /\b\d+\s*\*\s*60\s*\*\s*1000\b/u.test(d120WebhookSource) ||
+      /\b\d+\s*\*\s*1000\b/u.test(d120WebhookSource)
+    );
+
+  const d120HasStaleDetector =
+    d120StaleRegion.includes("Date.now()") &&
+    d120StaleRegion.includes("receivedAt.getTime()") &&
+    d120StaleRegion.includes("WEBHOOK_PROCESSING_STALE_AFTER_MS");
+
+  const d120CreatesProcessingReplayState =
+    d120RecordRegion.includes("db.stripeWebhookEvent.create") &&
+    d120RecordRegion.includes("stripeEventId: event.id") &&
+    d120RecordRegion.includes("eventType: event.type") &&
+    d120RecordRegion.includes("status: \"processing\"");
+
+  const d120LooksUpExistingReplayState =
+    d120RecordRegion.includes("db.stripeWebhookEvent.findUnique") &&
+    d120RecordRegion.includes("stripeEventId: event.id") &&
+    d120RecordRegion.includes("status: true") &&
+    d120RecordRegion.includes("receivedAt: true");
+
+  const d120FailedReplayAccepted =
+    d120RecordRegion.includes("existing.status === \"failed\"") &&
+    d120RecordRegion.includes("failed event replay accepted") &&
+    d120RecordRegion.includes("resetStripeWebhookEventForReplay(event.id)") &&
+    d120RecordRegion.includes("return \"reprocess\"");
+
+  const d120StaleProcessingReplayAccepted =
+    d120RecordRegion.includes("existing.status === \"processing\"") &&
+    d120RecordRegion.includes("isWebhookProcessingStale(existing.receivedAt)") &&
+    d120RecordRegion.includes("stale processing event replay accepted") &&
+    d120RecordRegion.includes("resetStripeWebhookEventForReplay(event.id)") &&
+    d120RecordRegion.includes("return \"reprocess\"");
+
+  const d120ReplayResetSemantics =
+    d120ResetRegion.includes("db.stripeWebhookEvent.updateMany") &&
+    d120ResetRegion.includes("stripeEventId") &&
+    d120ResetRegion.includes("status: \"processing\"") &&
+    d120ResetRegion.includes("processedAt: null") &&
+    d120ResetRegion.includes("errorCode: null");
+
+  const d120DuplicateAckIs2xx =
+    d120RecordRegion.includes("return \"duplicate\"") &&
+    d120PostRegion.includes("replayDecision === \"duplicate\"") &&
+    /jsonResponse\s*\(\s*200\s*,\s*["']ignored["']/u.test(d120PostRegion);
+
+  const d120ReprocessFallsThroughToHandler =
+    d120RecordRegion.includes("return \"reprocess\"") &&
+    d120PostRegion.includes("const replayDecision = await recordStripeWebhookEventReceived(event)") &&
+    /if\s*\(\s*replayDecision\s*===\s*["']duplicate["']\s*\)/u.test(d120PostRegion) &&
+    d120PostRegion.includes("handleVerifiedEvent(stripe, event)");
+
+  const d120ProcessingFailureMarkedRecoverable =
+    /markStripeWebhookEvent\s*\(\s*event\s*,\s*["']failed["']\s*,\s*["']processing_failed["']\s*\)/u.test(d120PostRegion) &&
+    /jsonResponse\s*\(\s*500\s*,\s*["']webhook_error["']/u.test(d120PostRegion);
+
+  const d120ReplayPersistenceFailureRetryable =
+    d120PostRegion.includes("replay persistence failed") &&
+    /jsonResponse\s*\(\s*500\s*,\s*["']webhook_error["']/u.test(d120PostRegion);
+
+  const d120RecoveryLoggingIsBounded =
+    d120RecordRegion.includes("failed event replay accepted") &&
+    d120RecordRegion.includes("stale processing event replay accepted") &&
+    !/console\.(?:debug|info|warn|error)\s*\([\s\S]{0,700}(?:rawBody|payload|signature|webhookSecret|STRIPE_WEBHOOK_SECRET|event\.data\.object|JSON\.stringify\s*\(\s*event)/u.test(
+      d120RecordRegion
+    );
+
+  const d120NoPermanentProcessingBlock =
+    d120RecordRegion.includes("existing.status === \"processing\"") &&
+    d120RecordRegion.includes("isWebhookProcessingStale(existing.receivedAt)") &&
+    d120RecordRegion.includes("return \"reprocess\"") &&
+    d120RecordRegion.includes("return \"duplicate\"");
+
+  const d120Checks = [
+    ["STRIPE_WEBHOOK_ROUTE_MISSING_FOR_STALE_RECOVERY_AUDIT", d120WebhookRouteExists, "Stripe webhook route must exist before stale-processing recovery audit can run."],
+    ["STRIPE_WEBHOOK_REPLAY_DECISION_CONTRACT_MISSING", d120HasReplayDecisionContract, "Stripe webhook replay decisions must distinguish created, duplicate, and reprocess."],
+    ["STRIPE_WEBHOOK_STALE_PROCESSING_THRESHOLD_MISSING", d120HasStaleThreshold, "Stripe webhook must define an explicit stale processing age threshold."],
+    ["STRIPE_WEBHOOK_STALE_PROCESSING_DETECTOR_MISSING", d120HasStaleDetector, "Stripe webhook must detect stale processing events from receivedAt and the stale threshold."],
+    ["STRIPE_WEBHOOK_REPLAY_STATE_CREATION_MISSING", d120CreatesProcessingReplayState, "Stripe webhook must persist a processing replay state before handling verified events."],
+    ["STRIPE_WEBHOOK_REPLAY_STATE_LOOKUP_MISSING", d120LooksUpExistingReplayState, "Stripe webhook must inspect existing replay state and receivedAt on duplicate events."],
+    ["STRIPE_WEBHOOK_FAILED_REPLAY_RECOVERY_MISSING", d120FailedReplayAccepted, "Stripe webhook must allow failed events to be replayed/reprocessed."],
+    ["STRIPE_WEBHOOK_STALE_PROCESSING_REPLAY_RECOVERY_MISSING", d120StaleProcessingReplayAccepted, "Stripe webhook must allow stale processing events to be replayed/reprocessed."],
+    ["STRIPE_WEBHOOK_REPLAY_RESET_SEMANTICS_MISSING", d120ReplayResetSemantics, "Stripe webhook replay recovery must reset event state to processing and clear terminal fields."],
+    ["STRIPE_WEBHOOK_DUPLICATE_ACK_2XX_MISSING", d120DuplicateAckIs2xx, "Stripe webhook duplicate non-recoverable events must acknowledge with 2xx to avoid unnecessary Stripe retries."],
+    ["STRIPE_WEBHOOK_REPROCESS_FALLTHROUGH_MISSING", d120ReprocessFallsThroughToHandler, "Stripe webhook recovered replay decisions must fall through to verified event handling."],
+    ["STRIPE_WEBHOOK_PROCESSING_FAILURE_RECOVERABLE_STATE_MISSING", d120ProcessingFailureMarkedRecoverable, "Stripe webhook processing failures must mark failed and return retryable non-success status."],
+    ["STRIPE_WEBHOOK_REPLAY_PERSISTENCE_RETRY_STATUS_MISSING", d120ReplayPersistenceFailureRetryable, "Stripe webhook replay persistence failures must return retryable non-success status."],
+    ["STRIPE_WEBHOOK_STALE_RECOVERY_LOGGING_BOUNDARY_MISSING", d120RecoveryLoggingIsBounded, "Stripe webhook stale/failed replay recovery logging must be bounded and must not log raw payloads, signatures, secrets, or event objects."],
+    ["STRIPE_WEBHOOK_PERMANENT_PROCESSING_BLOCK_RISK", d120NoPermanentProcessingBlock, "Stripe webhook processing state must not permanently block replay after the stale threshold."]
+  ];
+
+  for (const [code, ok, detail] of d120Checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-120",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
