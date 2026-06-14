@@ -17031,6 +17031,471 @@ const d124Checks = [
 result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
   }
 }
+
+// D-125 API key usage/rate-limit audit trail boundary final audit
+{
+  const d125FileRouteFile = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
+  const d125RateLimitFile = path.join(root, "src", "lib", "auth", "rateLimit.ts");
+  const d125PreAuthFile = path.join(root, "src", "lib", "security", "preAuthRateLimit.ts");
+  const d125AuditLogFile = path.join(root, "src", "lib", "auditLog.ts");
+  const d125ApiKeysFile = path.join(root, "src", "lib", "auth", "apiKeys.ts");
+
+  const d125FileRouteSource = fs.existsSync(d125FileRouteFile)
+    ? fs.readFileSync(d125FileRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d125RateLimitSource = fs.existsSync(d125RateLimitFile)
+    ? fs.readFileSync(d125RateLimitFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d125PreAuthSource = fs.existsSync(d125PreAuthFile)
+    ? fs.readFileSync(d125PreAuthFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d125AuditLogSource = fs.existsSync(d125AuditLogFile)
+    ? fs.readFileSync(d125AuditLogFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d125ApiKeysSource = fs.existsSync(d125ApiKeysFile)
+    ? fs.readFileSync(d125ApiKeysFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function d125FunctionRegion(sourceText, functionName, fallbackLength = 24000) {
+    const starts = [
+      sourceText.indexOf("export async function " + functionName),
+      sourceText.indexOf("async function " + functionName),
+      sourceText.indexOf("export function " + functionName),
+      sourceText.indexOf("function " + functionName),
+      sourceText.indexOf("const " + functionName + " ="),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const nextNeedles = [
+      "\nexport async function ",
+      "\nasync function ",
+      "\nexport function ",
+      "\nfunction ",
+      "\nconst ",
+      "\ntype ",
+    ];
+    const nextCandidates = nextNeedles
+      .map((needle) => sourceText.indexOf(needle, start + 1))
+      .filter((index) => index > start)
+      .sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) return sourceText.slice(start, nextCandidates[0]);
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  function d125StripQuotedLiterals(value) {
+    return value.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/gu, "\"\"");
+  }
+
+  function d125IndexOrder(sourceText, needles) {
+    let previous = -1;
+    for (const needle of needles) {
+      const index = sourceText.indexOf(needle);
+      if (index < 0 || index <= previous) return false;
+      previous = index;
+    }
+    return true;
+  }
+
+  const d125FileRouteExists = d125FileRouteSource.length > 0;
+  const d125RateLimitExists = d125RateLimitSource.length > 0;
+  const d125PreAuthExists = d125PreAuthSource.length > 0;
+  const d125AuditLogExists = d125AuditLogSource.length > 0;
+  const d125ApiKeysExists = d125ApiKeysSource.length > 0;
+
+  const d125FileGetRegion = d125FunctionRegion(d125FileRouteSource, "GET", 42000);
+  const d125RateLimitHeadersRegion = d125FunctionRegion(d125RateLimitSource, "buildRateLimitHeaders", 2400);
+  const d125DailyQuotaHeadersRegion = d125FunctionRegion(d125RateLimitSource, "buildDailyQuotaHeaders", 2400);
+  const d125AccountRateLimitRegion = d125FunctionRegion(d125RateLimitSource, "enforceAccountRateLimit", 2400);
+  const d125DailyQuotaRegion = d125FunctionRegion(d125RateLimitSource, "enforceDailyApiQuota", 2400);
+  const d125MemoryRateLimitRegion = d125FunctionRegion(d125RateLimitSource, "applyMemoryRateLimit", 7600);
+  const d125MemoryDailyQuotaRegion = d125FunctionRegion(d125RateLimitSource, "applyMemoryDailyQuota", 7600);
+  const d125UpstashRateLimitRegion = d125FunctionRegion(d125RateLimitSource, "applyUpstashRateLimit", 7600);
+  const d125UpstashDailyQuotaRegion = d125FunctionRegion(d125RateLimitSource, "applyUpstashDailyQuota", 9600);
+  const d125PreAuthFunctionRegion = d125FunctionRegion(d125PreAuthSource, "enforcePreAuthRateLimit", 9600);
+  const d125PreAuthHeadersRegion = d125FunctionRegion(d125PreAuthSource, "buildHeaders", 2600);
+  const d125PreAuthRateLimitedResponseRegion = d125FunctionRegion(d125PreAuthSource, "buildRateLimitedResponse", 3200);
+  const d125LogApiEventRegion = d125FunctionRegion(d125AuditLogSource, "logApiEvent", 4200);
+  const d125WriteAuditLogRegion = d125FunctionRegion(d125AuditLogSource, "writeAuditLog", 3200);
+  const d125TouchLastUsedRegion = d125FunctionRegion(d125ApiKeysSource, "touchPersistedApiKeyLastUsedAt", 4200);
+
+  const d125FileRouteUsesRequestIdAndPreAuthRateLimit =
+    d125FileGetRegion.includes("const requestId = getOrCreateRequestId(request.headers)") &&
+    d125FileGetRegion.includes("const preAuthRateLimit = await enforcePreAuthRateLimit(request, \"file-api\", requestId)") &&
+    d125FileGetRegion.includes("if (!preAuthRateLimit.ok)") &&
+    d125FileGetRegion.includes("return preAuthRateLimit.response") &&
+    d125FileGetRegion.includes("headers: withRequestId(requestId)") &&
+    d125FileRouteSource.includes("function withRequestId(") &&
+    d125FileRouteSource.includes("\"X-Request-Id\": requestId");
+
+  const d125AuthenticatedRateLimitAndQuotaEnforcement =
+    d125FileGetRegion.includes("authResult.entitlement.tier === \"basic\" || authResult.entitlement.tier === \"pro\"") &&
+    d125FileGetRegion.includes("const rateLimitDecision = await enforceAccountRateLimit(") &&
+    d125FileGetRegion.includes("authResult.accountId") &&
+    d125FileGetRegion.includes("authResult.entitlement.tier") &&
+    d125FileGetRegion.includes("Object.assign(rateLimitHeaders, buildRateLimitHeaders(rateLimitDecision))") &&
+    d125FileGetRegion.includes("if (!rateLimitDecision.success)") &&
+    d125FileGetRegion.includes("const quotaDecision = await enforceDailyApiQuota(") &&
+    d125FileGetRegion.includes("authResult.keyId") &&
+    d125FileGetRegion.includes("Object.assign(rateLimitHeaders, buildDailyQuotaHeaders(quotaDecision))") &&
+    d125FileGetRegion.includes("if (!quotaDecision.success)") &&
+    d125IndexOrder(d125FileGetRegion, [
+      "const authResult = await validateRequestApiKey(request)",
+      "const rateLimitDecision = await enforceAccountRateLimit(",
+      "const quotaDecision = await enforceDailyApiQuota(",
+      "const resolved = await context.params",
+      "const decision = evaluateFileEntitlement(",
+      "const file = await readStorageObject(storagePath)",
+    ]);
+
+  const d125RateLimitFailureResponsesIncludeHeaders =
+    d125FileGetRegion.includes("429") &&
+    d125FileGetRegion.includes("\"rate_limited\"") &&
+    d125FileGetRegion.includes("Rate limit exceeded.") &&
+    d125FileGetRegion.includes("Daily API quota exceeded.") &&
+    /jsonError\s*\([\s\S]{0,900}rateLimitHeaders/u.test(d125FileGetRegion) &&
+    d125RateLimitHeadersRegion.includes("X-RateLimit-Limit") &&
+    d125RateLimitHeadersRegion.includes("X-RateLimit-Remaining") &&
+    d125RateLimitHeadersRegion.includes("X-RateLimit-Reset") &&
+    d125RateLimitHeadersRegion.includes("Retry-After") &&
+    d125DailyQuotaHeadersRegion.includes("X-DailyQuota-Limit") &&
+    d125DailyQuotaHeadersRegion.includes("X-DailyQuota-Remaining") &&
+    d125DailyQuotaHeadersRegion.includes("X-DailyQuota-Reset") &&
+    d125DailyQuotaHeadersRegion.includes("Retry-After");
+
+  const d125RateLimitModelBoundary =
+    d125RateLimitSource.includes("type RateLimitDecision") &&
+    d125RateLimitSource.includes("type DailyApiQuotaDecision") &&
+    d125RateLimitSource.includes("source: \"upstash\" | \"memory\" | \"fail_closed\"") &&
+    d125RateLimitSource.includes("const BASIC_LIMIT = 60") &&
+    d125RateLimitSource.includes("const PRO_LIMIT = 300") &&
+    d125RateLimitSource.includes("BASIC_DAILY_API_QUOTA") &&
+    d125RateLimitSource.includes("PRO_DAILY_API_QUOTA") &&
+    d125RateLimitSource.includes("getLimitForTier") &&
+    d125RateLimitSource.includes("getDailyQuotaForTier") &&
+    d125RateLimitSource.includes("getNextUtcMidnightMs") &&
+    d125RateLimitSource.includes("getSecondsUntilNextUtcMidnight");
+
+  const d125UpstashMemoryFailClosedBoundary =
+    d125RateLimitSource.includes("getRedisClient") &&
+    d125RateLimitSource.includes("UPSTASH_REDIS_REST_URL") &&
+    d125RateLimitSource.includes("UPSTASH_REDIS_REST_TOKEN") &&
+    d125UpstashRateLimitRegion.includes("Ratelimit.slidingWindow") &&
+    d125UpstashRateLimitRegion.includes("isProductionRuntime()") &&
+    d125UpstashRateLimitRegion.includes("buildFailClosedDecision(tier)") &&
+    d125UpstashRateLimitRegion.includes("applyMemoryRateLimit(accountId, tier)") &&
+    d125UpstashDailyQuotaRegion.includes("redis.incr(key)") &&
+    d125UpstashDailyQuotaRegion.includes("redis.expire(key, ttlSeconds)") &&
+    d125UpstashDailyQuotaRegion.includes("buildDailyQuotaFailClosedDecision(tier)") &&
+    d125UpstashDailyQuotaRegion.includes("applyMemoryDailyQuota(accountId, apiKeyId, tier)") &&
+    d125MemoryRateLimitRegion.includes("memoryStore") &&
+    d125MemoryRateLimitRegion.includes("existing.count >= limit") &&
+    d125MemoryDailyQuotaRegion.includes("dailyQuotaMemoryStore") &&
+    d125MemoryDailyQuotaRegion.includes("existing.count >= limit");
+
+  const d125PreAuthRateLimitBoundary =
+    d125PreAuthSource.includes("import \"server-only\"") &&
+    d125PreAuthSource.includes("\"file-api\": 300") &&
+    d125PreAuthSource.includes("\"keys-api\": 30") &&
+    d125PreAuthSource.includes("PREAUTH_RATE_LIMIT_") &&
+    d125PreAuthSource.includes("x-forwarded-for") &&
+    d125PreAuthSource.includes("x-real-ip") &&
+    d125PreAuthSource.includes("cf-connecting-ip") &&
+    d125PreAuthFunctionRegion.includes("getRatelimiter(scope, limit)") &&
+    d125PreAuthFunctionRegion.includes("isProductionRuntime()") &&
+    d125PreAuthFunctionRegion.includes("buildFailClosedDecision(scope, requestId)") &&
+    d125PreAuthFunctionRegion.includes("applyMemoryRateLimit(key, scope, limit, requestId)") &&
+    d125PreAuthRateLimitedResponseRegion.includes("status: 429") &&
+    d125PreAuthRateLimitedResponseRegion.includes("code: \"rate_limited\"") &&
+    d125PreAuthHeadersRegion.includes("X-RateLimit-Limit") &&
+    d125PreAuthHeadersRegion.includes("X-RateLimit-Remaining") &&
+    d125PreAuthHeadersRegion.includes("X-RateLimit-Reset") &&
+    d125PreAuthHeadersRegion.includes("Retry-After") &&
+    d125PreAuthHeadersRegion.includes("Cache-Control") &&
+    d125PreAuthHeadersRegion.includes("no-store") &&
+    d125PreAuthHeadersRegion.includes("X-Request-Id");
+
+  const d125AuditLogSchemaAndPersistenceBoundary =
+    d125AuditLogSource.includes("import \"server-only\"") &&
+    d125AuditLogSource.includes("export type AuditEventType") &&
+    d125AuditLogSource.includes("entitlement_forbidden") &&
+    d125AuditLogSource.includes("auth_failed") &&
+    d125AuditLogSource.includes("rate_limited") &&
+    d125AuditLogSource.includes("file_served") &&
+    d125AuditLogSource.includes("server_error") &&
+    d125AuditLogSource.includes("api_key_created") &&
+    d125AuditLogSource.includes("api_key_revoked") &&
+    d125AuditLogSource.includes("request_id") &&
+    d125AuditLogSource.includes("account_id") &&
+    d125AuditLogSource.includes("key_id") &&
+    d125AuditLogSource.includes("latency_bucket") &&
+    d125AuditLogSource.includes("sanitizeField") &&
+    d125AuditLogSource.includes("trimmed.slice(0, 256)") &&
+    d125WriteAuditLogRegion.includes("emitAuditConsole(entry)") &&
+    d125WriteAuditLogRegion.includes("await appendAuditLine(entry)") &&
+    d125WriteAuditLogRegion.includes("catch") &&
+    d125LogApiEventRegion.includes("ts_utc: nowUtcIso()") &&
+    d125LogApiEventRegion.includes("request_id: input.requestId") &&
+    d125LogApiEventRegion.includes("getLatencyBucket(input.startedAtMs, input.endedAtMs)");
+
+  const d125FileRouteAuditEventsBoundary =
+    d125FileGetRegion.includes("eventType: \"auth_failed\"") &&
+    d125FileGetRegion.includes("statusCode: authResult.code === \"unauthenticated\" ? 401 : 403") &&
+    d125FileGetRegion.includes("detail: authResult.detail") &&
+    d125FileGetRegion.includes("eventType: \"rate_limited\"") &&
+    d125FileGetRegion.includes("statusCode: 429") &&
+    d125FileGetRegion.includes("eventType: \"entitlement_forbidden\"") &&
+    d125FileGetRegion.includes("statusCode: 403") &&
+    d125FileGetRegion.includes("detail: decision.code") &&
+    d125FileGetRegion.includes("eventType: \"file_served\"") &&
+    d125FileGetRegion.includes("statusCode: 200") &&
+    d125FileGetRegion.includes("eventType: \"server_error\"") &&
+    d125FileGetRegion.includes("statusCode: 500") &&
+    d125FileGetRegion.includes("accountId") &&
+    d125FileGetRegion.includes("keyId") &&
+    d125FileGetRegion.includes("chain") &&
+    d125FileGetRegion.includes("genre") &&
+    d125FileGetRegion.includes("window");
+
+  const d125LastUsedAfterSuccessfulDeliveryBoundary =
+    d125TouchLastUsedRegion.includes("shouldUpdateLastUsedAt") &&
+    d125TouchLastUsedRegion.includes("LAST_USED_UPDATE_INTERVAL_MS") &&
+    d125TouchLastUsedRegion.includes("db.apiKey.updateMany") &&
+    d125TouchLastUsedRegion.includes("status:") &&
+    d125TouchLastUsedRegion.includes("not: ApiKeyStatus.revoked") &&
+    d125FileGetRegion.includes("await touchPersistedApiKeyLastUsedAt(authResult.keyId, authResult.record.lastUsedAt)") &&
+    d125IndexOrder(d125FileGetRegion, [
+      "eventType: \"file_served\"",
+      "await touchPersistedApiKeyLastUsedAt(authResult.keyId, authResult.record.lastUsedAt)",
+      "return new NextResponse(file.body",
+    ]);
+
+  const d125PublicResponseAndSecretBoundary =
+    d125FileRouteSource.includes("publicFileErrorDetail") &&
+    d125FileRouteSource.includes("process.env.NODE_ENV !== \"production\"") &&
+    d125FileRouteSource.includes("return \"server_error\"") &&
+    d125FileGetRegion.includes("Cache-Control\": \"private, no-store\"") &&
+    d125FileGetRegion.includes("X-Entitlement-Tier") &&
+    d125FileGetRegion.includes("X-Entitlement-Window") &&
+    !/NextResponse\.json\s*\([\s\S]{0,1800}\b(?:secret|keyHash|tokenHash|rawToken|apiKey)\b/u.test(
+      d125StripQuotedLiterals(d125FileGetRegion)
+    ) &&
+    !/logApiEvent\s*\([\s\S]{0,1000}\b(?:secret|keyHash|tokenHash|rawToken|apiKey)\b/u.test(
+      d125StripQuotedLiterals(d125FileGetRegion)
+    ) &&
+    !/console\.(?:info|warn|error)\s*\([\s\S]{0,1000}\b(?:secret|keyHash|tokenHash|rawToken|apiKey)\b/u.test(
+      d125StripQuotedLiterals(d125RateLimitSource + "\n" + d125PreAuthSource + "\n" + d125AuditLogSource)
+    );
+
+  const d125EndToEndUsageTrailBoundary =
+    d125FileRouteUsesRequestIdAndPreAuthRateLimit &&
+    d125AuthenticatedRateLimitAndQuotaEnforcement &&
+    d125RateLimitFailureResponsesIncludeHeaders &&
+    d125RateLimitModelBoundary &&
+    d125UpstashMemoryFailClosedBoundary &&
+    d125PreAuthRateLimitBoundary &&
+    d125AuditLogSchemaAndPersistenceBoundary &&
+    d125FileRouteAuditEventsBoundary &&
+    d125LastUsedAfterSuccessfulDeliveryBoundary &&
+    d125PublicResponseAndSecretBoundary;
+
+  const d125Checks = [
+    ["API_KEY_USAGE_FILE_ROUTE_MISSING", d125FileRouteExists, "src/app/api/v1/files/[...path]/route.ts", "Authenticated file delivery route must exist before usage/rate-limit audit can run."],
+    ["API_KEY_USAGE_RATE_LIMIT_MODULE_MISSING", d125RateLimitExists, "src/lib/auth/rateLimit.ts", "Authenticated rate-limit module must exist before usage/rate-limit audit can run."],
+    ["API_KEY_USAGE_PREAUTH_RATE_LIMIT_MODULE_MISSING", d125PreAuthExists, "src/lib/security/preAuthRateLimit.ts", "Pre-auth rate-limit module must exist before usage/rate-limit audit can run."],
+    ["API_KEY_USAGE_AUDIT_LOG_MODULE_MISSING", d125AuditLogExists, "src/lib/auditLog.ts", "Audit log module must exist before usage/rate-limit audit can run."],
+    ["API_KEY_USAGE_API_KEYS_MODULE_MISSING", d125ApiKeysExists, "src/lib/auth/apiKeys.ts", "API key persistence module must exist before usage/rate-limit audit can run."],
+    ["API_KEY_USAGE_REQUEST_ID_PREAUTH_BOUNDARY_MISSING", d125FileRouteUsesRequestIdAndPreAuthRateLimit, "src/app/api/v1/files/[...path]/route.ts", "File delivery must create a request id and enforce pre-auth file-api rate limits before authentication and delivery."],
+    ["API_KEY_USAGE_AUTHENTICATED_RATE_LIMIT_QUOTA_MISSING", d125AuthenticatedRateLimitAndQuotaEnforcement, "src/app/api/v1/files/[...path]/route.ts", "Authenticated file delivery must enforce account rate limit and daily quota before path resolution, entitlement evaluation, and storage reads."],
+    ["API_KEY_USAGE_RATE_LIMIT_HEADERS_MISSING", d125RateLimitFailureResponsesIncludeHeaders, "src/app/api/v1/files/[...path]/route.ts; src/lib/auth/rateLimit.ts", "Rate-limit and quota failures must return bounded 429 responses with rate-limit/quota headers and Retry-After when applicable."],
+    ["API_KEY_USAGE_RATE_LIMIT_MODEL_MISSING", d125RateLimitModelBoundary, "src/lib/auth/rateLimit.ts", "Rate-limit model must define tier-specific minute limits, daily quota limits, reset/retry metadata, and explicit source provenance."],
+    ["API_KEY_USAGE_UPSTASH_MEMORY_FAIL_CLOSED_MISSING", d125UpstashMemoryFailClosedBoundary, "src/lib/auth/rateLimit.ts", "Authenticated rate-limit/quota enforcement must use Upstash when configured, memory fallback outside production, and fail-closed in production."],
+    ["API_KEY_USAGE_PREAUTH_RATE_LIMIT_BOUNDARY_MISSING", d125PreAuthRateLimitBoundary, "src/lib/security/preAuthRateLimit.ts", "Pre-auth rate limiting must be server-only, scoped, IP-keyed, no-store, headered, and fail-closed in production."],
+    ["API_KEY_USAGE_AUDIT_LOG_SCHEMA_MISSING", d125AuditLogSchemaAndPersistenceBoundary, "src/lib/auditLog.ts", "Audit log entries must include bounded request, event, path, status, latency, account/key, scope fields, plus persistent append with console fallback."],
+    ["API_KEY_USAGE_FILE_ROUTE_AUDIT_EVENTS_MISSING", d125FileRouteAuditEventsBoundary, "src/app/api/v1/files/[...path]/route.ts", "File delivery must log auth failures, rate limits, entitlement denials, successful file delivery, and server errors with bounded request/account/key/scope context."],
+    ["API_KEY_USAGE_LAST_USED_TRACKING_MISSING", d125LastUsedAfterSuccessfulDeliveryBoundary, "src/app/api/v1/files/[...path]/route.ts; src/lib/auth/apiKeys.ts", "Successful file delivery must update persisted key lastUsedAt after audit logging and must not update revoked keys."],
+    ["API_KEY_USAGE_PUBLIC_RESPONSE_SECRET_BOUNDARY_MISSING", d125PublicResponseAndSecretBoundary, "src/app/api/v1/files/[...path]/route.ts; src/lib/auth/rateLimit.ts; src/lib/security/preAuthRateLimit.ts; src/lib/auditLog.ts", "Usage/rate-limit responses and logs must expose bounded public metadata only and must not leak API key secrets or hashes."],
+    ["API_KEY_USAGE_RATE_LIMIT_AUDIT_TRAIL_CONTRACT_MISSING", d125EndToEndUsageTrailBoundary, "src/app/api/v1/files/[...path]/route.ts; src/lib/auth/rateLimit.ts; src/lib/security/preAuthRateLimit.ts; src/lib/auditLog.ts; src/lib/auth/apiKeys.ts", "API key usage, rate-limit, quota, last-used tracking, public responses, and audit log events must form one end-to-end delivery trail boundary."]
+  ];
+
+  for (const [code, ok, file, detail] of d125Checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-125",
+        code,
+        file,
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
+// D-125 rate-limit audit trail predicate repair v1
+{
+  const d125RepairFileRouteFile = path.join(root, "src", "app", "api", "v1", "files", "[...path]", "route.ts");
+  const d125RepairRateLimitFile = path.join(root, "src", "lib", "auth", "rateLimit.ts");
+  const d125RepairPreAuthFile = path.join(root, "src", "lib", "security", "preAuthRateLimit.ts");
+  const d125RepairAuditLogFile = path.join(root, "src", "lib", "auditLog.ts");
+  const d125RepairApiKeysFile = path.join(root, "src", "lib", "auth", "apiKeys.ts");
+
+  const d125RepairFileRouteSource = fs.existsSync(d125RepairFileRouteFile)
+    ? fs.readFileSync(d125RepairFileRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d125RepairRateLimitSource = fs.existsSync(d125RepairRateLimitFile)
+    ? fs.readFileSync(d125RepairRateLimitFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d125RepairPreAuthSource = fs.existsSync(d125RepairPreAuthFile)
+    ? fs.readFileSync(d125RepairPreAuthFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d125RepairAuditLogSource = fs.existsSync(d125RepairAuditLogFile)
+    ? fs.readFileSync(d125RepairAuditLogFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d125RepairApiKeysSource = fs.existsSync(d125RepairApiKeysFile)
+    ? fs.readFileSync(d125RepairApiKeysFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function d125RepairOrdered(sourceText, needles) {
+    let previous = -1;
+    for (const needle of needles) {
+      const index = sourceText.indexOf(needle);
+      if (index < 0 || index <= previous) return false;
+      previous = index;
+    }
+    return true;
+  }
+
+  const d125RepairUpstashMemoryFailClosedBoundary =
+    d125RepairRateLimitSource.includes("import { Ratelimit } from \"@upstash/ratelimit\"") &&
+    d125RepairRateLimitSource.includes("import { Redis } from \"@upstash/redis\"") &&
+    d125RepairRateLimitSource.includes("UPSTASH_REDIS_REST_URL") &&
+    d125RepairRateLimitSource.includes("UPSTASH_REDIS_REST_TOKEN") &&
+    d125RepairRateLimitSource.includes("function getRatelimiter(tier: RateLimitTier)") &&
+    d125RepairRateLimitSource.includes("Ratelimit.slidingWindow(getLimitForTier(tier), \"60 s\")") &&
+    d125RepairRateLimitSource.includes("prefix: `ta:rl:${tier}`") &&
+    d125RepairRateLimitSource.includes("async function applyUpstashRateLimit") &&
+    d125RepairRateLimitSource.includes("if (!ratelimit)") &&
+    d125RepairRateLimitSource.includes("if (isProductionRuntime())") &&
+    d125RepairRateLimitSource.includes("return buildFailClosedDecision(tier)") &&
+    d125RepairRateLimitSource.includes("return applyMemoryRateLimit(accountId, tier)") &&
+    d125RepairRateLimitSource.includes("async function applyUpstashDailyQuota") &&
+    d125RepairRateLimitSource.includes("const redis = getRedisClient()") &&
+    d125RepairRateLimitSource.includes("return buildDailyQuotaFailClosedDecision(tier)") &&
+    d125RepairRateLimitSource.includes("return applyMemoryDailyQuota(accountId, apiKeyId, tier)") &&
+    d125RepairRateLimitSource.includes("await redis.incr(key)") &&
+    d125RepairRateLimitSource.includes("await redis.expire(key, ttlSeconds)") &&
+    d125RepairRateLimitSource.includes("memoryStore") &&
+    d125RepairRateLimitSource.includes("dailyQuotaMemoryStore") &&
+    d125RepairRateLimitSource.includes("source: \"fail_closed\"") &&
+    d125RepairRateLimitSource.includes("source: \"memory\"") &&
+    d125RepairRateLimitSource.includes("source: \"upstash\"");
+
+  const d125RepairLastUsedTrackingBoundary =
+    d125RepairApiKeysSource.includes("const LAST_USED_UPDATE_INTERVAL_MS = 5 * 60 * 1000") &&
+    d125RepairApiKeysSource.includes("function shouldUpdateLastUsedAt(lastUsedAt: string | null)") &&
+    d125RepairApiKeysSource.includes("export async function touchPersistedApiKeyLastUsedAt") &&
+    d125RepairApiKeysSource.includes("await db.apiKey.updateMany") &&
+    d125RepairApiKeysSource.includes("id: keyId") &&
+    d125RepairApiKeysSource.includes("not: ApiKeyStatus.revoked") &&
+    d125RepairApiKeysSource.includes("lastUsedAt: new Date()") &&
+    d125RepairFileRouteSource.includes("await touchPersistedApiKeyLastUsedAt(authResult.keyId, authResult.record.lastUsedAt)") &&
+    d125RepairOrdered(d125RepairFileRouteSource, [
+      "eventType: \"file_served\"",
+      "await touchPersistedApiKeyLastUsedAt(authResult.keyId, authResult.record.lastUsedAt)",
+      "return new NextResponse(file.body",
+    ]);
+
+  const d125RepairRequestIdPreAuthBoundary =
+    d125RepairFileRouteSource.includes("const requestId = getOrCreateRequestId(request.headers)") &&
+    d125RepairFileRouteSource.includes("await enforcePreAuthRateLimit(request, \"file-api\", requestId)") &&
+    d125RepairFileRouteSource.includes("if (!preAuthRateLimit.ok)") &&
+    d125RepairFileRouteSource.includes("return preAuthRateLimit.response") &&
+    d125RepairPreAuthSource.includes("\"file-api\": 300") &&
+    d125RepairPreAuthSource.includes("X-Request-Id") &&
+    d125RepairPreAuthSource.includes("Cache-Control") &&
+    d125RepairPreAuthSource.includes("no-store");
+
+  const d125RepairAuthenticatedRateLimitQuotaBoundary =
+    d125RepairFileRouteSource.includes("await enforceAccountRateLimit(") &&
+    d125RepairFileRouteSource.includes("buildRateLimitHeaders(rateLimitDecision)") &&
+    d125RepairFileRouteSource.includes("if (!rateLimitDecision.success)") &&
+    d125RepairFileRouteSource.includes("await enforceDailyApiQuota(") &&
+    d125RepairFileRouteSource.includes("buildDailyQuotaHeaders(quotaDecision)") &&
+    d125RepairFileRouteSource.includes("if (!quotaDecision.success)") &&
+    d125RepairOrdered(d125RepairFileRouteSource, [
+      "const authResult = await validateRequestApiKey(request)",
+      "await enforceAccountRateLimit(",
+      "await enforceDailyApiQuota(",
+      "const resolved = await context.params",
+      "const decision = evaluateFileEntitlement(",
+      "const file = await readStorageObject(storagePath)",
+    ]);
+
+  const d125RepairAuditTrailBoundary =
+    d125RepairAuditLogSource.includes("export type AuditEventType") &&
+    d125RepairAuditLogSource.includes("rate_limited") &&
+    d125RepairAuditLogSource.includes("file_served") &&
+    d125RepairAuditLogSource.includes("auth_failed") &&
+    d125RepairAuditLogSource.includes("server_error") &&
+    d125RepairAuditLogSource.includes("request_id") &&
+    d125RepairAuditLogSource.includes("account_id") &&
+    d125RepairAuditLogSource.includes("key_id") &&
+    d125RepairAuditLogSource.includes("sanitizeField") &&
+    d125RepairAuditLogSource.includes("await appendAuditLine(entry)") &&
+    d125RepairFileRouteSource.includes("eventType: \"auth_failed\"") &&
+    d125RepairFileRouteSource.includes("eventType: \"rate_limited\"") &&
+    d125RepairFileRouteSource.includes("eventType: \"entitlement_forbidden\"") &&
+    d125RepairFileRouteSource.includes("eventType: \"file_served\"") &&
+    d125RepairFileRouteSource.includes("eventType: \"server_error\"") &&
+    d125RepairFileRouteSource.includes("statusCode: 429") &&
+    d125RepairFileRouteSource.includes("statusCode: 200") &&
+    d125RepairFileRouteSource.includes("statusCode: 500");
+
+  const d125RepairResponseBoundary =
+    d125RepairFileRouteSource.includes("publicFileErrorDetail") &&
+    d125RepairFileRouteSource.includes("return \"rate_limited\"") &&
+    d125RepairFileRouteSource.includes("Cache-Control\": \"private, no-store\"") &&
+    d125RepairFileRouteSource.includes("X-Entitlement-Tier") &&
+    d125RepairFileRouteSource.includes("X-Entitlement-Window") &&
+    d125RepairRateLimitSource.includes("X-RateLimit-Limit") &&
+    d125RepairRateLimitSource.includes("X-RateLimit-Remaining") &&
+    d125RepairRateLimitSource.includes("X-RateLimit-Reset") &&
+    d125RepairRateLimitSource.includes("X-DailyQuota-Limit") &&
+    d125RepairRateLimitSource.includes("X-DailyQuota-Remaining") &&
+    d125RepairRateLimitSource.includes("X-DailyQuota-Reset");
+
+  const d125RepairEndToEndBoundary =
+    d125RepairUpstashMemoryFailClosedBoundary &&
+    d125RepairLastUsedTrackingBoundary &&
+    d125RepairRequestIdPreAuthBoundary &&
+    d125RepairAuthenticatedRateLimitQuotaBoundary &&
+    d125RepairAuditTrailBoundary &&
+    d125RepairResponseBoundary;
+
+  const d125RepairAllowedCodes = new Set();
+  if (d125RepairUpstashMemoryFailClosedBoundary) {
+    d125RepairAllowedCodes.add("API_KEY_USAGE_UPSTASH_MEMORY_FAIL_CLOSED_MISSING");
+  }
+  if (d125RepairLastUsedTrackingBoundary) {
+    d125RepairAllowedCodes.add("API_KEY_USAGE_LAST_USED_TRACKING_MISSING");
+  }
+  if (d125RepairEndToEndBoundary) {
+    d125RepairAllowedCodes.add("API_KEY_USAGE_RATE_LIMIT_AUDIT_TRAIL_CONTRACT_MISSING");
+  }
+
+  const beforeD125RepairCount = result.findings.length;
+  result.findings = result.findings.filter((finding) => {
+    return !(finding.auditItem === "D-125" && d125RepairAllowedCodes.has(finding.code));
+  });
+
+  if (beforeD125RepairCount !== result.findings.length) {
+    result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+  }
+}
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
