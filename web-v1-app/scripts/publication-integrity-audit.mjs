@@ -17997,6 +17997,294 @@ result.result = result.findings.some((finding) => finding.severity === "fail") ?
   }
 }
 
+
+// D-127 Final billing launch readiness boundary final audit
+{
+  const d127BillingGateFile = path.join(root, "scripts", "run-billing-launch-gate.mjs");
+  const d127AuditGateFile = path.join(root, "scripts", "run-audit-gates.mjs");
+  const d127PackageFile = path.join(root, "package.json");
+  const d127ChecklistFile = path.join(root, "docs", "billing-launch-checklist.md");
+  const d127RunbookFile = path.join(root, "docs", "stripe-webhook-deployment-runbook.md");
+  const d127VerificationFile = path.join(root, "docs", "stripe-webhook-operational-verification.md");
+  const d127WebhookMigrationFile = path.join(root, "prisma", "migrations", "20260608120000_add_stripe_webhook_events", "migration.sql");
+
+  const d127Read = (file) =>
+    fs.existsSync(file)
+      ? fs.readFileSync(file, "utf8").replace(/^\uFEFF/u, "")
+      : "";
+
+  const d127HasAll = (sourceText, needles) => {
+    return needles.every((needle) => sourceText.includes(needle));
+  };
+
+  const d127Ordered = (sourceText, needles) => {
+    let previous = -1;
+    for (const needle of needles) {
+      const index = sourceText.indexOf(needle);
+      if (index < 0 || index <= previous) return false;
+      previous = index;
+    }
+    return true;
+  };
+
+  const d127BillingGateSource = d127Read(d127BillingGateFile);
+  const d127AuditGateSource = d127Read(d127AuditGateFile);
+  const d127PackageSource = d127Read(d127PackageFile);
+  const d127ChecklistSource = d127Read(d127ChecklistFile);
+  const d127RunbookSource = d127Read(d127RunbookFile);
+  const d127VerificationSource = d127Read(d127VerificationFile);
+  const d127WebhookMigrationSource = d127Read(d127WebhookMigrationFile);
+
+  let d127PackageJson = {};
+  try {
+    d127PackageJson = d127PackageSource ? JSON.parse(d127PackageSource) : {};
+  } catch {
+    d127PackageJson = {};
+  }
+
+  const d127Scripts = d127PackageJson && typeof d127PackageJson === "object" && d127PackageJson.scripts
+    ? d127PackageJson.scripts
+    : {};
+
+  const d127FilesExistBoundary =
+    fs.existsSync(d127BillingGateFile) &&
+    fs.existsSync(d127AuditGateFile) &&
+    fs.existsSync(d127PackageFile) &&
+    fs.existsSync(d127ChecklistFile) &&
+    fs.existsSync(d127RunbookFile) &&
+    fs.existsSync(d127VerificationFile) &&
+    fs.existsSync(d127WebhookMigrationFile);
+
+  const d127PackageCommandBoundary =
+    d127Scripts["check:billing-launch"] === "node scripts/run-billing-launch-gate.mjs" &&
+    d127Scripts["check:audit-gates"] === "node scripts/run-audit-gates.mjs" &&
+    d127Scripts["check:publication-integrity"] === "node scripts/publication-integrity-audit.mjs" &&
+    typeof d127Scripts.build === "string" &&
+    d127Scripts.build.includes("prisma generate") &&
+    d127Scripts.build.includes("next build") &&
+    typeof d127Scripts["check:public-copy-guard"] === "string" &&
+    typeof d127Scripts["check:api-contract"] === "string" &&
+    typeof d127Scripts["check:calculation-correctness"] === "string";
+
+  const d127BillingGateRunnerBoundary =
+    d127BillingGateSource.includes("const steps = [") &&
+    d127HasAll(d127BillingGateSource, [
+      "Prisma schema validation",
+      "Prisma Client generation",
+      "Audit gates and production build",
+      'args: ["prisma", "validate"]',
+      'args: ["prisma", "generate"]',
+      'args: ["run", "check:audit-gates"]',
+      "spawnSync(step.command, step.args",
+      'stdio: "inherit"',
+      'shell: process.platform === "win32"',
+      "Billing launch gate stopped at red gate",
+      "Do not commit, push, or enable live checkout traffic until this gate is green.",
+      "=== Billing launch gate passed ===",
+    ]) &&
+    d127Ordered(d127BillingGateSource, [
+      "Prisma schema validation",
+      "Prisma Client generation",
+      "Audit gates and production build",
+    ]);
+
+  const d127AuditGateRunnerBoundary =
+    d127AuditGateSource.includes('const skipBuild = args.has("--skip-build")') &&
+    d127HasAll(d127AuditGateSource, [
+      "Product boundary audit",
+      "API contract audit",
+      "Calculation correctness audit",
+      "Publication integrity audit",
+      "Production build",
+      'args: ["run", "check:public-copy-guard"]',
+      'args: ["run", "check:api-contract"]',
+      'args: ["run", "check:calculation-correctness"]',
+      'args: ["run", "check:publication-integrity"]',
+      'args: ["run", "build"]',
+      "spawnSync(step.command, step.args",
+      'stdio: "inherit"',
+      "Audit gate runner stopped at red gate",
+      "Do not commit or push until this gate is green.",
+      "=== Audit gate runner passed ===",
+    ]) &&
+    d127Ordered(d127AuditGateSource, [
+      "Product boundary audit",
+      "API contract audit",
+      "Calculation correctness audit",
+      "Publication integrity audit",
+      "Production build",
+    ]);
+
+  const d127ChecklistCoverageBoundary =
+    d127HasAll(d127ChecklistSource, [
+      "Billing launch checklist",
+      "npm run check:billing-launch",
+      "scripts/run-billing-launch-gate.mjs",
+      "prisma validate",
+      "prisma generate",
+      "npm run check:audit-gates",
+      "stripe_webhook_events",
+      "StripeWebhookEventStatus",
+      "prisma/migrations/20260608120000_add_stripe_webhook_events/migration.sql",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "STRIPE_PRICE_BASIC",
+      "STRIPE_PRICE_PRO",
+      "NEXT_PUBLIC_APP_URL",
+      "DATABASE_URL",
+      "DIRECT_URL",
+      "checkout.session.completed",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+      "same-origin validation",
+      "pre-auth rate limiting",
+      "client_reference_id",
+      "metadata used by webhook sync",
+      "invalid signatures",
+      "duplicate Stripe event id",
+      "dashboard displays subscription tier",
+      "API key creation is authenticated",
+      "generated API key is shown only once",
+      "file/API delivery enforces entitlement before storage access",
+      "billing portal uses existing Stripe customer id only",
+      "billing portal responses are no-store",
+      "docs/stripe-webhook-operational-verification.md",
+      "docs/stripe-webhook-deployment-runbook.md",
+      "stop live checkout traffic",
+      "replay failed Stripe events",
+      "logs and responses expose no secrets or raw Stripe payloads",
+      "not financial, investment, trading, or price advice",
+    ]);
+
+  const d127DeploymentRunbookBoundary =
+    d127HasAll(d127RunbookSource, [
+      "Stripe webhook deployment runbook",
+      "/api/v1/stripe/webhook",
+      "checkout.session.completed",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "STRIPE_PRICE_BASIC",
+      "STRIPE_PRICE_PRO",
+      "NEXT_PUBLIC_APP_URL",
+      "DATABASE_URL",
+      "DIRECT_URL",
+      "live key for production checkout",
+      "Stripe Dashboard webhook endpoint configuration",
+      "stripe_webhook_events",
+      "StripeWebhookEventStatus",
+      "prisma/migrations/20260608120000_add_stripe_webhook_events/migration.sql",
+      "Do not rely on",
+      "prisma generate",
+      "update the database",
+      "Apply the database migration",
+      "Configure the Stripe Dashboard webhook endpoint",
+      "Enable live checkout traffic",
+      "verify the stripe-signature header",
+      "use raw request body verification",
+      "persist Stripe event IDs before business processing",
+      "treat duplicate Stripe event IDs as safe ignored acknowledgements",
+      "never return raw Stripe event payloads",
+      "never log or expose Stripe secret values",
+      "replay failed events from Stripe Dashboard after the fix",
+    ]);
+
+  const d127OperationalVerificationBoundary =
+    d127HasAll(d127VerificationSource, [
+      "Stripe webhook operational verification checklist",
+      "Application code is deployed",
+      "Prisma Client was generated from the current schema",
+      "Production database migration was applied",
+      "Stripe Dashboard webhook endpoint points to /api/v1/stripe/webhook",
+      "STRIPE_WEBHOOK_SECRET is set from that exact Stripe endpoint",
+      "STRIPE_SECRET_KEY is a live key in production",
+      "checkout.session.completed",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+      "Invalid signatures must return a safe 4xx response",
+      "one stripe_webhook_events row for the Stripe event id",
+      "stripe_customer_id",
+      "stripe_subscription_id",
+      "entitled_chain when tier is basic",
+      "Replay the same Stripe event id",
+      "duplicate event is treated as ignored",
+      "failed event can be replayed after the underlying issue is fixed",
+      "WEBHOOK_PROCESSING_STALE_AFTER_MS",
+      "stale processing replay resets status to processing",
+      "Production Stripe webhook handling must reject signed Stripe events",
+      "event.livemode",
+      "livemode=true",
+      'export const runtime = "nodejs"',
+      'export const dynamic = "force-dynamic"',
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "sk_live_",
+      "rk_live_",
+      "whsec_",
+      "raw Stripe event JSON",
+      "stop live checkout traffic",
+      "failed events are observable and replayable",
+      "logs and responses expose no secrets or raw payloads",
+    ]);
+
+  const d127WebhookMigrationBoundary =
+    d127HasAll(d127WebhookMigrationSource, [
+      'CREATE TYPE "StripeWebhookEventStatus" AS ENUM',
+      "'processing'",
+      "'processed'",
+      "'ignored'",
+      "'failed'",
+      'CREATE TABLE IF NOT EXISTS "stripe_webhook_events"',
+      "stripe_event_id",
+      "event_type",
+      "status",
+      "received_at",
+      "processed_at",
+      "error_code",
+      'CREATE UNIQUE INDEX IF NOT EXISTS "stripe_webhook_events_stripe_event_id_key"',
+      "stripe_webhook_events_event_type_idx",
+      "stripe_webhook_events_status_idx",
+      "stripe_webhook_events_received_at_idx",
+    ]);
+
+  const d127FinalReadinessContractBoundary =
+    d127FilesExistBoundary &&
+    d127PackageCommandBoundary &&
+    d127BillingGateRunnerBoundary &&
+    d127AuditGateRunnerBoundary &&
+    d127ChecklistCoverageBoundary &&
+    d127DeploymentRunbookBoundary &&
+    d127OperationalVerificationBoundary &&
+    d127WebhookMigrationBoundary;
+
+  const d127Checks = [
+    ["BILLING_LAUNCH_READINESS_FILES_MISSING", d127FilesExistBoundary, "scripts/run-billing-launch-gate.mjs; scripts/run-audit-gates.mjs; docs/billing-launch-checklist.md", "Final billing launch readiness requires the billing gate runner, audit gate runner, launch checklist, deployment runbook, operational verification checklist, and webhook replay migration."],
+    ["BILLING_LAUNCH_PACKAGE_COMMANDS_MISSING", d127PackageCommandBoundary, "package.json", "Package scripts must expose check:billing-launch, check:audit-gates, check:publication-integrity, audit sub-gates, and a production build that regenerates Prisma Client before Next.js build."],
+    ["BILLING_LAUNCH_GATE_RUNNER_SEQUENCE_MISSING", d127BillingGateRunnerBoundary, "scripts/run-billing-launch-gate.mjs", "Billing launch gate must run Prisma validation, Prisma Client generation, and all audit gates/build in order, and stop with an explicit no-live-traffic warning on red gates."],
+    ["BILLING_LAUNCH_AUDIT_GATE_SEQUENCE_MISSING", d127AuditGateRunnerBoundary, "scripts/run-audit-gates.mjs", "Audit gate runner must include product boundary, API contract, calculation correctness, publication integrity, and production build unless explicitly skipped."],
+    ["BILLING_LAUNCH_CHECKLIST_COVERAGE_MISSING", d127ChecklistCoverageBoundary, "docs/billing-launch-checklist.md", "Billing launch checklist must cover code/build, database migration, Stripe env, Stripe Dashboard events, checkout, webhook, account/API delivery, portal, operational verification, rollback, and completion criteria."],
+    ["BILLING_LAUNCH_DEPLOYMENT_RUNBOOK_MISSING", d127DeploymentRunbookBoundary, "docs/stripe-webhook-deployment-runbook.md", "Deployment runbook must define production webhook route, required events/env vars, migration requirement, sequence, operational expectations, and failed-event replay path."],
+    ["BILLING_LAUNCH_OPERATIONAL_VERIFICATION_MISSING", d127OperationalVerificationBoundary, "docs/stripe-webhook-operational-verification.md", "Operational verification must cover valid/invalid webhook delivery, DB subscription state, replay, stale/failed recovery, livemode/runtime guard, security, rollback, and completion criteria."],
+    ["BILLING_LAUNCH_WEBHOOK_MIGRATION_BOUNDARY_MISSING", d127WebhookMigrationBoundary, "prisma/migrations/20260608120000_add_stripe_webhook_events/migration.sql", "Webhook replay migration must create the event status enum, stripe_webhook_events table, unique Stripe event id index, and operational lookup indexes."],
+    ["BILLING_LAUNCH_FINAL_READINESS_CONTRACT_MISSING", d127FinalReadinessContractBoundary, "scripts/run-billing-launch-gate.mjs; scripts/run-audit-gates.mjs; docs/billing-launch-checklist.md; docs/stripe-webhook-deployment-runbook.md; docs/stripe-webhook-operational-verification.md", "Final billing launch readiness must be represented as one operational contract covering command path, build/audit gates, Stripe setup, DB migration, webhook verification, account/API delivery, portal behavior, rollback, and non-advisory copy."],
+  ];
+
+  for (const [code, ok, file, detail] of d127Checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-127",
+        code,
+        file,
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
