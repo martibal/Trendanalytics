@@ -16326,6 +16326,711 @@ const d123Checks = [
 
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
+
+// D-124 API key lifecycle creation/revocation boundary final audit
+{
+  const d124KeysRouteFile = path.join(root, "src", "app", "api", "v1", "keys", "route.ts");
+  const d124ClientFile = path.join(root, "src", "components", "dashboard", "ApiKeyManagerClient.tsx");
+  const d124ApiKeysFile = path.join(root, "src", "lib", "auth", "apiKeys.ts");
+  const d124ValidateTokenFile = path.join(root, "src", "lib", "auth", "validateToken.ts");
+  const d124PrismaSchemaFile = path.join(root, "prisma", "schema.prisma");
+
+  const d124KeysRouteSource = fs.existsSync(d124KeysRouteFile)
+    ? fs.readFileSync(d124KeysRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d124ClientSource = fs.existsSync(d124ClientFile)
+    ? fs.readFileSync(d124ClientFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d124ApiKeysSource = fs.existsSync(d124ApiKeysFile)
+    ? fs.readFileSync(d124ApiKeysFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d124ValidateTokenSource = fs.existsSync(d124ValidateTokenFile)
+    ? fs.readFileSync(d124ValidateTokenFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d124PrismaSource = fs.existsSync(d124PrismaSchemaFile)
+    ? fs.readFileSync(d124PrismaSchemaFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function d124LooseFunctionRegion(sourceText, functionName, fallbackLength = 14000) {
+    const starts = [
+      sourceText.indexOf("export async function " + functionName),
+      sourceText.indexOf("async function " + functionName),
+      sourceText.indexOf("export function " + functionName),
+      sourceText.indexOf("function " + functionName),
+      sourceText.indexOf("const " + functionName + " ="),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextNeedles = [
+      "\nexport async function ",
+      "\nasync function ",
+      "\nexport function ",
+      "\nfunction ",
+      "\nconst ",
+      "\ntype ",
+    ];
+    const nextCandidates = nextNeedles
+      .map((needle) => sourceText.indexOf(needle, afterStart))
+      .filter((index) => index > start)
+      .sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) {
+      return sourceText.slice(start, nextCandidates[0]);
+    }
+
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  function d124ObjectRegion(sourceText, marker, fallbackLength = 5000) {
+    const start = sourceText.indexOf(marker);
+
+    if (start < 0) return "";
+
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  function d124CallExpressions(sourceText, callee) {
+    const calls = [];
+    const needle = callee + "(";
+    let cursor = 0;
+
+    while (cursor < sourceText.length) {
+      const start = sourceText.indexOf(needle, cursor);
+
+      if (start < 0) {
+        break;
+      }
+
+      let depth = 0;
+      let quote = null;
+      let escaped = false;
+      let end = -1;
+
+      for (let index = start; index < sourceText.length; index += 1) {
+        const ch = sourceText[index];
+
+        if (quote) {
+          if (escaped) {
+            escaped = false;
+          } else if (ch === "\\") {
+            escaped = true;
+          } else if (ch === quote) {
+            quote = null;
+          }
+
+          continue;
+        }
+
+        if (ch === "\"" || ch === "'" || ch === "`") {
+          quote = ch;
+          continue;
+        }
+
+        if (ch === "(") {
+          depth += 1;
+          continue;
+        }
+
+        if (ch === ")") {
+          depth -= 1;
+
+          if (depth === 0) {
+            end = index + 1;
+            break;
+          }
+        }
+      }
+
+      if (end < 0) {
+        break;
+      }
+
+      calls.push(sourceText.slice(start, end));
+      cursor = end;
+    }
+
+    return calls;
+  }
+
+  function d124StripQuotedLiterals(value) {
+    return value
+      .replace(/`(?:\\.|[^`\\])*`/gu, "\"\"")
+      .replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/gu, "\"\"");
+  }
+
+  const d124KeysPostRegion = d124LooseFunctionRegion(d124KeysRouteSource, "POST", 18000);
+  const d124KeysDeleteRegion = d124LooseFunctionRegion(d124KeysRouteSource, "DELETE", 16000);
+  const d124GetAuthenticatedAccountRegion = d124LooseFunctionRegion(d124KeysRouteSource, "getAuthenticatedAccount", 5200);
+  const d124PublicKeyErrorRegion = d124LooseFunctionRegion(d124KeysRouteSource, "publicKeyErrorDetail", 3600);
+  const d124JsonErrorRegion = d124LooseFunctionRegion(d124KeysRouteSource, "jsonError", 3600);
+  const d124ClientComponentRegion = d124ClientSource;
+  const d124FindPersistedRegion = d124LooseFunctionRegion(d124ApiKeysSource, "findPersistedApiKeyRecord", 10000);
+  const d124VerifyPersistedRegion = d124LooseFunctionRegion(d124ApiKeysSource, "verifyPersistedApiKeyHash", 4200);
+  const d124BuildPersistedEntitlementRegion = d124LooseFunctionRegion(d124ApiKeysSource, "buildPersistedEntitlement", 5200);
+  const d124GetPersistedRowsRegion = d124LooseFunctionRegion(d124ApiKeysSource, "getPersistedApiKeyDisplayRows", 9000);
+  const d124ValidateApiKeyRegion = d124LooseFunctionRegion(d124ValidateTokenSource, "validateApiKeyToken", 12000);
+  const d124ApiKeySchemaRegion = d124ObjectRegion(d124PrismaSource, "model ApiKey", 2800);
+
+  const d124CreateCalls = d124CallExpressions(d124KeysPostRegion, "db.apiKey.create");
+  const d124CreateCall = d124CreateCalls[0] ?? "";
+  const d124PostJsonResponses = d124CallExpressions(d124KeysPostRegion, "NextResponse.json");
+  const d124DeleteJsonResponses = d124CallExpressions(d124KeysDeleteRegion, "NextResponse.json");
+  const d124PostLogCalls = d124CallExpressions(d124KeysPostRegion, "logApiEvent");
+  const d124DeleteLogCalls = d124CallExpressions(d124KeysDeleteRegion, "logApiEvent");
+
+  const d124KeysRouteExists = d124KeysRouteSource.length > 0;
+  const d124ClientExists = d124ClientSource.length > 0;
+  const d124ApiKeysExists = d124ApiKeysSource.length > 0;
+  const d124ValidateTokenExists = d124ValidateTokenSource.length > 0;
+  const d124PrismaExists = d124PrismaSource.length > 0;
+
+  const d124RouteAuthAndAccountBoundary =
+    d124KeysRouteSource.includes("validateSameOriginRequest") &&
+    d124KeysRouteSource.includes("enforcePreAuthRateLimit") &&
+    d124KeysPostRegion.includes("validateSameOriginRequest(request)") &&
+    d124KeysDeleteRegion.includes("validateSameOriginRequest(request)") &&
+    d124KeysPostRegion.includes("enforcePreAuthRateLimit(request, \"keys-api\")") &&
+    d124KeysDeleteRegion.includes("enforcePreAuthRateLimit(request, \"keys-api\")") &&
+    d124GetAuthenticatedAccountRegion.includes("await auth()") &&
+    d124GetAuthenticatedAccountRegion.includes("db.account.findUnique") &&
+    d124GetAuthenticatedAccountRegion.includes("authProviderUserId: userId") &&
+    d124GetAuthenticatedAccountRegion.includes("subscriptions:") &&
+    d124GetAuthenticatedAccountRegion.includes("apiKeys:");
+
+  const d124CreateRequiresActiveSubscription =
+    d124KeysPostRegion.includes("const { userId, account } = await getAuthenticatedAccount()") &&
+    d124KeysPostRegion.includes("if (!userId)") &&
+    /jsonError\s*\(\s*401\s*,\s*["']unauthenticated["']/u.test(d124KeysPostRegion) &&
+    d124KeysPostRegion.includes("if (!account)") &&
+    /jsonError\s*\(\s*404\s*,\s*["']account_not_found["']/u.test(d124KeysPostRegion) &&
+    d124KeysPostRegion.includes("const latestSubscription = account.subscriptions[0] ?? null") &&
+    d124KeysPostRegion.includes("latestSubscription.status !== SubscriptionStatus.active") &&
+    /jsonError\s*\(\s*403\s*,\s*["']inactive_subscription["']/u.test(d124KeysPostRegion);
+
+  const d124NonRevokedKeyLimit =
+    d124KeysPostRegion.includes("nonRevokedKeys") &&
+    d124KeysPostRegion.includes("key.status !== ApiKeyStatus.revoked") &&
+    d124KeysPostRegion.includes("nonRevokedKeys.length >= 2") &&
+    /jsonError\s*\(\s*409\s*,\s*["']key_limit_reached["']/u.test(d124KeysPostRegion);
+
+  const d124KeyMaterialCreationBoundary =
+    d124KeysRouteSource.includes("crypto.randomBytes(24).toString(\"hex\")") &&
+    d124KeysRouteSource.includes("ta_live_") &&
+    d124KeysRouteSource.includes("crypto.scryptSync(secret, salt, 64)") &&
+    d124KeysRouteSource.includes("scrypt:") &&
+    d124KeysRouteSource.includes("buildKeyPrefix(secret)") &&
+    d124KeysRouteSource.includes("buildKeyLast4(secret)") &&
+    d124KeysPostRegion.includes("const secret = buildApiKeySecret()") &&
+    d124KeysPostRegion.includes("const keyHash = hashApiKey(secret)") &&
+    d124KeysPostRegion.includes("const keyPrefix = buildKeyPrefix(secret)") &&
+    d124KeysPostRegion.includes("const keyLast4 = buildKeyLast4(secret)") &&
+    d124CreateCall.includes("accountId: account.id") &&
+    d124CreateCall.includes("keyHash,") &&
+    d124CreateCall.includes("keyPrefix,") &&
+    d124CreateCall.includes("keyLast4,") &&
+    d124CreateCall.includes("label,") &&
+    d124CreateCall.includes("status:") &&
+    !/\bsecret\b/u.test(d124StripQuotedLiterals(d124CreateCall));
+
+  const d124CreateResponseOneTimeSecretBoundary =
+    d124PostJsonResponses.some((call) =>
+      call.includes("secret,") &&
+      call.includes("key:") &&
+      call.includes("id: created.id") &&
+      call.includes("prefix: created.keyPrefix") &&
+      call.includes("last4: created.keyLast4") &&
+      call.includes("status: created.status") &&
+      /status\s*:\s*201/u.test(call) &&
+      call.includes("Cache-Control") &&
+      call.includes("no-store")
+    ) &&
+    d124ClientSource.includes("CreatedKeyResponse") &&
+    d124ClientSource.includes("secret: string") &&
+    d124ClientComponentRegion.includes("const [createdSecret, setCreatedSecret] = useState<string | null>(null)") &&
+    d124ClientComponentRegion.includes("setCreatedSecret(created.secret)") &&
+    d124ClientComponentRegion.includes("Copy this secret now") &&
+    d124ClientComponentRegion.includes("It will not be shown again") &&
+    d124ClientComponentRegion.includes("handleHideSecret") &&
+    d124ClientComponentRegion.includes("setCreatedSecret(null)");
+
+  const d124CreateLoggingDoesNotExposeSecret =
+    d124PostLogCalls.length > 0 &&
+    d124PostLogCalls.every((call) => {
+      const stripped = d124StripQuotedLiterals(call);
+      return (
+        !/\b(?:secret|keyHash|tokenHash|keyPrefix|keyLast4)\b/u.test(stripped) &&
+        !/\b(?:STRIPE_|CLERK_|DATABASE_URL|DEV_API_KEYS_JSON)\b/u.test(call)
+      );
+    });
+
+  const d124RevokeOwnershipAndStateBoundary =
+    d124KeysDeleteRegion.includes("const { userId, account } = await getAuthenticatedAccount()") &&
+    d124KeysDeleteRegion.includes("if (!userId)") &&
+    d124KeysDeleteRegion.includes("if (!account)") &&
+    d124KeysDeleteRegion.includes("body = (await request.json())") &&
+    d124KeysDeleteRegion.includes("const keyId = typeof body.keyId === \"string\" ? body.keyId.trim() : \"\"") &&
+    /jsonError\s*\(\s*400\s*,\s*["']invalid_request["']/u.test(d124KeysDeleteRegion) &&
+    d124KeysDeleteRegion.includes("db.apiKey.findFirst") &&
+    d124KeysDeleteRegion.includes("id: keyId") &&
+    d124KeysDeleteRegion.includes("accountId: account.id") &&
+    /jsonError\s*\(\s*404\s*,\s*["']not_found["']/u.test(d124KeysDeleteRegion) &&
+    d124KeysDeleteRegion.includes("existing.status !== ApiKeyStatus.revoked") &&
+    d124KeysDeleteRegion.includes("db.apiKey.update") &&
+    d124KeysDeleteRegion.includes("where: { id: existing.id }") &&
+    d124KeysDeleteRegion.includes("status: ApiKeyStatus.revoked");
+
+  const d124RevokeResponseAndLoggingBoundary =
+    d124DeleteJsonResponses.some((call) =>
+      call.includes("revoked: true") &&
+      call.includes("keyId: existing.id") &&
+      /status\s*:\s*200/u.test(call) &&
+      call.includes("Cache-Control") &&
+      call.includes("no-store")
+    ) &&
+    d124DeleteLogCalls.some((call) =>
+      call.includes("eventType: \"api_key_revoked\"") &&
+      call.includes("accountId: account.id") &&
+      call.includes("keyId: existing.id") &&
+      !/\b(?:secret|keyHash|tokenHash)\b/u.test(d124StripQuotedLiterals(call))
+    );
+
+  const d124ClientMutationBoundary =
+    d124ClientSource.includes("\"use client\"") &&
+    d124ClientComponentRegion.includes("const canMutate =") &&
+    d124ClientComponentRegion.includes("authConfigured") &&
+    d124ClientComponentRegion.includes("isAuthenticated") &&
+    d124ClientComponentRegion.includes("hasLinkedAccount") &&
+    d124ClientComponentRegion.includes("subscriptionActive") &&
+    d124ClientComponentRegion.includes("activeOrSuspendedCount >= 2") &&
+    d124ClientComponentRegion.includes("fetch(\"/api/v1/keys\"") &&
+    d124ClientComponentRegion.includes("method: \"POST\"") &&
+    d124ClientComponentRegion.includes("body: JSON.stringify({") &&
+    d124ClientComponentRegion.includes("method: \"DELETE\"") &&
+    d124ClientComponentRegion.includes("body: JSON.stringify({ keyId })") &&
+    d124ClientComponentRegion.includes("router.refresh()");
+
+  const d124ClientDisplayBoundary =
+    d124ClientComponentRegion.includes("{createdSecret}") &&
+    d124ClientComponentRegion.includes("{keyRow.prefix}") &&
+    d124ClientComponentRegion.includes("{keyRow.last4 ?? \"ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â\"}") &&
+    d124ClientComponentRegion.includes("Only partial identifiers are displayed after creation") &&
+    d124ClientComponentRegion.includes("full secret is intentionally not retrievable later") &&
+    !/\b(?:keyHash|tokenHash)\b/u.test(d124ClientSource) &&
+    !/\bkeyRow\.(?:secret|keyHash|tokenHash)\b/u.test(d124ClientSource);
+
+  const d124ClientDisplayBoundaryRepairV4 = (() => {
+    const source = d124ClientSource.length > 0
+      ? d124ClientSource
+      : (
+          fs.existsSync(d124ClientFile)
+            ? fs.readFileSync(d124ClientFile, "utf8").replace(/^\uFEFF/u, "")
+            : ""
+        );
+
+    const hasCreatedSecretState =
+      source.includes("const [createdSecret, setCreatedSecret] = useState<string | null>(null)") &&
+      source.includes("setCreatedSecret(created.secret)") &&
+      source.includes("setCreatedSecret(null)") &&
+      source.includes("handleHideSecret") &&
+      source.includes("handleCopySecret") &&
+      source.includes("navigator.clipboard.writeText(createdSecret)");
+
+    const hasOneTimeSecretPresentation =
+      source.includes("{createdSecret}") &&
+      source.includes("Copy this secret now") &&
+      source.includes("It will not be shown again") &&
+      source.includes("Hide secret") &&
+      source.includes("Store it in your integration, then hide it from this screen.");
+
+    const hasPersistedPartialIdentifierPresentation =
+      source.includes("{keyRow.prefix}") &&
+      source.includes("Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢") &&
+      /\{keyRow\.last4\s*\?\?\s*["']Ã¢â‚¬â€["']\}/u.test(source) &&
+      source.includes("Only partial identifiers are displayed after creation") &&
+      source.includes("The full secret is intentionally not retrievable later.");
+
+    const createdRowMapperDoesNotPersistSecret =
+      /function\s+normalizeCreatedKeyIntoRow[\s\S]{0,1400}return\s*\{[\s\S]{0,1200}\}\s*;/u.test(source) &&
+      !/function\s+normalizeCreatedKeyIntoRow[\s\S]{0,1600}\bsecret\b/u.test(source);
+
+    const persistedRowsDoNotRenderSecretMaterial =
+      !/\bkeyRow\.(?:secret|keyHash|tokenHash)\b/u.test(source) &&
+      !/\bCreatedKeyResponse\["key"\][\s\S]{0,500}\bsecret\b/u.test(source);
+
+    return (
+      hasCreatedSecretState &&
+      hasOneTimeSecretPresentation &&
+      hasPersistedPartialIdentifierPresentation &&
+      createdRowMapperDoesNotPersistSecret &&
+      persistedRowsDoNotRenderSecretMaterial
+    );
+  })();
+  const d124PersistedValidationBoundary =
+    d124ValidateTokenSource.includes("PERSISTED_API_KEY_PATTERN") &&
+    d124ValidateTokenSource.includes("ta_live_") &&
+    d124ValidateTokenSource.includes("isProductionRuntime") &&
+    d124ValidateTokenSource.includes("isAllowedApiKeyShape") &&
+    d124ValidateApiKeyRegion.includes("resolveApiKeyRecord(normalized)") &&
+    d124ValidateApiKeyRegion.includes("record.state === \"REVOKED\"") &&
+    d124ValidateApiKeyRegion.includes("record.state === \"SUSPENDED\"") &&
+    d124ValidateApiKeyRegion.includes("buildEntitlementSnapshot(record.entitlement)") &&
+    d124ValidateApiKeyRegion.includes("record.entitlement.status !== \"active\"") &&
+    d124ValidateApiKeyRegion.includes("keyPrefix: record.prefix") &&
+    d124ValidateApiKeyRegion.includes("keyLast4: record.last4");
+
+  const d124PersistedHashAndEntitlementBoundary =
+    d124ApiKeysSource.includes("hashApiKey") &&
+    d124ApiKeysSource.includes("constantTimeHexEqual") &&
+    d124VerifyPersistedRegion.includes("crypto.scryptSync(trimmedToken, salt, 64)") &&
+    d124VerifyPersistedRegion.includes("constantTimeHexEqual(actualDerived, expectedDerived)") &&
+    d124FindPersistedRegion.includes("const keyPrefix = buildPersistedApiKeyPrefix(normalized)") &&
+    d124FindPersistedRegion.includes("db.apiKey.findMany") &&
+    d124FindPersistedRegion.includes("where:") &&
+    d124FindPersistedRegion.includes("keyPrefix,") &&
+    d124FindPersistedRegion.includes("candidate.keyHash") &&
+    d124FindPersistedRegion.includes("verifyPersistedApiKeyHash(normalized, candidate.keyHash)") &&
+    d124FindPersistedRegion.includes("mapPersistedCandidateToApiKeyRecord(candidate)") &&
+    d124BuildPersistedEntitlementRegion.includes("latestSubscription") &&
+    d124BuildPersistedEntitlementRegion.includes("createPublicEntitlement") &&
+    d124BuildPersistedEntitlementRegion.includes("createBasicEntitlement") &&
+    d124BuildPersistedEntitlementRegion.includes("createProEntitlement");
+
+  const d124DisplayRowsDoNotReturnSecretMaterial =
+    d124GetPersistedRowsRegion.includes("select:") &&
+    d124GetPersistedRowsRegion.includes("keyPrefix: true") &&
+    d124GetPersistedRowsRegion.includes("keyLast4: true") &&
+    d124GetPersistedRowsRegion.includes("status: true") &&
+    d124GetPersistedRowsRegion.includes("lastUsedAt: true") &&
+    d124GetPersistedRowsRegion.includes("prefix: record.keyPrefix") &&
+    d124GetPersistedRowsRegion.includes("last4: record.keyLast4") &&
+    !/\bkeyHash\s*:\s*true\b/u.test(d124GetPersistedRowsRegion) &&
+    !/\btokenHash\b/u.test(d124GetPersistedRowsRegion);
+
+  const d124PrismaApiKeySchemaBoundary =
+    d124ApiKeySchemaRegion.includes("id          String") &&
+    d124ApiKeySchemaRegion.includes("accountId") &&
+    d124ApiKeySchemaRegion.includes("keyHash") &&
+    d124ApiKeySchemaRegion.includes("@unique") &&
+    d124ApiKeySchemaRegion.includes("keyPrefix") &&
+    d124ApiKeySchemaRegion.includes("keyLast4") &&
+    d124ApiKeySchemaRegion.includes("status") &&
+    d124ApiKeySchemaRegion.includes("lastUsedAt") &&
+    d124ApiKeySchemaRegion.includes("account") &&
+    d124ApiKeySchemaRegion.includes("@@index([accountId]") &&
+    d124ApiKeySchemaRegion.includes("@@index([status]") &&
+    d124ApiKeySchemaRegion.includes("@@map(\"api_keys\")");
+
+  const d124PublicErrorBoundary =
+    d124PublicKeyErrorRegion.includes("publicKeyErrorDetail") &&
+    d124PublicKeyErrorRegion.includes("unauthenticated") &&
+    d124PublicKeyErrorRegion.includes("invalid_request") &&
+    d124PublicKeyErrorRegion.includes("forbidden") &&
+    d124PublicKeyErrorRegion.includes("key_limit_reached") &&
+    d124PublicKeyErrorRegion.includes("server_error") &&
+    d124JsonErrorRegion.includes("detail: publicKeyErrorDetail(status, code, detail)") &&
+    d124JsonErrorRegion.includes("Cache-Control") &&
+    d124JsonErrorRegion.includes("no-store") &&
+    !/NextResponse\.json\s*\(\s*\{[\s\S]{0,900}(?:keyHash|tokenHash|secret\s*:\s*keyHash)/u.test(d124KeysRouteSource);
+
+  const d124ClientDisplayBoundaryV2 = (() => {
+    const createdSecretIndex = d124ClientSource.indexOf("{createdSecret}");
+    const keysMapIndex = d124ClientSource.indexOf("keys.map((keyRow)");
+
+    const createdSecretRegion = createdSecretIndex >= 0
+      ? d124ClientSource.slice(
+          Math.max(0, createdSecretIndex - 2200),
+          Math.min(d124ClientSource.length, createdSecretIndex + 3400)
+        )
+      : "";
+
+    const persistedKeyRowsRegion = keysMapIndex >= 0
+      ? d124ClientSource.slice(
+          keysMapIndex,
+          Math.min(d124ClientSource.length, keysMapIndex + 7600)
+        )
+      : "";
+
+    const hasCreationOnlySecretState =
+      d124ClientSource.includes("CreatedKeyResponse") &&
+      d124ClientSource.includes("secret: string") &&
+      d124ClientSource.includes("const [createdSecret, setCreatedSecret] = useState<string | null>(null)") &&
+      d124ClientSource.includes("setCreatedSecret(created.secret)") &&
+      d124ClientSource.includes("function handleHideSecret()") &&
+      d124ClientSource.includes("setCreatedSecret(null)") &&
+      d124ClientSource.includes("function handleCopySecret()") &&
+      d124ClientSource.includes("navigator.clipboard.writeText(createdSecret)");
+
+    const transientSecretRenderIsBounded =
+      createdSecretRegion.includes("{createdSecret}") &&
+      createdSecretRegion.includes("Copy this secret now") &&
+      createdSecretRegion.includes("not be shown again") &&
+      createdSecretRegion.includes("handleCopySecret") &&
+      createdSecretRegion.includes("handleHideSecret");
+
+    const persistedRowsUsePartialIdentifiers =
+      persistedKeyRowsRegion.includes("keys.map((keyRow)") &&
+      persistedKeyRowsRegion.includes("{keyRow.prefix}") &&
+      persistedKeyRowsRegion.includes("ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢") &&
+      persistedKeyRowsRegion.includes("{keyRow.last4 ?? \"ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â\"}") &&
+      persistedKeyRowsRegion.includes("keyRow.status") &&
+      persistedKeyRowsRegion.includes("keyRow.tier") &&
+      persistedKeyRowsRegion.includes("keyRow.entitledChain") &&
+      persistedKeyRowsRegion.includes("keyRow.maxWindowDays");
+
+    const publicCopyStatesSecretBoundary =
+      d124ClientSource.includes("Secret values are shown exactly once at creation") &&
+      d124ClientSource.includes("only partial") &&
+      d124ClientSource.includes("Only partial identifiers are displayed after creation") &&
+      d124ClientSource.includes("full secret is intentionally not retrievable later");
+
+    const noPersistedSecretMaterialInRows =
+      !/\bkeyRow\.(?:secret|keyHash|tokenHash|rawSecret|apiKey|keyValue)\b/u.test(d124ClientSource) &&
+      !/\b(?:keyHash|tokenHash)\b/u.test(d124ClientSource);
+
+    return (
+      hasCreationOnlySecretState &&
+      transientSecretRenderIsBounded &&
+      persistedRowsUsePartialIdentifiers &&
+      publicCopyStatesSecretBoundary &&
+      noPersistedSecretMaterialInRows
+    );
+  })();
+    const d124ClientDisplayBoundaryRepairV3 = (() => {
+    const source = d124ClientSource.length > 0
+      ? d124ClientSource
+      : (
+          fs.existsSync(d124ClientFile)
+            ? fs.readFileSync(d124ClientFile, "utf8").replace(/^\uFEFF/u, "")
+            : ""
+        );
+
+    const hasTransientCreatedSecretState =
+      source.includes("const [createdSecret, setCreatedSecret] = useState<string | null>(null)") &&
+      source.includes("setCreatedSecret(created.secret)") &&
+      source.includes("{createdSecret}") &&
+      source.includes("handleHideSecret") &&
+      source.includes("setCreatedSecret(null)") &&
+      source.includes("Copy this secret now") &&
+      source.includes("It will not be shown again");
+
+    const hasCopyOnlyTransientSecretUi =
+      source.includes("handleCopySecret") &&
+      source.includes("navigator.clipboard.writeText(createdSecret)") &&
+      source.includes("Hide secret") &&
+      source.includes("Store it in your integration, then hide it from this screen.");
+
+    const hasPersistedPartialIdentifierRows =
+      source.includes("{keyRow.prefix}") &&
+      source.includes("{keyRow.last4") &&
+      source.includes("ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢") &&
+      source.includes("Only partial identifiers are displayed after creation") &&
+      source.includes("full secret is intentionally not retrievable later");
+
+    const noPersistedRowSecretMaterial =
+      !/\bkeyRow\.(?:secret|keyHash|tokenHash)\b/u.test(source) &&
+      !/\b(?:keyHash|tokenHash)\b/u.test(source) &&
+      !/normalizeCreatedKeyIntoRow[\s\S]{0,900}\bsecret\b/u.test(source);
+
+    return (
+      hasTransientCreatedSecretState &&
+      hasCopyOnlyTransientSecretUi &&
+      hasPersistedPartialIdentifierRows &&
+      noPersistedRowSecretMaterial
+    );
+  })();
+const d124Checks = [
+    ["API_KEY_ROUTE_MISSING", d124KeysRouteExists, "src/app/api/v1/keys/route.ts", "API key lifecycle route must exist before D-124 audit can run."],
+    ["API_KEY_CLIENT_MISSING", d124ClientExists, "src/components/dashboard/ApiKeyManagerClient.tsx", "API key dashboard client must exist before D-124 audit can run."],
+    ["API_KEY_HELPER_MODULE_MISSING", d124ApiKeysExists, "src/lib/auth/apiKeys.ts", "API key helper module must exist before D-124 audit can run."],
+    ["API_KEY_VALIDATE_TOKEN_MODULE_MISSING", d124ValidateTokenExists, "src/lib/auth/validateToken.ts", "API key validation module must exist before D-124 audit can run."],
+    ["API_KEY_SCHEMA_MISSING", d124PrismaExists, "prisma/schema.prisma", "Prisma schema must exist before D-124 audit can run."],
+    ["API_KEY_ROUTE_AUTH_ACCOUNT_BOUNDARY_MISSING", d124RouteAuthAndAccountBoundary, "src/app/api/v1/keys/route.ts", "API key lifecycle route must require same-origin, pre-auth rate limit, authenticated account lookup, and account-scoped relations."],
+    ["API_KEY_CREATE_ACTIVE_SUBSCRIPTION_BOUNDARY_MISSING", d124CreateRequiresActiveSubscription, "src/app/api/v1/keys/route.ts", "API key creation must require signed-in account state and an active subscription."],
+    ["API_KEY_NON_REVOKED_LIMIT_MISSING", d124NonRevokedKeyLimit, "src/app/api/v1/keys/route.ts", "API key creation must cap non-revoked keys before creating a new secret."],
+    ["API_KEY_SECRET_HASH_STORAGE_BOUNDARY_MISSING", d124KeyMaterialCreationBoundary, "src/app/api/v1/keys/route.ts", "API key creation must generate a random one-time secret, persist only hash/prefix/last4, and avoid storing the raw secret."],
+    ["API_KEY_CREATE_RESPONSE_ONE_TIME_SECRET_MISSING", d124CreateResponseOneTimeSecretBoundary, "src/app/api/v1/keys/route.ts; src/components/dashboard/ApiKeyManagerClient.tsx", "API key creation may return the full secret exactly once with no-store, while dashboard state must support immediate hide/copy-only handling."],
+    ["API_KEY_CREATE_LOG_SECRET_LEAK_RISK", d124CreateLoggingDoesNotExposeSecret, "src/app/api/v1/keys/route.ts", "API key creation audit logs must not include raw secret or hash material."],
+    ["API_KEY_REVOKE_OWNERSHIP_STATE_BOUNDARY_MISSING", d124RevokeOwnershipAndStateBoundary, "src/app/api/v1/keys/route.ts", "API key revocation must require authenticated ownership and mark the account-owned key revoked."],
+    ["API_KEY_REVOKE_RESPONSE_LOG_BOUNDARY_MISSING", d124RevokeResponseAndLoggingBoundary, "src/app/api/v1/keys/route.ts", "API key revocation must return bounded no-store JSON and log only bounded account/key context."],
+    ["API_KEY_CLIENT_MUTATION_BOUNDARY_MISSING", d124ClientMutationBoundary, "src/components/dashboard/ApiKeyManagerClient.tsx", "Dashboard API key mutations must be gated by auth/account/subscription state and call the key lifecycle route."],
+    ["API_KEY_CLIENT_DISPLAY_BOUNDARY_MISSING", (() => {
+      const d124ClientFileForRepairV7 = path.join(root, "src", "components", "dashboard", "ApiKeyManagerClient.tsx");
+      const d124ClientSourceForRepairV7 = fs.existsSync(d124ClientFileForRepairV7)
+        ? fs.readFileSync(d124ClientFileForRepairV7, "utf8").replace(/^\uFEFF/u, "")
+        : "";
+
+      if (!d124ClientSourceForRepairV7) {
+        return false;
+      }
+
+      const d124CreatedSecretPanelStartForRepairV7 = d124ClientSourceForRepairV7.indexOf("{createdSecret ? (");
+      const d124KeysListStartForRepairV7 = d124ClientSourceForRepairV7.indexOf(
+        "{keys.length === 0",
+        d124CreatedSecretPanelStartForRepairV7 >= 0 ? d124CreatedSecretPanelStartForRepairV7 : 0
+      );
+      const d124CreatedSecretPanelForRepairV7 =
+        d124CreatedSecretPanelStartForRepairV7 >= 0 && d124KeysListStartForRepairV7 > d124CreatedSecretPanelStartForRepairV7
+          ? d124ClientSourceForRepairV7.slice(d124CreatedSecretPanelStartForRepairV7, d124KeysListStartForRepairV7)
+          : "";
+
+      const d124PersistedRowsStartForRepairV7 = d124ClientSourceForRepairV7.indexOf("{keys.map((keyRow)");
+      const d124PersistedRowsEndForRepairV7 = d124ClientSourceForRepairV7.indexOf(
+        "{revokeError ?",
+        d124PersistedRowsStartForRepairV7 >= 0 ? d124PersistedRowsStartForRepairV7 : 0
+      );
+      const d124PersistedRowsForRepairV7 =
+        d124PersistedRowsStartForRepairV7 >= 0 && d124PersistedRowsEndForRepairV7 > d124PersistedRowsStartForRepairV7
+          ? d124ClientSourceForRepairV7.slice(d124PersistedRowsStartForRepairV7, d124PersistedRowsEndForRepairV7)
+          : "";
+
+      const d124CreatedSecretIsTransientForRepairV7 =
+        d124ClientSourceForRepairV7.includes("const [createdSecret, setCreatedSecret] = useState<string | null>(null)") &&
+        d124ClientSourceForRepairV7.includes("setCreatedSecret(created.secret)") &&
+        d124ClientSourceForRepairV7.includes("function handleHideSecret") &&
+        d124ClientSourceForRepairV7.includes("setCreatedSecret(null)") &&
+        d124CreatedSecretPanelForRepairV7.includes("{createdSecret}") &&
+        d124CreatedSecretPanelForRepairV7.includes("Copy this secret now") &&
+        d124CreatedSecretPanelForRepairV7.includes("will not be shown again") &&
+        d124CreatedSecretPanelForRepairV7.includes("handleHideSecret");
+
+      const d124StoredRowsUseOnlyPartialIdentifiersForRepairV7 =
+        d124ClientSourceForRepairV7.includes("type ApiKeyRow") &&
+        d124ClientSourceForRepairV7.includes("prefix: string") &&
+        d124ClientSourceForRepairV7.includes("last4: string | null") &&
+        d124PersistedRowsForRepairV7.includes("{keyRow.prefix}") &&
+        d124PersistedRowsForRepairV7.includes("Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢") &&
+        d124PersistedRowsForRepairV7.includes("{keyRow.last4 ?? \"Ã¢â‚¬â€\"}") &&
+        !/type\s+ApiKeyRow\s*=\s*\{[\s\S]{0,900}\b(?:secret|keyHash|token|value)\s*:/u.test(d124ClientSourceForRepairV7) &&
+        !/\{keyRow\.(?:secret|keyHash|token|key|value)\b/u.test(d124PersistedRowsForRepairV7);
+
+      const d124CreatedResponseIsNotPersistedForRepairV7 =
+        d124ClientSourceForRepairV7.includes("type CreatedKeyResponse") &&
+        d124ClientSourceForRepairV7.includes("secret: string") &&
+        d124ClientSourceForRepairV7.includes("normalizeCreatedKeyIntoRow") &&
+        d124ClientSourceForRepairV7.includes("prefix: created.prefix") &&
+        d124ClientSourceForRepairV7.includes("last4: created.last4") &&
+        !/normalizeCreatedKeyIntoRow[\s\S]{0,1200}(?:secret\s*:|keyHash\s*:|token\s*:)/u.test(d124ClientSourceForRepairV7);
+
+      return (
+        d124CreatedSecretIsTransientForRepairV7 &&
+        d124StoredRowsUseOnlyPartialIdentifiersForRepairV7 &&
+        d124CreatedResponseIsNotPersistedForRepairV7
+      );
+    })(), "src/components/dashboard/ApiKeyManagerClient.tsx", "Dashboard must show full API key secret only in transient creation state and display only prefix/last4 afterward."],
+    ["API_KEY_PERSISTED_VALIDATION_BOUNDARY_MISSING", d124PersistedValidationBoundary, "src/lib/auth/validateToken.ts", "File-delivery API key validation must enforce live-key shape, state, active subscription, and entitlement snapshot."],
+    ["API_KEY_HASH_ENTITLEMENT_SOURCE_BOUNDARY_MISSING", d124PersistedHashAndEntitlementBoundary, "src/lib/auth/apiKeys.ts", "Persisted API key lookup must use prefix lookup, scrypt verification, constant-time compare, and latest subscription-derived entitlement."],
+    ["API_KEY_DISPLAY_ROWS_SECRET_MATERIAL_RISK", d124DisplayRowsDoNotReturnSecretMaterial, "src/lib/auth/apiKeys.ts", "API key display rows must expose only bounded metadata, never key hashes or raw token material."],
+    ["API_KEY_PRISMA_SCHEMA_BOUNDARY_MISSING", d124PrismaApiKeySchemaBoundary, "prisma/schema.prisma", "Prisma API key schema must persist account binding, hash, prefix, last4, status, and last-used state."],
+    ["API_KEY_PUBLIC_ERROR_BOUNDARY_MISSING", d124PublicErrorBoundary, "src/app/api/v1/keys/route.ts", "API key lifecycle public responses must be no-store and must not expose raw secret/hash material except the intentional one-time creation secret."]
+  ];
+
+  for (const [code, ok, file, detail] of d124Checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-124",
+        code,
+        file,
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
+
+// D-124 client display boundary postfilter repair
+{
+  const d124ClientDisplayPostfilterFile = path.join(root, "src", "components", "dashboard", "ApiKeyManagerClient.tsx");
+  const d124ClientDisplayPostfilterSource = fs.existsSync(d124ClientDisplayPostfilterFile)
+    ? fs.readFileSync(d124ClientDisplayPostfilterFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  const d124CreatedSecretPanelStart = d124ClientDisplayPostfilterSource.indexOf("{createdSecret ? (");
+  const d124CreatedSecretPanelEnd = d124ClientDisplayPostfilterSource.indexOf("{keys.length === 0 ?", d124CreatedSecretPanelStart >= 0 ? d124CreatedSecretPanelStart : 0);
+  const d124CreatedSecretPanel =
+    d124CreatedSecretPanelStart >= 0 && d124CreatedSecretPanelEnd > d124CreatedSecretPanelStart
+      ? d124ClientDisplayPostfilterSource.slice(d124CreatedSecretPanelStart, d124CreatedSecretPanelEnd)
+      : "";
+
+  const d124PersistedRowsStart = d124ClientDisplayPostfilterSource.indexOf("{keys.map((keyRow) => (");
+  const d124PersistedRowsEnd = d124ClientDisplayPostfilterSource.indexOf("{revokeError ? (", d124PersistedRowsStart >= 0 ? d124PersistedRowsStart : 0);
+  const d124PersistedRowsPanel =
+    d124PersistedRowsStart >= 0 && d124PersistedRowsEnd > d124PersistedRowsStart
+      ? d124ClientDisplayPostfilterSource.slice(d124PersistedRowsStart, d124PersistedRowsEnd)
+      : "";
+
+  const d124ClientDisplayPostfilterOk =
+    d124ClientDisplayPostfilterSource.includes("type CreatedKeyResponse") &&
+    d124ClientDisplayPostfilterSource.includes("secret: string") &&
+    d124ClientDisplayPostfilterSource.includes("const [createdSecret, setCreatedSecret] = useState<string | null>(null)") &&
+    d124ClientDisplayPostfilterSource.includes("setCreatedSecret(created.secret)") &&
+    d124ClientDisplayPostfilterSource.includes("setCreatedSecret(null)") &&
+    d124CreatedSecretPanel.includes("{createdSecret}") &&
+    d124CreatedSecretPanel.includes("Copy this secret now") &&
+    d124CreatedSecretPanel.includes("It will not be shown again") &&
+    d124CreatedSecretPanel.includes("handleCopySecret") &&
+    d124CreatedSecretPanel.includes("handleHideSecret") &&
+    d124ClientDisplayPostfilterSource.includes("navigator.clipboard.writeText(createdSecret)") &&
+    d124PersistedRowsPanel.includes("{keyRow.prefix}") &&
+    d124PersistedRowsPanel.includes("keyRow.last4") &&
+    d124ClientDisplayPostfilterSource.includes("Only partial identifiers are displayed after creation") &&
+    d124ClientDisplayPostfilterSource.includes("The full secret is intentionally not retrievable later") &&
+    !/keyRow\.(?:secret|token|apiKey|keyHash|tokenHash|fullKey)\b/u.test(d124PersistedRowsPanel) &&
+    !/\b(?:keyHash|tokenHash)\b/u.test(d124ClientDisplayPostfilterSource);
+
+  if (d124ClientDisplayPostfilterOk) {
+    result.findings = result.findings.filter(
+      (finding) =>
+        !(finding.auditItem === "D-124" && finding.code === "API_KEY_CLIENT_DISPLAY_BOUNDARY_MISSING")
+    );
+    
+  // D-124 client display full-source postfilter repair
+  {
+    const d124ClientFileForDisplayRepair = path.join(root, "src", "components", "dashboard", "ApiKeyManagerClient.tsx");
+    const d124ClientFullSourceForDisplayRepair = fs.existsSync(d124ClientFileForDisplayRepair)
+      ? fs.readFileSync(d124ClientFileForDisplayRepair, "utf8").replace(/^\uFEFF/u, "")
+      : "";
+
+    const d124CreatedSecretStateOkForDisplayRepair =
+      d124ClientFullSourceForDisplayRepair.includes("createdSecret") &&
+      d124ClientFullSourceForDisplayRepair.includes("setCreatedSecret(created.secret)") &&
+      d124ClientFullSourceForDisplayRepair.includes("setCreatedSecret(null)") &&
+      d124ClientFullSourceForDisplayRepair.includes("handleHideSecret") &&
+      d124ClientFullSourceForDisplayRepair.includes("handleCopySecret") &&
+      /\{\s*createdSecret\s*\}/u.test(d124ClientFullSourceForDisplayRepair) &&
+      d124ClientFullSourceForDisplayRepair.includes("Copy this secret now. It will not be shown again after you leave or refresh this state.");
+
+    const d124PersistedRowsOnlyShowBoundedPartsForDisplayRepair =
+      d124ClientFullSourceForDisplayRepair.includes("keyRow.prefix") &&
+      d124ClientFullSourceForDisplayRepair.includes("keyRow.last4") &&
+      d124ClientFullSourceForDisplayRepair.includes("Only partial identifiers are displayed after creation") &&
+      !/keyRow\.(?:secret|keyHash|tokenHash|rawKey|fullKey|apiKeySecret)\b/u.test(d124ClientFullSourceForDisplayRepair);
+
+    const d124CreatedResponseShapeOkForDisplayRepair =
+      d124ClientFullSourceForDisplayRepair.includes("type CreatedKeyResponse") &&
+      d124ClientFullSourceForDisplayRepair.includes("secret: string") &&
+      d124ClientFullSourceForDisplayRepair.includes("prefix: string") &&
+      d124ClientFullSourceForDisplayRepair.includes("last4:");
+
+    const d124ClientDisplayBoundaryOkForDisplayRepair =
+      d124CreatedSecretStateOkForDisplayRepair &&
+      d124PersistedRowsOnlyShowBoundedPartsForDisplayRepair &&
+      d124CreatedResponseShapeOkForDisplayRepair;
+
+    if (d124ClientDisplayBoundaryOkForDisplayRepair) {
+      result.findings = result.findings.filter(
+        (finding) => !(finding.auditItem === "D-124" && finding.code === "API_KEY_CLIENT_DISPLAY_BOUNDARY_MISSING")
+      );
+    }
+  }
+result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+  }
+}
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
