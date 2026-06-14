@@ -15164,6 +15164,269 @@ ensureReportDir();
 
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
+
+// D-121 Checkout-to-webhook entitlement end-to-end contract final audit
+{
+  const d121CheckoutRouteFile = path.join(root, "src", "app", "api", "v1", "checkout", "route.ts");
+  const d121WebhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const d121PrismaSchemaFile = path.join(root, "prisma", "schema.prisma");
+
+  const d121CheckoutSource = fs.existsSync(d121CheckoutRouteFile)
+    ? fs.readFileSync(d121CheckoutRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d121WebhookSource = fs.existsSync(d121WebhookRouteFile)
+    ? fs.readFileSync(d121WebhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+  const d121PrismaSource = fs.existsSync(d121PrismaSchemaFile)
+    ? fs.readFileSync(d121PrismaSchemaFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function d121LooseFunctionRegion(sourceText, functionName, fallbackLength = 12000) {
+    const starts = [
+      sourceText.indexOf("export async function " + functionName),
+      sourceText.indexOf("async function " + functionName),
+      sourceText.indexOf("export function " + functionName),
+      sourceText.indexOf("function " + functionName),
+      sourceText.indexOf("const " + functionName + " ="),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextNeedles = [
+      "\nexport async function ",
+      "\nasync function ",
+      "\nexport function ",
+      "\nfunction ",
+      "\nconst ",
+      "\ntype ",
+    ];
+    const nextCandidates = nextNeedles
+      .map((needle) => sourceText.indexOf(needle, afterStart))
+      .filter((index) => index > start)
+      .sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) {
+      return sourceText.slice(start, nextCandidates[0]);
+    }
+
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  function d121ObjectRegion(sourceText, marker, fallbackLength = 8000) {
+    const start = sourceText.indexOf(marker);
+
+    if (start < 0) return "";
+
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  const d121CheckoutMetadataRegion = d121LooseFunctionRegion(d121CheckoutSource, "checkoutMetadata", 3200);
+  const d121CheckoutHandleRegion = d121LooseFunctionRegion(d121CheckoutSource, "handleCheckout", 18000);
+  const d121WebhookCheckoutRegion = d121LooseFunctionRegion(d121WebhookSource, "syncCheckoutSessionCompleted", 16000);
+  const d121WebhookSubscriptionRegion = d121LooseFunctionRegion(d121WebhookSource, "syncSubscriptionEvent", 16000);
+  const d121WebhookPlanRegion = d121LooseFunctionRegion(d121WebhookSource, "subscriptionPlan", 5000);
+  const d121WebhookChainRegion = d121LooseFunctionRegion(d121WebhookSource, "entitledChainFromSession", 5000);
+  const d121WebhookHistoryRegion = d121LooseFunctionRegion(d121WebhookSource, "historyUnlockedFromPlan", 2600);
+  const d121WebhookDispatcherRegion = d121LooseFunctionRegion(d121WebhookSource, "handleVerifiedEvent", 5000);
+  const d121SubscriptionSchemaRegion = d121ObjectRegion(d121PrismaSource, "model Subscription", 3600);
+
+  const d121CheckoutRouteExists = d121CheckoutSource.length > 0;
+  const d121WebhookRouteExists = d121WebhookSource.length > 0;
+  const d121PrismaSchemaExists = d121PrismaSource.length > 0;
+
+  const d121CheckoutMetadataContract =
+    d121CheckoutMetadataRegion.includes("checkout_plan: params.plan") &&
+    d121CheckoutMetadataRegion.includes("account_id: params.accountId") &&
+    d121CheckoutMetadataRegion.includes("auth_provider_user_id: params.authProviderUserId") &&
+    d121CheckoutMetadataRegion.includes("entitled_chain") &&
+    d121CheckoutMetadataRegion.includes("history_unlocked") &&
+    d121CheckoutMetadataRegion.includes("params.plan === \"basic\"") &&
+    d121CheckoutMetadataRegion.includes("\"checkout_selection\"");
+
+  const d121CheckoutSessionMirrorsMetadata =
+    d121CheckoutHandleRegion.includes("const metadata = checkoutMetadata({") &&
+    d121CheckoutHandleRegion.includes("plan,") &&
+    d121CheckoutHandleRegion.includes("accountId: account.id") &&
+    d121CheckoutHandleRegion.includes("authProviderUserId: signedInUser.userId") &&
+    d121CheckoutHandleRegion.includes("client_reference_id: account.id") &&
+    d121CheckoutHandleRegion.includes("metadata,") &&
+    d121CheckoutHandleRegion.includes("subscription_data:") &&
+    d121CheckoutHandleRegion.includes("metadata,");
+
+  const d121BasicChainSelectionBoundary =
+    d121CheckoutSource.includes("CHAIN_OPTIONS") &&
+    d121CheckoutSource.includes("\"bitcoin\"") &&
+    d121CheckoutSource.includes("\"ethereum\"") &&
+    d121CheckoutSource.includes("\"arbitrum\"") &&
+    d121CheckoutSource.includes("\"base\"") &&
+    d121CheckoutHandleRegion.includes("if (plan === \"basic\")") &&
+    d121CheckoutHandleRegion.includes("sessionParams.custom_fields") &&
+    d121CheckoutHandleRegion.includes("key: \"entitled_chain\"") &&
+    d121CheckoutHandleRegion.includes("type: \"dropdown\"") &&
+    d121CheckoutHandleRegion.includes("CHAIN_OPTIONS.map") &&
+    d121CheckoutHandleRegion.includes("value: chain.value");
+
+  const d121CheckoutAccountCorrelation =
+    d121CheckoutSource.includes("db.account.upsert") &&
+    d121CheckoutSource.includes("where:") &&
+    d121CheckoutSource.includes("authProviderUserId: params.authProviderUserId") &&
+    d121CheckoutHandleRegion.includes("signedInUser.userId") &&
+    d121CheckoutHandleRegion.includes("account.id") &&
+    !/checkoutMetadata\s*\(\s*\{[\s\S]{0,600}accountId\s*:\s*(?:body|request|formData|url|searchParams)/u.test(d121CheckoutSource);
+
+  const d121WebhookCheckoutMetadataConsumption =
+    d121WebhookCheckoutRegion.includes("session.client_reference_id") &&
+    d121WebhookCheckoutRegion.includes("session.metadata?.account_id") &&
+    d121WebhookCheckoutRegion.includes("session.metadata?.auth_provider_user_id") &&
+    d121WebhookCheckoutRegion.includes("normalizePlan(session.metadata?.checkout_plan)") &&
+    d121WebhookCheckoutRegion.includes("tierFromPlan(plan)") &&
+    d121WebhookCheckoutRegion.includes("retrieveSubscriptionForCheckout") &&
+    d121WebhookCheckoutRegion.includes("getSubscriptionMetadata(retrievedSubscription)");
+
+  const d121WebhookChainResolution =
+    d121WebhookSource.includes("SUPPORTED_CHAINS") &&
+    d121WebhookSource.includes("normalizeChain") &&
+    d121WebhookChainRegion.includes("session.custom_fields") &&
+    d121WebhookChainRegion.includes("field.key !== \"entitled_chain\"") &&
+    d121WebhookChainRegion.includes("field.dropdown?.value") &&
+    d121WebhookChainRegion.includes("normalizeChain(value)") &&
+    d121WebhookCheckoutRegion.includes("tier === SubscriptionTier.basic") &&
+    d121WebhookCheckoutRegion.includes("entitledChainFromSession(session)") &&
+    d121WebhookCheckoutRegion.includes("normalizeChain(metadata.entitled_chain)") &&
+    d121WebhookCheckoutRegion.includes(": null");
+
+  const d121HistoryUnlockSemantics =
+    d121WebhookHistoryRegion.includes("parseBoolean(metadataValue)") &&
+    d121WebhookHistoryRegion.includes("return plan === \"pro\"") &&
+    d121WebhookCheckoutRegion.includes("historyUnlockedFromPlan(") &&
+    d121WebhookCheckoutRegion.includes("metadata.history_unlocked") &&
+    d121WebhookCheckoutRegion.includes("session.metadata?.history_unlocked") &&
+    d121WebhookSubscriptionRegion.includes("historyUnlockedFromPlan(plan, metadata.history_unlocked)");
+
+  const d121CheckoutSubscriptionUpsertState =
+    d121WebhookCheckoutRegion.includes("tx.subscription.upsert") &&
+    d121WebhookCheckoutRegion.includes("where:") &&
+    d121WebhookCheckoutRegion.includes("stripeCustomerId") &&
+    d121WebhookCheckoutRegion.includes("update:") &&
+    d121WebhookCheckoutRegion.includes("stripeSubscriptionId") &&
+    d121WebhookCheckoutRegion.includes("tier,") &&
+    d121WebhookCheckoutRegion.includes("historyUnlocked,") &&
+    d121WebhookCheckoutRegion.includes("entitledChain,") &&
+    d121WebhookCheckoutRegion.includes("status,") &&
+    d121WebhookCheckoutRegion.includes("currentPeriodEnd,") &&
+    d121WebhookCheckoutRegion.includes("create:") &&
+    d121WebhookCheckoutRegion.includes("accountId,");
+
+  const d121SubscriptionEventMetadataConsumption =
+    d121WebhookPlanRegion.includes("metadata.checkout_plan") &&
+    d121WebhookPlanRegion.includes("STRIPE_PRICE_BASIC") &&
+    d121WebhookPlanRegion.includes("STRIPE_PRICE_PRO") &&
+    d121WebhookSubscriptionRegion.includes("metadata.account_id") &&
+    d121WebhookSubscriptionRegion.includes("subscriptionPlan(subscription)") &&
+    d121WebhookSubscriptionRegion.includes("tierFromPlan(plan)") &&
+    d121WebhookSubscriptionRegion.includes("normalizeChain(metadata.entitled_chain)") &&
+    d121WebhookSubscriptionRegion.includes("historyUnlockedFromPlan(plan, metadata.history_unlocked)") &&
+    d121WebhookSubscriptionRegion.includes("tx.subscription.findFirst") &&
+    d121WebhookSubscriptionRegion.includes("stripeSubscriptionId") &&
+    d121WebhookSubscriptionRegion.includes("stripeCustomerId") &&
+    d121WebhookSubscriptionRegion.includes("resolvedAccountId");
+
+  const d121SubscriptionEventUpsertState =
+    d121WebhookSubscriptionRegion.includes("tx.subscription.upsert") &&
+    d121WebhookSubscriptionRegion.includes("where:") &&
+    d121WebhookSubscriptionRegion.includes("stripeCustomerId") &&
+    d121WebhookSubscriptionRegion.includes("update:") &&
+    d121WebhookSubscriptionRegion.includes("stripeSubscriptionId") &&
+    d121WebhookSubscriptionRegion.includes("tier,") &&
+    d121WebhookSubscriptionRegion.includes("historyUnlocked,") &&
+    d121WebhookSubscriptionRegion.includes("entitledChain,") &&
+    d121WebhookSubscriptionRegion.includes("status,") &&
+    d121WebhookSubscriptionRegion.includes("currentPeriodEnd,") &&
+    d121WebhookSubscriptionRegion.includes("create:") &&
+    d121WebhookSubscriptionRegion.includes("accountId: resolvedAccountId");
+
+  const d121SubscriptionDeleteDegradesAccess =
+    d121WebhookDispatcherRegion.includes("customer.subscription.deleted") &&
+    d121WebhookDispatcherRegion.includes("syncSubscriptionEvent") &&
+    d121WebhookDispatcherRegion.includes("SubscriptionStatus.inactive") &&
+    d121WebhookSource.includes("forcedStatus") &&
+    d121WebhookSubscriptionRegion.includes("const status = forcedStatus ?? normalizeStripeSubscriptionStatus(subscription.status)");
+
+  const d121PrismaEntitlementSchema =
+    d121PrismaSource.includes("enum SubscriptionTier") &&
+    d121PrismaSource.includes("basic") &&
+    d121PrismaSource.includes("pro") &&
+    d121PrismaSource.includes("enum SubscriptionStatus") &&
+    d121PrismaSource.includes("active") &&
+    d121PrismaSource.includes("inactive") &&
+    d121SubscriptionSchemaRegion.includes("stripeCustomerId") &&
+    d121SubscriptionSchemaRegion.includes("@unique") &&
+    d121SubscriptionSchemaRegion.includes("stripeSubscriptionId") &&
+    d121SubscriptionSchemaRegion.includes("tier") &&
+    d121SubscriptionSchemaRegion.includes("historyUnlocked") &&
+    d121SubscriptionSchemaRegion.includes("@default(false)") &&
+    d121SubscriptionSchemaRegion.includes("entitledChain") &&
+    d121SubscriptionSchemaRegion.includes("status") &&
+    d121SubscriptionSchemaRegion.includes("account") &&
+    d121SubscriptionSchemaRegion.includes("@relation") &&
+    d121SubscriptionSchemaRegion.includes("@@index([accountId]") &&
+    d121SubscriptionSchemaRegion.includes("@@index([entitledChain]");
+
+  const d121NoClientControlledEntitlementIdentity =
+    !/checkoutMetadata\s*\(\s*\{[\s\S]{0,900}(?:accountId|authProviderUserId)\s*:\s*(?:body|request|formData|url|searchParams)/u.test(d121CheckoutSource) &&
+    !/metadata\s*:\s*\{[\s\S]{0,900}(?:account_id|auth_provider_user_id)\s*:\s*(?:body|request|formData|url|searchParams)/u.test(d121CheckoutSource) &&
+    !/subscription\.upsert\s*\([\s\S]{0,1200}accountId\s*:\s*(?:session\.metadata\?\.auth_provider_user_id|metadata\.auth_provider_user_id)/u.test(d121WebhookSource);
+
+  const d121EndToEndContract =
+    d121CheckoutMetadataContract &&
+    d121CheckoutSessionMirrorsMetadata &&
+    d121BasicChainSelectionBoundary &&
+    d121WebhookCheckoutMetadataConsumption &&
+    d121WebhookChainResolution &&
+    d121HistoryUnlockSemantics &&
+    d121CheckoutSubscriptionUpsertState &&
+    d121SubscriptionEventMetadataConsumption &&
+    d121SubscriptionEventUpsertState &&
+    d121SubscriptionDeleteDegradesAccess &&
+    d121PrismaEntitlementSchema &&
+    d121NoClientControlledEntitlementIdentity;
+
+  const d121Checks = [
+    ["STRIPE_ENTITLEMENT_CHECKOUT_ROUTE_MISSING", d121CheckoutRouteExists, "src/app/api/v1/checkout/route.ts", "Checkout route must exist before entitlement end-to-end audit can run."],
+    ["STRIPE_ENTITLEMENT_WEBHOOK_ROUTE_MISSING", d121WebhookRouteExists, "src/app/api/v1/stripe/webhook/route.ts", "Stripe webhook route must exist before entitlement end-to-end audit can run."],
+    ["STRIPE_ENTITLEMENT_SCHEMA_MISSING", d121PrismaSchemaExists, "prisma/schema.prisma", "Prisma schema must exist before entitlement end-to-end audit can run."],
+    ["STRIPE_ENTITLEMENT_CHECKOUT_METADATA_CONTRACT_MISSING", d121CheckoutMetadataContract, "src/app/api/v1/checkout/route.ts", "Checkout metadata must include checkout_plan, account_id, auth_provider_user_id, entitled_chain, and history_unlocked."],
+    ["STRIPE_ENTITLEMENT_CHECKOUT_SESSION_METADATA_MIRROR_MISSING", d121CheckoutSessionMirrorsMetadata, "src/app/api/v1/checkout/route.ts", "Checkout session must mirror metadata to session and subscription_data and use account.id as client_reference_id."],
+    ["STRIPE_ENTITLEMENT_BASIC_CHAIN_SELECTION_BOUNDARY_MISSING", d121BasicChainSelectionBoundary, "src/app/api/v1/checkout/route.ts", "Basic checkout must use an allowlisted hosted Stripe chain selector for entitled_chain."],
+    ["STRIPE_ENTITLEMENT_CHECKOUT_ACCOUNT_CORRELATION_MISSING", d121CheckoutAccountCorrelation, "src/app/api/v1/checkout/route.ts", "Checkout metadata must be correlated to the resolved local account and authenticated provider user, not client supplied identity."],
+    ["STRIPE_ENTITLEMENT_WEBHOOK_CHECKOUT_METADATA_CONSUMPTION_MISSING", d121WebhookCheckoutMetadataConsumption, "src/app/api/v1/stripe/webhook/route.ts", "Webhook checkout completion must consume session/client metadata and retrieved subscription metadata."],
+    ["STRIPE_ENTITLEMENT_WEBHOOK_CHAIN_RESOLUTION_MISSING", d121WebhookChainResolution, "src/app/api/v1/stripe/webhook/route.ts", "Webhook must resolve basic entitled_chain from hosted checkout custom fields or normalized subscription metadata and keep pro chain-wide access unscoped."],
+    ["STRIPE_ENTITLEMENT_HISTORY_UNLOCK_SEMANTICS_MISSING", d121HistoryUnlockSemantics, "src/app/api/v1/stripe/webhook/route.ts", "Webhook must derive history_unlocked from metadata and default pro plans to unlocked history."],
+    ["STRIPE_ENTITLEMENT_CHECKOUT_SUBSCRIPTION_UPSERT_MISSING", d121CheckoutSubscriptionUpsertState, "src/app/api/v1/stripe/webhook/route.ts", "Checkout webhook sync must upsert subscription state with tier, historyUnlocked, entitledChain, status, and currentPeriodEnd."],
+    ["STRIPE_ENTITLEMENT_SUBSCRIPTION_EVENT_METADATA_MISSING", d121SubscriptionEventMetadataConsumption, "src/app/api/v1/stripe/webhook/route.ts", "Subscription lifecycle webhook sync must consume metadata, infer plan/price, and resolve existing account binding before entitlement updates."],
+    ["STRIPE_ENTITLEMENT_SUBSCRIPTION_EVENT_UPSERT_MISSING", d121SubscriptionEventUpsertState, "src/app/api/v1/stripe/webhook/route.ts", "Subscription lifecycle webhook sync must upsert entitlement state with tier, historyUnlocked, entitledChain, status, and currentPeriodEnd."],
+    ["STRIPE_ENTITLEMENT_SUBSCRIPTION_DELETE_DEGRADE_MISSING", d121SubscriptionDeleteDegradesAccess, "src/app/api/v1/stripe/webhook/route.ts", "Subscription deletion webhook must degrade access by forcing inactive subscription status."],
+    ["STRIPE_ENTITLEMENT_SCHEMA_FIELDS_MISSING", d121PrismaEntitlementSchema, "prisma/schema.prisma", "Prisma subscription schema must persist local account binding, tier, historyUnlocked, entitledChain, status, and Stripe correlation identifiers."],
+    ["STRIPE_ENTITLEMENT_CLIENT_CONTROLLED_IDENTITY_RISK", d121NoClientControlledEntitlementIdentity, "src/app/api/v1/checkout/route.ts + src/app/api/v1/stripe/webhook/route.ts", "Entitlement account/auth identity must not be sourced directly from request body, query, form data, or untrusted public inputs."],
+    ["STRIPE_ENTITLEMENT_END_TO_END_CONTRACT_MISSING", d121EndToEndContract, "src/app/api/v1/checkout/route.ts + src/app/api/v1/stripe/webhook/route.ts + prisma/schema.prisma", "Checkout metadata, Stripe webhook consumption, Prisma persistence, chain scoping, history unlock, and cancellation degradation must form one end-to-end entitlement contract."]
+  ];
+
+  for (const [code, ok, file, detail] of d121Checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-121",
+        code,
+        file,
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
