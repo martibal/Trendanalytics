@@ -14550,6 +14550,200 @@ ensureReportDir();
   result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
 }
 
+// D-118 Stripe webhook response cache boundary final audit
+{
+  const d118WebhookRouteFile = path.join(root, "src", "app", "api", "v1", "stripe", "webhook", "route.ts");
+  const d118WebhookSource = fs.existsSync(d118WebhookRouteFile)
+    ? fs.readFileSync(d118WebhookRouteFile, "utf8").replace(/^\uFEFF/u, "")
+    : "";
+
+  function d118LooseFunctionRegion(sourceText, functionName, fallbackLength = 9000) {
+    const starts = [
+      sourceText.indexOf("export async function " + functionName),
+      sourceText.indexOf("async function " + functionName),
+      sourceText.indexOf("export function " + functionName),
+      sourceText.indexOf("function " + functionName),
+      sourceText.indexOf("const " + functionName + " ="),
+    ].filter((index) => index >= 0);
+
+    if (starts.length === 0) return "";
+
+    const start = Math.min(...starts);
+    const afterStart = start + 1;
+    const nextCandidates = [
+      sourceText.indexOf("\nexport async function ", afterStart),
+      sourceText.indexOf("\nasync function ", afterStart),
+      sourceText.indexOf("\nexport function ", afterStart),
+      sourceText.indexOf("\nfunction ", afterStart),
+      sourceText.indexOf("\nconst ", afterStart),
+    ].filter((index) => index > start).sort((a, b) => a - b);
+
+    if (nextCandidates.length > 0) {
+      return sourceText.slice(start, nextCandidates[0]);
+    }
+
+    return sourceText.slice(start, start + fallbackLength);
+  }
+
+  const d118PostRegion = d118LooseFunctionRegion(d118WebhookSource, "POST", 18000);
+  const d118JsonResponseRegion = d118LooseFunctionRegion(d118WebhookSource, "jsonResponse", 3200);
+  const d118JsonResponseSearchIndex = d118WebhookSource.indexOf("jsonResponse");
+  const d118JsonResponseFallbackRegion = d118JsonResponseSearchIndex >= 0
+    ? d118WebhookSource.slice(
+        Math.max(0, d118JsonResponseSearchIndex - 600),
+        Math.min(d118WebhookSource.length, d118JsonResponseSearchIndex + 2400)
+      )
+    : "";
+  const d118JsonResponseEvidence = d118JsonResponseRegion.length > 0
+    ? d118JsonResponseRegion
+    : d118JsonResponseFallbackRegion;
+
+  const d118WebhookRouteExists = d118WebhookSource.length > 0;
+
+  const d118NoStoreHeaderExists =
+    d118WebhookSource.includes("Cache-Control") &&
+    d118WebhookSource.includes("no-store");
+
+  const d118JsonResponseIsNoStore =
+    d118WebhookSource.includes("jsonResponse") &&
+    d118WebhookSource.includes("NextResponse.json") &&
+    d118WebhookSource.includes("Cache-Control") &&
+    d118WebhookSource.includes("no-store") &&
+    (
+      d118JsonResponseEvidence.length === 0 ||
+      (
+        d118JsonResponseEvidence.includes("NextResponse.json") &&
+        d118JsonResponseEvidence.includes("Cache-Control") &&
+        d118JsonResponseEvidence.includes("no-store")
+      ) ||
+      (
+        d118WebhookSource.includes("function jsonResponse") ||
+        d118WebhookSource.includes("const jsonResponse")
+      )
+    );
+
+  const d118PostUsesJsonResponse =
+    d118PostRegion.includes("jsonResponse(");
+
+  const d118NoRawNextJsonInWebhookPost =
+    !/NextResponse\.json\s*\(/u.test(
+      d118PostRegion.replace(d118JsonResponseEvidence, "")
+    );
+
+  const d118NoPublicCacheDirectives =
+    !/\bCache-Control["']?\s*:\s*["'][^"']*(?:public|s-maxage|max-age|immutable|stale-while-revalidate)/iu.test(
+      d118WebhookSource
+    );
+
+  const d118SignatureFailuresAreBounded =
+    (
+      d118WebhookSource.includes("stripe-signature") ||
+      d118WebhookSource.includes("constructEvent") ||
+      d118WebhookSource.includes("webhookSecret")
+    ) &&
+    d118JsonResponseIsNoStore &&
+    d118PostUsesJsonResponse &&
+    !/NextResponse\.json\s*\([\s\S]{0,600}(?:signature|rawBody|payload|STRIPE_WEBHOOK_SECRET|error\.message|error\.stack)/u.test(
+      d118PostRegion
+    );
+
+  const d118WebhookNotConfiguredIsBounded =
+    !d118WebhookSource.includes("STRIPE_WEBHOOK_SECRET") ||
+    (
+      d118WebhookSource.includes("webhook_not_configured") ||
+      d118WebhookSource.includes("not_configured") ||
+      d118WebhookSource.includes("missing")
+    );
+
+  const d118NoSecretNamesInPublicResponsePayload =
+    !/jsonResponse\s*\([\s\S]{0,700}(?:STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|DATABASE_URL|CLERK_SECRET_KEY)/u.test(
+      d118WebhookSource
+    );
+
+  const d118NoRawEventReturned =
+    !/jsonResponse\s*\(\s*(?:event|stripeEvent)\b/u.test(d118WebhookSource) &&
+    !/NextResponse\.json\s*\(\s*(?:event|stripeEvent)\b/u.test(d118WebhookSource);
+
+  const d118NoStripeObjectReturnedInJson =
+    !/jsonResponse\s*\([\s\S]{0,900}(?:session|subscription|customer|invoice)\s*:\s*(?:session|subscription|customer|invoice)\b/u.test(
+      d118WebhookSource
+    ) &&
+    !/NextResponse\.json\s*\([\s\S]{0,900}(?:session|subscription|customer|invoice)\s*:\s*(?:session|subscription|customer|invoice)\b/u.test(
+      d118WebhookSource
+    );
+
+  const d118NoSensitiveIdentifierJsonLeak =
+    !/jsonResponse\s*\([\s\S]{0,900}(?:stripeCustomerId|stripeSubscriptionId|customerId|subscriptionId|sessionId|eventId)\s*:\s*(?:stripeCustomerId|stripeSubscriptionId|customerId|subscriptionId|sessionId|eventId)/u.test(
+      d118WebhookSource
+    );
+
+  const d118PublicResponseRawDataLeakPattern =
+    /(?:jsonResponse|NextResponse\.json)\s*\(\s*(?:rawBody|payload|signature|stripeEvent|event)\b/u;
+
+  const d118PublicResponseRawDataObjectLeakPattern =
+    /(?:jsonResponse|NextResponse\.json)\s*\(\s*\{[\s\S]{0,520}(?:rawBody|payload|signature|stripeEvent|event|eventData|eventObject)\s*:/u;
+
+  const d118PublicResponseEventObjectLeakPattern =
+    /(?:jsonResponse|NextResponse\.json)\s*\(\s*\{[\s\S]{0,520}(?:data|object)\s*:\s*event\.(?:data|object)/u;
+
+  const d118SuccessResponseIsMinimal =
+    d118PostUsesJsonResponse &&
+    (
+      d118WebhookSource.includes("received") ||
+      d118WebhookSource.includes("ok") ||
+      d118WebhookSource.includes("processed") ||
+      d118WebhookSource.includes("ignored")
+    ) &&
+    !d118PublicResponseRawDataLeakPattern.test(d118WebhookSource) &&
+    !d118PublicResponseRawDataObjectLeakPattern.test(d118WebhookSource) &&
+    !d118PublicResponseEventObjectLeakPattern.test(d118WebhookSource);
+
+  const d118PublicResponseRawErrorLeakPattern =
+    /(?:jsonResponse|NextResponse\.json)\s*\(\s*(?:error|cause)\.(?:stack|message)\b/u;
+
+  const d118PublicResponseRawErrorObjectLeakPattern =
+    /(?:jsonResponse|NextResponse\.json)\s*\(\s*\{[\s\S]{0,520}(?:stack|message|error|detail)\s*:\s*(?:error|cause)\.(?:stack|message)/u;
+
+  const d118PublicResponseStringifiedErrorLeakPattern =
+    /(?:jsonResponse|NextResponse\.json)\s*\(\s*\{[\s\S]{0,520}(?:error|message|detail)\s*:\s*String\((?:error|cause)\)/u;
+
+  const d118FailureResponseDoesNotExposeRawError =
+    !d118PublicResponseRawErrorLeakPattern.test(d118WebhookSource) &&
+    !d118PublicResponseRawErrorObjectLeakPattern.test(d118WebhookSource) &&
+    !d118PublicResponseStringifiedErrorLeakPattern.test(d118WebhookSource);
+
+  const d118Checks = [
+    ["STRIPE_WEBHOOK_ROUTE_MISSING_FOR_CACHE_AUDIT", d118WebhookRouteExists, "Stripe webhook route must exist before response cache audit can run."],
+    ["STRIPE_WEBHOOK_NO_STORE_HEADER_MISSING", d118NoStoreHeaderExists, "Stripe webhook route must define no-store Cache-Control response headers."],
+    ["STRIPE_WEBHOOK_JSON_RESPONSE_NO_STORE_MISSING", d118JsonResponseIsNoStore, "Stripe webhook jsonResponse helper must set no-store."],
+    ["STRIPE_WEBHOOK_POST_JSON_RESPONSE_HELPER_MISSING", d118PostUsesJsonResponse, "Stripe webhook POST must use bounded jsonResponse helper."],
+    ["STRIPE_WEBHOOK_RAW_NEXT_JSON_BYPASS_RISK", d118NoRawNextJsonInWebhookPost, "Stripe webhook POST must not bypass no-store jsonResponse helper."],
+    ["STRIPE_WEBHOOK_PUBLIC_CACHE_DIRECTIVE_RISK", d118NoPublicCacheDirectives, "Stripe webhook must not emit public/s-maxage/max-age/immutable cache directives."],
+    ["STRIPE_WEBHOOK_SIGNATURE_FAILURE_BOUNDARY_MISSING", d118SignatureFailuresAreBounded, "Stripe webhook signature failures must be bounded no-store responses."],
+    ["STRIPE_WEBHOOK_NOT_CONFIGURED_BOUNDARY_MISSING", d118WebhookNotConfiguredIsBounded, "Stripe webhook missing-configuration responses must be bounded."],
+    ["STRIPE_WEBHOOK_SECRET_NAME_RESPONSE_LEAK_RISK", d118NoSecretNamesInPublicResponsePayload, "Stripe webhook public responses must not expose secret env names."],
+    ["STRIPE_WEBHOOK_RAW_EVENT_RESPONSE_LEAK_RISK", d118NoRawEventReturned, "Stripe webhook must not return raw Stripe event objects."],
+    ["STRIPE_WEBHOOK_STRIPE_OBJECT_JSON_LEAK_RISK", d118NoStripeObjectReturnedInJson, "Stripe webhook must not return raw Stripe customer/subscription/session/invoice objects."],
+    ["STRIPE_WEBHOOK_IDENTIFIER_JSON_LEAK_RISK", d118NoSensitiveIdentifierJsonLeak, "Stripe webhook public JSON must not expose Stripe identifiers."],
+    ["STRIPE_WEBHOOK_SUCCESS_RESPONSE_NOT_MINIMAL", d118SuccessResponseIsMinimal, "Stripe webhook success response must be minimal and not include raw payload/signature/event data."],
+    ["STRIPE_WEBHOOK_RAW_ERROR_RESPONSE_LEAK_RISK", d118FailureResponseDoesNotExposeRawError, "Stripe webhook public error responses must not expose raw error stack/message."]
+  ];
+
+  for (const [code, ok, detail] of d118Checks) {
+    if (!ok) {
+      result.findings.push({
+        severity: "fail",
+        auditItem: "D-118",
+        code,
+        file: "src/app/api/v1/stripe/webhook/route.ts",
+        detail,
+      });
+    }
+  }
+
+  result.result = result.findings.some((finding) => finding.severity === "fail") ? "FAIL" : "PASS";
+}
+
 writeJson(reportJsonPath, result);
 fs.writeFileSync(reportMarkdownPath, markdownReport(result), "utf8");
 
