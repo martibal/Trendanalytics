@@ -461,9 +461,25 @@ function Price({
       </div>
       <p>{note}</p>
       <ul>{features.map((f) => <li key={f}>{f}</li>)}</ul>
-      <Link href={href} className="ua-vf-btn-primary">
-        {cta}
-      </Link>
+      {href.startsWith("/api/v1/checkout") ? (
+        <form action={href} method="post" style={{ margin: 0 }}>
+          <button
+            type="submit"
+            className="ua-vf-btn-primary"
+            style={{
+              width: "100%",
+              cursor: "pointer",
+              border: 0,
+            }}
+          >
+            {cta}
+          </button>
+        </form>
+      ) : (
+        <Link href={href} className="ua-vf-btn-primary">
+          {cta}
+        </Link>
+      )}
     </article>
   );
 }
