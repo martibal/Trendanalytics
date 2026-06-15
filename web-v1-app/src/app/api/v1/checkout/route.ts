@@ -395,7 +395,7 @@ async function handleCheckout(request: Request) {
   }
 
   if (!signedInUser) {
-      const returnUrl = `${appUrl}/api/v1/checkout?plan=${plan}`;
+      const returnUrl = `${appUrl}/checkout/start?plan=${plan}`;
     const signInUrl = new URL("/sign-in", appUrl);
     signInUrl.searchParams.set("redirect_url", returnUrl);
 
