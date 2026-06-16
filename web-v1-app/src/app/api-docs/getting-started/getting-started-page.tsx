@@ -352,7 +352,7 @@ export default function GettingStartedJsonApiPage() {
               Open a terminal. Run this command with your actual API key:
               <div className="mt-3">
                 <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY_HERE" \\
-  https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json`}</CodeBlock>
+  https://www.urdatlas.com/api/v1/files/meta/bitcoin/latest.json`}</CodeBlock>
               </div>
               You will see a JSON response printed in the terminal.
             </StepCard>
@@ -361,7 +361,7 @@ export default function GettingStartedJsonApiPage() {
               Add a redirect to save the output to a file:
               <div className="mt-3">
                 <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY_HERE" \\
-  https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json \\
+  https://www.urdatlas.com/api/v1/files/meta/bitcoin/latest.json \\
   -o bitcoin_meta_latest.json`}</CodeBlock>
               </div>
               You now have a local JSON file you can open and use.
@@ -375,6 +375,66 @@ export default function GettingStartedJsonApiPage() {
           </Callout>
         </Section>
 
+        {/* Request format */}
+        <Section
+          id="request-format"
+          eyebrow="Request format"
+          title="Use X-API-Key and d-suffixed windows"
+          subtitle="Most failed first requests come from using the wrong authentication header or writing windows as 30 instead of 30d."
+        >
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">Authentication header</h3>
+              <p className="mt-3 text-sm leading-7 text-[var(--urd-text-body)]">
+                Authenticated file delivery expects your API key in the <InlineCode>X-API-Key</InlineCode> header.
+                Do not use <InlineCode>Authorization: Bearer</InlineCode> unless this documentation is updated later to say it is supported.
+              </p>
+              <div className="mt-4">
+                <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY_HERE" https://www.urdatlas.com/api/v1/files/gold/bitcoin/latest.json`}</CodeBlock>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-[var(--urd-raised)] p-5">
+              <h3 className="text-base font-semibold text-[var(--urd-text-strong)]">Window tokens</h3>
+              <p className="mt-3 text-sm leading-7 text-[var(--urd-text-body)]">
+                Historical window paths use explicit tokens: <InlineCode>7d</InlineCode>, <InlineCode>30d</InlineCode>,
+                <InlineCode>90d</InlineCode>, <InlineCode>180d</InlineCode>, and <InlineCode>365d</InlineCode>.
+                Single Chain access includes <InlineCode>latest</InlineCode>, <InlineCode>7d</InlineCode>,
+                <InlineCode>30d</InlineCode>, and <InlineCode>90d</InlineCode>.
+              </p>
+              <div className="mt-4">
+                <CodeBlock>{`/api/v1/files/gold/bitcoin/latest.json
+/api/v1/files/gold/bitcoin/7d/latest.json
+/api/v1/files/gold/bitcoin/30d/latest.json
+/api/v1/files/gold/bitcoin/90d/latest.json`}</CodeBlock>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-[var(--urd-text-muted)]">
+                Do not omit the <InlineCode>d</InlineCode> suffix. For example, <InlineCode>30/latest.json</InlineCode>
+                is not the same as <InlineCode>30d/latest.json</InlineCode>.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+              <h3 className="text-sm font-bold text-[var(--urd-text-strong)]">Correct examples</h3>
+              <div className="mt-3">
+                <CodeBlock>{`/api/v1/files/gold/bitcoin/30d/latest.json
+/api/v1/files/derived/bitcoin/30d/latest.json
+/api/v1/files/meta/bitcoin/90d/latest.json`}</CodeBlock>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
+              <h3 className="text-sm font-bold text-[var(--urd-text-strong)]">Incorrect examples</h3>
+              <div className="mt-3">
+                <CodeBlock>{`/api/v1/files/gold/bitcoin/30/latest.json
+/api/v1/files/derived/bitcoin/90/latest.json
+Authorization: Bearer YOUR_KEY_HERE`}</CodeBlock>
+              </div>
+            </div>
+          </div>
+        </Section>
         {/* ── 5. Plans ── */}
         <Section
           id="plans"
