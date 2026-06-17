@@ -19,7 +19,7 @@ const INTEGRATION_STEPS = [
     n: "02",
     title: "Request the latest file",
     body: "Every layer has a latest.json path. Paid API access uses the same artifact model the website reads.",
-    code: "GET /api/v1/files/meta/ethereum/latest.json\nAuthorization: Bearer YOUR_KEY",
+    code: "GET /api/v1/files/meta/ethereum/latest.json\nX-API-Key: YOUR_KEY",
   },
   {
     n: "03",
