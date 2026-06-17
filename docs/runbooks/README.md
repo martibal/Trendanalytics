@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This directory contains operational runbooks for Urd Atlas production support, billing recovery, API access, data publishing, and incident response.
+This directory contains operational runbooks for Urd Atlas production support, billing recovery, API access, data publishing, observability, and incident response.
 
 Use these runbooks when production behavior must be diagnosed or recovered in a controlled, documented way.
 
@@ -33,7 +33,7 @@ Use these runbooks when production behavior must be diagnosed or recovered in a 
 - [API Key Rotation](./api-key-rotation.md)
   Use when a key is exposed, suspected compromised, no longer needed, or must be rotated.
 
-### Data, pipeline, and publishing
+### Data, pipeline, publishing, and observability
 
 - [Data Stale or Missing](./data-stale-or-missing.md)
   Use when published JSON appears stale, missing, inconsistent, or unavailable through the website or API.
@@ -43,6 +43,9 @@ Use these runbooks when production behavior must be diagnosed or recovered in a 
 
 - [Production Migration](./production-migrations.md)
   Use when checking, applying, or recovering production database migrations.
+
+- [Production Alerts and Observability](./production-alerts-and-observability.md)
+  Use when defining, reviewing, or routing alerts for webhook failures, API errors, pipeline failures, stale data, missing files, or migration drift.
 
 ## General safety rules
 
@@ -72,6 +75,7 @@ Use this quick routing table when an incident starts:
 | Data is stale or file is missing | Data Stale or Missing |
 | Daily pipeline failed | Daily Pipeline Failure |
 | Production database schema issue | Production Migration |
+| Alert needs to be defined or routed | Production Alerts and Observability |
 
 ## Completion expectation
 
