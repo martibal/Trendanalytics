@@ -512,7 +512,7 @@ export default function GettingStartedJsonApiPage() {
               Open a terminal. Run:
               <div className="mt-3">
                 <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY" \\
-  https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json`}</CodeBlock>
+  https://www.urdatlas.com/api/v1/files/meta/bitcoin/latest.json`}</CodeBlock>
               </div>
               You will see a full JSON response printed.
             </StepCard>
@@ -520,7 +520,7 @@ export default function GettingStartedJsonApiPage() {
               Add <InlineCode>-o filename.json</InlineCode> to save to disk:
               <div className="mt-3">
                 <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY" \\
-  https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json \\
+  https://www.urdatlas.com/api/v1/files/meta/bitcoin/latest.json \\
   -o bitcoin_meta_latest.json`}</CodeBlock>
               </div>
             </StepCard>
@@ -584,6 +584,62 @@ export default function GettingStartedJsonApiPage() {
             cancelled immediately, subscriber API access stops when the subscription status becomes inactive.
           </Callout>
         </Section>
+        {/* ── Request format guardrails ── */}
+        <Section
+          id="request-format"
+          eyebrow="Request format"
+          title="Use X-API-Key and d-suffixed windows"
+          subtitle="Most failed first requests come from using the wrong authentication header or writing windows as 30 instead of 30d."
+        >
+          <div className="grid gap-4 lg:grid-cols-2">
+            <UrdCard className="rounded-2xl p-5">
+              <h3 className="text-base font-black text-[#0d2447]">Authentication header</h3>
+              <p className="mt-3 text-sm font-semibold leading-7 text-[#27476f]">
+                Authenticated file delivery expects your API key in the <InlineCode>X-API-Key</InlineCode> header.
+                Do not use <InlineCode>Authorization: Bearer</InlineCode> unless this documentation is updated later to say it is supported.
+              </p>
+              <div className="mt-4">
+                <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY_HERE" https://www.urdatlas.com/api/v1/files/gold/bitcoin/latest.json`}</CodeBlock>
+              </div>
+            </UrdCard>
+
+            <UrdCard className="rounded-2xl p-5">
+              <h3 className="text-base font-black text-[#0d2447]">Window tokens</h3>
+              <p className="mt-3 text-sm font-semibold leading-7 text-[#27476f]">
+                Historical window paths use explicit tokens: <InlineCode>7d</InlineCode>, <InlineCode>30d</InlineCode>,
+                <InlineCode>90d</InlineCode>, <InlineCode>180d</InlineCode>, and <InlineCode>365d</InlineCode>.
+                Single Chain access includes <InlineCode>latest</InlineCode>, <InlineCode>7d</InlineCode>,
+                <InlineCode>30d</InlineCode>, and <InlineCode>90d</InlineCode>.
+              </p>
+              <div className="mt-4">
+                <CodeBlock>{`/api/v1/files/gold/bitcoin/latest.json
+/api/v1/files/gold/bitcoin/7d/latest.json
+/api/v1/files/gold/bitcoin/30d/latest.json
+/api/v1/files/gold/bitcoin/90d/latest.json`}</CodeBlock>
+              </div>
+            </UrdCard>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <UrdCard className="rounded-2xl border-emerald-500/20 bg-emerald-500/5 p-5">
+              <h3 className="text-sm font-black text-[#0d2447]">Correct examples</h3>
+              <div className="mt-3">
+                <CodeBlock>{`/api/v1/files/gold/bitcoin/30d/latest.json
+/api/v1/files/derived/bitcoin/30d/latest.json
+/api/v1/files/meta/bitcoin/90d/latest.json`}</CodeBlock>
+              </div>
+            </UrdCard>
+
+            <UrdCard className="rounded-2xl border-amber-500/20 bg-amber-500/5 p-5">
+              <h3 className="text-sm font-black text-[#0d2447]">Incorrect examples</h3>
+              <div className="mt-3">
+                <CodeBlock>{`/api/v1/files/gold/bitcoin/30/latest.json
+/api/v1/files/derived/bitcoin/90/latest.json
+Authorization: Bearer YOUR_KEY_HERE`}</CodeBlock>
+              </div>
+            </UrdCard>
+          </div>
+        </Section>
         {/* ── 7. First request ── */}
         <Section id="first-request" eyebrow="Chapter 7" title="How to make your first API request">
           <p className="text-sm leading-7 text-[#27476f]">
@@ -595,9 +651,9 @@ export default function GettingStartedJsonApiPage() {
             <div className="rounded-2xl border bg-[#f8fbff] p-5">
               <h3 className="text-base font-semibold text-[#0d2447] mb-1">Option A: curl (simplest — works on Windows, Mac, Linux)</h3>
               <p className="text-xs text-[#557099] mb-3">curl is usually pre-installed. Open any terminal and run:</p>
-              <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY_HERE" https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json`}</CodeBlock>
+              <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY_HERE" https://www.urdatlas.com/api/v1/files/meta/bitcoin/latest.json`}</CodeBlock>
               <p className="mt-3 text-xs text-[#557099]">To save to a file instead of printing:</p>
-              <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY_HERE" https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json -o meta_bitcoin_latest.json`}</CodeBlock>
+              <CodeBlock>{`curl -H "X-API-Key: YOUR_KEY_HERE" https://www.urdatlas.com/api/v1/files/meta/bitcoin/latest.json -o meta_bitcoin_latest.json`}</CodeBlock>
             </div>
 
             <div className="rounded-2xl border bg-[#f8fbff] p-5">
@@ -606,7 +662,7 @@ export default function GettingStartedJsonApiPage() {
               <CodeBlock>{`import requests, json
 
 API_KEY = "YOUR_KEY_HERE"
-url = "https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json"
+url = "https://www.urdatlas.com/api/v1/files/meta/bitcoin/latest.json"
 
 response = requests.get(url, headers={"X-API-Key": API_KEY}, timeout=30)
 response.raise_for_status()  # raises an error if request failed
@@ -623,7 +679,7 @@ with open("meta_bitcoin_latest.json", "w") as f:
             <div className="rounded-2xl border bg-[#f8fbff] p-5">
               <h3 className="text-base font-semibold text-[#0d2447] mb-1">Option C: PowerShell (Windows)</h3>
               <CodeBlock>{`$key = "YOUR_KEY_HERE"
-$url = "https://urdatlas.com/api/v1/files/meta/bitcoin/latest.json"
+$url = "https://www.urdatlas.com/api/v1/files/meta/bitcoin/latest.json"
 $headers = @{ "X-API-Key" = $key }
 
 $response = Invoke-RestMethod -Uri $url -Headers $headers
@@ -727,7 +783,7 @@ CHAINS = ["bitcoin", "ethereum", "arbitrum", "base"]
 
 rows = []
 for chain in CHAINS:
-    url = f"https://urdatlas.com/api/v1/files/meta/{chain}/latest.json"
+    url = f"https://www.urdatlas.com/api/v1/files/meta/{chain}/latest.json"
     data = requests.get(url, headers={"X-API-Key": API_KEY}).json()
     rows.append({
         "chain": chain,
@@ -775,7 +831,7 @@ print(df.to_string(index=False))`}</CodeBlock>
 from pathlib import Path
 import requests
 
-BASE_URL = "https://urdatlas.com"
+BASE_URL = "https://www.urdatlas.com"
 API_KEY = os.environ["URD_ATLAS_API_KEY"]  # set this as environment variable — never hardcode
 
 CHAIN = "bitcoin"   # change to your entitled chain
