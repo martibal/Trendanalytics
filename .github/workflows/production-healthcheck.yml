@@ -17,6 +17,7 @@ jobs:
 
     permissions:
       contents: read
+      issues: write
 
     defaults:
       run:
@@ -42,3 +43,64 @@ jobs:
 
       - name: Run production healthcheck
         run: npm run check:production-health
+
+      - name: Open or update production healthcheck failure issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = "[Production Healthcheck] Failure";
+
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const shortSha = context.sha.slice(0, 12);
+            const now = new Date().toISOString();
+
+            const body = [
+              "The scheduled production healthcheck failed.",
+              "",
+              `- UTC: ${now}`,
+              `- Workflow: ${context.workflow}`,
+              `- Run: ${runUrl}`,
+              `- Ref: ${context.ref}`,
+              `- Commit: ${shortSha}`,
+              `- Actor: ${context.actor}`,
+              "",
+              "Start with: `docs/runbooks/production-alerts-and-observability.md`",
+              "",
+              "If the failure is route/status/data related, use: `docs/runbooks/data-stale-or-missing.md`",
+              "",
+              "Do not paste secrets, full API keys, Stripe secrets, database URLs, or webhook secrets into this issue.",
+            ].join("\n");
+
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: "open",
+              per_page: 100,
+            });
+
+            const existing = existingIssues.data.find((issue) => {
+              return !issue.pull_request && issue.title === title;
+            });
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body,
+              });
+
+              core.notice(`Updated existing production healthcheck issue #${existing.number}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body,
+              });
+
+              core.notice(`Created production healthcheck issue #${created.data.number}`);
+            }
