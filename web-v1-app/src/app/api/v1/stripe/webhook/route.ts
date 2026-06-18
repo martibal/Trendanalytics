@@ -1,6 +1,7 @@
 // src/app/api/v1/stripe/webhook/route.ts
 import { NextResponse } from "next/server";
-import { ApiKeyStatus, SubscriptionStatus, SubscriptionTier } from "@prisma/client";
+import { ApiKeyStatus } from "@prisma/client";
+import { SubscriptionStatus, SubscriptionTier } from "@prisma/client";
 import Stripe from "stripe";
 
 import type { ChainId } from "@/config/chains";
