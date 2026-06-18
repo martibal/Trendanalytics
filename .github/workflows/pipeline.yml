@@ -18,7 +18,7 @@ jobs:
 
     permissions:
       contents: write
-
+      issues: write
     env:
       CSS_PYTHON: python
       CSS_SYNC_WEB: "0"
@@ -320,3 +320,64 @@ jobs:
             pipeline/_work/prod/status
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Open or update daily pipeline failure issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = "[Daily Pipeline Publish] Failure";
+
+            const runUrl = context.serverUrl + "/" + owner + "/" + repo + "/actions/runs/" + context.runId;
+            const shortSha = context.sha.slice(0, 12);
+            const now = new Date().toISOString();
+
+            const body = [
+              "The Daily Pipeline Publish workflow failed.",
+              "",
+              "- UTC: " + now,
+              "- Workflow: " + context.workflow,
+              "- Run: " + runUrl,
+              "- Ref: " + context.ref,
+              "- Commit: " + shortSha,
+              "- Actor: " + context.actor,
+              "",
+              "Start with: `docs/runbooks/daily-pipeline-failure.md`",
+              "",
+              "If the failure is stale or missing data, use: `docs/runbooks/data-stale-or-missing.md`",
+              "",
+              "Do not paste secrets, database URLs, AWS credentials, Stripe secrets, Clerk secrets, or full API keys into this issue."
+            ].join("\n");
+
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: "open",
+              per_page: 100
+            });
+
+            const existing = existingIssues.data.find((issue) => {
+              return !issue.pull_request && issue.title === title;
+            });
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body
+              });
+
+              core.notice("Updated existing daily pipeline failure issue #" + existing.number);
+            } else {
+              const created = await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body
+              });
+
+              core.notice("Created daily pipeline failure issue #" + created.data.number);
+            }
