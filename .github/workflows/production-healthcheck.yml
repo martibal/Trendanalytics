@@ -1,0 +1,44 @@
+name: Production Healthcheck
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+
+concurrency:
+  group: production-healthcheck
+  cancel-in-progress: false
+
+jobs:
+  healthcheck:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: ./web-v1-app
+
+    env:
+      URD_HEALTHCHECK_BASE_URL: https://www.urdatlas.com
+      URD_HEALTHCHECK_TIMEOUT_MS: "15000"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web-v1-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run production healthcheck
+        run: npm run check:production-health
