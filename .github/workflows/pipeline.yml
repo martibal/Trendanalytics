@@ -2,6 +2,15 @@ name: Daily Pipeline Publish
 
 on:
   workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: "Set to true to verify the daily pipeline failure issue alert path."
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
   schedule:
     - cron: '0 6 * * *'
     - cron: '0 18 * * *'
@@ -49,6 +58,12 @@ jobs:
           git checkout main
           git reset --hard origin/main
 
+      - name: Simulate daily pipeline failure issue alert
+        if: github.event_name == 'workflow_dispatch' && inputs.simulate_failure == 'true'
+        shell: pwsh
+        run: |
+          Write-Host "Manual failure simulation requested. This is expected to fail so the issue alert path can be verified."
+          exit 1
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
