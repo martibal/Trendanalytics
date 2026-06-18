@@ -1,6 +1,6 @@
 // src/app/api/v1/stripe/webhook/route.ts
 import { NextResponse } from "next/server";
-import { SubscriptionStatus, SubscriptionTier } from "@prisma/client";
+import { ApiKeyStatus, SubscriptionStatus, SubscriptionTier } from "@prisma/client";
 import Stripe from "stripe";
 
 import type { ChainId } from "@/config/chains";
@@ -348,6 +348,9 @@ async function syncSubscriptionEvent(
 
   let synced = false;
 
+
+  let autoRevokedApiKeys = 0;
+
   await db.$transaction(async (tx) => {
     const existing = await tx.subscription.findFirst({
       where: {
@@ -363,6 +366,7 @@ async function syncSubscriptionEvent(
       select: {
         id: true,
         accountId: true,
+        stripeSubscriptionId: true,
       },
     });
 
@@ -372,6 +376,20 @@ async function syncSubscriptionEvent(
       console.warn("[stripe-webhook] subscription event has no account binding", {
         stripeCustomerId,
         stripeSubscriptionId,
+      });
+      return;
+    }
+
+
+    if (
+      status === SubscriptionStatus.inactive &&
+      existing?.stripeSubscriptionId &&
+      existing.stripeSubscriptionId !== stripeSubscriptionId
+    ) {
+      console.warn("[stripe-webhook] inactive subscription event ignored for non-current subscription", {
+        stripeCustomerId,
+        stripeSubscriptionId,
+        currentStripeSubscriptionId: existing.stripeSubscriptionId,
       });
       return;
     }
@@ -400,6 +418,23 @@ async function syncSubscriptionEvent(
       },
     });
 
+    if (status === SubscriptionStatus.inactive) {
+      const revoked = await tx.apiKey.updateMany({
+        where: {
+          accountId: resolvedAccountId,
+          status: {
+            not: ApiKeyStatus.revoked,
+          },
+        },
+        data: {
+          status: ApiKeyStatus.revoked,
+        },
+      });
+
+      autoRevokedApiKeys = revoked.count;
+    }
+
+
     synced = true;
   });
 
@@ -413,6 +448,7 @@ async function syncSubscriptionEvent(
     tier,
     entitledChain,
     status,
+    autoRevokedApiKeys,
   });
 
   return "ok";
