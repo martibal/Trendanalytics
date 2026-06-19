@@ -104,7 +104,7 @@ function heroRegimeAsOf(hero?: LandingHero | null): string | null {
 }
 
 function expectedDelayDays(chain: ChainId): number {
-  return chain === "arbitrum" || chain === "base" ? 7 : 1;
+  return chain === "arbitrum" || chain === "base" ? 8 : 1;
 }
 
 function classifyStatus(params: {
