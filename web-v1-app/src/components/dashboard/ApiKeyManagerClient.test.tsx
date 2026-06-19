@@ -1,4 +1,4 @@
-// src/components/dashboard/ApiKeyManagerClient.test.tsx
+﻿// src/components/dashboard/ApiKeyManagerClient.test.tsx
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import ApiKeyManagerClient from "@/components/dashboard/ApiKeyManagerClient";
@@ -208,7 +208,7 @@ describe("components/dashboard/ApiKeyManagerClient", () => {
       });
     });
 
-    const keyRow = screen.getByText(/label:\s*primary/i).closest(".rounded-xl.border");
+    const keyRow = screen.getByText(/label:\s*primary/i).closest(".rounded-2xl.border");
     expect(keyRow).not.toBeNull();
     expect(within(keyRow as HTMLElement).getByText(/^revoked$/i)).toBeInTheDocument();
   });
