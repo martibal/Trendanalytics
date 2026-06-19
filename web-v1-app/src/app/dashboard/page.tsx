@@ -1,9 +1,9 @@
-// src/app/dashboard/page.tsx
+﻿// src/app/dashboard/page.tsx
 import { Fragment, type ReactNode } from "react";
 
 import Link from "next/link";
 
-import { CHAIN_LIST } from "@/config/chains";
+import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import ApiKeyManagerClient from "@/components/dashboard/ApiKeyManagerClient";
 import { getCurrentAccountView } from "@/lib/auth/account";
 import { getPersistedApiKeyDisplayRows } from "@/lib/auth/apiKeys";
@@ -249,6 +249,106 @@ function capabilityRows() {
   ];
 }
 
+type DashboardEndpointExample = {
+  label: string;
+  path: string;
+  detail: string;
+};
+
+function deliveryChainIds(params: {
+  tier: "public" | "basic" | "pro";
+  entitledChain: string | null | undefined;
+}): ChainId[] {
+  if (params.tier === "pro") {
+    return CHAIN_LIST.map((chain) => chain.id);
+  }
+
+  if (
+    params.tier === "basic" &&
+    params.entitledChain &&
+    CHAIN_LIST.some((chain) => chain.id === params.entitledChain)
+  ) {
+    return [params.entitledChain as ChainId];
+  }
+
+  return [];
+}
+
+function dashboardEndpointReferenceNote(params: {
+  tier: "public" | "basic" | "pro";
+  status: "active" | "inactive";
+}) {
+  if (params.tier === "public" || params.status !== "active") {
+    return "Endpoint examples appear after an active subscription is linked to this account. Entitlement enforcement remains server-side on the authenticated file route.";
+  }
+
+  if (params.tier === "pro") {
+    return "Examples are generated from this account's active Research entitlement: all supported chains and delivery windows up to 365d.";
+  }
+
+  return "Examples are generated from this account's active Single Chain entitlement: the selected chain and delivery windows up to 90d.";
+}
+
+function dashboardEndpointExamples(params: {
+  tier: "public" | "basic" | "pro";
+  entitledChain: string | null | undefined;
+  maxWindowDays: number;
+}): DashboardEndpointExample[] {
+  const chains = deliveryChainIds({
+    tier: params.tier,
+    entitledChain: params.entitledChain,
+  });
+
+  const primaryChain = chains[0];
+
+  if (!primaryChain) {
+    return [];
+  }
+
+  const examples: DashboardEndpointExample[] = [
+    {
+      label: "Latest Meta",
+      path: `/api/v1/files/meta/${primaryChain}/latest.json`,
+      detail: "Current Meta snapshot for this account's entitled delivery scope.",
+    },
+    {
+      label: "90-day Derived",
+      path: `/api/v1/files/derived/${primaryChain}/90d/latest.json`,
+      detail: "90-day Derived window within the active subscription boundary.",
+    },
+  ];
+
+  if (params.maxWindowDays >= 180) {
+    examples.push({
+      label: "180-day Meta",
+      path: `/api/v1/files/meta/${primaryChain}/180d/latest.json`,
+      detail: "Research-only 180-day Meta window for the current entitlement.",
+    });
+  }
+
+  if (params.maxWindowDays >= 365) {
+    examples.push({
+      label: "365-day Gold",
+      path: `/api/v1/files/gold/${primaryChain}/365d/latest.json`,
+      detail: "Research-only 365-day Gold window for the current entitlement.",
+    });
+  }
+
+  if (params.tier === "pro") {
+    const secondaryChain = chains.find((chain) => chain !== primaryChain);
+
+    if (secondaryChain) {
+      examples.push({
+        label: "Second chain latest",
+        path: `/api/v1/files/meta/${secondaryChain}/latest.json`,
+        detail: "Research keys can use the same API key across all supported chains.",
+      });
+    }
+  }
+
+  return examples.slice(0, 4);
+}
+
 function deriveSubscriptionState(params: {
   authConfigured: boolean;
   isAuthenticated: boolean;
@@ -319,7 +419,7 @@ function deriveLifecycleState(params: {
 }
 
 function formatDateTime(value: string | null | undefined) {
-  if (!value) return "—";
+  if (!value) return "â€”";
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
@@ -473,6 +573,17 @@ export default async function DashboardPage() {
     accountView.snapshot.maxWindowDays >= 180 ? "180d" : null,
     accountView.snapshot.maxWindowDays >= 365 ? "365d" : null,
   ].filter((value): value is string => !!value);
+
+  const endpointExamples = dashboardEndpointExamples({
+    tier: accountView.snapshot.tier,
+    entitledChain: accountView.snapshot.entitledChain,
+    maxWindowDays: accountView.snapshot.maxWindowDays,
+  });
+
+  const endpointReferenceNote = dashboardEndpointReferenceNote({
+    tier: accountView.snapshot.tier,
+    status: accountView.snapshot.status,
+  });
 
   if (accountView.authConfigured && !accountView.isAuthenticated) {
     return (
@@ -818,7 +929,7 @@ export default async function DashboardPage() {
             <Fragment key={row.tier}>
               <DataRow
                 label={row.tier}
-                value={`${row.chains} · ${row.history}`}
+                value={`${row.chains} Â· ${row.history}`}
                 detail={`Windows: ${row.windows}. Custom outputs: ${row.custom}.`}
                 token={<Token tone={row.tier === accountView.tierLabel ? "ok" : "quiet"}>{row.tier === accountView.tierLabel ? "current" : "reference"}</Token>}
               />
@@ -830,26 +941,29 @@ export default async function DashboardPage() {
       <Section
         eyebrow="07 / Delivery paths"
         title="Endpoint reference"
-        note="Examples only. Entitlement enforcement remains server-side on the authenticated file route."
+        note={endpointReferenceNote}
       >
         <div>
-          <div className="ua-dashboard-endpoint">
-            <span>GET</span> /api/v1/files/meta/ethereum/latest.json
-          </div>
-          <div className="ua-dashboard-endpoint">
-            <span>GET</span> /api/v1/files/derived/bitcoin/90d/latest.json
-          </div>
-          <div className="ua-dashboard-endpoint">
-            <span>GET</span> /api/v1/files/gold/base/365d/latest.json
-          </div>
+          {endpointExamples.length > 0 ? (
+            endpointExamples.map((example) => (
+              <div key={example.path} className="ua-dashboard-endpoint">
+                <span>GET</span> {example.path}
+                <p className="ua-dashboard-detail">{example.detail}</p>
+              </div>
+            ))
+          ) : (
+            <div className="ua-dashboard-endpoint">
+              <span>Pending</span> Active subscription required before account-specific examples can be shown.
+            </div>
+          )}
         </div>
 
         <div className="mt-6 space-y-3 text-sm leading-7 text-[var(--ink2)]">
           <p>
-            Example header: <CodePath>X-API-Key: ua_key_xxxxxxxxx</CodePath>
+            Header for these examples: <CodePath>X-API-Key: your_active_dashboard_key</CodePath>
           </p>
           <p>
-            Delivery validation should enforce chain entitlement, window depth, and subscription state.
+            These examples are derived from the active entitlement snapshot; delivery validation still enforces chain entitlement, window depth, and subscription state.
             Forbidden scope should return 403 rather than pretending the file does not exist.
           </p>
         </div>

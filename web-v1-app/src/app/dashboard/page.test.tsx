@@ -1,4 +1,4 @@
-// src/components/dashboard/page.test.tsx
+﻿// src/components/dashboard/page.test.tsx
 /**
  * @jest-environment node
  */
@@ -100,15 +100,31 @@ describe("app/dashboard/page", () => {
     ).toBeInTheDocument();
 
     expect(
-      screen.getByRole("heading", { level: 2, name: /subscription snapshot/i })
+      screen.getByRole("heading", { level: 2, name: /delivery scope/i })
     ).toBeInTheDocument();
 
     expect(
-      screen.getByRole("heading", { level: 2, name: /billing management/i })
+      screen.getByRole("heading", { level: 2, name: /manage subscription/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/payments are temporarily disabled while business registration and production billing setup are being completed/i)
+      screen.getByText(/opening subscription management sends you to stripe's hosted portal/i)
     ).toBeInTheDocument();
+
+    expect(
+      screen.getByText(/\/api\/v1\/files\/meta\/bitcoin\/latest\.json/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/\/api\/v1\/files\/derived\/bitcoin\/90d\/latest\.json/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/\/api\/v1\/files\/meta\/bitcoin\/180d\/latest\.json/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/\/api\/v1\/files\/gold\/bitcoin\/365d\/latest\.json/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/\/api\/v1\/files\/gold\/base\/365d\/latest\.json/i)
+    ).not.toBeInTheDocument();
 
     const client = screen.getByTestId("api-key-manager-client");
     expect(client).toBeInTheDocument();
@@ -189,8 +205,18 @@ describe("app/dashboard/page", () => {
 
     expect(
       screen.getByText(
-        /payments will be re-enabled once business registration, bank account setup, and live stripe configuration are complete/i
+        /billing management becomes available after checkout has created and linked a stripe customer for this account/i
       )
     ).toBeInTheDocument();
+
+    expect(
+      screen.getByText(/\/api\/v1\/files\/meta\/ethereum\/latest\.json/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/\/api\/v1\/files\/derived\/ethereum\/90d\/latest\.json/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/\/api\/v1\/files\/gold\/ethereum\/365d\/latest\.json/i)
+    ).not.toBeInTheDocument();
   });
 });
