@@ -154,6 +154,39 @@ Before launch, define the rollback path:
 - replay failed Stripe events only after the underlying issue is fixed
 ```
 
+## Verified production evidence - 2026-06-18
+
+The following billing and entitlement checks were completed against production before open-market launch:
+
+```text
+- Production healthcheck passed after deployment.
+- Billing launch gate passed after deployment.
+- Live Basic Bitcoin checkout reached Stripe successfully.
+- Stripe registered the test payment and invoice as paid.
+- Dashboard displayed active entitlement after successful checkout.
+- Dashboard allowed API key creation while entitlement was active.
+- Subscription cancellation was tested with cancel immediately.
+- Dashboard changed to inactive entitlement after cancellation.
+- Existing active API key was automatically revoked after cancellation.
+- Dashboard blocked new API key creation after cancellation.
+- Test payment was refunded after cancellation verification.
+```
+
+Code evidence:
+
+```text
+95fc915a9 Auto revoke API keys on subscription cancellation
+fccb4e1a9 Keep Stripe webhook audit import compatibility
+```
+
+Operational policy confirmed:
+
+```text
+- Cancellation without refund may allow access through the paid period only if cancellation is explicitly scheduled at period end.
+- Immediate cancellation must remove entitlement immediately.
+- Immediate cancellation must auto-revoke all non-revoked API keys for the account.
+- A refunded test/live payment must not leave active entitlement behind.
+```
 ## Completion criteria
 
 Billing launch is complete only when:
