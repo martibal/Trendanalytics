@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 // src/components/landing/CheckoutButton.tsx
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 
 type Plan = "basic" | "pro" | "history_addon";
 type Chain = "bitcoin" | "ethereum" | "arbitrum" | "base";
@@ -23,54 +23,25 @@ export default function CheckoutButton({
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleClick() {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     setMessage(null);
 
     if (plan === "history_addon") {
+      event.preventDefault();
       setMessage("History add-on checkout is not enabled yet.");
       return;
     }
 
     setIsSubmitting(true);
-
-    try {
-      const response = await fetch("/api/v1/checkout", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ plan, chain }),
-      });
-
-      const payload = (await response.json().catch(() => null)) as {
-        url?: string;
-        message?: string;
-        detail?: string | null;
-      } | null;
-
-      if (response.status === 401 && payload?.detail) {
-        window.location.assign(payload.detail);
-        return;
-      }
-
-      if (!response.ok || !payload?.url) {
-        setMessage(payload?.message ?? "Could not start checkout.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      window.location.assign(payload.url);
-    } catch {
-      setMessage("Could not start checkout. Please try again.");
-      setIsSubmitting(false);
-    }
   }
 
   return (
-    <>
+    <form action="/api/v1/checkout" method="post" onSubmit={handleSubmit} className="contents">
+      <input type="hidden" name="plan" value={plan} />
+      {chain ? <input type="hidden" name="chain" value={chain} /> : null}
+
       <button
-        type="button"
-        onClick={handleClick}
+        type="submit"
         className={className}
         disabled={isSubmitting}
         aria-busy={isSubmitting}
@@ -79,6 +50,6 @@ export default function CheckoutButton({
       </button>
 
       {message && <p className="mt-2 text-xs text-slate-400">{message}</p>}
-    </>
+    </form>
   );
 }
