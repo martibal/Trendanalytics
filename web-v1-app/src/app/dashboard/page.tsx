@@ -963,7 +963,7 @@ export default async function DashboardPage() {
             Header for these examples: <CodePath>X-API-Key: your_active_dashboard_key</CodePath>
           </p>
           <p>
-            These examples are derived from the active entitlement snapshot; delivery validation still enforces chain entitlement, window depth, and subscription state.
+            Examples only. Entitlement enforcement remains server-side on the authenticated file route. Delivery validation still enforces chain entitlement, window depth, and subscription state.
             Forbidden scope should return 403 rather than pretending the file does not exist.
           </p>
         </div>
@@ -977,3 +977,4 @@ export default async function DashboardPage() {
     </main>
   );
 }
+
