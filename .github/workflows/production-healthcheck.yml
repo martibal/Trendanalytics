@@ -11,8 +11,11 @@ on:
         options:
           - "false"
           - "true"
-  schedule:
-    - cron: '17 */6 * * *'
+  workflow_run:
+    workflows:
+      - Daily Pipeline Publish
+    types:
+      - completed
 
 concurrency:
   group: production-healthcheck
@@ -20,9 +23,13 @@ concurrency:
 
 jobs:
   healthcheck:
-    if: github.ref == 'refs/heads/main'
+    if: >
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     permissions:
       contents: read
@@ -35,10 +42,18 @@ jobs:
     env:
       URD_HEALTHCHECK_BASE_URL: https://www.urdatlas.com
       URD_HEALTHCHECK_TIMEOUT_MS: "15000"
+      URD_HEALTHCHECK_DEPLOY_WAIT_SECONDS: "180"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Wait for production deploy propagation
+        if: github.event_name == 'workflow_run'
+        run: |
+          echo "Daily Pipeline Publish completed successfully."
+          echo "Waiting ${URD_HEALTHCHECK_DEPLOY_WAIT_SECONDS}s before checking production so the Vercel deploy hook can propagate."
+          sleep "${URD_HEALTHCHECK_DEPLOY_WAIT_SECONDS}"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -76,13 +91,19 @@ jobs:
               context.eventName === "workflow_dispatch" &&
               String(context.payload.inputs?.simulate_failure || "false") === "true";
 
+            const trigger =
+              context.eventName === "workflow_run"
+                ? "Daily Pipeline Publish completed successfully"
+                : "Manual workflow dispatch";
+
             const body = [
               simulated
                 ? "Manual failure simulation was requested to verify the production healthcheck alert path."
-                : "The scheduled production healthcheck failed.",
+                : "The post-publish production healthcheck failed.",
               "",
               `- UTC: ${now}`,
               `- Workflow: ${context.workflow}`,
+              `- Trigger: ${trigger}`,
               `- Run: ${runUrl}`,
               `- Ref: ${context.ref}`,
               `- Commit: ${shortSha}`,
