@@ -13,6 +13,11 @@ const REQUEST_TIMEOUT_MS = readPositiveIntegerEnv(
   15000,
 );
 
+const FAIL_ON_WARNINGS = readBooleanEnv(
+  "URD_HEALTHCHECK_FAIL_ON_WARNINGS",
+  false,
+);
+
 const REQUIRED_ROUTES = [
   {
     name: "Home page",
@@ -72,6 +77,26 @@ function readPositiveIntegerEnv(name, fallback) {
   }
 
   return parsed;
+}
+
+function readBooleanEnv(name, fallback) {
+  const raw = process.env[name];
+
+  if (raw === undefined || raw === null || String(raw).trim() === "") {
+    return fallback;
+  }
+
+  const normalized = String(raw).trim().toLowerCase();
+
+  if (["1", "true", "yes", "y", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "n", "off"].includes(normalized)) {
+    return false;
+  }
+
+  throw new Error(`${name} must be a boolean value.`);
 }
 
 function nowIso() {
@@ -259,8 +284,11 @@ function evaluateStatusBody(statusBody) {
       value: failCount,
     });
 
+    const warnCountOk = warnCount === 0 || !FAIL_ON_WARNINGS;
+
     findings.push({
-      ok: warnCount === 0,
+      ok: warnCountOk,
+      severity: warnCount === 0 ? "pass" : FAIL_ON_WARNINGS ? "fail" : "warn",
       check: "summary_warn_count",
       message:
         warnCount === 0
@@ -295,27 +323,42 @@ function evaluateStatusBody(statusBody) {
       continue;
     }
 
+    const chainStatus = String(chainEntry.status ?? "unknown");
+    const chainStatusOk =
+      chainStatus === "ok" || (chainStatus === "warn" && !FAIL_ON_WARNINGS);
+    const chainStatusSeverity =
+      chainStatus === "ok"
+        ? "pass"
+        : chainStatus === "warn" && !FAIL_ON_WARNINGS
+          ? "warn"
+          : "fail";
+
     findings.push({
-      ok: chainEntry.status === "ok",
+      ok: chainStatusOk,
+      severity: chainStatusSeverity,
       check: "chain_status_ok",
       chain: requiredChain,
       message:
-        chainEntry.status === "ok"
+        chainStatus === "ok"
           ? `Chain status is ok for ${requiredChain}.`
-          : `Chain status is ${String(chainEntry.status)} for ${requiredChain}.`,
-      value: chainEntry.status,
+          : `Chain status is ${chainStatus} for ${requiredChain}.`,
+      value: chainStatus,
     });
 
     const lagDays = Number(chainEntry.lag_days);
     const expectedDelayDays = Number(chainEntry.expected_delay_days);
 
     if (Number.isFinite(lagDays) && Number.isFinite(expectedDelayDays)) {
+      const lagWithinPolicy = lagDays <= expectedDelayDays;
+      const lagSeverity = lagWithinPolicy ? "pass" : FAIL_ON_WARNINGS ? "fail" : "warn";
+
       findings.push({
-        ok: lagDays <= expectedDelayDays,
+        ok: lagWithinPolicy || !FAIL_ON_WARNINGS,
+        severity: lagSeverity,
         check: "chain_lag_within_policy",
         chain: requiredChain,
         message:
-          lagDays <= expectedDelayDays
+          lagWithinPolicy
             ? `Chain lag is within policy for ${requiredChain}.`
             : `Chain lag exceeds policy for ${requiredChain}: ${lagDays}d > ${expectedDelayDays}d.`,
         lagDays,
@@ -367,8 +410,15 @@ function printRouteResult(result) {
   }
 }
 
+function statusFindingSeverity(finding) {
+  if (finding.severity === "warn") return "warn";
+  if (finding.severity === "fail") return "fail";
+  return finding.ok ? "pass" : "fail";
+}
+
 function printStatusFinding(finding) {
-  const prefix = finding.ok ? "PASS" : "FAIL";
+  const severity = statusFindingSeverity(finding);
+  const prefix = severity === "warn" ? "WARN" : finding.ok ? "PASS" : "FAIL";
   const chain = finding.chain ? ` chain=${finding.chain}` : "";
   console.log(`${prefix} status_check=${finding.check}${chain}`);
   console.log(`  ${finding.message}`);
@@ -421,11 +471,15 @@ async function main() {
 
   const failedRoutes = routeResults.filter((result) => !result.ok);
   const failedStatusChecks = statusFindings.filter((finding) => !finding.ok);
+  const warningStatusChecks = statusFindings.filter(
+    (finding) => statusFindingSeverity(finding) === "warn",
+  );
 
   console.log("");
   console.log("Summary:");
   console.log(`  route_failures=${failedRoutes.length}`);
   console.log(`  status_failures=${failedStatusChecks.length}`);
+  console.log(`  status_warnings=${warningStatusChecks.length}`);
 
   if (failedRoutes.length > 0 || failedStatusChecks.length > 0) {
     console.log("");
