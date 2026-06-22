@@ -205,7 +205,7 @@ export default function GettingStartedJsonApiPage() {
               you enter, and the system knows which rooms you are allowed into.
             </p>
             <div className="mt-3">
-              <CodeBlock label="Example: what an API key looks like">{`ta_live_2c627b2852556cf57de58ae97d6476e27660cf1ebe9348a2`}</CodeBlock>
+              <CodeBlock label="Example: what an API key looks like">{`ta_live_<replace-with-your-access-value>`}</CodeBlock>
             </div>
             <Callout color="amber">
               <span className="font-semibold text-white">Important:</span>{" "}
