@@ -18,8 +18,8 @@ const AUTH_ENDPOINTS = [
   ["GET", "/api/v1/files/[genre]/[chain]/[window]/latest.json", "Authenticated file delivery for subscriber artifacts."],
   ["POST", "/api/v1/keys", "Create a new API key from the dashboard."],
   ["DELETE", "/api/v1/keys", "Revoke an API key."],
-  ["POST", "/api/v1/checkout", "Checkout endpoint — currently documented, but billing is not active until business registration is complete."],
-  ["POST", "/api/v1/checkout/portal", "Customer portal endpoint — currently documented, but billing is not active until business registration is complete."],
+  ["POST", "/api/v1/checkout", "Checkout endpoint for starting a subscription purchase."],
+  ["POST", "/api/v1/checkout/portal", "Customer portal endpoint for managing an existing subscription."],
 ];
 
 function InlineCode({ children }: { children: ReactNode }) {
@@ -79,7 +79,7 @@ export default async function ApiDocsPage() {
 
         <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
           <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">Authentication model</h2>
-          <p className="mt-4 text-sm leading-7 text-[var(--urd-text-body)]">Public endpoints require no key. Authenticated file delivery uses <InlineCode>X-API-Key</InlineCode>. Keys are created from the dashboard after purchase. Billing endpoints remain documented but inactive until business registration is completed.</p>
+          <p className="mt-4 text-sm leading-7 text-[var(--urd-text-body)]">Public endpoints require no key. Authenticated file delivery uses <InlineCode>X-API-Key</InlineCode>. Keys are created from the dashboard after purchase. Checkout starts a subscription purchase, and the customer portal manages an existing subscription.</p>
           <CodeBlock>{`curl -H "X-API-Key: ta_live_xxxxxxxxx" https://www.urdatlas.com/api/v1/files/meta/bitcoin/90d/latest.json`}</CodeBlock>
         </section>
 
