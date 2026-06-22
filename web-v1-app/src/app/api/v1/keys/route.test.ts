@@ -39,13 +39,28 @@ jest.mock("next/server", () => ({
 }));
 
 type MockJsonRequest = {
+  headers: Headers;
+  method: string;
+  url: string;
   json: () => Promise<unknown>;
 };
 
 type MockJsonResponse = {
   status: number;
+  headers?: Headers;
   json: () => Promise<unknown>;
 };
+
+function mockJsonRequest(body: unknown, method = "POST"): MockJsonRequest {
+  return {
+    headers: new Headers({
+      origin: "https://www.urdatlas.com",
+    }),
+    method,
+    url: "https://www.urdatlas.com/api/v1/keys",
+    json: async () => body,
+  };
+}
 
 let keysPost: (request: MockJsonRequest) => Promise<MockJsonResponse>;
 let keysDelete: (request: MockJsonRequest) => Promise<MockJsonResponse>;
@@ -71,9 +86,7 @@ describe("/api/v1/keys route", () => {
     it("returns 401 when unauthenticated", async () => {
       authMock.mockResolvedValue({ userId: null });
 
-      const request: MockJsonRequest = {
-        json: async () => ({ label: "local dev" }),
-      };
+      const request = mockJsonRequest({ label: "local dev" });
 
       const response = await keysPost(request);
       const payload = (await response.json()) as { code: string };
@@ -87,9 +100,7 @@ describe("/api/v1/keys route", () => {
       authMock.mockResolvedValue({ userId: "user_123" });
       findUniqueMock.mockResolvedValue(null);
 
-      const request: MockJsonRequest = {
-        json: async () => ({ label: "local dev" }),
-      };
+      const request = mockJsonRequest({ label: "local dev" });
 
       const response = await keysPost(request);
       const payload = (await response.json()) as { code: string };
@@ -108,9 +119,7 @@ describe("/api/v1/keys route", () => {
         apiKeys: [],
       });
 
-      const request: MockJsonRequest = {
-        json: async () => ({ label: "local dev" }),
-      };
+      const request = mockJsonRequest({ label: "local dev" });
 
       const response = await keysPost(request);
       const payload = (await response.json()) as { code: string };
@@ -131,9 +140,7 @@ describe("/api/v1/keys route", () => {
         ],
       });
 
-      const request: MockJsonRequest = {
-        json: async () => ({ label: "local dev" }),
-      };
+      const request = mockJsonRequest({ label: "local dev" });
 
       const response = await keysPost(request);
       const payload = (await response.json()) as { code: string };
@@ -160,9 +167,7 @@ describe("/api/v1/keys route", () => {
         createdAt: new Date("2026-03-18T12:00:00.000Z"),
       });
 
-      const request: MockJsonRequest = {
-        json: async () => ({ label: "local dev" }),
-      };
+      const request = mockJsonRequest({ label: "local dev" });
 
       const response = await keysPost(request);
       const payload = (await response.json()) as {
@@ -197,9 +202,7 @@ describe("/api/v1/keys route", () => {
     it("returns 401 when unauthenticated", async () => {
       authMock.mockResolvedValue({ userId: null });
 
-      const request: MockJsonRequest = {
-        json: async () => ({ keyId: "key_1" }),
-      };
+      const request = mockJsonRequest({ keyId: "key_1" }, "DELETE");
 
       const response = await keysDelete(request);
       const payload = (await response.json()) as { code: string };
@@ -217,9 +220,7 @@ describe("/api/v1/keys route", () => {
         apiKeys: [],
       });
 
-      const request: MockJsonRequest = {
-        json: async () => ({}),
-      };
+      const request = mockJsonRequest({}, "DELETE");
 
       const response = await keysDelete(request);
       const payload = (await response.json()) as { code: string };
@@ -238,9 +239,7 @@ describe("/api/v1/keys route", () => {
       });
       findFirstMock.mockResolvedValue(null);
 
-      const request: MockJsonRequest = {
-        json: async () => ({ keyId: "key_missing" }),
-      };
+      const request = mockJsonRequest({ keyId: "key_missing" }, "DELETE");
 
       const response = await keysDelete(request);
       const payload = (await response.json()) as { code: string };
@@ -262,9 +261,7 @@ describe("/api/v1/keys route", () => {
         status: "active",
       });
 
-      const request: MockJsonRequest = {
-        json: async () => ({ keyId: "key_1" }),
-      };
+      const request = mockJsonRequest({ keyId: "key_1" }, "DELETE");
 
       const response = await keysDelete(request);
       const payload = (await response.json()) as {
@@ -294,9 +291,7 @@ describe("/api/v1/keys route", () => {
         status: "revoked",
       });
 
-      const request: MockJsonRequest = {
-        json: async () => ({ keyId: "key_1" }),
-      };
+      const request = mockJsonRequest({ keyId: "key_1" }, "DELETE");
 
       const response = await keysDelete(request);
       const payload = (await response.json()) as {
