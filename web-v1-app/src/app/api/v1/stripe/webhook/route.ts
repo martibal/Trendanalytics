@@ -6,6 +6,7 @@ import Stripe from "stripe";
 
 import type { ChainId } from "@/config/chains";
 import { db } from "@/lib/db";
+import { sendOnboardingEmail } from "@/lib/email/onboarding";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -216,6 +217,52 @@ async function retrieveSubscriptionForCheckout(
   }
 }
 
+
+function getCheckoutRecipientEmail(session: Stripe.Checkout.Session): string | null {
+  const customerDetailsEmail = session.customer_details?.email;
+
+  if (typeof customerDetailsEmail === "string" && customerDetailsEmail.trim()) {
+    return customerDetailsEmail.trim();
+  }
+
+  const customerEmail = session.customer_email;
+
+  if (typeof customerEmail === "string" && customerEmail.trim()) {
+    return customerEmail.trim();
+  }
+
+  return null;
+}
+
+async function sendCheckoutOnboardingEmails(params: {
+  session: Stripe.Checkout.Session;
+  plan: CheckoutPlan | null;
+  entitledChain: ChainId | null;
+}): Promise<void> {
+  const to = getCheckoutRecipientEmail(params.session);
+  const plan = params.plan === "basic" ? "basic" : "pro";
+  const common = {
+    to,
+    plan,
+    entitledChain: params.entitledChain,
+  } as const;
+
+  const welcomeResult = await sendOnboardingEmail({
+    ...common,
+    kind: "welcome",
+  });
+
+  const guideResult = await sendOnboardingEmail({
+    ...common,
+    kind: "api_access_guidance",
+  });
+
+  console.info("[stripe-webhook] onboarding email delivery attempted", {
+    hasRecipient: Boolean(to),
+    welcomeStatus: welcomeResult.status,
+    apiGuidanceStatus: guideResult.status,
+  });
+}
 async function syncCheckoutSessionCompleted(
   stripe: Stripe,
   session: Stripe.Checkout.Session
@@ -292,6 +339,16 @@ async function syncCheckoutSessionCompleted(
     tier,
     entitledChain,
     status,
+  });
+
+  await sendCheckoutOnboardingEmails({
+    session,
+    plan,
+    entitledChain,
+  }).catch((error) => {
+    console.warn("[stripe-webhook] onboarding email delivery failed", {
+      reason: error instanceof Error ? error.message : String(error),
+    });
   });
 
   return "ok";
