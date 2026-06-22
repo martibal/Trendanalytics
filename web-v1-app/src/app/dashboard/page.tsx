@@ -1,4 +1,7 @@
-﻿// src/app/dashboard/page.tsx
+// src/app/dashboard/page.tsx
+import { promises as fs } from "fs";
+import path from "path";
+
 import { Fragment, type ReactNode } from "react";
 
 import Link from "next/link";
@@ -225,6 +228,256 @@ const dashboardCss = `
   }
 }
 `;
+
+type DashboardAuditLogEntry = {
+  ts_utc: string;
+  event_type: string;
+  path: string;
+  method: string;
+  status_code: number;
+  latency_bucket: string;
+  account_id: string | null;
+  key_id: string | null;
+  detail: string | null;
+  chain: string | null;
+  genre: string | null;
+  window: string | null;
+};
+
+type DashboardUsageEventRow = {
+  id: string;
+  label: string;
+  detail: string;
+  status: string;
+  tone: TokenTone;
+};
+
+type DashboardUsageSummaryRow = {
+  label: string;
+  detail: string;
+  token: string;
+  tone: TokenTone;
+};
+
+type DashboardUsageSummary = {
+  dailyQuotaLabel: string;
+  dailyQuotaDetail: string;
+  dailyQuotaToken: string;
+  dailyQuotaTone: TokenTone;
+  rateLimitLabel: string;
+  rateLimitDetail: string;
+  latestRequestLabel: string;
+  latestRequestDetail: string;
+  latestRequestTone: TokenTone;
+  lastKeyUseLabel: string;
+  lastKeyUseDetail: string;
+  statusRows: DashboardUsageSummaryRow[];
+  recentEvents: DashboardUsageEventRow[];
+};
+
+const DEFAULT_AUDIT_LOG_DIR = path.join(process.cwd(), ".runtime-logs");
+const DEFAULT_AUDIT_LOG_FILE = "audit.log";
+const RECENT_USAGE_EVENT_LIMIT = 5;
+const RECENT_USAGE_READ_LIMIT = 5_000;
+
+function numericEnv(name: string, fallback: number): number {
+  const value = Number.parseInt(process.env[name] ?? "", 10);
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return fallback;
+  }
+
+  return Math.floor(value);
+}
+
+function quotaLimitForTier(tier: "public" | "basic" | "pro"): number {
+  if (tier === "pro") return numericEnv("PRO_DAILY_API_QUOTA", 5_000);
+  if (tier === "basic") return numericEnv("BASIC_DAILY_API_QUOTA", 500);
+  return 0;
+}
+
+function perMinuteLimitForTier(tier: "public" | "basic" | "pro"): number {
+  if (tier === "pro") return 300;
+  if (tier === "basic") return 60;
+  return 0;
+}
+
+function currentUtcDayPrefix(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getAuditLogPath(): string {
+  const configured = process.env.AUDIT_LOG_DIR?.trim();
+  const dir = configured || DEFAULT_AUDIT_LOG_DIR;
+
+  return path.join(dir, DEFAULT_AUDIT_LOG_FILE);
+}
+
+function parseAuditLogLine(line: string): DashboardAuditLogEntry | null {
+  if (!line.trim()) return null;
+
+  try {
+    const parsed = JSON.parse(line) as Partial<DashboardAuditLogEntry>;
+
+    if (
+      typeof parsed.ts_utc !== "string" ||
+      typeof parsed.event_type !== "string" ||
+      typeof parsed.path !== "string" ||
+      typeof parsed.method !== "string" ||
+      typeof parsed.status_code !== "number"
+    ) {
+      return null;
+    }
+
+    return {
+      ts_utc: parsed.ts_utc,
+      event_type: parsed.event_type,
+      path: parsed.path,
+      method: parsed.method,
+      status_code: parsed.status_code,
+      latency_bucket:
+        typeof parsed.latency_bucket === "string" ? parsed.latency_bucket : "unknown",
+      account_id: typeof parsed.account_id === "string" ? parsed.account_id : null,
+      key_id: typeof parsed.key_id === "string" ? parsed.key_id : null,
+      detail: typeof parsed.detail === "string" ? parsed.detail : null,
+      chain: typeof parsed.chain === "string" ? parsed.chain : null,
+      genre: typeof parsed.genre === "string" ? parsed.genre : null,
+      window: typeof parsed.window === "string" ? parsed.window : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function eventTone(eventType: string, statusCode: number): TokenTone {
+  if (statusCode >= 500 || eventType === "server_error") return "danger";
+  if (statusCode === 429 || eventType === "rate_limited") return "danger";
+  if (statusCode === 401 || statusCode === 403 || eventType === "auth_failed") return "pending";
+  if (statusCode >= 200 && statusCode < 300) return "ok";
+  return "quiet";
+}
+
+function eventLabel(eventType: string): string {
+  return eventType
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function statusSummaryLabel(eventType: string, statusCode: number): string {
+  return `${eventLabel(eventType)} (${statusCode})`;
+}
+
+function latestKeyUse(apiKeys: Array<{ lastUsedAt: string | null }>): string | null {
+  const timestamps = apiKeys
+    .map((key) => key.lastUsedAt)
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+
+  if (timestamps.length === 0) return null;
+
+  return new Date(Math.max(...timestamps)).toISOString();
+}
+
+async function loadAccountAuditEvents(accountId: string | null): Promise<DashboardAuditLogEntry[]> {
+  if (!accountId) return [];
+
+  try {
+    const raw = await fs.readFile(getAuditLogPath(), "utf8");
+    const lines = raw.split(/\r?\n/).slice(-RECENT_USAGE_READ_LIMIT);
+
+    return lines
+      .map(parseAuditLogLine)
+      .filter((entry): entry is DashboardAuditLogEntry => Boolean(entry))
+      .filter((entry) => entry.account_id === accountId)
+      .sort((a, b) => new Date(b.ts_utc).getTime() - new Date(a.ts_utc).getTime());
+  } catch {
+    return [];
+  }
+}
+
+async function buildDashboardUsageSummary(params: {
+  accountId: string | null;
+  tier: "public" | "basic" | "pro";
+  status: "active" | "inactive";
+  apiKeys: Array<{ lastUsedAt: string | null }>;
+}): Promise<DashboardUsageSummary> {
+  const quotaLimit = quotaLimitForTier(params.tier);
+  const perMinuteLimit = perMinuteLimitForTier(params.tier);
+  const active = params.status === "active" && params.tier !== "public";
+  const auditEvents = await loadAccountAuditEvents(params.accountId);
+  const today = currentUtcDayPrefix();
+  const todayEvents = auditEvents.filter((event) => event.ts_utc.startsWith(today));
+  const quotaRemaining = quotaLimit > 0 ? Math.max(0, quotaLimit - todayEvents.length) : 0;
+  const latestEvent = auditEvents[0] ?? null;
+  const lastKeyUseAt = latestKeyUse(params.apiKeys);
+
+  const statusCounts = new Map<string, { count: number; eventType: string; statusCode: number }>();
+
+  for (const event of auditEvents.slice(0, 100)) {
+    const key = `${event.event_type}:${event.status_code}`;
+    const existing = statusCounts.get(key);
+
+    if (existing) {
+      existing.count += 1;
+    } else {
+      statusCounts.set(key, {
+        count: 1,
+        eventType: event.event_type,
+        statusCode: event.status_code,
+      });
+    }
+  }
+
+  const statusRows = [...statusCounts.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 4)
+    .map((row) => ({
+      label: statusSummaryLabel(row.eventType, row.statusCode),
+      detail: `${row.count} recent recorded event${row.count === 1 ? "" : "s"} for this account.`,
+      token: String(row.count),
+      tone: eventTone(row.eventType, row.statusCode),
+    }));
+
+  return {
+    dailyQuotaLabel: active
+      ? `${todayEvents.length} recorded today / ${quotaLimit} daily allowance`
+      : "No active delivery quota",
+    dailyQuotaDetail: active
+      ? `Remaining today: ${quotaRemaining}. Per-request response headers remain the source of truth for live quota state.`
+      : "Daily quota applies after an active paid entitlement is linked to this account.",
+    dailyQuotaToken: active ? `${quotaRemaining} left` : "inactive",
+    dailyQuotaTone: !active ? "quiet" : quotaRemaining > 0 ? "ok" : "danger",
+    rateLimitLabel: active
+      ? `${perMinuteLimit} authenticated file requests per minute`
+      : "No active rate-limit tier",
+    rateLimitDetail: active
+      ? "Rate-limit and daily quota enforcement happen server-side before file delivery."
+      : "Rate-limit tier becomes active with a paid entitlement.",
+    latestRequestLabel: latestEvent
+      ? statusSummaryLabel(latestEvent.event_type, latestEvent.status_code)
+      : "No recent recorded API requests",
+    latestRequestDetail: latestEvent
+      ? `${formatDateTime(latestEvent.ts_utc)} Â· ${latestEvent.method} ${latestEvent.path}`
+      : "The dashboard only reads safe operational metadata. Full API key values are never shown here.",
+    latestRequestTone: latestEvent ? eventTone(latestEvent.event_type, latestEvent.status_code) : "quiet",
+    lastKeyUseLabel: lastKeyUseAt ? formatDateTime(lastKeyUseAt) : "No recorded key use",
+    lastKeyUseDetail: "Derived from the persisted key metadata already shown in the key lifecycle section.",
+    statusRows,
+    recentEvents: auditEvents.slice(0, RECENT_USAGE_EVENT_LIMIT).map((event) => ({
+      id: `${event.ts_utc}:${event.event_type}:${event.status_code}:${event.path}`,
+      label: `${event.method} ${event.path}`,
+      detail: `${formatDateTime(event.ts_utc)} Â· ${event.latency_bucket}${
+        event.chain || event.genre || event.window
+          ? ` Â· ${[event.chain, event.genre, event.window].filter(Boolean).join(" / ")}`
+          : ""
+      }`,
+      status: statusSummaryLabel(event.event_type, event.status_code),
+      tone: eventTone(event.event_type, event.status_code),
+    })),
+  };
+}
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -535,6 +788,13 @@ export default async function DashboardPage() {
   const apiKeys = await getPersistedApiKeyDisplayRows(
     accountView.account?.accountId ?? null,
   );
+
+  const usageSummary = await buildDashboardUsageSummary({
+    accountId: accountView.account?.accountId ?? null,
+    tier: accountView.snapshot.tier,
+    status: accountView.snapshot.status,
+    apiKeys,
+  });
 
   const subscriptionState = deriveSubscriptionState({
     authConfigured: accountView.authConfigured,
@@ -879,7 +1139,79 @@ export default async function DashboardPage() {
       </Section>
 
       <Section
-        eyebrow="05 / Billing"
+        eyebrow="05 / Usage"
+        title="Usage and limits"
+        note="Safe operational metadata for authenticated JSON delivery: recorded usage, daily quota, rate-limit tier, last key use, and recent request outcomes."
+      >
+        <DataStack>
+          <DataRow
+            label="Daily quota"
+            value={usageSummary.dailyQuotaLabel}
+            detail={usageSummary.dailyQuotaDetail}
+            token={<Token tone={usageSummary.dailyQuotaTone}>{usageSummary.dailyQuotaToken}</Token>}
+          />
+          <DataRow
+            label="Rate-limit tier"
+            value={usageSummary.rateLimitLabel}
+            detail={usageSummary.rateLimitDetail}
+            token={<Token tone={subscriptionState === "active" ? "blue" : "quiet"}>{accountView.tierLabel}</Token>}
+          />
+          <DataRow
+            label="Last key use"
+            value={usageSummary.lastKeyUseLabel}
+            detail={usageSummary.lastKeyUseDetail}
+            token={<Token tone={usageSummary.lastKeyUseLabel === "No recorded key use" ? "quiet" : "ok"}>last used</Token>}
+          />
+          <DataRow
+            label="Latest request"
+            value={usageSummary.latestRequestLabel}
+            detail={usageSummary.latestRequestDetail}
+            token={<Token tone={usageSummary.latestRequestTone}>latest</Token>}
+          />
+        </DataStack>
+
+        <div className="mt-6">
+          {usageSummary.statusRows.length > 0 ? (
+            <DataStack>
+              {usageSummary.statusRows.map((row) => (
+                <DataRow
+                  key={row.label}
+                  label={row.label}
+                  value={row.detail}
+                  token={<Token tone={row.tone}>{row.token}</Token>}
+                />
+              ))}
+            </DataStack>
+          ) : (
+            <div className="ua-dashboard-endpoint">
+              <span>No recent request summary</span>
+              <p className="ua-dashboard-detail">
+                Recent request status appears after authenticated file delivery has recorded events for this account.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6">
+          {usageSummary.recentEvents.length > 0 ? (
+            usageSummary.recentEvents.map((event) => (
+              <div key={event.id} className="ua-dashboard-endpoint">
+                <span>{event.status}</span> {event.label}
+                <p className="ua-dashboard-detail">{event.detail}</p>
+              </div>
+            ))
+          ) : (
+            <div className="ua-dashboard-endpoint">
+              <span>No recent requests</span>
+              <p className="ua-dashboard-detail">
+                Only safe request metadata is summarized here. Full delivery key values are never displayed.
+              </p>
+            </div>
+          )}
+        </div>
+      </Section>
+      <Section
+        eyebrow="06 / Billing"
         title="Manage subscription"
         note="Subscription cancellation, upgrades, payment methods, and invoices should stay self-serve through Stripe Customer Portal."
       >
@@ -920,7 +1252,7 @@ export default async function DashboardPage() {
       </Section>
 
       <Section
-        eyebrow="06 / Plan matrix"
+        eyebrow="07 / Plan matrix"
         title="Capability reference"
         note="A compact reference for how entitlement scope maps to delivery windows and history depth."
       >
@@ -939,7 +1271,7 @@ export default async function DashboardPage() {
       </Section>
 
       <Section
-        eyebrow="07 / Delivery paths"
+        eyebrow="08 / Delivery paths"
         title="Endpoint reference"
         note={endpointReferenceNote}
       >

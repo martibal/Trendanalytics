@@ -10,8 +10,9 @@ const authMocks = {
 const rateLimitMocks = {
   enforceAccountRateLimit: jest.fn(),
   buildRateLimitHeaders: jest.fn(),
+  enforceDailyApiQuota: jest.fn(),
+  buildDailyQuotaHeaders: jest.fn(),
 };
-
 const entitlementMocks = {
   evaluateFileEntitlement: jest.fn(),
 };
@@ -25,17 +26,26 @@ const auditMocks = {
   getOrCreateRequestId: jest.fn(),
   logApiEvent: jest.fn(),
 };
+const apiKeyMocks = {
+  touchPersistedApiKeyLastUsedAt: jest.fn(),
+};
 
 jest.mock("@/lib/auth/validateToken", () => ({
   validateRequestApiKey: (...args: unknown[]) => authMocks.validateRequestApiKey(...args),
   buildAuthErrorResponseBody: (...args: unknown[]) => authMocks.buildAuthErrorResponseBody(...args),
 }));
 
+jest.mock("@/lib/auth/apiKeys", () => ({
+  touchPersistedApiKeyLastUsedAt: (...args: unknown[]) =>
+    apiKeyMocks.touchPersistedApiKeyLastUsedAt(...args),
+}));
+
 jest.mock("@/lib/auth/rateLimit", () => ({
   enforceAccountRateLimit: (...args: unknown[]) => rateLimitMocks.enforceAccountRateLimit(...args),
   buildRateLimitHeaders: (...args: unknown[]) => rateLimitMocks.buildRateLimitHeaders(...args),
+  enforceDailyApiQuota: (...args: unknown[]) => rateLimitMocks.enforceDailyApiQuota(...args),
+  buildDailyQuotaHeaders: (...args: unknown[]) => rateLimitMocks.buildDailyQuotaHeaders(...args),
 }));
-
 jest.mock("@/lib/auth/entitlements", () => ({
   evaluateFileEntitlement: (...args: unknown[]) => entitlementMocks.evaluateFileEntitlement(...args),
   isWindowToken: (value: string) =>
@@ -74,7 +84,18 @@ describe("GET /api/v1/files/[...path]", () => {
     auditMocks.getOrCreateRequestId.mockReturnValue("req_test_123");
     storageMocks.currentDataSource.mockReturnValue("local");
     rateLimitMocks.buildRateLimitHeaders.mockReturnValue({});
+    rateLimitMocks.enforceDailyApiQuota.mockResolvedValue({
+      success: true,
+      limit: 5000,
+      remaining: 4999,
+      reset: 123456,
+      retryAfter: null,
+      tier: "pro",
+      source: "memory",
+    });
+    rateLimitMocks.buildDailyQuotaHeaders.mockReturnValue({});
     auditMocks.logApiEvent.mockResolvedValue(undefined);
+    apiKeyMocks.touchPersistedApiKeyLastUsedAt.mockResolvedValue(undefined);
     authMocks.buildAuthErrorResponseBody.mockReturnValue({
       code: "unauthenticated",
       message: "Missing API key.",
@@ -130,6 +151,9 @@ describe("GET /api/v1/files/[...path]", () => {
       accountId: "acct_1",
       keyId: "key_1",
       keyPrefix: "ta_live",
+      record: {
+        lastUsedAt: null,
+      },
       entitlement: {
         tier: "basic",
       },
@@ -177,6 +201,9 @@ describe("GET /api/v1/files/[...path]", () => {
       accountId: "acct_1",
       keyId: "key_1",
       keyPrefix: "ta_live",
+      record: {
+        lastUsedAt: null,
+      },
       entitlement: {
         tier: "pro",
       },
@@ -227,6 +254,9 @@ describe("GET /api/v1/files/[...path]", () => {
       accountId: "acct_1",
       keyId: "key_1",
       keyPrefix: "ta_live",
+      record: {
+        lastUsedAt: null,
+      },
       entitlement: {
         tier: "pro",
       },
@@ -264,11 +294,10 @@ describe("GET /api/v1/files/[...path]", () => {
     expect(response.status).toBe(200);
     expect(text).toBe('{"ok":true}');
     expect(response.headers.get("X-Request-Id")).toBe("req_test_123");
-    expect(response.headers.get("X-Account-Id")).toBe("acct_1");
-    expect(response.headers.get("X-API-Key-Prefix")).toBe("ta_live");
+    expect(response.headers.get("X-Account-Id")).toBeNull();
+    expect(response.headers.get("X-API-Key-Prefix")).toBeNull();
     expect(response.headers.get("X-Entitlement-Window")).toBe("latest");
-    expect(response.headers.get("X-Data-Source")).toBe("local");
-    expect(response.headers.get("X-Storage-Backend")).toBe("local");
+    expect(response.headers.get("X-Entitlement-Tier")).toBe("pro");
 
     expect(auditMocks.logApiEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -282,6 +311,11 @@ describe("GET /api/v1/files/[...path]", () => {
         statusCode: 200,
       })
     );
+
+    expect(apiKeyMocks.touchPersistedApiKeyLastUsedAt).toHaveBeenCalledWith(
+      "key_1",
+      null
+    );
   });
 
   it("returns 500 and logs server_error when storage throws", async () => {
@@ -290,6 +324,9 @@ describe("GET /api/v1/files/[...path]", () => {
       accountId: "acct_1",
       keyId: "key_1",
       keyPrefix: "ta_live",
+      record: {
+        lastUsedAt: null,
+      },
       entitlement: {
         tier: "pro",
       },
