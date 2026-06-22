@@ -140,6 +140,7 @@ export default function TermsPage() {
           </Section>
 
           <Section title="17. Contact and Related Documents">
+            <p>Urd Atlas is operated by MARTIN BALSTAD, organisation number 937 581 254, Norway.</p>
             <p>For support, billing, cancellation, refund, privacy, or legal requests, contact <a href="mailto:support@urdatlas.com" className="text-link">support@urdatlas.com</a>.</p>
             <p>For privacy-related information, see <Link href="/privacy" className="text-link">Privacy Policy</Link>.</p>
             <p>For system health and freshness information, see <Link href="/status" className="text-link">System Status</Link>.</p>

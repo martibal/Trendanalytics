@@ -37,6 +37,7 @@ export default function PrivacyPage() {
 
           <Section title="1. Scope">
             <p>This Privacy Policy applies to Urd Atlas public pages, subscriber account pages, authenticated JSON delivery, and related support, billing, and operational workflows.</p>
+            <p>The legal operator of Urd Atlas is MARTIN BALSTAD, organisation number 937 581 254, Norway. Privacy, support, billing, and legal requests can be sent to <a href="mailto:support@urdatlas.com" className="text-link">support@urdatlas.com</a>.</p>
             <p>It covers the handling of account information, entitlement state, usage data, API access data, billing-related metadata, and technical service-operation metadata.</p>
           </Section>
 
@@ -74,6 +75,7 @@ export default function PrivacyPage() {
 
           <Section title="7. Public Website Analytics and Operational Data">
             <p>Urd Atlas may process limited operational and technical information necessary to operate the public website and API, such as route usage, availability signals, error states, freshness information, response timing, and delivery diagnostics.</p>
+            <p>Urd Atlas does not use advertising cookies and does not require behavioral profiling to provide the service. If analytics or diagnostics are used, they are intended for aggregate product operation, reliability, abuse prevention, and performance monitoring rather than advertising or resale of user profiles.</p>
             <p>The product is not designed to collect unnecessary personal content. Public blockchain analytics content is descriptive and does not require user profiling to function.</p>
           </Section>
 
