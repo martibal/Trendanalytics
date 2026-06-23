@@ -6058,8 +6058,10 @@ function evaluateDashboardAccountSurfaceContract(findings) {
       dashboard.includes("webhook-synced entitlements");
 
     result.dashboardEndpointExamplesAreNonAuthoritative =
-      dashboard.includes('eyebrow="07 / Delivery paths"') &&
+      (dashboard.includes('eyebrow="07 / Delivery paths"') ||
+        dashboard.includes('eyebrow="08 / Delivery paths"')) &&
       dashboard.includes("Examples only. Entitlement enforcement remains server-side on the authenticated file route.") &&
+      dashboard.includes("server-side entitlement enforcement remains authoritative") &&
       dashboard.includes("Forbidden scope should return 403 rather than pretending the file does not exist.") &&
       dashboard.includes("X-API-Key");
 
