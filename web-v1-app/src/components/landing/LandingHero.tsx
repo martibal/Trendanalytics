@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SourceFreshnessExplainer from "@/components/SourceFreshnessExplainer";
 
 type LandingHeroProps = {
   datasetVersion: string | null;
@@ -19,7 +20,9 @@ export default function LandingHero(props: LandingHeroProps) {
   const { datasetVersion, publishedAt, methodologyVersion } = props;
 
   return (
-    <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm sm:p-8">
+    <>
+      <SourceFreshnessExplainer variant="overview" className="mb-10" />
+      <section className="rounded-3xl border border-border bg-card/70 p-6 shadow-sm sm:p-8">
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.9fr)]">
         <div>
           <div className="text-sm font-medium text-primary">On-chain reference data</div>
@@ -56,6 +59,7 @@ export default function LandingHero(props: LandingHeroProps) {
           </div>
         </aside>
       </div>
-    </section>
+      </section>
+    </>
   );
 }

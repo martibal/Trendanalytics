@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import MetricLineChart, { type MetricPoint } from "@/components/MetricLineChart";
 import RegimeBadge from "@/components/RegimeBadge";
 import ChainIcon from "@/components/ChainIcon";
+import SourceFreshnessExplainer from "@/components/SourceFreshnessExplainer";
 import ScoreGauge from "@/components/ui/ScoreGauge";
 import StalenessBar from "@/components/ui/StalenessBar";
 import { getChainConfig, type ChainId } from "@/config/chains";
@@ -2215,6 +2216,12 @@ export default async function ChainPage({
 
         </div>
       </header>
+
+      <section className="border-b border-[var(--line)] py-8">
+        <div className="page-shell">
+          <SourceFreshnessExplainer chain={chainId} variant="chain" />
+        </div>
+      </section>
 
       <div className="page-shell" style={{ paddingTop: "56px", paddingBottom: "96px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "72px" }}>
