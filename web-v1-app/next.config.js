@@ -1,5 +1,6 @@
 // next.config.js
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require("path");
 
 const SECURITY_HEADERS = [

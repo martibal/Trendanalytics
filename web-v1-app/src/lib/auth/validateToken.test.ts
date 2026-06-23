@@ -22,6 +22,11 @@ jest.mock("@/lib/auth/apiKeys", () => ({
   getApiKeyDisplayRows: (...args: unknown[]) => apiKeysMocks.getApiKeyDisplayRows(...args),
 }));
 
+const ORIGINAL_ENV = {
+  DEV_API_KEYS_JSON: process.env.DEV_API_KEYS_JSON,
+  VERCEL_ENV: process.env.VERCEL_ENV,
+};
+
 function makeEntitlement(
   overrides?: Partial<EntitlementInput>
 ): EntitlementInput {
@@ -58,10 +63,27 @@ describe("lib/auth/validateToken", () => {
     jest.resetModules();
     jest.clearAllMocks();
 
+    process.env.DEV_API_KEYS_JSON = "[]";
+    delete process.env.VERCEL_ENV;
+
     apiKeysMocks.findPersistedApiKeyRecord.mockResolvedValue(null);
     apiKeysMocks.loadDevelopmentApiKeys.mockReturnValue([]);
     apiKeysMocks.findApiKeyRecord.mockReturnValue(null);
     apiKeysMocks.getApiKeyDisplayRows.mockReturnValue([]);
+  });
+
+  afterAll(() => {
+    if (ORIGINAL_ENV.DEV_API_KEYS_JSON === undefined) {
+      delete process.env.DEV_API_KEYS_JSON;
+    } else {
+      process.env.DEV_API_KEYS_JSON = ORIGINAL_ENV.DEV_API_KEYS_JSON;
+    }
+
+    if (ORIGINAL_ENV.VERCEL_ENV === undefined) {
+      delete process.env.VERCEL_ENV;
+    } else {
+      process.env.VERCEL_ENV = ORIGINAL_ENV.VERCEL_ENV;
+    }
   });
 
   it("returns unauthenticated when token is null", async () => {

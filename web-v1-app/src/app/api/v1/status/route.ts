@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { CHAIN_LIST, type ChainId } from "@/config/chains";
 import { readDatasetManifest } from "@/lib/dataset";
-import { readStorageObject } from "@/lib/storage";
+import { currentDataSource, readStorageObject } from "@/lib/storage";
 import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
 
 export const revalidate = 300;
@@ -134,7 +134,7 @@ function heroRegimeAsOf(hero?: LandingHero | null): string | null {
 }
 
 function expectedDelayDays(chain: ChainId): number {
-  return chain === "arbitrum" || chain === "base" ? 8 : 1;
+  return chain === "arbitrum" || chain === "base" ? 7 : 1;
 }
 
 function sourceFreshnessForChain(
@@ -294,6 +294,7 @@ export async function GET(request: Request) {
 
   const payload = {
     ok: true,
+    data_source: currentDataSource(),
     generated_at_utc: new Date().toISOString(),
     dataset: dataset
       ? {

@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 
 import RegimeBadge, { resolveRegimeHex } from "@/components/RegimeBadge";
-import { getRegimeColorByLabel, hexToRgba } from "@/lib/design-tokens";
+import { getRegimeColorByLabel } from "@/lib/design-tokens";
 
 describe("components/RegimeBadge", () => {
   it("renders normalized STABLE badge and matches snapshot", () => {
@@ -16,8 +16,8 @@ describe("components/RegimeBadge", () => {
     expect(container.firstChild).toMatchInlineSnapshot(`
 <span
   aria-label="Regime: STABLE"
-  class="inline-flex items-center justify-center h-7 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide uppercase select-none whitespace-nowrap"
-  style="border-color: rgb(0, 255, 136); background-color: rgba(0, 255, 136, 0.15); color: rgb(0, 255, 136); box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.25), 0 0 18px rgba(0, 255, 136, 0.14);"
+  class="regime-token"
+  style="color: rgb(16, 185, 129); border-bottom-color: rgb(16, 185, 129);"
   title="STABLE"
 >
   STABLE
@@ -32,11 +32,12 @@ describe("components/RegimeBadge", () => {
 
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent("UNKNOWN/DEGRADED");
+    expect(badge).toHaveAttribute("title", "UNKNOWN/DEGRADED");
     expect(container.firstChild).toMatchInlineSnapshot(`
 <span
   aria-label="Regime: UNKNOWN/DEGRADED"
-  class="inline-flex items-center justify-center h-7 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide uppercase select-none whitespace-nowrap"
-  style="border-color: rgb(107, 114, 128); background-color: rgba(107, 114, 128, 0.15); color: rgb(107, 114, 128); box-shadow: 0 0 0 1px rgba(107, 114, 128, 0.25), 0 0 18px rgba(107, 114, 128, 0.14);"
+  class="regime-token"
+  style="color: rgb(82, 94, 110); border-bottom-color: rgb(82, 94, 110);"
   title="UNKNOWN/DEGRADED"
 >
   UNKNOWN/DEGRADED
@@ -44,14 +45,22 @@ describe("components/RegimeBadge", () => {
 `);
   });
 
-  it("adds pulse class for CONGESTED and honors custom title", () => {
+  it("honors custom title and preserves token class for CONGESTED", () => {
     render(<RegimeBadge label="CONGESTED" title="Custom regime title" />);
 
     const badge = screen.getByLabelText("Regime: CONGESTED");
 
     expect(badge).toHaveTextContent("CONGESTED");
     expect(badge).toHaveAttribute("title", "Custom regime title");
-    expect(badge.className).toContain("motion-safe:animate-pulse");
+    expect(badge.className).toBe("regime-token");
+  });
+
+  it("merges custom className after the token class", () => {
+    render(<RegimeBadge label="STABLE" className="extra-class" />);
+
+    const badge = screen.getByLabelText("Regime: STABLE");
+
+    expect(badge.className).toBe("regime-token extra-class");
   });
 
   it("uses colorHexOverride ahead of statusColor and label mapping", () => {
@@ -66,10 +75,8 @@ describe("components/RegimeBadge", () => {
     const badge = screen.getByLabelText("Regime: STABLE");
 
     expect(badge).toHaveStyle({
-      borderColor: "#123ABC",
-      backgroundColor: hexToRgba("#123ABC", 0.15),
       color: "#123ABC",
-      boxShadow: `0 0 0 1px ${hexToRgba("#123ABC", 0.25)}, 0 0 18px ${hexToRgba("#123ABC", 0.14)}`,
+      borderBottomColor: "#123ABC",
     });
   });
 
@@ -80,10 +87,8 @@ describe("components/RegimeBadge", () => {
     const congestedHex = getRegimeColorByLabel("CONGESTED");
 
     expect(badge).toHaveStyle({
-      borderColor: congestedHex,
-      backgroundColor: hexToRgba(congestedHex, 0.15),
       color: congestedHex,
-      boxShadow: `0 0 0 1px ${hexToRgba(congestedHex, 0.25)}, 0 0 18px ${hexToRgba(congestedHex, 0.14)}`,
+      borderBottomColor: congestedHex,
     });
   });
 
@@ -94,10 +99,8 @@ describe("components/RegimeBadge", () => {
     const cheapHex = getRegimeColorByLabel("CHEAP");
 
     expect(badge).toHaveStyle({
-      borderColor: cheapHex,
-      backgroundColor: hexToRgba(cheapHex, 0.15),
       color: cheapHex,
-      boxShadow: `0 0 0 1px ${hexToRgba(cheapHex, 0.25)}, 0 0 18px ${hexToRgba(cheapHex, 0.14)}`,
+      borderBottomColor: cheapHex,
     });
   });
 
