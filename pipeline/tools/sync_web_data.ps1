@@ -42,21 +42,14 @@ try {
 
   $published = Join-Path $Root 'data\published\v1'
 
-  # Current app is web-v1-app. Keep old fallbacks for compatibility.
+  # Current app is web-v1-app.
   $webV1App = Join-Path $Root 'web-v1-app'
-  $webV1 = Join-Path $Root 'web-v1'
-  $webLegacy = Join-Path $Root 'web'
 
-  $targetWeb = $null
-  if (Test-Path $webV1App) {
-    $targetWeb = $webV1App
-  } elseif (Test-Path $webV1) {
-    $targetWeb = $webV1
-  } elseif (Test-Path $webLegacy) {
-    $targetWeb = $webLegacy
-  } else {
-    throw "No web app folder found under root. Expected: $webV1App, $webV1 or $webLegacy"
+  if (-not (Test-Path $webV1App)) {
+    throw "No web app folder found under root. Expected: $webV1App"
   }
+
+  $targetWeb = $webV1App
 
   $dst = Join-Path $targetWeb '.private-data\published\v1'
 

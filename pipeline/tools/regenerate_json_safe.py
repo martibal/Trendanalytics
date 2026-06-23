@@ -48,11 +48,9 @@ def _run(cmd: List[str], *, cwd: Path) -> int:
 
 
 def _find_web_app(root: Path) -> Optional[Path]:
-    # Current repo uses web-v1-app. Older helpers used web-v1 or web.
-    for name in ("web-v1-app", "web-v1", "web"):
-        p = root / name
-        if p.exists() and p.is_dir():
-            return p
+    web_app = root / "web-v1-app"
+    if web_app.exists() and web_app.is_dir():
+        return web_app
     return None
 
 
