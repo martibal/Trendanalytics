@@ -1,0 +1,39 @@
+﻿name: AWS Raw Source Probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify AWS CLI
+        shell: pwsh
+        run: |
+          aws --version
+
+      - name: Probe Ethereum raw source
+        shell: pwsh
+        env:
+          CSS_RAW_LOOKBACK_DAYS: "14"
+        run: |
+          Write-Host "=== Find AWS-related env names exposed to this job (names only, no values) ==="
+          Get-ChildItem Env: |
+            Where-Object { $_.Name -match 'AWS|S3|CSS' } |
+            Select-Object -ExpandProperty Name |
+            Sort-Object
+
+          Write-Host "`n=== Try to infer S3 bucket/prefix from repo scripts/config ==="
+          Select-String -Path .\pipeline\**\*.py, .\pipeline\**\*.ps1, .\*.ps1 -Pattern 's3://|S3_BUCKET|AWS_BUCKET|CSS_RAW|ethereum|blocks' -ErrorAction SilentlyContinue |
+            Select-Object -First 200 |
+            ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line)" }
+
+          Write-Host "`n=== Run RAW downloader in dry/probe-adjacent mode if supported ==="
+          python .\pipeline\tools\download_up_to_date_minimal.py --help
+
+          Write-Host "`n=== Done. Use the env/config names above to add exact aws s3 ls probe if needed. ==="
