@@ -10,6 +10,30 @@ import { UrdContainer, UrdPage } from "@/components/site/UrdDesignSystem";
 
 import "server-only";
 
+type SourceFreshnessChain = {
+  last_run_at_utc?: string | null;
+  last_run_date?: string | null;
+  last_data_load_date?: string | null;
+  latest_available_source_date?: string | null;
+  latest_seen_source_partition_date?: string | null;
+  source_cutoff_date?: string | null;
+  published_asof?: string | null;
+  source_latest_available?: string | null;
+  source_effective_latest?: string | null;
+  reason_code?: string | null;
+  reason?: string | null;
+  source_is_newer_than_published?: boolean;
+  source_is_not_newer_than_published?: boolean;
+};
+
+type SourceFreshnessReport = {
+  generated_at_utc?: string;
+  last_run_at_utc?: string;
+  last_run_date?: string;
+  source?: string;
+  chains?: Record<string, SourceFreshnessChain>;
+};
+
 type StatusRow = {
   chain: ChainId;
   name: string;
@@ -20,6 +44,8 @@ type StatusRow = {
   published_regime: string | null;
   confidence_score: number | null;
   expected_delay_days: number;
+  source_freshness: SourceFreshnessChain | null;
+  freshness_explanation: string | null;
 };
 
 type LandingHero = {
@@ -105,7 +131,7 @@ function ExplainModal({
             className="inline-flex h-9 w-9 items-center justify-center rounded-[3px] border border-[rgba(232,224,208,.14)] font-mono text-[14px] text-[#E8E0D0] transition hover:border-[rgba(232,224,208,.22)] hover:bg-[#162840]"
             aria-label="Close dialog"
           >
-            ×
+            Ã—
           </a>
         </div>
         <div className="overflow-y-auto px-6 py-6">
@@ -149,7 +175,7 @@ async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
 }
 
 function fmtDate(d?: string | null) {
-  return d && d.trim().length > 0 ? d : "—";
+  return d && d.trim().length > 0 ? d : "â€”";
 }
 
 function parseIsoDayToOsloMs(date?: string | null): number | null {
@@ -238,19 +264,62 @@ function expectedDelayDays(chain: ChainId): number {
   return chain === "arbitrum" || chain === "base" ? 7 : 1;
 }
 
+function sourceFreshnessForChain(
+  report: SourceFreshnessReport | null,
+  chain: ChainId
+): SourceFreshnessChain | null {
+  const row = report?.chains?.[chain];
+  return row && typeof row === "object" ? row : null;
+}
+
+function sourceExplainsPublishedLag(sourceFreshness: SourceFreshnessChain | null): boolean {
+  if (!sourceFreshness) return false;
+  if (sourceFreshness.reason_code === "source_not_newer_than_published") return true;
+  if (sourceFreshness.reason_code === "published_newer_than_source_listing") return true;
+  if (sourceFreshness.source_is_not_newer_than_published === true) return true;
+  return false;
+}
+
+function sourceCheckUnavailable(sourceFreshness: SourceFreshnessChain | null): boolean {
+  if (!sourceFreshness) return false;
+  return (
+    sourceFreshness.reason_code === "source_check_unavailable" ||
+    sourceFreshness.reason_code === "source_no_dates_detected"
+  );
+}
+
+function sourceFreshnessLabel(row: StatusRow): string {
+  const source = row.source_freshness;
+  const lastRun = source?.last_run_date ?? "Ã¢â‚¬â€";
+  const lastLoad = source?.last_data_load_date ?? row.as_of ?? "Ã¢â‚¬â€";
+  const latestSource =
+    source?.latest_available_source_date ??
+    source?.source_effective_latest ??
+    source?.source_latest_available ??
+    "Ã¢â‚¬â€";
+
+  return `Last run: ${lastRun} Ã‚Â· Last data load: ${lastLoad} Ã‚Â· Latest source: ${latestSource}`;
+}
+
 function deriveHealth(params: {
   lagDays: number | null;
   asOf: string | null;
   expectedDelayDays: number;
+  sourceFreshness: SourceFreshnessChain | null;
 }): "ok" | "warn" | "fail" | "unknown" {
-  const { lagDays, asOf, expectedDelayDays } = params;
+  const { lagDays, asOf, expectedDelayDays, sourceFreshness } = params;
   if (!asOf || typeof lagDays !== "number") return "unknown";
   if (lagDays <= expectedDelayDays) return "ok";
   if (lagDays <= expectedDelayDays + 2) return "warn";
+  if (sourceExplainsPublishedLag(sourceFreshness) || sourceCheckUnavailable(sourceFreshness)) return "warn";
   return "fail";
 }
 
 async function buildStatusRows(): Promise<StatusRow[]> {
+  const sourceFreshnessReport = await readPublishedJson<SourceFreshnessReport>(
+    "data/published/v1/source-freshness.json"
+  );
+
   return Promise.all(
     CHAIN_LIST.map(async (chain) => {
       const [meta, hero] = await Promise.all([
@@ -261,17 +330,32 @@ async function buildStatusRows(): Promise<StatusRow[]> {
       const asOf = displayAsOf ?? meta?.updated_through ?? meta?.regime?.asof_date ?? meta?.date ?? null;
       const lagDays = lagDaysFromIsoDay(asOf);
       const delay = expectedDelayDays(chain.id);
+      const sourceFreshness = sourceFreshnessForChain(sourceFreshnessReport, chain.id);
+      const status = deriveHealth({
+        lagDays,
+        asOf,
+        expectedDelayDays: delay,
+        sourceFreshness,
+      });
+      const freshnessExplanation =
+        sourceFreshness?.reason ??
+        (status === "fail"
+          ? "Published data is older than the chain freshness policy and no upstream source explanation is available."
+          : null);
+
       return {
         chain: chain.id,
         name: chain.name,
         label: chain.label,
         as_of: asOf,
         lag_days: lagDays,
-        status: deriveHealth({ lagDays, asOf, expectedDelayDays: delay }),
+        status,
         published_regime: meta?.status?.label ?? meta?.regime?.label ?? null,
         confidence_score:
           typeof meta?.confidence?.confidence_score === "number" ? meta.confidence.confidence_score : null,
         expected_delay_days: delay,
+        source_freshness: sourceFreshness,
+        freshness_explanation: freshnessExplanation,
       };
     })
   );
@@ -289,9 +373,18 @@ function chainNarrative(row: StatusRow) {
     return "Published data is current, but the evidence quality is degraded. Freshness is not the issue here; confidence is.";
   }
   if (row.status === "warn") {
-    return "Published data is slightly behind the chain’s usual cadence. The row is still shown, but freshness should be read with more caution.";
+    if (sourceExplainsPublishedLag(row.source_freshness)) {
+      return row.freshness_explanation ?? "Published data is behind policy because the upstream AWS source has no newer complete day available.";
+    }
+    if (sourceCheckUnavailable(row.source_freshness)) {
+      return row.freshness_explanation ?? "Published data is behind policy, and the upstream source freshness check is currently unavailable.";
+    }
+    return "Published data is slightly behind the chainÃ¢â‚¬â„¢s usual cadence. The row is still shown, but freshness should be read with more caution.";
   }
   if (row.status === "fail") {
+    if (row.source_freshness?.source_is_newer_than_published) {
+      return row.freshness_explanation ?? "The upstream AWS source has newer data than the currently published dataset, so the publication pipeline is behind source.";
+    }
     return "Published data is beyond the normal freshness boundary for this chain. Treat the latest row as delayed until the next expected publication arrives.";
   }
   return "Freshness cannot be classified from the latest available publication metadata.";
@@ -299,9 +392,9 @@ function chainNarrative(row: StatusRow) {
 
 function cadenceCopy(chain: ChainId) {
   if (chain === "arbitrum" || chain === "base") {
-    return "Expected ~7d · soft warning > 10d · hard fail > 15d";
+    return "Expected ~7d Â· soft warning > 10d Â· hard fail > 15d";
   }
-  return "Expected ~1d · soft warning > 2d · hard fail > 4d";
+  return "Expected ~1d Â· soft warning > 2d Â· hard fail > 4d";
 }
 
 const howToReadExplain: ExplainPair = {
@@ -375,8 +468,8 @@ const cadenceExplain: ExplainPair = {
   traceability: (
     <ul className="list-disc space-y-2 pl-5">
       <li>Expected windows: around 09:00 and 21:00 Europe/Oslo</li>
-      <li>BTC / ETH: expected 1d · warn &gt; 2d · fail &gt; 4d</li>
-      <li>ARB / BASE: expected 7d · warn &gt; 10d · fail &gt; 15d</li>
+      <li>BTC / ETH: expected 1d Â· warn &gt; 2d Â· fail &gt; 4d</li>
+      <li>ARB / BASE: expected 7d Â· warn &gt; 10d Â· fail &gt; 15d</li>
     </ul>
   ),
 };
@@ -388,8 +481,8 @@ const confidenceExplain: ExplainPair = {
         Confidence measures how strongly the available data supports the published label.
       </p>
       <ul className="mt-4 list-disc space-y-2 pl-5">
-        <li><span className="text-[#E8E0D0]">Good</span> (≥ 0.70) means strong evidence.</li>
-        <li><span className="text-[#E8E0D0]">Caution</span> (0.40–0.69) means moderate evidence.</li>
+        <li><span className="text-[#E8E0D0]">Good</span> (â‰¥ 0.70) means strong evidence.</li>
+        <li><span className="text-[#E8E0D0]">Caution</span> (0.40â€“0.69) means moderate evidence.</li>
         <li><span className="text-[#E8E0D0]">Degraded</span> (&lt; 0.40) means weak evidence.</li>
       </ul>
     </>
@@ -439,9 +532,9 @@ export default async function StatusPage() {
                 No price data. No forecasts. No recommendations.
               </p>
               <div className="mt-8 flex flex-wrap gap-6">
-                <TextLink href="#how-to-read">How to read this page →</TextLink>
-                <TextLink href="#cadence">Publication cadence →</TextLink>
-                <TextLink href="#confidence">Confidence bands →</TextLink>
+                <TextLink href="#how-to-read">How to read this page â†’</TextLink>
+                <TextLink href="#cadence">Publication cadence â†’</TextLink>
+                <TextLink href="#confidence">Confidence bands â†’</TextLink>
               </div>
               <div className="mt-8 text-[14px] leading-7 text-[#7A8A96]">
                 Expected publish windows around <span className="text-[#E8E0D0]">09:00</span> and <span className="text-[#E8E0D0]">21:00 Europe/Oslo</span>.
@@ -526,12 +619,12 @@ export default async function StatusPage() {
             </div>
           </div>
           <div className="mt-8 flex flex-wrap gap-6">
-            <TextLink href="#how-to-read-modal">Full explanation →</TextLink>
+            <TextLink href="#how-to-read-modal">Full explanation â†’</TextLink>
             <Link
               href="/service"
               className="inline-flex items-center gap-2 border-b border-[rgba(232,224,208,.07)] pb-[1px] font-mono text-[11px] uppercase tracking-[0.08em] text-[#7A8A96] transition hover:border-[rgba(232,224,208,.22)] hover:text-[#E8E0D0]"
             >
-              Service policy →
+              Service policy â†’
             </Link>
           </div>
         </section>
@@ -579,21 +672,37 @@ export default async function StatusPage() {
                         <div className="mt-4 text-[13px] leading-7 text-[#7A8A96]">
                           <span className="text-[#E8E0D0]">Policy:</span> {cadenceCopy(row.chain)}
                         </div>
+                          <div className="mt-2 text-[13px] leading-7 text-[#7A8A96]">
+                            <span className="text-[#E8E0D0]">Dates:</span> {sourceFreshnessLabel(row)}
+                          </div>
+                          {row.freshness_explanation ? (
+                            <div className="mt-2 text-[13px] leading-7 text-[#7A8A96]">
+                              <span className="text-[#E8E0D0]">Freshness note:</span> {row.freshness_explanation}
+                            </div>
+                          ) : null}
                       </div>
                       <div className="border-t border-[rgba(232,224,208,.07)] pt-4 md:border-t-0 md:border-l md:border-[rgba(232,224,208,.07)] md:pl-6">
                         <dl className="grid grid-cols-2 gap-x-4 gap-y-4 text-[13px] leading-6">
                           <div>
-                            <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">As of</dt>
-                            <dd className="mt-1 text-[#E8E0D0]">{fmtDate(row.as_of)}</dd>
+                            <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Last data load</dt>
+                            <dd className="mt-1 text-[#E8E0D0]">{fmtDate(row.source_freshness?.last_data_load_date ?? row.as_of)}</dd>
                           </div>
                           <div>
                             <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Observed lag</dt>
-                            <dd className="mt-1 text-[#E8E0D0]">{row.lag_days !== null ? `${row.lag_days}d` : "—"}</dd>
+                            <dd className="mt-1 text-[#E8E0D0]">{row.lag_days !== null ? `${row.lag_days}d` : "â€”"}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Last run</dt>
+                            <dd className="mt-1 text-[#E8E0D0]">{fmtDate(row.source_freshness?.last_run_date)}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Latest source</dt>
+                            <dd className="mt-1 text-[#E8E0D0]">{fmtDate(row.source_freshness?.latest_available_source_date ?? row.source_freshness?.source_effective_latest)}</dd>
                           </div>
                           <div>
                             <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Confidence</dt>
                             <dd className="mt-1 text-[#E8E0D0]">
-                              {typeof row.confidence_score === "number" ? row.confidence_score.toFixed(3) : "—"}
+                              {typeof row.confidence_score === "number" ? row.confidence_score.toFixed(3) : "â€”"}
                             </dd>
                           </div>
                           <div>
@@ -633,13 +742,13 @@ export default async function StatusPage() {
             <div className="border-t border-[rgba(232,224,208,.07)]">
               {[
                 {
-                  label: "Bitcoin · Ethereum",
-                  policy: "Expected ~1 day · soft warning above 2 days · hard fail above 4 days",
+                  label: "Bitcoin Â· Ethereum",
+                  policy: "Expected ~1 day Â· soft warning above 2 days Â· hard fail above 4 days",
                   note: "Daily publication policy. A one-day lag is normal.",
                 },
                 {
-                  label: "Arbitrum · Base",
-                  policy: "Expected ~7 days · soft warning above 10 days · hard fail above 15 days",
+                  label: "Arbitrum Â· Base",
+                  policy: "Expected ~7 days Â· soft warning above 10 days Â· hard fail above 15 days",
                   note: "Weekly-style publication policy by design. Seeing 7d lag is normal.",
                 },
               ].map((item) => (
@@ -650,7 +759,7 @@ export default async function StatusPage() {
                 </div>
               ))}
               <div className="pt-6">
-                <TextLink href="#cadence-modal">Full cadence explanation →</TextLink>
+                <TextLink href="#cadence-modal">Full cadence explanation â†’</TextLink>
               </div>
             </div>
           </div>
@@ -729,8 +838,8 @@ export default async function StatusPage() {
                 </div>
               </details>
               <div className="mt-6 flex flex-wrap gap-6">
-                <TextLink href="#how-to-read-modal">Health vs confidence →</TextLink>
-                <TextLink href="#confidence-modal">Confidence bands →</TextLink>
+                <TextLink href="#how-to-read-modal">Health vs confidence â†’</TextLink>
+                <TextLink href="#confidence-modal">Confidence bands â†’</TextLink>
               </div>
             </div>
           </div>

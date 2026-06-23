@@ -268,7 +268,37 @@ function Invoke-PublishedSnapshotMetadataHarmonizerIfPresent {
         "-File", $harmonizer,
         "-Root", $RepoRoot
     )
-}function Invoke-Git {
+}
+
+function Invoke-SourceFreshnessProbeIfPresent {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $probe = Join-Path $RepoRoot "pipeline\tools\probe_source_freshness.py"
+    $publishedRoot = Join-Path $RepoRoot "data\published\v1"
+
+    if (-not (Test-Path -LiteralPath $probe)) {
+        Write-Log "Source freshness probe not found, skipping: $probe"
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath $publishedRoot)) {
+        Write-Log "Published root not found for source freshness probe, skipping: $publishedRoot"
+        return
+    }
+
+    $python = Resolve-PythonExecutable
+    Write-Log "STEP 3D: Probe upstream AWS source freshness"
+    Invoke-Native -WorkingDirectory $RepoRoot -FilePath $python -Arguments @(
+        $probe,
+        "--root", $RepoRoot,
+        "--published-root", $publishedRoot,
+        "--chains", "bitcoin,ethereum,arbitrum,base",
+        "--lag-l1-days", "1",
+        "--lag-l2-days", "7"
+    )
+}
+
+function Invoke-Git {
     param(
         [Parameter(Mandatory = $true)][string]$WorkingDirectory,
         [Parameter(Mandatory = $true)][string[]]$Arguments,
@@ -400,6 +430,7 @@ try {
     Invoke-WebBriefsBuilderIfPresent -RepoRoot $RootDir
     Validate-WebPublishedMetaIfPresent -RepoRoot $RootDir
     Invoke-PublishedSnapshotMetadataHarmonizerIfPresent -RepoRoot $RootDir
+    Invoke-SourceFreshnessProbeIfPresent -RepoRoot $RootDir
 
     Write-Log "STEP 3: Publish web data"
     $publishArgs = @(
