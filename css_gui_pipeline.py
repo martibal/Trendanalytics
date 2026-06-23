@@ -186,21 +186,21 @@
 #         This project’s authoritative dataset is produced under:
 #           data\published\v1
 
-#         The website (web-v1) reads from:
-#           web-v1\public\data\published\v1
+#         The website (web-v1-app) reads from:
+#           web-v1-app\.private-data\published\v1
 
 #         For backwards compatibility, we also support a legacy:
 #           web\public\data\published\v1
 
-#         The sync script itself decides which web folder to use (web-v1 preferred).
+#         The sync script itself decides which web folder to use (web-v1-app preferred).
 #         """
 #         if not self.ps_sync_web_data.exists():
 #             self._log("Skipping web sync (pipeline/tools/sync_web_data.ps1 not present).")
 #             return True
 
 #         # Only attempt sync if at least one known web folder exists.
-#         if not ((self.root_dir / "web-v1").exists() or (self.root_dir / "web").exists()):
-#             self._log("Skipping web sync (no web-v1/ or web/ folder present). Published artifacts are ready under data/published/v1.")
+#         if not (self.root_dir / "web-v1-app").exists():
+#             self._log("Skipping web sync (no web-v1-app/ folder present). Published artifacts are ready under data/published/v1.")
 #             return True
 
 #         self._log("Syncing published dataset -> web public folder ...")
@@ -282,12 +282,12 @@
 #             return
 
 #         # If no website folder exists, inform and exit.
-#         if not ((self.root_dir / "web-v1").exists() or (self.root_dir / "web").exists()):
+#         if not (self.root_dir / "web-v1-app").exists():
 #             messagebox.showinfo(
 #                 "Nettside ikke satt opp",
-#                 "Fant ingen web-v1/ eller web/ i dette prosjektet.\n\n"
+#                 "Fant ingen web-v1-app/ i dette prosjektet.\n\n"
 #                 "Pipeline produserer web-klare artefakter her:\n  data/published/v1\n\n"
-#                 "Nettsiden leser fra:\n  web-v1/public/data/published/v1\n"
+#                 "Nettsiden leser fra:\n  web-v1-app/.private-data/published/v1\n"
 #                 "(via sync_web_data.ps1).",
 #             )
 #             return
@@ -308,7 +308,7 @@
 #                 self._log("Web open requested. (This GUI currently keeps web start separate from data pipeline.)")
 #                 messagebox.showinfo(
 #                     "Web start",
-#                     "Start web (Next.js) via ditt vanlige web-v1-oppsett (npm dev/build).\n"
+#                     "Start web (Next.js) via ditt vanlige web-v1-app-oppsett (npm dev/build).\n"
 #                     "Data blir synket automatisk etter pipeline-run.",
 #                 )
 #             finally:
@@ -564,22 +564,22 @@
 #         This project’s authoritative dataset is produced under:
 #           data\published\v1
 
-#         The website (web-v1) reads from:
-#           web-v1\public\data\published\v1
+#         The website (web-v1-app) reads from:
+#           web-v1-app\.private-data\published\v1
 
 #         For backwards compatibility, we also support a legacy:
 #           web\public\data\published\v1
 
-#         The sync script itself decides which web folder to use (web-v1 preferred).
+#         The sync script itself decides which web folder to use (web-v1-app preferred).
 #         """
 #         if not self.ps_sync_web_data.exists():
 #             self._log("Skipping web sync (pipeline/tools/sync_web_data.ps1 not present).")
 #             return True
 
 #         # Only attempt sync if at least one known web folder exists.
-#         if not ((self.root_dir / "web-v1").exists() or (self.root_dir / "web").exists()):
+#         if not (self.root_dir / "web-v1-app").exists():
 #             self._log(
-#                 "Skipping web sync (no web-v1/ or web/ folder present). Published artifacts are ready under data/published/v1."
+#                 "Skipping web sync (no web-v1-app/ folder present). Published artifacts are ready under data/published/v1."
 #             )
 #             return True
 
@@ -736,12 +736,12 @@
 #             return
 
 #         # If no website folder exists, inform and exit.
-#         if not ((self.root_dir / "web-v1").exists() or (self.root_dir / "web").exists()):
+#         if not (self.root_dir / "web-v1-app").exists():
 #             messagebox.showinfo(
 #                 "Nettside ikke satt opp",
-#                 "Fant ingen web-v1/ eller web/ i dette prosjektet.\n\n"
+#                 "Fant ingen web-v1-app/ i dette prosjektet.\n\n"
 #                 "Pipeline produserer web-klare artefakter her:\n  data/published/v1\n\n"
-#                 "Nettsiden leser fra:\n  web-v1/public/data/published/v1\n"
+#                 "Nettsiden leser fra:\n  web-v1-app/.private-data/published/v1\n"
 #                 "(via sync_web_data.ps1).",
 #             )
 #             return
@@ -762,7 +762,7 @@
 #                 self._log("Web open requested. (This GUI currently keeps web start separate from data pipeline.)")
 #                 messagebox.showinfo(
 #                     "Web start",
-#                     "Start web (Next.js) via ditt vanlige web-v1-oppsett (npm dev/build).\n"
+#                     "Start web (Next.js) via ditt vanlige web-v1-app-oppsett (npm dev/build).\n"
 #                     "Data blir synket automatisk etter pipeline-run.",
 #                 )
 #             finally:
@@ -1000,9 +1000,9 @@ class App(tk.Tk):
             self._log("Skipping web sync (pipeline/tools/sync_web_data.ps1 not present).")
             return True
 
-        if not ((self.root_dir / "web-v1").exists() or (self.root_dir / "web").exists()):
+        if not (self.root_dir / "web-v1-app").exists():
             self._log(
-                "Skipping web sync (no web-v1/ or web/ folder present). Published artifacts are ready under data/published/v1."
+                "Skipping web sync (no web-v1-app/ folder present). Published artifacts are ready under data/published/v1."
             )
             return True
 
@@ -1173,12 +1173,12 @@ Dette scriptet er et WebEkstra-krav (meta-only publish).""",
         if self.busy:
             return
 
-        if not ((self.root_dir / "web-v1").exists() or (self.root_dir / "web").exists()):
+        if not (self.root_dir / "web-v1-app").exists():
             messagebox.showinfo(
                 "Nettside ikke satt opp",
-                "Fant ingen web-v1/ eller web/ i dette prosjektet.\n\n"
+                "Fant ingen web-v1-app/ i dette prosjektet.\n\n"
                 "Pipeline produserer web-klare artefakter her:\n  data/published/v1\n\n"
-                "Nettsiden leser fra:\n  web-v1/public/data/published/v1\n"
+                "Nettsiden leser fra:\n  web-v1-app/.private-data/published/v1\n"
                 "(via sync_web_data.ps1).",
             )
             return
@@ -1197,7 +1197,7 @@ Dette scriptet er et WebEkstra-krav (meta-only publish).""",
                 self._log("Web open requested. (This GUI currently keeps web start separate from data pipeline.)")
                 messagebox.showinfo(
                     "Web start",
-                    "Start web (Next.js) via ditt vanlige web-v1-oppsett (npm dev/build).\n"
+                    "Start web (Next.js) via ditt vanlige web-v1-app-oppsett (npm dev/build).\n"
                     "Data blir publisert til repo/Vercel via den daglige incremental-wrapperen.",
                 )
             finally:
