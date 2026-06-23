@@ -16,6 +16,14 @@ export type DateTimeOptions = {
   locale?: string;
 };
 
+function normalizeCompactNumberSuffix(value: string): string {
+  return value
+    .replace(/k$/g, "K")
+    .replace(/m$/g, "M")
+    .replace(/b$/g, "B")
+    .replace(/t$/g, "T");
+}
+
 export function formatCompactNumber(
   value: number | null | undefined,
   options: CompactNumberOptions = {}
@@ -34,11 +42,13 @@ export function formatCompactNumber(
     minimumFractionDigits = 0,
   } = options;
 
-  return new Intl.NumberFormat("en-GB", {
+  const formatted = new Intl.NumberFormat("en-GB", {
     notation: "compact",
     maximumFractionDigits,
     minimumFractionDigits,
   }).format(value);
+
+  return normalizeCompactNumberSuffix(formatted);
 }
 
 export function formatInteger(value: number | null | undefined): string {
