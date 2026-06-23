@@ -1,4 +1,4 @@
-﻿name: AWS Raw Source Probe
+﻿name: AWS Ethereum Raw Source Dry Run
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
 jobs:
   probe:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -17,23 +17,27 @@ jobs:
         run: |
           aws --version
 
-      - name: Probe Ethereum raw source
+      - name: Probe Ethereum source availability
         shell: pwsh
-        env:
-          CSS_RAW_LOOKBACK_DAYS: "14"
         run: |
-          Write-Host "=== Find AWS-related env names exposed to this job (names only, no values) ==="
-          Get-ChildItem Env: |
-            Where-Object { $_.Name -match 'AWS|S3|CSS' } |
-            Select-Object -ExpandProperty Name |
-            Sort-Object
+          Write-Host "=== Direct S3 prefix listing: ethereum blocks ==="
+          aws s3 ls s3://aws-public-blockchain/v1.0/eth/blocks/ --no-sign-request |
+            Select-String "2026-06-18|2026-06-19|2026-06-20|2026-06-21|2026-06-22|2026-06-23"
 
-          Write-Host "`n=== Try to infer S3 bucket/prefix from repo scripts/config ==="
-          Select-String -Path .\pipeline\**\*.py, .\pipeline\**\*.ps1, .\*.ps1 -Pattern 's3://|S3_BUCKET|AWS_BUCKET|CSS_RAW|ethereum|blocks' -ErrorAction SilentlyContinue |
-            Select-Object -First 200 |
-            ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line)" }
+          Write-Host "`n=== Direct S3 prefix listing: ethereum transactions ==="
+          aws s3 ls s3://aws-public-blockchain/v1.0/eth/transactions/ --no-sign-request |
+            Select-String "2026-06-18|2026-06-19|2026-06-20|2026-06-21|2026-06-22|2026-06-23"
 
-          Write-Host "`n=== Run RAW downloader in dry/probe-adjacent mode if supported ==="
-          python .\pipeline\tools\download_up_to_date_minimal.py --help
+          Write-Host "`n=== Downloader dry-run: ethereum only ==="
+          python .\pipeline\tools\download_up_to_date_minimal.py `
+            --root . `
+            --raw-root .\data\raw `
+            --published-root .\data\published\v1 `
+            --start 2026-06-18 `
+            --chains ethereum `
+            --lag-l1-days 1 `
+            --lag-l2-days 7 `
+            --dry-run
 
-          Write-Host "`n=== Done. Use the env/config names above to add exact aws s3 ls probe if needed. ==="
+          Write-Host "`n=== Dry-run report ==="
+          Get-Content .\reports\download_up_to_date_minimal.json -Raw
