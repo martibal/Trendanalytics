@@ -1,4 +1,3 @@
-// src/lib/utils/freshness.test.ts
 import {
   computeAgeDays,
   computeFreshnessState,
@@ -9,6 +8,7 @@ import {
   getFreshnessPolicy,
   isFreshnessWarning,
   normalizeAsOfDate,
+  type FreshnessState,
 } from "@/lib/utils/freshness";
 
 describe("utils/freshness", () => {
@@ -135,6 +135,52 @@ describe("utils/freshness", () => {
         asOfDate: "2026-03-16",
         detail: "Data appears delayed beyond the expected schedule (2d old).",
       });
+    });
+
+    it("evaluates ethereum freshness using the fast-chain ok/warn/fail thresholds", () => {
+      const cases: Array<{
+        asOfDate: string;
+        expectedAgeDays: number;
+        expectedState: FreshnessState;
+        expectedDetail: string;
+      }> = [
+        {
+          asOfDate: "2026-03-17T00:00:00.000Z",
+          expectedAgeDays: 1,
+          expectedState: "ok",
+          expectedDetail: "Data freshness is within the expected schedule (1d old).",
+        },
+        {
+          asOfDate: "2026-03-16T00:00:00.000Z",
+          expectedAgeDays: 2,
+          expectedState: "warn",
+          expectedDetail: "Data appears delayed beyond the expected schedule (2d old).",
+        },
+        {
+          asOfDate: "2026-03-14T00:00:00.000Z",
+          expectedAgeDays: 4,
+          expectedState: "fail",
+          expectedDetail: "Data appears significantly stale (4d old).",
+        },
+      ];
+
+      for (const testCase of cases) {
+        expect(
+          evaluateFreshness({
+            chainId: "ethereum",
+            asOfDate: testCase.asOfDate,
+            now: "2026-03-18T00:00:00.000Z",
+          })
+        ).toEqual({
+          state: testCase.expectedState,
+          ageDays: testCase.expectedAgeDays,
+          expectedLagDays: 1,
+          warnAfterDays: 2,
+          failAfterDays: 4,
+          asOfDate: testCase.asOfDate.slice(0, 10),
+          detail: testCase.expectedDetail,
+        });
+      }
     });
 
     it("evaluates base freshness using the slower-chain thresholds", () => {
