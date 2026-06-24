@@ -68,6 +68,7 @@ const webPublicPublishedRoot = path.join(root, "public", "data", "published", "v
 const CHAINS = ["bitcoin", "ethereum", "arbitrum", "base"];
 const GENRES = ["gold", "meta", "derived"];
 const WINDOWS = [7, 30, 90, 180, 365];
+const GIT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
 
 const reportDir = path.join(root, ".audit", "publication-integrity");
 const reportJsonPath = path.join(reportDir, "publication-integrity.json");
@@ -2501,6 +2502,7 @@ function gitOutput(args) {
     cwd: repoRoot,
     encoding: "utf8",
     shell: process.platform === "win32",
+    maxBuffer: GIT_MAX_BUFFER_BYTES,
   });
 
   if (result.error) {
