@@ -691,6 +691,31 @@ function inventoryKey(item) {
 function observedKey(item) {
   return `${item.genre}:${item.field}`;
 }
+const OPTIONAL_CURRENT_META_SCHEMA_VARIANT_FIELDS = new Set([
+  "meta:coverage.expected_days",
+  "meta:coverage.present_days",
+  "meta:coverage.nonNull_ratio",
+  "meta:coverage.non_null_ratio",
+  "meta:freshness.lag_days",
+]);
+
+function inventoryObservedInLatest(inventory, observedByKey) {
+  if (observedByKey.has(inventoryKey(inventory))) {
+    return true;
+  }
+
+  const arrayNormalizedKey = `${inventory.genre}:${inventory.field.replaceAll("[]", ".[]")}`;
+  return observedByKey.has(arrayNormalizedKey);
+}
+
+function shouldWarnForUnobservedInventoryField(inventory, observedByKey) {
+  if (OPTIONAL_CURRENT_META_SCHEMA_VARIANT_FIELDS.has(inventoryKey(inventory))) {
+    return false;
+  }
+
+  return !inventoryObservedInLatest(inventory, observedByKey);
+}
+
 
 function requiredInventoryFieldErrors(item) {
   const required = [
@@ -1644,7 +1669,7 @@ for (const missingFile of missingFiles) {
       });
     }
 
-    if (!observedByKey.has(inventoryKey(inventory))) {
+    if (shouldWarnForUnobservedInventoryField(inventory, observedByKey)) {
       findings.push({
         severity: "warn",
         auditItem: "C-001",
