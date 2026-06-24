@@ -10806,7 +10806,7 @@ function evaluatePrismaDbDeploymentContract(findings) {
 
   result.migrationContainsStripeWebhookEventTable =
     migrationText.includes("stripe_webhook_events") &&
-    /CREATE\s+TABLE\s+["']?stripe_webhook_events["']?/iu.test(migrationText);
+    /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?stripe_webhook_events["']?/iu.test(migrationText);
 
   result.migrationContainsStripeWebhookEventStatusEnum =
     migrationText.includes("StripeWebhookEventStatus") ||
