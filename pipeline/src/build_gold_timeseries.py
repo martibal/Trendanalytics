@@ -49,8 +49,44 @@ CANON_COLS = [
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _utc_now_iso() -> str:
-    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+def _parse_iso_date(value: str) -> datetime.date:
+    try:
+        return datetime.fromisoformat(value).date()
+    except Exception as e:
+        raise ValueError(f"Expected YYYY-MM-DD date, got {value!r}") from e
+
+
+def _validate_generated_at_utc(value: str) -> str:
+    try:
+        parsed = value[:-1] + "+00:00" if value.endswith("Z") else value
+        datetime.fromisoformat(parsed)
+    except Exception as e:
+        raise ValueError(f"Expected ISO timestamp for generated_at_utc, got {value!r}") from e
+    return value
+
+
+def _resolve_generated_at_utc(explicit_value: Optional[str], last_date: Optional[str]) -> str:
+    """Resolve status timestamp without reading a runtime clock.
+
+    Production callers may pass --generated-at-utc. When omitted, the fallback is
+    derived from the data itself so this script remains reproducible in tests and
+    rebuilds.
+    """
+    if explicit_value:
+        return _validate_generated_at_utc(explicit_value)
+    if last_date:
+        return f"{last_date}T00:00:00Z"
+    return "1970-01-01T00:00:00Z"
+
+
+def _resolve_utc_today(explicit_value: Optional[str], last_date: Optional[str]) -> Optional[datetime.date]:
+    """Resolve the date used for lag calculations without reading a runtime clock."""
+    if explicit_value:
+        return _parse_iso_date(explicit_value)
+    if last_date:
+        return _parse_iso_date(last_date)
+    return None
 
 
 def _load_json_if_exists(p: Path) -> Optional[dict]:
@@ -344,9 +380,10 @@ def build_gold_for_chain(
     gold_root: Path,
     status_root: Path,
     reports_dir: Path,
+    generated_at_utc: Optional[str] = None,
+    utc_today: Optional[str] = None,
 ) -> int:
     paths = _resolve_paths(features_root, gold_root, status_root, chain)
-    generated_at = _utc_now_iso()
 
     # Pull raw manifest context (freshness, raw gaps)
     raw_manifest_summary_path = reports_dir / "raw_manifest_summary.json"
@@ -360,6 +397,7 @@ def build_gold_for_chain(
 
     if not days_present:
         LOG.warning("No feature files found for chain=%s under %s", chain, paths.features_dir)
+        generated_at = _resolve_generated_at_utc(generated_at_utc, None)
         status = {
             "chain": chain,
             "generated_at_utc": generated_at,
@@ -386,6 +424,7 @@ def build_gold_for_chain(
     missing_dates = _missing_dates(days_present)
     first_date = days_present[0]
     last_date = days_present[-1]
+    generated_at = _resolve_generated_at_utc(generated_at_utc, last_date)
 
     df, read_errors = _read_features_schema_robust(paths.features_dir, days_present, chain)
 
@@ -409,11 +448,12 @@ def build_gold_for_chain(
 
     quality = _quality_summary(df, chain)
 
-    # Also compute an explicit freshness/lag indicator for UI:
-    # lag_days = today_utc_date - last_feature_date (simple, deterministic).
+    # Also compute an explicit freshness/lag indicator for UI.
+    # The reference date is injected by callers or derived from the data itself.
     try:
         last_dt = datetime.fromisoformat(last_date).date()
-        lag_days = int((datetime.utcnow().date() - last_dt).days)
+        today_dt = _resolve_utc_today(utc_today, last_date)
+        lag_days = int((today_dt - last_dt).days) if today_dt is not None else None
     except Exception:
         lag_days = None
 
@@ -452,6 +492,16 @@ def main() -> int:
     ap.add_argument("--gold_root", required=True)
     ap.add_argument("--status_root", required=True)
     ap.add_argument("--reports_dir", required=True)
+    ap.add_argument(
+        "--generated-at-utc",
+        default=None,
+        help="Optional explicit generated_at_utc timestamp for deterministic status output.",
+    )
+    ap.add_argument(
+        "--utc-today",
+        default=None,
+        help="Optional YYYY-MM-DD date used for status lag calculations.",
+    )
     args = ap.parse_args()
 
     return build_gold_for_chain(
@@ -460,6 +510,8 @@ def main() -> int:
         gold_root=Path(args.gold_root),
         status_root=Path(args.status_root),
         reports_dir=Path(args.reports_dir),
+        generated_at_utc=args.generated_at_utc,
+        utc_today=args.utc_today,
     )
 
 
