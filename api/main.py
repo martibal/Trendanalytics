@@ -170,6 +170,12 @@ def _chrome_devtools_probe() -> Response:
 
 
 def _utc_today() -> date:
+    override = os.getenv("CSS_UTC_TODAY", "").strip()
+    if override:
+        try:
+            return date.fromisoformat(override)
+        except Exception:
+            pass
     now = datetime.now(timezone.utc)
     return date(now.year, now.month, now.day)
 
