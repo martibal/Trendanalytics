@@ -28,6 +28,14 @@ const config: Config = {
     "!src/app/**/error.tsx",
     "!src/proxy.ts",
   ],
+  coverageThreshold: {
+    global: {
+      statements: 25,
+      branches: 22,
+      functions: 20,
+      lines: 27,
+    },
+  },
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "mjs"],
   testPathIgnorePatterns: [
     "<rootDir>/.next/",
