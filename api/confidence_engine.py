@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 from datetime import date, datetime, timezone, timedelta
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -131,6 +132,12 @@ PUBLISH_LAG_DAYS_POLICY_DEFAULT = {
 
 
 def _utc_today() -> date:
+    override = os.getenv("CSS_UTC_TODAY", "").strip()
+    if override:
+        try:
+            return date.fromisoformat(override)
+        except Exception:
+            pass
     now = datetime.now(timezone.utc)
     return date(now.year, now.month, now.day)
 
