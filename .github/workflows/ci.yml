@@ -43,8 +43,16 @@ jobs:
           cache: npm
           cache-dependency-path: web-v1-app/package-lock.json
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Install pipeline Python dependencies
+        run: python -m pip install --upgrade pip pandas polars pyarrow
 
       - name: Run lint
         run: npm run lint
@@ -60,6 +68,9 @@ jobs:
 
       - name: Run pipeline determinism gate
         run: npm run check:pipeline-determinism
+
+      - name: Run pipeline golden fixture gate
+        run: npm run check:pipeline-golden-fixture
 
       - name: Run audit gates
         run: npm run check:audit-gates:no-build
