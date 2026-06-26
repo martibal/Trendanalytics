@@ -9,6 +9,8 @@ const REPO_ROOT = path.resolve(WEB_ROOT, "..");
 const PYTHON = process.env.PYTHON || "python";
 const CHAIN = "bitcoin";
 const DAYS = ["2026-01-01", "2026-01-02", "2026-01-03"];
+const FIXED_GENERATED_AT_UTC = "2026-01-04T00:00:00Z";
+const FIXED_UTC_TODAY = "2026-01-04";
 
 const EXPECTED_GOLD_DAYS = {
   "2026-01-01": {
@@ -49,6 +51,53 @@ const EXPECTED_GOLD_DAYS = {
     tx_count_daily: 2,
     unique_active_addresses: 4,
     value_transferred_native: 8,
+  },
+};
+
+const EXPECTED_STATUS = {
+  chain: "bitcoin",
+  generated_at_utc: FIXED_GENERATED_AT_UTC,
+  features_first_date: "2026-01-01",
+  features_last_date: "2026-01-03",
+  features_lag_days_vs_utc_today: 1,
+  missing_dates: [],
+  row_count: 3,
+  gold_path: "<RUN_ROOT>/gold/bitcoin.parquet",
+  features_path: "<RUN_ROOT>/features_agg/bitcoin",
+  read_errors: [],
+  quality: {
+    row_count: 3,
+    null_rates: {
+      avg_block_time_sec: 0,
+      block_count_daily: 0,
+      chain: 0,
+      date: 0,
+      failed_tx_rate: 0,
+      gas_utilization_pct: 1,
+      median_tx_fee_native: 0,
+      median_tx_value_native: 0,
+      tx_count_daily: 0,
+      unique_active_addresses: 0,
+      value_transferred_native: 0,
+    },
+    out_of_range_counts: {
+      avg_block_time_sec: 0,
+      failed_tx_rate: 0,
+      gas_utilization_pct: 0,
+    },
+  },
+  fixes: {
+    applied: ["gas_utilization_pct_null_for_btc"],
+    notes: [],
+  },
+  raw_context: {
+    latest_raw_ok_date: {
+      blocks: "2026-01-03",
+      transactions: "2026-01-03",
+    },
+    raw_gaps: {},
+    raw_manifest_summary_path: "<RUN_ROOT>/reports/raw_manifest_summary.json",
+    raw_gaps_path: "<RUN_ROOT>/reports/raw_gaps.json",
   },
 };
 
@@ -174,6 +223,23 @@ function relPath(root, filePath) {
   return path.relative(root, filePath).split(path.sep).join("/");
 }
 
+function normalizeFixtureValue(value, runRoot) {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeFixtureValue(item, runRoot));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [key, normalizeFixtureValue(nested, runRoot)]),
+    );
+  }
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const normalizedRunRoot = path.resolve(runRoot).split(path.sep).join("/");
+  return value.split(path.sep).join("/").split(normalizedRunRoot).join("<RUN_ROOT>");
+}
+
 function walkJsonFiles(root) {
   if (!fs.existsSync(root)) {
     return [];
@@ -195,10 +261,11 @@ function walkJsonFiles(root) {
   return out.sort((a, b) => relPath(root, a).localeCompare(relPath(root, b)));
 }
 
-function collectJsonTree(root) {
+function collectJsonTree(root, runRoot = null) {
   const tree = {};
   for (const filePath of walkJsonFiles(root)) {
-    tree[relPath(root, filePath)] = readJson(filePath);
+    const parsed = readJson(filePath);
+    tree[relPath(root, filePath)] = runRoot ? normalizeFixtureValue(parsed, runRoot) : parsed;
   }
   return tree;
 }
@@ -224,7 +291,14 @@ function assertObjectSubset(actual, expected, label) {
   for (const [key, expectedValue] of Object.entries(expected)) {
     const actualValue = actual[key];
     const childLabel = `${label}.${key}`;
-    if (expectedValue && typeof expectedValue === "object" && !Array.isArray(expectedValue)) {
+    if (Array.isArray(expectedValue)) {
+      if (!Array.isArray(actualValue) || actualValue.length !== expectedValue.length) {
+        throw new Error(`${childLabel}: expected array length ${expectedValue.length}`);
+      }
+      for (let index = 0; index < expectedValue.length; index += 1) {
+        assertClose(actualValue[index], expectedValue[index], `${childLabel}[${index}]`);
+      }
+    } else if (expectedValue && typeof expectedValue === "object") {
       assertObjectSubset(actualValue, expectedValue, childLabel);
     } else {
       assertClose(actualValue, expectedValue, childLabel);
@@ -338,6 +412,10 @@ function runFixtureOnce(parent, runName) {
     statusRoot,
     "--reports_dir",
     reportsDir,
+    "--generated-at-utc",
+    FIXED_GENERATED_AT_UTC,
+    "--utc-today",
+    FIXED_UTC_TODAY,
   ]);
 
   runCommand(PYTHON, [
@@ -378,6 +456,7 @@ function runFixtureOnce(parent, runName) {
 
   const output = {
     gold_json: collectJsonTree(goldJsonRoot),
+    gold_status: collectJsonTree(statusRoot, runRoot),
     derived_json: collectJsonTree(derivedJsonRoot),
   };
 
@@ -389,6 +468,8 @@ function runFixtureOnce(parent, runName) {
 }
 
 function validateExpectedOutputs(output) {
+  assertObjectSubset(output.gold_status["bitcoin.json"], EXPECTED_STATUS, "gold_status.bitcoin.json");
+
   for (const day of DAYS) {
     const gold = output.gold_json[`bitcoin/${day}.json`];
     assertObjectSubset(gold, EXPECTED_GOLD_DAYS[day], `gold.${day}`);
@@ -416,8 +497,8 @@ function writeReport(reportPath, runA, runB) {
       "",
       "Covered chain: bitcoin",
       "Covered layers: raw parquet fixture -> feature_daily_agg -> build_gold_timeseries -> sync_gold_json_history -> export_derived_json_history",
-      "Compared outputs: GOLD JSON and DERIVED JSON day/window files.",
-      "Status JSON is intentionally excluded until build_gold_timeseries has an injected clock/as-of source.",
+      "Compared outputs: GOLD status JSON, GOLD JSON, and DERIVED JSON day/window files.",
+      "Status paths are normalized to <RUN_ROOT> before hashing.",
       "",
     ].join("\n"),
     "utf-8",
