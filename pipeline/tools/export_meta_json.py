@@ -13,6 +13,7 @@ Notes
 - This script is designed to be runnable from ANY working directory.
 - It adds the repo root to sys.path so `import api.main` works even when launched from `pipeline/tools`.
 - Start date should typically be: 2024-12-01
+- End date is required so historical META export ranges are explicit and reproducible.
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ def _iso_date(s: str) -> dt.date:
     try:
         return dt.date.fromisoformat(s)
     except Exception:
-        raise SystemExit(f"--start must be YYYY-MM-DD, got: {s}")
+        raise SystemExit(f"expected YYYY-MM-DD date, got: {s}")
 
 
 def _json_dump(path: Path, obj: Any) -> None:
@@ -91,14 +92,14 @@ def main() -> int:
     ap.add_argument("--start", required=True, help="ISO date YYYY-MM-DD (inclusive), e.g. 2024-12-01")
     ap.add_argument(
         "--end",
-        default=None,
-        help="ISO date YYYY-MM-DD (inclusive). Default: today-<publish_lag_days_policy> (min 1 day).",
+        required=True,
+        help="ISO date YYYY-MM-DD (inclusive). Required for deterministic export ranges.",
     )
     ap.add_argument(
         "--publish-lag-days-policy",
         type=int,
         default=1,
-        help="Conservative lag policy for 'end' when --end is omitted. Default 1.",
+        help="Deprecated compatibility argument. End date must be passed explicitly with --end.",
     )
     ap.add_argument(
         "--chains",
@@ -123,13 +124,7 @@ def main() -> int:
             chains = ["bitcoin", "ethereum", "arbitrum", "base"]
 
     start = _iso_date(args.start)
-
-    if args.end:
-        end = _iso_date(args.end)
-    else:
-        # Conservative end: UTC today - lag_days (min 1)
-        lag = max(1, int(args.publish_lag_days_policy or 1))
-        end = (dt.datetime.utcnow().date() - dt.timedelta(days=lag))
+    end = _iso_date(args.end)
 
     if end < start:
         raise SystemExit(f"end < start ({end} < {start})")
