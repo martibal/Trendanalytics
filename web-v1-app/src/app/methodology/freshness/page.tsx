@@ -53,6 +53,29 @@ export default async function MethodologyFreshnessPage() {
             <li><InlineCode>lag_days_vs_utc_today</InlineCode> = runtime freshness relative to the current UTC date</li>
           </ul>
         </Section>
+
+        <Section title="Date-field precedence">
+          <p>
+            Public surfaces may display several date fields because publication, source availability, and calculation time are separate concepts. When a page needs one customer-facing as-of date, it should prefer the explicit display date first, then fall back to the latest available data date, and only then to layer-specific dates.
+          </p>
+          <SimpleTable
+            headers={["Field", "Layer", "Meaning"]}
+            rows={[
+              ["display_asof", "Landing/status", "Preferred customer-facing as-of date when present."],
+              ["asof.display", "Landing/status", "Structured equivalent of display_asof."],
+              ["asof.latest_available", "Landing/status", "Latest available date across the public data layers used by the surface."],
+              ["asof.gold", "Gold", "Latest raw observation date available for the chain."],
+              ["asof.derived", "Derived", "Latest moving-average or transformed observation date available for the chain."],
+              ["asof.meta", "Meta", "Latest Meta publication date available for the chain."],
+              ["updated_through", "Meta", "Latest Gold observation date actually included in the Meta calculation."],
+              ["regime.asof_date", "Meta", "Date the regime label is evaluated against."],
+              ["computed_at_utc", "Dataset/index", "UTC timestamp for when an index, manifest, or artifact was computed; it is not an observation date."],
+            ]}
+          />
+          <p className="mt-3">
+            The status page follows this precedence for its displayed as-of value: <InlineCode>display_asof</InlineCode>, <InlineCode>asof.display</InlineCode>, <InlineCode>asof.latest_available</InlineCode>, <InlineCode>asof.gold</InlineCode>, <InlineCode>asof.derived</InlineCode>, <InlineCode>asof.meta</InlineCode>, then Meta fallbacks such as <InlineCode>updated_through</InlineCode>, <InlineCode>regime.asof_date</InlineCode>, and <InlineCode>date</InlineCode>.
+          </p>
+        </Section>
           </div>
         }
       />
