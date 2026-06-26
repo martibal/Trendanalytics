@@ -23,6 +23,11 @@ const steps = [
     args: ["run", "check:calculation-correctness"],
   },
   {
+    name: "Published JSON schema contract",
+    command: "npm",
+    args: ["run", "check:published-json-schemas"],
+  },
+  {
     name: "Publication integrity audit",
     command: "npm",
     args: ["run", "check:publication-integrity"],
