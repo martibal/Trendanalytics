@@ -11,6 +11,7 @@ const CHAIN = "bitcoin";
 const DAYS = ["2026-01-01", "2026-01-02", "2026-01-03"];
 const FIXED_GENERATED_AT_UTC = "2026-01-04T00:00:00Z";
 const FIXED_UTC_TODAY = "2026-01-04";
+const EXPECTED_GOLDEN_FIXTURE_DIGEST = "6ac586ab7a21fc4a664130d39e7bd9bf75cdda52698eac3e8005cebe6ee9d55f";
 
 const EXPECTED_GOLD_DAYS = {
   "2026-01-01": {
@@ -515,6 +516,11 @@ try {
     throw new Error(`Golden fixture digest mismatch: ${runA.digest} != ${runB.digest}`);
   }
 
+  if (runA.digest !== EXPECTED_GOLDEN_FIXTURE_DIGEST) {
+    throw new Error(
+      `Golden fixture digest ${runA.digest} does not match committed expected digest ${EXPECTED_GOLDEN_FIXTURE_DIGEST}`,
+    );
+  }
   validateExpectedOutputs(runA.output);
   validateExpectedOutputs(runB.output);
 
@@ -531,3 +537,4 @@ try {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
 }
+
