@@ -28,6 +28,11 @@ const steps = [
     args: ["run", "check:published-json-schemas"],
   },
   {
+    name: "Published atomicity / replay gate",
+    command: "npm",
+    args: ["run", "check:published-atomicity"],
+  },
+  {
     name: "Publication integrity audit",
     command: "npm",
     args: ["run", "check:publication-integrity"],
