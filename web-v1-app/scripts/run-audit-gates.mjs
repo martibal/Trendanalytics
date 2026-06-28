@@ -33,6 +33,11 @@ const steps = [
     args: ["run", "check:published-atomicity"],
   },
   {
+    name: "Source failure handling gate",
+    command: "npm",
+    args: ["run", "check:source-failure-handling"],
+  },
+  {
     name: "Publication integrity audit",
     command: "npm",
     args: ["run", "check:publication-integrity"],

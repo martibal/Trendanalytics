@@ -45,8 +45,17 @@ def local_day_dir(raw_root: str, chain: str, table: str, day: str) -> Tuple[str,
     return a, b
 
 
+def aws_command() -> List[str]:
+    override_py = os.environ.get("CSS_AWS_CLI_PY")
+    if override_py:
+        return [sys.executable, override_py]
+    return ["aws"]
+
+
 def aws_run(cmd: List[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True)
+    if cmd and cmd[0] == "aws":
+        cmd = cmd[1:]
+    return subprocess.run(aws_command() + cmd, capture_output=True, text=True)
 
 
 def _parse_day_from_prefix(name: str) -> Optional[str]:
@@ -62,20 +71,25 @@ def _parse_day_from_prefix(name: str) -> Optional[str]:
     return name if DATE_RE.match(name) else None
 
 
-def aws_list_available_days(chain: str, table: str, base: str) -> Set[str]:
+def aws_list_available_days(chain: str, table: str, base: str) -> Tuple[Set[str], Optional[str]]:
     """
     List available days on S3 by listing the table prefix once.
     Works for BOTH layouts:
       - .../<table>/date=YYYY-MM-DD/
       - .../<table>/YYYY-MM-DD/
+
+    Returns (days, error). A source listing error is explicit because the
+    pipeline must fail closed instead of silently treating "source unavailable"
+    as "nothing new exists".
     """
     prefix = f"{base}/{table}/"
     p = aws_run(["aws", "s3", "ls", prefix, "--no-sign-request"])
     if p.returncode != 0:
+        detail = (p.stderr or p.stdout or f"aws s3 ls returned {p.returncode}").strip()
         eprint(f"[ERR] aws s3 ls failed for {chain}/{table}: rc={p.returncode}")
-        if p.stderr.strip():
-            eprint(p.stderr.strip())
-        return set()
+        if detail:
+            eprint(detail)
+        return set(), detail[:500]
 
     days: Set[str] = set()
     for line in p.stdout.splitlines():
@@ -88,12 +102,12 @@ def aws_list_available_days(chain: str, table: str, base: str) -> Set[str]:
             if d:
                 days.add(d)
 
-    return days
+    return days, None
 
 
 def aws_sync_day(src: str, dst: str) -> int:
     return subprocess.run(
-        ["aws", "s3", "sync", src, dst, "--no-sign-request", "--only-show-errors"]
+        aws_command() + ["s3", "sync", src, dst, "--no-sign-request", "--only-show-errors"]
     ).returncode
 
 
@@ -191,11 +205,12 @@ def main() -> None:
             "Supports both S3 layouts: .../date=YYYY-MM-DD/ and .../YYYY-MM-DD/",
             "Downloads are limited to [start, cutoff_by_chain] per chain (safety lag).",
             "If --published-root is provided, already-published day-json files are treated as state and are not re-downloaded.",
+            "Source listing and download failures are fail-closed and return a non-zero exit code.",
         ],
     }
 
     try:
-        v = subprocess.run(["aws", "--version"], capture_output=True, text=True)
+        v = aws_run(["--version"])
         if v.returncode != 0:
             eprint("[ERR] aws cli not available or returned non-zero from aws --version")
             if v.stderr.strip():
@@ -210,12 +225,30 @@ def main() -> None:
 
         for table in TABLES:
             print(f"[INFO] Listing available days on S3: {chain}/{table}", flush=True)
-            available = aws_list_available_days(chain, table, base)
+            available, list_error = aws_list_available_days(chain, table, base)
+            if list_error:
+                report["summary"][f"{chain}:{table}"] = {
+                    "missing_raw_unpublished": 0,
+                    "skipped_existing_raw": 0,
+                    "skipped_already_published": 0,
+                    "source_listing_failed": True,
+                }
+                report["failures"].append({
+                    "chain": chain,
+                    "table": table,
+                    "day": None,
+                    "stage": "list_available_days",
+                    "reason": list_error,
+                    "tried": [f"{base}/{table}/"],
+                })
+                continue
+
             if not available:
                 report["summary"][f"{chain}:{table}"] = {
                     "missing_raw_unpublished": 0,
                     "skipped_existing_raw": 0,
                     "skipped_already_published": 0,
+                    "source_listing_failed": False,
                 }
                 continue
 
@@ -243,6 +276,7 @@ def main() -> None:
                 "missing_raw_unpublished": len(missing),
                 "skipped_existing_raw": len(skipped_existing),
                 "skipped_already_published": len(skipped_published),
+                "source_listing_failed": False,
             }
             report["skipped_existing"] += [{"chain": chain, "table": table, "day": d} for d in skipped_existing]
             report["skipped_published"] += [{"chain": chain, "table": table, "day": d} for d in skipped_published]
@@ -281,7 +315,10 @@ def main() -> None:
                     if rc2 != 0 or not local_has_parquet(dst):
                         eprint(f"[FAIL] {chain} {table} {day} (rc_a={rc}, rc_b={rc2})")
                         report["failures"].append({
-                            "chain": chain, "table": table, "day": day,
+                            "chain": chain,
+                            "table": table,
+                            "day": day,
+                            "stage": "sync_day",
                             "reason": f"sync failed rc_a={rc} rc_b={rc2}",
                             "tried": [src_a, src_b],
                         })
@@ -296,6 +333,11 @@ def main() -> None:
         json.dump(report, f, indent=2)
 
     print("[DONE] report:", out, flush=True)
+
+    failure_count = len(report["failures"])
+    if failure_count:
+        eprint(f"[FAIL] source download/listing failures: {failure_count}; see report: {out}")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
