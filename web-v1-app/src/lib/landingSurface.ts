@@ -17,6 +17,8 @@ export type SurfaceRowDisplay = {
   asOfTooltip: string;
   lagValue: string;
   lagTooltip: string;
+  degradationNote?: string;
+  degradationTooltip?: string;
   takeaway: string;
 };
 

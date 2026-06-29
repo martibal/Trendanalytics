@@ -393,6 +393,35 @@ function lagTooltip(row: StatusApiRow) {
   return `${row.label} is ${row.lag_days} day${row.lag_days === 1 ? "" : "s"} behind UTC today. Normal policy is about ${expected} day${expected === 1 ? "" : "s"} for this chain.`;
 }
 
+function rowDegradationNote(row: StatusApiRow): string | undefined {
+  if (row.status === "unknown") {
+    return "Published metadata is incomplete.";
+  }
+
+  if (!row.published_regime) {
+    return "Published regime label is missing.";
+  }
+
+  if (typeof row.confidence_score !== "number") {
+    return "Published confidence score is missing.";
+  }
+
+  if (!row.as_of) {
+    return "Published as-of date is missing.";
+  }
+
+  return undefined;
+}
+
+function rowDegradationTooltip(row: StatusApiRow): string | undefined {
+  const note = rowDegradationNote(row);
+  if (!note) {
+    return undefined;
+  }
+
+  return `${note} The row remains visible for traceability, but regime, confidence, and freshness should be read as degraded until the published metadata is complete again.`;
+}
+
 function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
   const band = confidenceBand(row.confidence_score);
 
@@ -415,6 +444,8 @@ function toSurfaceRowDisplay(row: StatusApiRow): SurfaceRowDisplay {
     asOfTooltip: asOfTooltip(row),
     lagValue: row.lag_days !== null ? `${row.lag_days}d` : "—",
     lagTooltip: lagTooltip(row),
+    degradationNote: rowDegradationNote(row),
+    degradationTooltip: rowDegradationTooltip(row),
     takeaway: rowTakeaway({
       status: row.status,
       publishedRegime: row.published_regime,
