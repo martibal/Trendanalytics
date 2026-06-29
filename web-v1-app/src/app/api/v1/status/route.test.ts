@@ -177,12 +177,57 @@ describe("GET /api/v1/status", () => {
       fail_count: 0,
       unknown_count: 4,
     });
+    expect(body.degraded).toBe(true);
+    expect(body.degradation_summary).toEqual({
+      degraded_chain_count: 4,
+      missing_meta_count: 4,
+      invalid_meta_count: 0,
+      invalid_shape_count: 0,
+    });
 
     for (const row of body.chains) {
       expect(row.status).toBe("unknown");
       expect(row.as_of).toBeNull();
       expect(row.lag_days).toBeNull();
       expect(row.confidence_score).toBeNull();
+      expect(row.degradation).toMatchObject({
+        degraded: true,
+        reason_code: "published_meta_missing",
+      });
+    }
+  });
+
+  it("marks chain rows degraded when published meta JSON is invalid", async () => {
+    const bytes = new TextEncoder().encode("{invalid-json");
+
+    mockReadStorageObject.mockResolvedValue({
+      body: bytes,
+      contentType: "application/json; charset=utf-8",
+      contentLength: bytes.byteLength,
+      etag: null,
+      lastModified: null,
+      source: "local",
+    });
+
+    const response = await GET(new Request("https://www.urdatlas.com/api/v1/status"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.degraded).toBe(true);
+    expect(body.degradation_summary).toEqual({
+      degraded_chain_count: 4,
+      missing_meta_count: 0,
+      invalid_meta_count: 4,
+      invalid_shape_count: 0,
+    });
+
+    for (const row of body.chains) {
+      expect(row.status).toBe("unknown");
+      expect(row.as_of).toBeNull();
+      expect(row.degradation).toMatchObject({
+        degraded: true,
+        reason_code: "published_meta_invalid_json",
+      });
     }
   });
 
