@@ -43,6 +43,11 @@ const steps = [
     args: ["run", "check:timeout-retry-policy"],
   },
   {
+    name: "Pipeline environment parity inventory",
+    command: "npm",
+    args: ["run", "check:pipeline-environment-parity"],
+  },
+  {
     name: "Publication integrity audit",
     command: "npm",
     args: ["run", "check:publication-integrity"],
