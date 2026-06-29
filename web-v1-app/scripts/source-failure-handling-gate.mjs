@@ -139,6 +139,9 @@ function runDownloader({ name, mode, withPublishedDay }) {
     PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}`,
     URD_FAKE_AWS_MODE: mode,
     CSS_AWS_CLI_PY: path.join(binDir, "fake-aws.py"),
+    CSS_AWS_TIMEOUT_SECONDS: "5",
+    CSS_AWS_MAX_ATTEMPTS: "2",
+    CSS_AWS_BACKOFF_SECONDS: "0.01",
   };
 
   const result = spawnSync(

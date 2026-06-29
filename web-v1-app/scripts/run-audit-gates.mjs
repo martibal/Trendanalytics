@@ -38,6 +38,11 @@ const steps = [
     args: ["run", "check:source-failure-handling"],
   },
   {
+    name: "Timeout / retry policy gate",
+    command: "npm",
+    args: ["run", "check:timeout-retry-policy"],
+  },
+  {
     name: "Publication integrity audit",
     command: "npm",
     args: ["run", "check:publication-integrity"],

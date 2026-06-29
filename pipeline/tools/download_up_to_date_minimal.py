@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from typing import Dict, List, Optional, Set, Tuple
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -18,6 +19,15 @@ S3_BASE = {
 }
 TABLES = ["blocks", "transactions"]
 PUBLISHED_GENRE_PREFERENCE = ["gold", "derived"]
+
+AWS_TIMEOUT_SECONDS_ENV = "CSS_AWS_TIMEOUT_SECONDS"
+AWS_MAX_ATTEMPTS_ENV = "CSS_AWS_MAX_ATTEMPTS"
+AWS_BACKOFF_SECONDS_ENV = "CSS_AWS_BACKOFF_SECONDS"
+
+DEFAULT_AWS_TIMEOUT_SECONDS = 120.0
+DEFAULT_AWS_MAX_ATTEMPTS = 3
+DEFAULT_AWS_BACKOFF_SECONDS = 2.0
+RETRYABLE_AWS_RETURN_CODES = {1, 2, 124, 130, 255}
 
 
 def eprint(*a):
@@ -52,10 +62,100 @@ def aws_command() -> List[str]:
     return ["aws"]
 
 
+def _env_float(name: str, default: float, minimum: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        eprint(f"[WARN] invalid {name}={raw!r}; using default {default}")
+        return default
+    return max(minimum, value)
+
+
+def _env_int(name: str, default: int, minimum: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        eprint(f"[WARN] invalid {name}={raw!r}; using default {default}")
+        return default
+    return max(minimum, value)
+
+
+def aws_timeout_seconds() -> float:
+    return _env_float(AWS_TIMEOUT_SECONDS_ENV, DEFAULT_AWS_TIMEOUT_SECONDS, 0.1)
+
+
+def aws_max_attempts() -> int:
+    return _env_int(AWS_MAX_ATTEMPTS_ENV, DEFAULT_AWS_MAX_ATTEMPTS, 1)
+
+
+def aws_backoff_seconds() -> float:
+    return _env_float(AWS_BACKOFF_SECONDS_ENV, DEFAULT_AWS_BACKOFF_SECONDS, 0.0)
+
+
+def is_retryable_aws_return_code(returncode: int) -> bool:
+    return returncode in RETRYABLE_AWS_RETURN_CODES
+
+
+def _coerce_timeout_stream(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
 def aws_run(cmd: List[str]) -> subprocess.CompletedProcess:
     if cmd and cmd[0] == "aws":
         cmd = cmd[1:]
-    return subprocess.run(aws_command() + cmd, capture_output=True, text=True)
+
+    full_cmd = aws_command() + cmd
+    timeout_seconds = aws_timeout_seconds()
+    max_attempts = aws_max_attempts()
+    backoff_seconds = aws_backoff_seconds()
+    last_result: Optional[subprocess.CompletedProcess] = None
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = subprocess.run(
+                full_cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            result = subprocess.CompletedProcess(
+                full_cmd,
+                124,
+                stdout=_coerce_timeout_stream(exc.stdout),
+                stderr=(
+                    _coerce_timeout_stream(exc.stderr)
+                    + f"\naws command timed out after {timeout_seconds:.3f}s"
+                ).strip(),
+            )
+
+        last_result = result
+        if result.returncode == 0:
+            return result
+
+        if not is_retryable_aws_return_code(result.returncode):
+            return result
+
+        if attempt < max_attempts:
+            eprint(
+                f"[WARN] aws command failed attempt {attempt}/{max_attempts} "
+                f"rc={result.returncode}; retrying after {backoff_seconds * (2 ** (attempt - 1)):.3f}s"
+            )
+            if backoff_seconds > 0:
+                time.sleep(backoff_seconds * (2 ** (attempt - 1)))
+
+    assert last_result is not None
+    return last_result
 
 
 def _parse_day_from_prefix(name: str) -> Optional[str]:
@@ -106,9 +206,7 @@ def aws_list_available_days(chain: str, table: str, base: str) -> Tuple[Set[str]
 
 
 def aws_sync_day(src: str, dst: str) -> int:
-    return subprocess.run(
-        aws_command() + ["s3", "sync", src, dst, "--no-sign-request", "--only-show-errors"]
-    ).returncode
+    return aws_run(["aws", "s3", "sync", src, dst, "--no-sign-request", "--only-show-errors"]).returncode
 
 
 def chain_cutoff(chain: str, today: dt.date, lag_l1: int, lag_l2: int) -> dt.date:
@@ -194,6 +292,11 @@ def main() -> None:
         "published_root": published_root,
         "dry_run": bool(args.dry_run),
         "lags": {"l1_days": int(args.lag_l1_days), "l2_days": int(args.lag_l2_days)},
+        "aws_policy": {
+            "timeout_seconds": aws_timeout_seconds(),
+            "max_attempts": aws_max_attempts(),
+            "backoff_seconds": aws_backoff_seconds(),
+        },
         "cutoff_by_chain": {c: chain_cutoff(c, today, args.lag_l1_days, args.lag_l2_days).isoformat() for c in chains},
         "published_days_by_chain": {c: len(published_days_by_chain.get(c, set())) for c in chains},
         "summary": {},
@@ -206,6 +309,7 @@ def main() -> None:
             "Downloads are limited to [start, cutoff_by_chain] per chain (safety lag).",
             "If --published-root is provided, already-published day-json files are treated as state and are not re-downloaded.",
             "Source listing and download failures are fail-closed and return a non-zero exit code.",
+            "AWS CLI calls use a bounded timeout, bounded retry count, and exponential backoff.",
         ],
     }
 
