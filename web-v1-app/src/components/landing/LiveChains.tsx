@@ -112,6 +112,13 @@ export default function LiveChains({ rows }: { rows: SurfaceRowDisplay[] }) {
                 <span className="text-sm text-slate-500">No published label</span>
               )}
               <p className="mt-1.5 text-[11px] leading-[1.55] text-slate-300">{row.takeaway}</p>
+              {row.degradationNote ? (
+                <Tooltip tooltip={row.degradationTooltip ?? row.degradationNote}>
+                  <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-500/8 px-3 py-2 font-mono text-[10px] leading-[1.55] text-amber-200">
+                    {row.degradationNote}
+                  </div>
+                </Tooltip>
+              ) : null}
             </div>
 
             <BlockTooltip tooltip={row.confidenceTooltip}>
