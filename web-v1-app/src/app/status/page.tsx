@@ -34,6 +34,18 @@ type SourceFreshnessReport = {
   chains?: Record<string, SourceFreshnessChain>;
 };
 
+type ChainDegradationReason =
+  | "published_meta_missing"
+  | "published_meta_invalid_json"
+  | "published_meta_invalid_shape";
+
+type ChainDegradation = {
+  degraded: true;
+  reason_code: ChainDegradationReason;
+  source_path: string;
+  detail: string;
+};
+
 type StatusRow = {
   chain: ChainId;
   name: string;
@@ -46,6 +58,7 @@ type StatusRow = {
   expected_delay_days: number;
   source_freshness: SourceFreshnessChain | null;
   freshness_explanation: string | null;
+  degradation: ChainDegradation | null;
 };
 
 type LandingHero = {
@@ -161,17 +174,94 @@ function arrayBufferToUtf8(buffer: ArrayBuffer): string {
   return new TextDecoder("utf-8").decode(new Uint8Array(buffer));
 }
 
-async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
+type PublishedJsonReadStatus = "ok" | "missing" | "invalid_json" | "invalid_shape";
+
+type PublishedJsonRead<T> = {
+  path: string;
+  status: PublishedJsonReadStatus;
+  value: T | null;
+  detail: string | null;
+};
+
+async function readPublishedJsonWithState<T>(
+  storagePath: string
+): Promise<PublishedJsonRead<T>> {
   const result = await readStorageObject(storagePath);
-  if (!result) return null;
+
+  if (!result) {
+    return {
+      path: storagePath,
+      status: "missing",
+      value: null,
+      detail: "Published JSON object is missing.",
+    };
+  }
+
   try {
     const raw = arrayBufferToUtf8(result.body);
     const json = JSON.parse(raw);
-    if (!json || typeof json !== "object") return null;
-    return json as T;
+
+    if (!json || typeof json !== "object") {
+      return {
+        path: storagePath,
+        status: "invalid_shape",
+        value: null,
+        detail: "Published JSON object is not an object.",
+      };
+    }
+
+    return {
+      path: storagePath,
+      status: "ok",
+      value: json as T,
+      detail: null,
+    };
   } catch {
+    return {
+      path: storagePath,
+      status: "invalid_json",
+      value: null,
+      detail: "Published JSON object could not be parsed.",
+    };
+  }
+}
+
+async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
+  const result = await readPublishedJsonWithState<T>(storagePath);
+  return result.value;
+}
+
+function chainDegradationFromMetaRead(
+  read: PublishedJsonRead<unknown>
+): ChainDegradation | null {
+  if (read.status === "ok") {
     return null;
   }
+
+  if (read.status === "missing") {
+    return {
+      degraded: true,
+      reason_code: "published_meta_missing",
+      source_path: read.path,
+      detail: read.detail ?? "Published meta latest JSON is missing.",
+    };
+  }
+
+  if (read.status === "invalid_json") {
+    return {
+      degraded: true,
+      reason_code: "published_meta_invalid_json",
+      source_path: read.path,
+      detail: read.detail ?? "Published meta latest JSON could not be parsed.",
+    };
+  }
+
+  return {
+    degraded: true,
+    reason_code: "published_meta_invalid_shape",
+    source_path: read.path,
+    detail: read.detail ?? "Published meta latest JSON is not an object.",
+  };
 }
 
 function fmtDate(d?: string | null) {
@@ -322,10 +412,13 @@ async function buildStatusRows(): Promise<StatusRow[]> {
 
   return Promise.all(
     CHAIN_LIST.map(async (chain) => {
-      const [meta, hero] = await Promise.all([
-        readPublishedJson<MetaLatest>(`data/published/v1/meta/${chain.id}/latest.json`),
+      const metaPath = `data/published/v1/meta/${chain.id}/latest.json`;
+      const [metaRead, hero] = await Promise.all([
+        readPublishedJsonWithState<MetaLatest>(metaPath),
         readPublishedJson<LandingHero>(`data/published/v1/landing/${chain.id}/hero.json`),
       ]);
+      const meta = metaRead.value;
+      const degradation = chainDegradationFromMetaRead(metaRead);
       const displayAsOf = heroDisplayAsOf(hero);
       const asOf = displayAsOf ?? meta?.updated_through ?? meta?.regime?.asof_date ?? meta?.date ?? null;
       const lagDays = lagDaysFromIsoDay(asOf);
@@ -356,12 +449,17 @@ async function buildStatusRows(): Promise<StatusRow[]> {
         expected_delay_days: delay,
         source_freshness: sourceFreshness,
         freshness_explanation: freshnessExplanation,
+        degradation,
       };
     })
   );
 }
 
 function chainNarrative(row: StatusRow) {
+  if (row.degradation) {
+    return "Published meta artifact is degraded. The row remains visible for traceability, but regime, confidence, and freshness should be treated as degraded until the artifact is repaired.";
+  }
+
   const band = confidenceBand(row.confidence_score);
   if (row.status === "ok" && band === "Good") {
     return "Published data is on its expected schedule and the evidence quality behind the label is strong.";
@@ -388,6 +486,10 @@ function chainNarrative(row: StatusRow) {
     return "Published data is beyond the normal freshness boundary for this chain. Treat the latest row as delayed until the next expected publication arrives.";
   }
   return "Freshness cannot be classified from the latest available publication metadata.";
+}
+
+function degradationCopy(degradation: ChainDegradation): string {
+  return `${degradation.detail} Source path: ${degradation.source_path}.`;
 }
 
 function cadenceCopy(chain: ChainId) {
@@ -510,6 +612,7 @@ export default async function StatusPage() {
   const failCount = rows.filter((r) => r.status === "fail").length;
   const goodConfidence = rows.filter((r) => confidenceBand(r.confidence_score) === "Good").length;
   const degradedConfidence = rows.filter((r) => confidenceBand(r.confidence_score) === "Degraded").length;
+  const degradedArtifacts = rows.filter((r) => r.degradation !== null).length;
 
   return (
     <UrdPage className="bg-[#080F1A] text-[#E8E0D0]">
@@ -578,6 +681,10 @@ export default async function StatusPage() {
                 <div>
                   <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Degraded confidence</div>
                   <div className="mt-2 font-[var(--serif)] text-[34px] leading-none text-[#9E4040]">{degradedConfidence}</div>
+                </div>
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Degraded artifacts</div>
+                  <div className="mt-2 font-[var(--serif)] text-[34px] leading-none text-[#9E4040]">{degradedArtifacts}</div>
                 </div>
                 <div>
                   <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#C49230]">Methodology</div>
@@ -678,6 +785,11 @@ export default async function StatusPage() {
                           {row.freshness_explanation ? (
                             <div className="mt-2 text-[13px] leading-7 text-[#7A8A96]">
                               <span className="text-[#E8E0D0]">Freshness note:</span> {row.freshness_explanation}
+                            </div>
+                          ) : null}
+                          {row.degradation ? (
+                            <div className="mt-2 text-[13px] leading-7 text-[#C4843C]">
+                              <span className="text-[#E8E0D0]">Artifact note:</span> {degradationCopy(row.degradation)}
                             </div>
                           ) : null}
                       </div>
