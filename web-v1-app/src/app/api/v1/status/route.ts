@@ -77,11 +77,39 @@ function arrayBufferToUtf8(buffer: ArrayBuffer): string {
   return new TextDecoder("utf-8").decode(new Uint8Array(buffer));
 }
 
-async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
+type PublishedJsonReadStatus = "ok" | "missing" | "invalid_json" | "invalid_shape";
+
+type PublishedJsonRead<T> = {
+  path: string;
+  status: PublishedJsonReadStatus;
+  value: T | null;
+  detail: string | null;
+};
+
+type ChainDegradationReason =
+  | "published_meta_missing"
+  | "published_meta_invalid_json"
+  | "published_meta_invalid_shape";
+
+type ChainDegradation = {
+  degraded: true;
+  reason_code: ChainDegradationReason;
+  source_path: string;
+  detail: string;
+};
+
+async function readPublishedJsonWithState<T>(
+  storagePath: string
+): Promise<PublishedJsonRead<T>> {
   const result = await readStorageObject(storagePath);
 
   if (!result) {
-    return null;
+    return {
+      path: storagePath,
+      status: "missing",
+      value: null,
+      detail: "Published JSON object is missing.",
+    };
   }
 
   try {
@@ -89,13 +117,85 @@ async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
     const json = JSON.parse(raw);
 
     if (!json || typeof json !== "object") {
-      return null;
+      return {
+        path: storagePath,
+        status: "invalid_shape",
+        value: null,
+        detail: "Published JSON object is not an object.",
+      };
     }
 
-    return json as T;
+    return {
+      path: storagePath,
+      status: "ok",
+      value: json as T,
+      detail: null,
+    };
   } catch {
+    return {
+      path: storagePath,
+      status: "invalid_json",
+      value: null,
+      detail: "Published JSON object could not be parsed.",
+    };
+  }
+}
+
+async function readPublishedJson<T>(storagePath: string): Promise<T | null> {
+  const result = await readPublishedJsonWithState<T>(storagePath);
+  return result.value;
+}
+
+function chainDegradationFromMetaRead(
+  read: PublishedJsonRead<unknown>
+): ChainDegradation | null {
+  if (read.status === "ok") {
     return null;
   }
+
+  if (read.status === "missing") {
+    return {
+      degraded: true,
+      reason_code: "published_meta_missing",
+      source_path: read.path,
+      detail: read.detail ?? "Published meta latest JSON is missing.",
+    };
+  }
+
+  if (read.status === "invalid_json") {
+    return {
+      degraded: true,
+      reason_code: "published_meta_invalid_json",
+      source_path: read.path,
+      detail: read.detail ?? "Published meta latest JSON could not be parsed.",
+    };
+  }
+
+  return {
+    degraded: true,
+    reason_code: "published_meta_invalid_shape",
+    source_path: read.path,
+    detail: read.detail ?? "Published meta latest JSON is not an object.",
+  };
+}
+
+function summarizeChainDegradation(
+  rows: Array<{ degradation?: ChainDegradation | null }>
+) {
+  const degradedRows = rows.filter((row) => row.degradation);
+
+  return {
+    degraded_chain_count: degradedRows.length,
+    missing_meta_count: degradedRows.filter(
+      (row) => row.degradation?.reason_code === "published_meta_missing"
+    ).length,
+    invalid_meta_count: degradedRows.filter(
+      (row) => row.degradation?.reason_code === "published_meta_invalid_json"
+    ).length,
+    invalid_shape_count: degradedRows.filter(
+      (row) => row.degradation?.reason_code === "published_meta_invalid_shape"
+    ).length,
+  };
 }
 
 function parseIsoDayToUtcMs(date?: string): number | null {
@@ -207,11 +307,13 @@ export async function GET(request: Request) {
       const metaPath = `data/published/v1/meta/${chain.id}/latest.json`;
       const heroPath = `data/published/v1/landing/${chain.id}/hero.json`;
 
-      const [meta, hero] = await Promise.all([
-        readPublishedJson<MetaLatest>(metaPath),
+      const [metaRead, hero] = await Promise.all([
+        readPublishedJsonWithState<MetaLatest>(metaPath),
         readPublishedJson<LandingHero>(heroPath),
       ]);
 
+      const meta = metaRead.value;
+      const degradation = chainDegradationFromMetaRead(metaRead);
       const displayAsOf = heroDisplayAsOf(hero);
       const regimeAsOf = heroRegimeAsOf(hero) ?? meta?.regime?.asof_date ?? null;
       const asOf =
@@ -283,6 +385,7 @@ export async function GET(request: Request) {
             }
           : null,
         freshness_explanation: freshnessExplanation,
+        degradation,
         traceability: {
           source_path: metaPath,
           hero_path: heroPath,
@@ -292,8 +395,12 @@ export async function GET(request: Request) {
     })
   );
 
+  const degradationSummary = summarizeChainDegradation(chains);
+
   const payload = {
     ok: true,
+    degraded: degradationSummary.degraded_chain_count > 0,
+    degradation_summary: degradationSummary,
     data_source: currentDataSource(),
     generated_at_utc: new Date().toISOString(),
     dataset: dataset
