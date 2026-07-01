@@ -12,6 +12,7 @@ const REPORT_PATH = path.join(WEB_ROOT, ".audit", "pipeline-environment-parity",
 
 const REQUIRED_FILES = [
   "pipeline/tools/full_pipeline.ps1",
+  "pipeline/tools/full_pipeline.py",
   "pipeline/tools/sync_web_data.ps1",
   "pipeline/tools/sync_web_data.py",
 ];
@@ -124,12 +125,27 @@ function readPackageScriptNames() {
   return Object.keys(packageJson.scripts || {}).sort();
 }
 
+function runPython(args, label) {
+  const python = process.env.CSS_PYTHON || "python";
+  const result = spawnSync(python, args, {
+    cwd: WEB_ROOT,
+    encoding: "utf-8",
+    shell: process.platform === "win32",
+  });
+
+  assertCondition(
+    result.status === 0,
+    `${label} failed rc=${result.status}\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`,
+  );
+
+  return result;
+}
+
 function runWebSyncFixture() {
   const fixtureRoot = path.join(WEB_ROOT, ".audit", "pipeline-environment-parity", "fixture-web-sync-root");
   const publishedRoot = path.join(fixtureRoot, "data", "published", "v1");
   const targetRoot = path.join(fixtureRoot, "web-v1-app", ".private-data", "published", "v1");
   const syncScript = path.join(REPO_ROOT, "pipeline", "tools", "sync_web_data.py");
-  const python = process.env.CSS_PYTHON || "python";
 
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
 
@@ -138,16 +154,7 @@ function runWebSyncFixture() {
   writeFile(path.join(targetRoot, "dataset.json"), JSON.stringify({ fixture: true, revision: 1 }, null, 2));
   writeFile(path.join(targetRoot, "stale.json"), JSON.stringify({ stale: true }, null, 2));
 
-  const result = spawnSync(python, ["-u", syncScript, "--root", fixtureRoot], {
-    cwd: WEB_ROOT,
-    encoding: "utf-8",
-    shell: process.platform === "win32",
-  });
-
-  assertCondition(
-    result.status === 0,
-    `sync_web_data.py fixture failed rc=${result.status}\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`,
-  );
+  const result = runPython(["-u", syncScript, "--root", fixtureRoot], "sync_web_data.py fixture");
 
   assertCondition(fs.existsSync(path.join(targetRoot, "dataset.json")), "fixture dataset.json was not mirrored");
   assertCondition(
@@ -170,7 +177,33 @@ function runWebSyncFixture() {
   };
 }
 
-function writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFixture }) {
+function runNativePipelineContract() {
+  const nativeScript = path.join(REPO_ROOT, "pipeline", "tools", "full_pipeline.py");
+  const result = runPython(
+    ["-u", nativeScript, "--root", REPO_ROOT, "--mode", "incremental", "--skip-raw-download", "--dry-run", "--json"],
+    "full_pipeline.py dry-run contract",
+  );
+
+  const stdout = String(result.stdout || "");
+  assertCondition(
+    stdout.includes("PIPELINE NATIVE ENTRYPOINT CONTRACT OK"),
+    "full_pipeline.py did not emit the native entrypoint contract success marker",
+  );
+  assertCondition(stdout.includes("build_daily_features"), "full_pipeline.py contract did not include feature build stage");
+  assertCondition(stdout.includes("publish_artifacts"), "full_pipeline.py contract did not include publish stage");
+  assertCondition(stdout.includes("sync_web_data"), "full_pipeline.py contract did not include web sync stage");
+
+  return {
+    status: "PASS",
+    stdoutTail: stdout
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .slice(-12),
+  };
+}
+
+function writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFixture, nativePipelineContract }) {
   const lines = [
     "# Pipeline environment parity inventory",
     "",
@@ -178,7 +211,7 @@ function writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFix
     "",
     "Status: PASS",
     "",
-    "This is an inventory gate. It intentionally makes the remaining platform-coupling visible without claiming full Linux-native pipeline orchestration is complete.",
+    "This is an inventory gate. It intentionally makes the remaining platform-coupling visible without claiming full Linux-native pipeline execution is complete.",
     "",
     "## Required pipeline entrypoints",
     "",
@@ -205,6 +238,14 @@ function writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFix
   lines.push("");
   lines.push(`- status: ${webSyncFixture.status}`);
   for (const line of webSyncFixture.stdoutTail) {
+    lines.push(`- stdout: ${line}`);
+  }
+
+  lines.push("");
+  lines.push("## Native pipeline entrypoint contract");
+  lines.push("");
+  lines.push(`- status: ${nativePipelineContract.status}`);
+  for (const line of nativePipelineContract.stdoutTail) {
     lines.push(`- stdout: ${line}`);
   }
 
@@ -243,9 +284,9 @@ function writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFix
 
   lines.push("## Required next slices");
   lines.push("");
-  lines.push("- Add a Linux-native or Python pipeline entrypoint that can run the same orchestration contract as `pipeline/tools/full_pipeline.ps1`.");
+  lines.push("- Replace the native dry-run contract with actual Linux-native stage execution.");
   lines.push("- Add CI coverage for the native pipeline entrypoint before removing this inventory-only classification.");
-  lines.push("- Keep the PowerShell web-sync wrapper only as a compatibility layer while current local workflows still use PowerShell.");
+  lines.push("- Keep the PowerShell entrypoint as the local compatibility path until the native runner has execution parity.");
   lines.push("");
   lines.push("## Related package scripts");
   lines.push("");
@@ -272,9 +313,12 @@ for (const filePath of ps1Files) {
 const scripts = readPackageScriptNames();
 const syncWebPyPath = path.join(REPO_ROOT, "pipeline/tools/sync_web_data.py");
 const syncWebPs1Path = path.join(REPO_ROOT, "pipeline/tools/sync_web_data.ps1");
+const fullPipelinePyPath = path.join(REPO_ROOT, "pipeline/tools/full_pipeline.py");
 const syncWebPyContent = fs.readFileSync(syncWebPyPath, "utf-8");
 const syncWebPs1Content = fs.readFileSync(syncWebPs1Path, "utf-8");
+const fullPipelinePyContent = fs.readFileSync(fullPipelinePyPath, "utf-8");
 const webSyncFixture = runWebSyncFixture();
+const nativePipelineContract = runNativePipelineContract();
 
 assertCondition(ps1Files.length > 0, "Pipeline parity inventory must see at least one PowerShell pipeline file");
 assertCondition(
@@ -288,12 +332,15 @@ assertCondition(
   !hitsByFile.get(syncWebPs1Path)?.some((hit) => hit.id === "robocopy"),
   "robocopy must not be present in sync_web_data.ps1",
 );
+assertCondition(fullPipelinePyContent.includes("build_contract"), "full_pipeline.py must expose the native pipeline contract builder");
+assertCondition(fullPipelinePyContent.includes("dry-run contract"), "full_pipeline.py must remain explicitly dry-run-only in this slice");
 
-writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFixture });
+writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFixture, nativePipelineContract });
 
 console.log("Pipeline environment parity inventory gate passed.");
 console.log(`PowerShell pipeline files: ${ps1Files.length}`);
 console.log(`Native parity candidates: ${candidateFiles.length}`);
 console.log(`Cross-platform web sync fixture: ${webSyncFixture.status}`);
+console.log(`Native pipeline entrypoint contract: ${nativePipelineContract.status}`);
 console.log(`Report: ${path.relative(WEB_ROOT, REPORT_PATH)}`);
 /*END FILE*/
