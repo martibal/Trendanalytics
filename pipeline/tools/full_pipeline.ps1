@@ -218,7 +218,7 @@ try {
 
   $PUBLISHED_ROOT = Get-EnvOrDefault -Name 'CSS_PUBLISHED_ROOT' -DefaultValue (Join-Path $DATA_ROOT 'published\v1')
 
-  $SYNC_WEB = Join-Path $TOOLS_ROOT 'sync_web_data.ps1'
+  $SYNC_WEB = Join-Path $TOOLS_ROOT 'sync_web_data.py'
   $SYNC_WEB_ENABLED = Get-SyncWebEnabled
 
   $WORK_ROOT = Join-Path $PIPELINE_ROOT '_work'
@@ -475,13 +475,13 @@ try {
       Write-Log 'STEP 9: Sync published dataset -> web public'
 
       try {
-        & $SYNC_WEB -Root $MAIN_ROOT
+        & $PY -u $SYNC_WEB --root $MAIN_ROOT
         if ($LASTEXITCODE -ne 0) {
-          throw "sync_web_data.ps1 failed rc=$LASTEXITCODE"
+          throw "sync_web_data.py failed rc=$LASTEXITCODE"
         }
       }
       catch {
-        Write-Log "NOTE: sync_web_data.ps1 failed (non-fatal): $($_.Exception.Message)"
+        Write-Log "NOTE: sync_web_data.py failed (non-fatal): $($_.Exception.Message)"
       }
     }
     elseif (-not $SYNC_WEB_ENABLED) {
