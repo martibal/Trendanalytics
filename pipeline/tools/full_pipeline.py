@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Native pipeline entrypoint contract.
+# Native pipeline entrypoint scaffold.
 #
-# This is intentionally a dry-run contract first. It mirrors the orchestration
-# contract and path model of pipeline/tools/full_pipeline.ps1 without executing
-# the mutating pipeline stages yet. The next parity slice can replace the
-# dry-run-only guard with actual native stage execution.
+# This entrypoint now supports two things:
+#   1. dry-run contract validation for the full orchestration plan
+#   2. allowlisted native execution of non-mutating smoke stages
+#
+# Full mutating native orchestration is intentionally still disabled until the
+# remaining execution-parity slices are covered by CI and fixtures.
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -20,6 +23,8 @@ from pathlib import Path
 
 CHAINS = ["bitcoin", "ethereum", "arbitrum", "base"]
 WINDOWS = [7, 30, 90, 180, 365]
+GENRES = ["gold", "meta", "derived"]
+SAFE_EXECUTION_STAGES = {"validate_published_dataset"}
 
 
 @dataclass(frozen=True)
@@ -28,6 +33,7 @@ class Stage:
     description: str
     tool: Path | None
     mutates: bool
+    executable: bool = False
 
 
 def utc_ts() -> str:
@@ -51,11 +57,16 @@ def default_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def csv(values: list[str] | list[int]) -> str:
+    return ",".join(str(value) for value in values)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Native pipeline entrypoint contract. Use --dry-run to validate the "
-            "cross-platform orchestration contract without mutating data."
+            "Native pipeline entrypoint scaffold. Use --dry-run to validate the "
+            "cross-platform orchestration contract, or --execute-stage for an "
+            "allowlisted non-mutating smoke stage."
         )
     )
     parser.add_argument("--root", default="", help="Repository root. Defaults to two levels above this script.")
@@ -64,7 +75,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Required for this contract slice. Non-dry-run native orchestration is intentionally not enabled yet.",
+        help="Validate the orchestration contract without mutating data.",
+    )
+    parser.add_argument(
+        "--execute-stage",
+        action="append",
+        default=[],
+        choices=["validate_published_dataset"],
+        help="Execute an allowlisted native smoke stage. May be provided more than once.",
     )
     parser.add_argument(
         "--json",
@@ -115,17 +133,23 @@ def build_contract(root: Path, mode: str, skip_raw_download: bool) -> dict[str, 
     }
 
     stages = [
-        Stage("download_raw", "Download/sync RAW from source", tools["download_raw"], True),
-        Stage("probe_latest_raw", "Probe latest local raw and published days", None, False),
-        Stage("build_daily_features", "Build missing daily feature parquet", tools["feature_daily_agg"], True),
-        Stage("build_gold_timeseries", "Build GOLD timeseries parquet", tools["build_gold_timeseries"], True),
-        Stage("build_gold_weekly", "Build GOLD weekly aggregates", tools["build_gold_weekly"], True),
-        Stage("sync_gold_json_history", "Sync GOLD JSON history and windows", tools["sync_gold_json_history"], True),
-        Stage("export_derived_json_history", "Export DERIVED JSON history and windows", tools["export_derived_json_history"], True),
-        Stage("export_meta_json_history", "Export META JSON history and windows", tools["export_meta_json_history"], True),
-        Stage("publish_artifacts", "Publish canonical artifacts", tools["publish_artifacts"], True),
-        Stage("validate_published_dataset", "Validate published dataset contract", tools["validate_published_dataset"], False),
-        Stage("sync_web_data", "Mirror published dataset into web app private data", tools["sync_web_data"], True),
+        Stage("download_raw", "Download/sync RAW from source", tools["download_raw"], True, False),
+        Stage("probe_latest_raw", "Probe latest local raw and published days", None, False, False),
+        Stage("build_daily_features", "Build missing daily feature parquet", tools["feature_daily_agg"], True, False),
+        Stage("build_gold_timeseries", "Build GOLD timeseries parquet", tools["build_gold_timeseries"], True, False),
+        Stage("build_gold_weekly", "Build GOLD weekly aggregates", tools["build_gold_weekly"], True, False),
+        Stage("sync_gold_json_history", "Sync GOLD JSON history and windows", tools["sync_gold_json_history"], True, False),
+        Stage("export_derived_json_history", "Export DERIVED JSON history and windows", tools["export_derived_json_history"], True, False),
+        Stage("export_meta_json_history", "Export META JSON history and windows", tools["export_meta_json_history"], True, False),
+        Stage("publish_artifacts", "Publish canonical artifacts", tools["publish_artifacts"], True, False),
+        Stage(
+            "validate_published_dataset",
+            "Validate published dataset contract",
+            tools["validate_published_dataset"],
+            False,
+            True,
+        ),
+        Stage("sync_web_data", "Mirror published dataset into web app private data", tools["sync_web_data"], True, False),
     ]
 
     if skip_raw_download:
@@ -136,14 +160,16 @@ def build_contract(root: Path, mode: str, skip_raw_download: bool) -> dict[str, 
 
     return {
         "entrypoint": "pipeline/tools/full_pipeline.py",
-        "status": "dry_run_contract",
+        "status": "native_execution_scaffold",
         "mode": mode,
         "skip_raw_download": skip_raw_download,
         "python": env_or_default("CSS_PYTHON", sys.executable or "python"),
         "chains": CHAINS,
         "windows": WINDOWS,
+        "genres": GENRES,
         "sync_mode_gold": sync_mode_gold,
         "mode_inc_rebuild": mode_inc_rebuild,
+        "safe_execution_stages": sorted(SAFE_EXECUTION_STAGES),
         "paths": {
             "root": str(root),
             "pipeline_root": str(pipeline_root),
@@ -169,6 +195,7 @@ def build_contract(root: Path, mode: str, skip_raw_download: bool) -> dict[str, 
                 "description": stage.description,
                 "tool": str(stage.tool) if stage.tool else None,
                 "mutates": stage.mutates,
+                "executable": stage.executable,
             }
             for stage in stages
         ],
@@ -212,29 +239,119 @@ def validate_contract(contract: dict[str, object]) -> None:
         if stage_id not in stage_ids:
             raise ValueError(f"missing required native pipeline stage contract: {stage_id}")
 
+    executable_stage_ids = {str(stage["id"]) for stage in stages if stage.get("executable") is True}
+    if SAFE_EXECUTION_STAGES - executable_stage_ids:
+        missing = sorted(SAFE_EXECUTION_STAGES - executable_stage_ids)
+        raise ValueError(f"safe execution stages missing from contract: {missing}")
 
-def main() -> int:
-    args = parse_args()
-    root = Path(args.root).resolve() if args.root else default_root()
 
-    if not args.dry_run:
-        log("Native pipeline execution is not enabled in this slice.")
-        log("Run with --dry-run to validate the orchestration contract.")
-        return 2
+def find_stage(contract: dict[str, object], stage_id: str) -> dict[str, object]:
+    stages = contract["stages"]
+    if not isinstance(stages, list):
+        raise TypeError("contract stages must be a list")
 
-    contract = build_contract(root=root, mode=args.mode, skip_raw_download=bool(args.skip_raw_download))
-    validate_contract(contract)
+    for stage in stages:
+        if isinstance(stage, dict) and stage.get("id") == stage_id:
+            return stage
 
+    raise ValueError(f"stage is not present in this contract: {stage_id}")
+
+
+def command_for_stage(contract: dict[str, object], stage_id: str) -> list[str]:
+    paths = contract["paths"]
+    tools = contract["tools"]
+    python = str(contract["python"])
+
+    if not isinstance(paths, dict) or not isinstance(tools, dict):
+        raise TypeError("contract paths/tools must be dictionaries")
+
+    if stage_id == "validate_published_dataset":
+        return [
+            python,
+            "-u",
+            str(tools["validate_published_dataset"]),
+            "--published-root",
+            str(paths["published_root"]),
+            "--chains",
+            csv(CHAINS),
+            "--genres",
+            csv(GENRES),
+            "--windows",
+            csv(WINDOWS),
+        ]
+
+    raise ValueError(f"native execution is not implemented for stage: {stage_id}")
+
+
+def run_command(command: list[str], cwd: Path, label: str) -> int:
+    log(f"RUN {label}: {' '.join(command)}")
+    completed = subprocess.run(command, cwd=str(cwd), check=False)
+    log(f"DONE {label}: rc={completed.returncode}")
+    return int(completed.returncode)
+
+
+def run_stage(contract: dict[str, object], stage_id: str) -> int:
+    if stage_id not in SAFE_EXECUTION_STAGES:
+        raise ValueError(f"stage is not allowlisted for native execution scaffold: {stage_id}")
+
+    stage = find_stage(contract, stage_id)
+    if stage.get("mutates") is True:
+        raise ValueError(f"refusing to execute mutating stage in scaffold: {stage_id}")
+    if stage.get("executable") is not True:
+        raise ValueError(f"stage is not marked executable in scaffold contract: {stage_id}")
+
+    paths = contract["paths"]
+    if not isinstance(paths, dict):
+        raise TypeError("contract paths must be a dictionary")
+
+    command = command_for_stage(contract, stage_id)
+    root = Path(str(paths["root"]))
+    return run_command(command, cwd=root, label=stage_id)
+
+
+def print_contract_summary(contract: dict[str, object]) -> None:
     log("=== PIPELINE NATIVE ENTRYPOINT CONTRACT OK ===")
     log(f"mode={contract['mode']} skip_raw_download={contract['skip_raw_download']}")
     log(f"chains={','.join(CHAINS)} windows={','.join(str(window) for window in WINDOWS)}")
     log(f"stages={len(contract['stages'])}")
     for stage in contract["stages"]:
-        log(f"stage={stage['id']} mutates={stage['mutates']}")
+        log(f"stage={stage['id']} mutates={stage['mutates']} executable={stage['executable']}")
 
+
+def main() -> int:
+    args = parse_args()
+    root = Path(args.root).resolve() if args.root else default_root()
+
+    contract = build_contract(root=root, mode=args.mode, skip_raw_download=bool(args.skip_raw_download))
+    validate_contract(contract)
+
+    if args.dry_run:
+        print_contract_summary(contract)
+        if args.json:
+            print(json.dumps(contract, indent=2, sort_keys=True))
+        return 0
+
+    execute_stages = list(dict.fromkeys(args.execute_stage or []))
+    if not execute_stages:
+        log("Full native pipeline execution is not enabled in this slice.")
+        log("Use --dry-run for contract validation or --execute-stage validate_published_dataset for the scaffold smoke.")
+        return 2
+
+    log("=== PIPELINE NATIVE EXECUTION SCAFFOLD START ===")
+    results: list[dict[str, object]] = []
+    for stage_id in execute_stages:
+        rc = run_stage(contract, stage_id)
+        results.append({"stage": stage_id, "returncode": rc})
+        log(f"stage={stage_id} rc={rc}")
+        if rc != 0:
+            log("=== PIPELINE NATIVE EXECUTION SCAFFOLD FAILED ===")
+            if args.json:
+                print(json.dumps({"contract": contract, "results": results}, indent=2, sort_keys=True))
+            return rc
+
+    log("=== PIPELINE NATIVE EXECUTION SCAFFOLD OK ===")
     if args.json:
-        print(json.dumps(contract, indent=2, sort_keys=True))
-
+        print(json.dumps({"contract": contract, "results": results}, indent=2, sort_keys=True))
     return 0
 
 

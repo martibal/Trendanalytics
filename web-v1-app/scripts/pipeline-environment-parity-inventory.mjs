@@ -203,7 +203,33 @@ function runNativePipelineContract() {
   };
 }
 
-function writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFixture, nativePipelineContract }) {
+
+function runNativePipelineExecutionScaffold() {
+  const nativeScript = path.join(REPO_ROOT, "pipeline", "tools", "full_pipeline.py");
+  const result = runPython(
+    ["-u", nativeScript, "--root", REPO_ROOT, "--mode", "incremental", "--skip-raw-download", "--execute-stage", "validate_published_dataset", "--json"],
+    "full_pipeline.py native execution scaffold",
+  );
+
+  const stdout = String(result.stdout || "");
+  assertCondition(
+    stdout.includes("PIPELINE NATIVE EXECUTION SCAFFOLD OK"),
+    "full_pipeline.py did not emit the native execution scaffold success marker",
+  );
+  assertCondition(stdout.includes("stage=validate_published_dataset rc=0"), "native execution scaffold did not complete validate_published_dataset");
+  assertCondition(stdout.includes("RUN validate_published_dataset"), "native execution scaffold did not invoke the stage runner");
+
+  return {
+    status: "PASS",
+    stdoutTail: stdout
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .slice(-12),
+  };
+}
+
+function writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFixture, nativePipelineContract, nativeExecutionScaffold }) {
   const lines = [
     "# Pipeline environment parity inventory",
     "",
@@ -246,6 +272,14 @@ function writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFix
   lines.push("");
   lines.push(`- status: ${nativePipelineContract.status}`);
   for (const line of nativePipelineContract.stdoutTail) {
+    lines.push(`- stdout: ${line}`);
+  }
+
+  lines.push("");
+  lines.push("## Native pipeline execution scaffold");
+  lines.push("");
+  lines.push(`- status: ${nativeExecutionScaffold.status}`);
+  for (const line of nativeExecutionScaffold.stdoutTail) {
     lines.push(`- stdout: ${line}`);
   }
 
@@ -319,6 +353,7 @@ const syncWebPs1Content = fs.readFileSync(syncWebPs1Path, "utf-8");
 const fullPipelinePyContent = fs.readFileSync(fullPipelinePyPath, "utf-8");
 const webSyncFixture = runWebSyncFixture();
 const nativePipelineContract = runNativePipelineContract();
+const nativeExecutionScaffold = runNativePipelineExecutionScaffold();
 
 assertCondition(ps1Files.length > 0, "Pipeline parity inventory must see at least one PowerShell pipeline file");
 assertCondition(
@@ -333,14 +368,17 @@ assertCondition(
   "robocopy must not be present in sync_web_data.ps1",
 );
 assertCondition(fullPipelinePyContent.includes("build_contract"), "full_pipeline.py must expose the native pipeline contract builder");
-assertCondition(fullPipelinePyContent.includes("dry-run contract"), "full_pipeline.py must remain explicitly dry-run-only in this slice");
+assertCondition(fullPipelinePyContent.includes("run_stage"), "full_pipeline.py must expose the native stage runner");
+assertCondition(fullPipelinePyContent.includes("SAFE_EXECUTION_STAGES"), "full_pipeline.py must define explicit safe execution stages");
+assertCondition(fullPipelinePyContent.includes("validate_published_dataset"), "full_pipeline.py must include the validation smoke stage");
 
-writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFixture, nativePipelineContract });
+writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFixture, nativePipelineContract, nativeExecutionScaffold });
 
 console.log("Pipeline environment parity inventory gate passed.");
 console.log(`PowerShell pipeline files: ${ps1Files.length}`);
 console.log(`Native parity candidates: ${candidateFiles.length}`);
 console.log(`Cross-platform web sync fixture: ${webSyncFixture.status}`);
 console.log(`Native pipeline entrypoint contract: ${nativePipelineContract.status}`);
+console.log(`Native pipeline execution scaffold: ${nativeExecutionScaffold.status}`);
 console.log(`Report: ${path.relative(WEB_ROOT, REPORT_PATH)}`);
 /*END FILE*/
