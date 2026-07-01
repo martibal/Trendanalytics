@@ -325,6 +325,7 @@ function writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFix
   lines.push("## Related package scripts");
   lines.push("");
   lines.push(`- check:pipeline-environment-parity: ${scripts.includes("check:pipeline-environment-parity") ? "present" : "missing"}`);
+  lines.push(`- check:native-pipeline: ${scripts.includes("check:native-pipeline") ? "present" : "missing"}`);
   lines.push("");
 
   writeFile(REPORT_PATH, `${lines.join("\n")}\n`);
@@ -371,6 +372,7 @@ assertCondition(fullPipelinePyContent.includes("build_contract"), "full_pipeline
 assertCondition(fullPipelinePyContent.includes("run_stage"), "full_pipeline.py must expose the native stage runner");
 assertCondition(fullPipelinePyContent.includes("SAFE_EXECUTION_STAGES"), "full_pipeline.py must define explicit safe execution stages");
 assertCondition(fullPipelinePyContent.includes("validate_published_dataset"), "full_pipeline.py must include the validation smoke stage");
+assertCondition(scripts.includes("check:native-pipeline"), "package.json must expose check:native-pipeline");
 
 writeReport({ ps1Files, candidateFiles, hitsByFile, scripts, webSyncFixture, nativePipelineContract, nativeExecutionScaffold });
 
