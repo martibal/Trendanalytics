@@ -9,66 +9,34 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Log([string]$msg) {
-  $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-  Write-Host "[$ts] $msg"
-}
-
-function Ensure-Dir([string]$p) {
-  if (-not (Test-Path $p)) { New-Item -ItemType Directory -Force -Path $p | Out-Null }
-}
-
-function Copy-Tree([string]$src, [string]$dst) {
-  if (-not (Test-Path $src)) { throw "Source missing: $src" }
-  Ensure-Dir $dst
-
-  Write-Log "Mirror copy to private data folder: $src -> $dst"
-  if ($DryRun) { return }
-
-  robocopy $src $dst /MIR /NFL /NDL /NJH /NJS /NP /R:2 /W:1 | Out-Null
-  $rc = $LASTEXITCODE
-  if ($rc -ge 8) { throw "Robocopy failed (exit code $rc) copying $src -> $dst" }
-}
-
 try {
   $thisScript = $MyInvocation.MyCommand.Path
   $toolsDir = Split-Path -Parent $thisScript
+  $pythonScript = Join-Path $toolsDir 'sync_web_data.py'
 
-  if ([string]::IsNullOrWhiteSpace($Root)) {
-    $Root = Resolve-Path (Join-Path $toolsDir '..\..') | Select-Object -ExpandProperty Path
-  } else {
-    $Root = Resolve-Path $Root | Select-Object -ExpandProperty Path
+  if (-not (Test-Path $pythonScript)) {
+    throw "Missing Python sync script: $pythonScript"
   }
 
-  $published = Join-Path $Root 'data\published\v1'
-
-  # Current app is web-v1-app.
-  $webV1App = Join-Path $Root 'web-v1-app'
-
-  if (-not (Test-Path $webV1App)) {
-    throw "No web app folder found under root. Expected: $webV1App"
+  $python = [Environment]::GetEnvironmentVariable('CSS_PYTHON')
+  if ([string]::IsNullOrWhiteSpace($python)) {
+    $python = 'python'
   }
 
-  $targetWeb = $webV1App
+  $pythonArgs = @('-u', $pythonScript)
 
-  $dst = Join-Path $targetWeb '.private-data\published\v1'
+  if (-not [string]::IsNullOrWhiteSpace($Root)) {
+    $pythonArgs += @('--root', $Root)
+  }
 
-  Write-Log "=== SYNC WEB DATA START ==="
-  Write-Log "root        = $Root"
-  Write-Log "published   = $published"
-  Write-Log "targetWeb   = $targetWeb"
-  Write-Log "dst         = $dst"
-  Write-Log "dryRun      = $($DryRun.IsPresent)"
+  if ($DryRun) {
+    $pythonArgs += '--dry-run'
+  }
 
-  if (-not (Test-Path $published)) { throw "Missing published dataset folder: $published" }
-
-  Copy-Tree $published $dst
-
-  Write-Log "=== SYNC WEB DATA OK ==="
-  exit 0
+  & $python @pythonArgs
+  exit $LASTEXITCODE
 }
 catch {
-  Write-Log ("=== SYNC WEB DATA FAILED === " + $_.Exception.Message)
   Write-Error $_
   exit 1
 }
