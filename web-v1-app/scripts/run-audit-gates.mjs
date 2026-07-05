@@ -23,6 +23,11 @@ const steps = [
     args: ["run", "check:calculation-correctness"],
   },
   {
+    name: "Field Dictionary sync",
+    command: "npm",
+    args: ["run", "check:field-dictionary-sync"],
+  },
+  {
     name: "Published JSON schema contract",
     command: "npm",
     args: ["run", "check:published-json-schemas"],
