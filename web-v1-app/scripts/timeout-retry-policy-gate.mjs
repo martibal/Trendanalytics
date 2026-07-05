@@ -10,7 +10,9 @@ const WEB_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(WEB_ROOT, "..");
 const DOWNLOADER = path.join(REPO_ROOT, "pipeline", "tools", "download_up_to_date_minimal.py");
 const REPORT_PATH = path.join(WEB_ROOT, ".audit", "timeout-retry-policy", "timeout-retry-policy-gate.md");
-const PYTHON = process.env.CSS_PYTHON || process.env.PYTHON || "python";
+const EXPLICIT_PYTHON = process.env.CSS_PYTHON || process.env.PYTHON || "";
+const PYTHON_CMD = EXPLICIT_PYTHON || (process.platform === "win32" ? "py" : "python");
+const PYTHON_ARGS_PREFIX = EXPLICIT_PYTHON ? [] : process.platform === "win32" ? ["-3"] : [];
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -121,8 +123,9 @@ function runDownloader({ name, mode, withPublishedDay = false }) {
   };
 
   const result = spawnSync(
-    PYTHON,
+    PYTHON_CMD,
     [
+      ...PYTHON_ARGS_PREFIX,
       DOWNLOADER,
       "--root",
       scenarioRoot,
@@ -152,6 +155,25 @@ function runDownloader({ name, mode, withPublishedDay = false }) {
   const report = fs.existsSync(reportFile) ? readJson(reportFile) : null;
   const state = fs.existsSync(stateFile) ? readJson(stateFile) : null;
 
+  if (result.error) {
+    return {
+      name,
+      mode,
+      exitCode: null,
+      stdout: result.stdout || "",
+      stderr: [
+        result.stderr || "",
+        `Failed to execute Python command: ${PYTHON_CMD} ${PYTHON_ARGS_PREFIX.join(" ")}`.trim(),
+        result.error.message,
+        "Set CSS_PYTHON to an explicit Python executable if the launcher is unavailable.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      report,
+      state,
+    };
+  }
+
   return {
     name,
     mode,
@@ -163,8 +185,22 @@ function runDownloader({ name, mode, withPublishedDay = false }) {
   };
 }
 
+function logDiagnostics(result) {
+  console.error("");
+  console.error(`[diagnostic] ${result.name}`);
+  console.error(`[diagnostic] exitCode=${result.exitCode}`);
+  console.error(`[diagnostic] state=${JSON.stringify(result.state)}`);
+  console.error("[diagnostic] stdout:");
+  console.error(result.stdout || "<empty>");
+  console.error("[diagnostic] stderr:");
+  console.error(result.stderr || "<empty>");
+}
+
 function assertPolicyShape(result) {
   const policy = result.report?.aws_policy;
+  if (!(policy && typeof policy === "object")) {
+    logDiagnostics(result);
+  }
   assertCondition(policy && typeof policy === "object", `${result.name} report must include aws_policy`);
   assertCondition(policy.timeout_seconds === 5, `${result.name} must apply fixture timeout policy`);
   assertCondition(policy.max_attempts === 2, `${result.name} must apply fixture max-attempt policy`);
@@ -172,6 +208,9 @@ function assertPolicyShape(result) {
 }
 
 function assertSuccessfulRetryScenario(result, expectedCounter) {
+  if (result.exitCode !== 0) {
+    logDiagnostics(result);
+  }
   assertCondition(result.exitCode === 0, `${result.name} must exit zero after transient AWS failures`);
   assertCondition(result.report && typeof result.report === "object", `${result.name} must write report`);
   assertCondition(Array.isArray(result.report.failures) && result.report.failures.length === 0, `${result.name} must not report failures`);
