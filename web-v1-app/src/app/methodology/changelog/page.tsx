@@ -69,6 +69,23 @@ export default async function MethodologyChangelogPage() {
                   ]}
                   rows={[
                     [
+                      "2026-07-05",
+                      "docs-only contract coverage fix",
+                      "methodology/fields · methodology/changelog · audit gates",
+                      "No",
+                      "No",
+                      "No",
+                      <>
+                        Field Dictionary now documents all nine active Gold metric fields, including{" "}
+                        <InlineCode>block_count_daily</InlineCode>, <InlineCode>value_transferred_native</InlineCode>,{" "}
+                        <InlineCode>failed_tx_rate</InlineCode>, <InlineCode>gas_utilization_pct</InlineCode>, and{" "}
+                        <InlineCode>unique_active_addresses</InlineCode>. Added the per-chain axis mapping table and
+                        a CI sync gate so documentation cannot silently drift from{" "}
+                        <InlineCode>CANON_COLS</InlineCode>, <InlineCode>PROFILE_COMPONENTS</InlineCode>, or{" "}
+                        <InlineCode>CHAIN_SIGNAL_PROFILES</InlineCode>. No calculation logic changed.
+                      </>,
+                    ],
+                    [
                       "2026-05-18",
                       "methodology update + historical republish",
                       "meta/<chain>/<date>.json · meta/<chain>/latest.json · briefs/*",
