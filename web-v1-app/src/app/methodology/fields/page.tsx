@@ -22,22 +22,76 @@ const GOLD_FIELDS: FieldEntry[] = [
   {
     field: "tx_count_daily",
     meaning: "Confirmed daily transaction count.",
-    notes: "Direct daily chain activity count.",
+    notes: "Direct daily chain activity count. Used as the primary activity signal across every chain profile.",
   },
   {
-    field: "median_tx_fee_native",
-    meaning: "Typical same-day transaction fee in native denomination.",
-    notes: "Published as a median, not an arithmetic average.",
+    field: "block_count_daily",
+    meaning: "Number of blocks produced that day.",
+    notes:
+      "Used as a required data-quality input for every chain profile. Not a direct Demand/Friction/Capacity driver on its own — it confirms the day's block coverage before other block-derived fields (avg_block_time_sec, gas_utilization_pct) are trusted.",
+  },
+  {
+    field: "value_transferred_native",
+    meaning: "Sum of transaction value moved that day, in the chain's native denomination.",
+    notes:
+      "Optional across all chain profiles: visible when available, never a confidence penalty when absent, and not currently used in the public Demand/Friction/Capacity scorecard.",
   },
   {
     field: "median_tx_value_native",
     meaning: "Typical same-day transaction value in native denomination.",
-    notes: "Optional for some chain profiles in Confidence v2; visible when available, but not always a confidence penalty when absent.",
+    notes: "Optional for all current chain profiles; visible when available, but not a confidence penalty when absent. Used only where value-normalized fee burden is methodologically valid.",
+  },
+  {
+    field: "median_tx_fee_native",
+    meaning: "Typical same-day transaction fee in native denomination.",
+    notes: "Published as a median, not an arithmetic average. Drives the Friction axis for every current chain profile.",
+  },
+  {
+    field: "failed_tx_rate",
+    meaning: "Share of transactions that did not succeed.",
+    notes: (
+      <>
+        Drives the Friction axis for Ethereum L1 only (weight 0.7, alongside{" "}
+        <FieldCode>median_tx_fee_native</FieldCode>). Structurally not applicable for Bitcoin
+        (no execution failures in the UTXO model) and currently presentation-hidden for
+        Arbitrum and Base while L2 failure semantics are still being validated.
+      </>
+    ),
+  },
+  {
+    field: "gas_utilization_pct",
+    meaning: "Share of a block's gas capacity actually used.",
+    notes: (
+      <>
+        Drives the Capacity axis for Ethereum L1 (weight 1.0). Always null for Bitcoin (no gas
+        mechanism). For Arbitrum and Base this is computed when source fields are available but
+        currently presentation-hidden; the public L2 Capacity axis instead uses{" "}
+        <FieldCode>capacity_util_pct</FieldCode>.
+      </>
+    ),
+  },
+  {
+    field: "unique_active_addresses",
+    meaning: "Count of distinct addresses that sent or received a transaction that day.",
+    notes: (
+      <>
+        Drives the Demand axis for Ethereum L1 and both L2 chains, both directly (weight 1.0)
+        and via the derived <FieldCode>tx_per_user</FieldCode> ratio (weight 0.6). Not used for
+        Bitcoin&apos;s Demand axis, where <FieldCode>tx_count_daily</FieldCode> alone is the
+        methodology&apos;s chosen activity signal.
+      </>
+    ),
   },
   {
     field: "avg_block_time_sec",
     meaning: "Typical daily inter-block interval behaviour.",
-    notes: "Interpret as a robust typical block interval field, not as a strict arithmetic mean claim.",
+    notes: (
+      <>
+        Inter-block cadence field. It is not read as a raw directional congestion metric; it feeds
+        the derived <FieldCode>blocktime_instability</FieldCode> component where that component is
+        used by the chain profile.
+      </>
+    ),
   },
 ];
 
@@ -230,6 +284,116 @@ function NotePanel({ title, children }: { title: string; children: ReactNode }) 
   );
 }
 
+function AxisComponent({ field, weight, transform }: { field: string; weight: string; transform: string }) {
+  return (
+    <li>
+      <FieldCode>{field}</FieldCode>{" "}
+      <span className="text-[var(--ink2)]">weight {weight}; transform {transform}</span>
+    </li>
+  );
+}
+
+function AxisMappingTable() {
+  return (
+    <div className="mt-4 overflow-x-auto rounded-xl border border-[var(--line)]">
+      {/* field-dictionary-axis-map:start */}
+      <table className="w-full min-w-[880px] border-collapse text-left text-sm">
+        <thead className="border-b border-[var(--line)] bg-[rgba(8,15,26,.34)] text-[var(--ink)]">
+          <tr>
+            <th className="px-4 py-3">Chain profile</th>
+            <th className="px-4 py-3">Demand</th>
+            <th className="px-4 py-3">Friction</th>
+            <th className="px-4 py-3">Capacity</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--line)] text-[var(--ink2)]">
+          <tr className="align-top">
+            <td className="px-4 py-4 text-[var(--ink)]">Bitcoin / BTC</td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="tx_count_daily" weight="1.0" transform="log1p" />
+              </ul>
+            </td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="median_tx_fee_native" weight="1.0" transform="log1p" />
+              </ul>
+            </td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="blocktime_instability" weight="0.7" transform="instability" />
+              </ul>
+            </td>
+          </tr>
+          <tr className="align-top">
+            <td className="px-4 py-4 text-[var(--ink)]">Ethereum L1</td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="tx_count_daily" weight="1.0" transform="log1p" />
+                <AxisComponent field="unique_active_addresses" weight="1.0" transform="log1p" />
+                <AxisComponent field="tx_per_user" weight="0.6" transform="log1p" />
+              </ul>
+            </td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="median_tx_fee_native" weight="1.0" transform="log1p" />
+                <AxisComponent field="failed_tx_rate" weight="0.7" transform="none" />
+              </ul>
+            </td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="gas_utilization_pct" weight="1.0" transform="none" />
+                <AxisComponent field="blocktime_instability" weight="0.3" transform="instability" />
+              </ul>
+            </td>
+          </tr>
+          <tr className="align-top">
+            <td className="px-4 py-4 text-[var(--ink)]">Arbitrum / L2</td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="tx_count_daily" weight="1.0" transform="log1p" />
+                <AxisComponent field="unique_active_addresses" weight="1.0" transform="log1p" />
+                <AxisComponent field="tx_per_user" weight="0.6" transform="log1p" />
+              </ul>
+            </td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="median_tx_fee_native" weight="1.0" transform="log1p" />
+              </ul>
+            </td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="capacity_util_pct" weight="1.0" transform="none" />
+              </ul>
+            </td>
+          </tr>
+          <tr className="align-top">
+            <td className="px-4 py-4 text-[var(--ink)]">Base / L2</td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="tx_count_daily" weight="1.0" transform="log1p" />
+                <AxisComponent field="unique_active_addresses" weight="1.0" transform="log1p" />
+                <AxisComponent field="tx_per_user" weight="0.6" transform="log1p" />
+              </ul>
+            </td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="median_tx_fee_native" weight="1.0" transform="log1p" />
+              </ul>
+            </td>
+            <td className="px-4 py-4">
+              <ul className="grid gap-2">
+                <AxisComponent field="capacity_util_pct" weight="1.0" transform="none" />
+              </ul>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      {/* field-dictionary-axis-map:end */}
+    </div>
+  );
+}
+
 export default function MethodologyFieldsPage() {
   return (
     <MethodologyPageShell>
@@ -285,8 +449,28 @@ export default function MethodologyFieldsPage() {
                 </div>
               </Section>
 
+              <NotePanel title="Where Gold fields come from">
+                <p>
+                  Every Gold field is derived from two raw tables per chain — <FieldCode>blocks</FieldCode>{" "}
+                  and <FieldCode>transactions</FieldCode> — sourced from the AWS Public Blockchain Dataset.
+                  Column names vary slightly across chains and over time; the pipeline resolves a
+                  prioritized list of known candidate names per concept (case-insensitive) before falling
+                  back to null rather than guessing.
+                </p>
+              </NotePanel>
+
               <Section title="Key Gold fields">
                 <FieldGrid entries={GOLD_FIELDS} />
+              </Section>
+
+              <Section title="Which field drives which axis, per chain">
+                <p>
+                  The same nine Gold metric fields are not used identically across chains. Each chain profile
+                  (BTC, ETH L1, L2) has its own Demand / Friction / Capacity component list, weights, and
+                  transform. This table mirrors <FieldCode>PROFILE_COMPONENTS</FieldCode> in the scoring
+                  engine directly, so documentation drift is caught by the field-dictionary sync gate.
+                </p>
+                <AxisMappingTable />
               </Section>
 
               <Section title="Key Meta fields">
