@@ -45,13 +45,36 @@ function extractPythonListStrings(source, name, filePath) {
   return [...match[1].matchAll(/["']([^"']+)["']/g)].map((m) => m[1]);
 }
 
+function extractBetweenMarkers(source, startMarker, endMarker, filePath) {
+  const start = source.indexOf(startMarker);
+  if (start < 0) {
+    failures.push(`${rel(filePath)}: could not find ${startMarker}`);
+    return "";
+  }
+
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  if (end < 0) {
+    failures.push(`${rel(filePath)}: could not find marker after ${startMarker}: ${endMarker}`);
+    return "";
+  }
+
+  return source.slice(start, end);
+}
+
 function extractGoldFieldDictionaryFields(source) {
-  const match = source.match(/const GOLD_FIELDS[\s\S]*?=\s*\[([\s\S]*?)\n\];/m);
-  if (!match) {
+  const start = source.indexOf("const GOLD_FIELDS");
+  if (start < 0) {
     failures.push(`${rel(FIELD_DICTIONARY_PATH)}: could not find GOLD_FIELDS array`);
     return [];
   }
-  return [...match[1].matchAll(/field:\s*["']([^"']+)["']/g)].map((m) => m[1]);
+
+  const end = source.indexOf("const META_FIELDS", start);
+  if (end < 0) {
+    failures.push(`${rel(FIELD_DICTIONARY_PATH)}: could not find META_FIELDS marker after GOLD_FIELDS`);
+    return [];
+  }
+
+  return [...source.slice(start, end).matchAll(/field:\s*["']([^"']+)["']/g)].map((m) => m[1]);
 }
 
 function extractAxisMapText(source) {
@@ -64,22 +87,15 @@ function extractAxisMapText(source) {
 }
 
 function extractProfileComponentFields(source) {
-  const match = source.match(/PROFILE_COMPONENTS[\s\S]*?=\s*\{([\s\S]*?)\n\}\n\n\ndef _profile_for_chain/m);
-  if (!match) {
-    failures.push(`${rel(MARKET_SCORECARD_PATH)}: could not find PROFILE_COMPONENTS block`);
-    return [];
-  }
-  return [...match[1].matchAll(/\(\s*["']([^"']+)["']\s*,\s*[0-9.]+\s*,\s*["'][^"']+["']\s*\)/g)]
-    .map((m) => m[1]);
+  const block = extractBetweenMarkers(source, "PROFILE_COMPONENTS", "def _profile_for_chain", MARKET_SCORECARD_PATH);
+  return [...block.matchAll(/\(\s*["']([^"']+)["']\s*,\s*[0-9.]+\s*,\s*["'][^"']+["']\s*\)/g)].map(
+    (m) => m[1],
+  );
 }
 
 function extractConfidenceProfileFields(source) {
-  const match = source.match(/CHAIN_SIGNAL_PROFILES[\s\S]*?=\s*\{([\s\S]*?)\n\}\n\n\nLOGICAL_METRIC_ALIASES/m);
-  if (!match) {
-    failures.push(`${rel(CONFIDENCE_ENGINE_PATH)}: could not find CHAIN_SIGNAL_PROFILES block`);
-    return [];
-  }
-  return [...match[1].matchAll(/["']([a-z][a-z0-9_]*_[a-z0-9_]+)["']/g)]
+  const block = extractBetweenMarkers(source, "CHAIN_SIGNAL_PROFILES", "LOGICAL_METRIC_ALIASES", CONFIDENCE_ENGINE_PATH);
+  return [...block.matchAll(/["']([a-z][a-z0-9_]*_[a-z0-9_]+)["']/g)]
     .map((m) => m[1])
     .filter((name) => !["not_applicable", "not_penalized"].includes(name));
 }
@@ -143,6 +159,14 @@ if (missingDocumentedConfidenceGold.length > 0) {
   failures.push(
     `${rel(FIELD_DICTIONARY_PATH)}: GOLD_FIELDS is missing Gold metrics referenced by CHAIN_SIGNAL_PROFILES: ${unique(missingDocumentedConfidenceGold).join(", ")}`,
   );
+}
+
+if (profileComponentFields.length === 0) {
+  failures.push(`${rel(MARKET_SCORECARD_PATH)}: PROFILE_COMPONENTS parsed to zero scorecard signals`);
+}
+
+if (confidenceProfileFields.length === 0) {
+  failures.push(`${rel(CONFIDENCE_ENGINE_PATH)}: CHAIN_SIGNAL_PROFILES parsed to zero confidence fields`);
 }
 
 if (failures.length > 0) {
