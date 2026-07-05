@@ -13,7 +13,9 @@ const PUBLISHED_SOURCE_ROOT = path.join(REPO_ROOT, "data", "published", "v1");
 const PUBLISH_SCRIPT = path.join(REPO_ROOT, "pipeline", "tools", "publish_artifacts.py");
 const REPORT_PATH = path.join(WEB_ROOT, ".audit", "published-atomicity", "published-atomicity-gate.md");
 
-const PYTHON = process.env.CSS_PYTHON || process.env.PYTHON || "python";
+const EXPLICIT_PYTHON = process.env.CSS_PYTHON || process.env.PYTHON || "";
+const PYTHON_CMD = EXPLICIT_PYTHON || (process.platform === "win32" ? "py" : "python");
+const PYTHON_ARGS_PREFIX = EXPLICIT_PYTHON ? [] : process.platform === "win32" ? ["-3"] : [];
 const CHAINS = ["bitcoin", "ethereum", "arbitrum", "base"];
 const GENRES = ["gold", "meta", "derived"];
 const WINDOWS = ["7", "30", "90", "180", "365"];
@@ -185,39 +187,45 @@ function runPublish(calculatedRoot, publishedRoot, label) {
   ensureDir(publishedRoot);
   log(`${label}: running publish_artifacts.py`);
 
-  const result = spawnSync(
-    PYTHON,
-    [
-      PUBLISH_SCRIPT,
-      "--root",
-      REPO_ROOT,
-      "--calculated-root",
-      calculatedRoot,
-      "--published-root",
-      publishedRoot,
-      "--chains",
-      CHAINS.join(","),
-      "--genres",
-      GENRES.join(","),
-      "--windows",
-      WINDOWS.join(","),
-    ],
-    {
-      cwd: REPO_ROOT,
-      encoding: "utf-8",
-      stdio: "pipe",
-      timeout: 120000,
-    },
-  );
+  const publishArgs = [
+    ...PYTHON_ARGS_PREFIX,
+    PUBLISH_SCRIPT,
+    "--root",
+    REPO_ROOT,
+    "--calculated-root",
+    calculatedRoot,
+    "--published-root",
+    publishedRoot,
+    "--chains",
+    CHAINS.join(","),
+    "--genres",
+    GENRES.join(","),
+    "--windows",
+    WINDOWS.join(","),
+  ];
+
+  const result = spawnSync(PYTHON_CMD, publishArgs, {
+    cwd: REPO_ROOT,
+    encoding: "utf-8",
+    stdio: "pipe",
+    timeout: 120000,
+  });
 
   if (result.error) {
-    throw result.error;
+    throw new Error(
+      [
+        `Failed to execute Python command: ${PYTHON_CMD} ${PYTHON_ARGS_PREFIX.join(" ")}`.trim(),
+        result.error.message,
+        "Set CSS_PYTHON to an explicit Python executable if the launcher is unavailable.",
+      ].join("\n"),
+    );
   }
 
   if (result.status !== 0) {
     throw new Error(
       [
         `publish_artifacts.py failed with exit code ${result.status}`,
+        `Python command: ${PYTHON_CMD} ${PYTHON_ARGS_PREFIX.join(" ")}`.trim(),
         "--- stdout ---",
         result.stdout || "",
         "--- stderr ---",
@@ -392,4 +400,3 @@ try {
   }
 }
 /*END FILE*/
-
