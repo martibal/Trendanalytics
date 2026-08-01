@@ -10,6 +10,7 @@ import { CHAIN_LIST } from "@/config/chains";
 const DESKTOP_ITEMS = [
   { href: "/explorer", label: "Explorer" },
   { href: "/analyst-kit", label: "Analyst Kit" },
+  { href: "/plans", label: "Plans" },
   { href: "/workflows", label: "Workflows" },
   { href: "/validation", label: "Validation" },
   { href: "/api-docs", label: "API Docs" },
