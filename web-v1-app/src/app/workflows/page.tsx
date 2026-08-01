@@ -9,23 +9,23 @@ export const metadata: Metadata = {
 const workflows = [
   {
     title: "Regime-conditioned model evaluation",
-    user: "Quant researchers and data scientists with model outputs, signal returns or forecast errors.",
+    user: "Quant researchers and data scientists with model outputs, prediction errors or operational metrics.",
     problem: "A single aggregate metric hides when the model works and when it breaks.",
     fields: "regime, confidence_score, observation_date, chain, available_at, methodology_version",
-    output: "MAE, hit rate, drawdown, IC, calibration or return split by network state.",
-    decision: "Reduce trust, size exposure, retrain, or split the model when performance is regime-specific.",
+    output: "MAE, hit rate, residual error, calibration, alert count or KPI split by network state.",
+    decision: "Reduce model trust, widen uncertainty intervals, retrain, or split the model when behavior is regime-specific.",
   },
   {
-    title: "Point-in-time backtesting",
-    user: "Researchers validating daily or weekly crypto strategies without look-ahead leakage.",
+    title: "Point-in-time historical simulation",
+    user: "Researchers validating daily or weekly decision rules without look-ahead leakage.",
     problem: "A row about July 10 cannot be used in a July 10 decision if it was published on July 11.",
     fields: "observation_date, available_at, chain, regime, confidence_score, vintage_id",
-    output: "A backtest dataset that only sees rows that were available at the decision timestamp.",
-    decision: "Use Urd Atlas as a filter, context variable or diagnostic layer without contaminating the test.",
+    output: "A historical dataset that only sees rows that were available at the decision timestamp.",
+    decision: "Use Urd Atlas as a context variable or diagnostic layer without contaminating the test.",
   },
   {
     title: "Production model monitoring",
-    user: "Teams running volatility, activity, liquidity, risk or anomaly models on blockchain-related data.",
+    user: "Teams running activity, demand, capacity, quality or anomaly models on blockchain-related operational data.",
     problem: "Model error rises and the team cannot tell whether this is data drift, code failure or a network-state shift.",
     fields: "regime, confidence_score, demand_score, friction_score, capacity_score",
     output: "Error, bias and uncertainty by network state.",
@@ -33,7 +33,7 @@ const workflows = [
   },
   {
     title: "Research segmentation",
-    user: "Analysts testing relationships between on-chain activity, protocol metrics, flows, volatility or returns.",
+    user: "Analysts testing relationships between on-chain activity, protocol metrics, usage flows or operational KPIs.",
     problem: "A relationship may be weak in aggregate but meaningful under specific network conditions.",
     fields: "regime plus continuous demand, friction and capacity scores.",
     output: "Interaction terms, stratified samples and coefficient comparisons by state.",
@@ -53,7 +53,7 @@ const workflows = [
     problem: "Weekly reports spend too much time interpreting raw charts and too little time explaining what changed.",
     fields: "regime, confidence, drivers, transitions, 30/90/365-day regime calendar.",
     output: "Copyable summaries, charts and tables for reports or BI annotations.",
-    decision: "Describe chain conditions consistently without presenting the label as a trading signal.",
+    decision: "Describe chain conditions consistently without presenting the label as an automated instruction.",
   },
 ];
 
@@ -76,7 +76,7 @@ report = (
         observations=("error", "size"),
         mae=("absolute_error", "mean"),
         hit_rate=("is_correct", "mean"),
-        avg_return=("strategy_return", "mean"),
+        avg_kpi=("operational_metric", "mean"),
     )
 )
 
@@ -132,7 +132,7 @@ export default function WorkflowsPage() {
             <li><strong className="text-foreground">Join:</strong> attach Urd Atlas to existing rows on date and chain.</li>
             <li><strong className="text-foreground">Gate:</strong> remove or down-weight rows where confidence or freshness is not good enough.</li>
             <li><strong className="text-foreground">Segment:</strong> calculate the metric that matters by regime or continuous score band.</li>
-            <li><strong className="text-foreground">Act:</strong> change reporting, monitoring, model trust, research priority or exposure rules.</li>
+            <li><strong className="text-foreground">Act:</strong> change reporting, monitoring, model trust, research priority or control rules.</li>
           </ol>
         </div>
 
@@ -141,11 +141,11 @@ export default function WorkflowsPage() {
 
       <section className="mt-14 rounded-[2rem] border border-border bg-card p-8">
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Important limitation</p>
-        <h2 className="mt-4 text-3xl font-medium tracking-tight">Urd Atlas should not be sold as an intraday trading signal.</h2>
+        <h2 className="mt-4 text-3xl font-medium tracking-tight">Urd Atlas should not be used as a real-time action trigger.</h2>
         <p className="mt-4 max-w-3xl text-muted-foreground leading-7">
           BTC and ETH are published at T+1. Base and Arbitrum are weekly. That makes the product suitable for research,
-          reporting, daily/weekly monitoring and point-in-time model diagnostics. It is not suitable for market making,
-          latency-sensitive execution, short-horizon congestion response or guaranteed price prediction.
+          reporting, daily/weekly monitoring and point-in-time model diagnostics. It is not suitable for latency-sensitive
+          automation, short-horizon congestion response or guaranteed future-state claims.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/analyst-kit" className="rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground">Use without a pipeline</Link>
