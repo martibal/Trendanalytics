@@ -198,7 +198,7 @@ describe("lib/analystKit", () => {
 
     expect(summary).toContain("Ethereum was classified as HEATING for 2026-07-02");
     expect(summary).toContain("The latest row changed from STABLE to HEATING.");
-    expect(summary).toContain("not a price forecast or trading recommendation");
+    expect(summary).toContain("not an automated instruction or future-state guarantee");
     expect(summary).toContain("Published drivers: active addresses up.");
   });
 
@@ -213,7 +213,7 @@ describe("lib/analystKit", () => {
     }));
     expect(Array.isArray(schema.fields)).toBe(true);
     expect(schema.safe_uses).toContain("reporting context");
-    expect(schema.unsafe_uses).toContain("buy/sell recommendation");
+    expect(schema.unsafe_uses).toContain("automated decision without human review");
 
     expect(notebook).toEqual(expect.objectContaining({ nbformat: 4, nbformat_minor: 5 }));
     expect(Array.isArray(notebook.cells)).toBe(true);
