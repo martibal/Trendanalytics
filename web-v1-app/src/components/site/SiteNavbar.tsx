@@ -15,6 +15,7 @@ const DESKTOP_ITEMS = [
   { href: "/api-docs", label: "API Docs" },
   { href: "/methodology", label: "Methodology" },
   { href: "/status", label: "Status" },
+  { href: "/about", label: "About" },
 ] as const;
 
 const MOBILE_SECONDARY_ITEMS = [
