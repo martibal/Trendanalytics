@@ -109,7 +109,7 @@ async function getSnapshot(chain: (typeof CHAINS)[number]): Promise<ChainSnapsho
     asOf: formatDate(meta?.date ?? meta?.updated_through ?? meta?.regime?.asof_date),
     oneLiner:
       meta?.status?.one_liner ??
-      `${chain.name}'s latest published network-state row is ${regime}.`,
+      `${chain.name} latest published network-state row is ${regime}.`,
   };
 }
 
@@ -213,8 +213,9 @@ export default async function HomePage() {
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <PrimaryLink href="/workflows">See technical workflows</PrimaryLink>
+            <PrimaryLink href="/explorer">Read current state</PrimaryLink>
             <SecondaryLink href="/analyst-kit">Use without a pipeline</SecondaryLink>
+            <SecondaryLink href="/api-docs">Open API docs</SecondaryLink>
           </div>
 
           <dl className="mt-10 grid max-w-2xl grid-cols-2 gap-4 sm:grid-cols-4">
@@ -288,30 +289,49 @@ date        chain       prediction   actual   error   regime     confidence
 
       <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
         <div className="max-w-3xl">
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Choose your level</p>
-          <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">No pipeline required. Production path included.</h2>
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Start where you are</p>
+          <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">
+            One product surface for each stage of trust.
+          </h2>
+          <p className="mt-4 text-muted-foreground leading-7">
+            First read the current state, then test the table, inspect diagnostics, understand workflows and integrate only when the use case is proven.
+          </p>
         </div>
-        <div className="mt-8 grid gap-5 lg:grid-cols-3">
+        <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
           <LevelCard
-            level="Level 1 · Explore"
-            title="Read network state in the browser"
-            body="Use the Explorer to understand current and historical chain conditions, confidence, latest transitions and supporting drivers without writing code."
+            level="Read"
+            title="Explorer"
+            body="See the latest regime, confidence, freshness and recent state path for each supported chain."
             href="/explorer"
             cta="Open Explorer"
           />
           <LevelCard
-            level="Level 2 · Analyze"
-            title="Download into analyst workflows"
-            body="Use regime calendars, CSV exports, report snippets and notebooks when you need charts, weekly summaries or a quick analytical starting point."
+            level="Analyze"
+            title="Analyst Kit"
+            body="Open CSV calendars, weekly summaries, schema and a runnable notebook without owning a pipeline."
             href="/analyst-kit"
-            cta="View Analyst Kit"
+            cta="Use Analyst Kit"
           />
           <LevelCard
-            level="Level 3 · Integrate"
-            title="Join into models and systems"
-            body="Use point-in-time network-state features for model evaluation, monitoring, research segmentation, backtesting and feature-store ingestion."
+            level="Trust"
+            title="Validation"
+            body="Check observations, regime balance, transition structure and confidence coverage before relying on the data."
+            href="/validation"
+            cta="Check diagnostics"
+          />
+          <LevelCard
+            level="Apply"
+            title="Workflows"
+            body="Map Urd Atlas to report annotation, app metric segmentation, model evaluation and monitoring."
             href="/workflows"
             cta="See workflows"
+          />
+          <LevelCard
+            level="Integrate"
+            title="API Docs"
+            body="Use public checks, Analyst Kit endpoints and authenticated artifact delivery once the workflow is proven."
+            href="/api-docs"
+            cta="Open API docs"
           />
         </div>
       </section>
@@ -357,14 +377,17 @@ date        chain       prediction   actual   error   regime     confidence
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Validation before persuasion</p>
           <div className="mt-4 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
-              <h2 className="text-3xl font-medium tracking-tight sm:text-4xl">The next proof point is not better copy. It is evidence.</h2>
+              <h2 className="text-3xl font-medium tracking-tight sm:text-4xl">Trust starts with diagnostics, not copy.</h2>
               <p className="mt-4 max-w-3xl text-muted-foreground leading-7">
-                The 2.0 product path includes validation of class balance, transition frequency, confidence distribution,
-                baseline comparisons and concrete workflow examples. Technical customers need to see when the feature
-                carries information and when it should not be used.
+                The Validation page now shows published-data diagnostics: observations, transition structure,
+                dominant regime share, confidence coverage and per-chain segmentation status. Use it before
+                treating the network-state layer as a downstream control variable.
               </p>
             </div>
-            <PrimaryLink href="/validation">See validation plan</PrimaryLink>
+            <div className="flex flex-wrap gap-3 lg:justify-end">
+              <PrimaryLink href="/validation">See validation</PrimaryLink>
+              <SecondaryLink href="/api-docs">Open API docs</SecondaryLink>
+            </div>
           </div>
         </div>
       </section>
