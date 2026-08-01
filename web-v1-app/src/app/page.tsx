@@ -45,8 +45,8 @@ type ChainSnapshot = {
 const CHAINS = [
   { id: "bitcoin", ticker: "BTC", name: "Bitcoin", lag: "T+1" },
   { id: "ethereum", ticker: "ETH", name: "Ethereum", lag: "T+1" },
-  { id: "arbitrum", ticker: "ARB", name: "Arbitrum", lag: "weekly" },
-  { id: "base", ticker: "BASE", name: "Base", lag: "weekly" },
+  { id: "arbitrum", ticker: "ARB", name: "Arbitrum", lag: "T+7" },
+  { id: "base", ticker: "BASE", name: "Base", lag: "T+7" },
 ] as const;
 
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
@@ -239,7 +239,7 @@ export default async function HomePage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Latest published rows</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">Published on cadence: BTC/ETH T+1, Base/Arbitrum weekly.</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">Published daily with data lag: BTC/ETH T+1, Base/Arbitrum T+7.</p>
               </div>
               <Link href="/validation" className="shrink-0 text-xs font-medium text-primary">
                 Validate →
