@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -8,13 +8,20 @@ import { useEffect, useRef, useState } from "react";
 import { CHAIN_LIST } from "@/config/chains";
 
 const DESKTOP_ITEMS = [
+  { href: "/explorer", label: "Explorer" },
+  { href: "/analyst-kit", label: "Analyst Kit" },
+  { href: "/workflows", label: "Workflows" },
+  { href: "/validation", label: "Validation" },
+  { href: "/api-docs", label: "API Docs" },
+  { href: "/methodology", label: "Methodology" },
   { href: "/status", label: "Status" },
+] as const;
+
+const MOBILE_SECONDARY_ITEMS = [
   { href: "/track-record", label: "Track Record" },
   { href: "/thresholds", label: "Thresholds" },
   { href: "/glossary", label: "Glossary" },
   { href: "/faq", label: "FAQ" },
-  { href: "/api-docs", label: "API Docs" },
-  { href: "/methodology", label: "Methodology" },
 ] as const;
 
 const CLERK_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
@@ -128,6 +135,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
       <div className={`ua-mobile-menu ${mobileOpen ? "is-open" : ""}`}>
         <Link href="/chains" onClick={closeMenus} className="ua-site-link">Chains</Link>
         {DESKTOP_ITEMS.map((item) => <Link key={item.href} href={item.href} onClick={closeMenus} className="ua-site-link">{item.label}</Link>)}
+        {MOBILE_SECONDARY_ITEMS.map((item) => <Link key={item.href} href={item.href} onClick={closeMenus} className="ua-site-link">{item.label}</Link>)}
         <div className="flex flex-wrap gap-3 pt-2">{CLERK_CONFIGURED ? <AuthAwareActions mobile onNavigate={closeMenus} /> : <><Link href="/dashboard" onClick={closeMenus} className="btn-ghost">Dashboard</Link><Link href="/sign-in" onClick={closeMenus} className="text-link">Log in</Link></>}</div>
       </div>
     </header>
@@ -137,4 +145,3 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
 export default function SiteNavbar() {
   return <SiteNavbarInner pathname={usePathname()} />;
 }
-
