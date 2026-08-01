@@ -195,36 +195,29 @@ export default async function HomePage() {
 
   return (
     <main className="bg-background text-foreground">
-      <section className="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-24">
+      <section className="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-24">
         <div>
           <div className="flex flex-wrap gap-2">
             <Pill>Daily reference data</Pill>
+            <Pill>Public CSV kit</Pill>
             <Pill>Descriptive only</Pill>
-            <Pill>Point-in-time ready</Pill>
           </div>
 
-          <h1 className="mt-8 max-w-4xl text-5xl font-medium tracking-[-0.05em] text-foreground sm:text-6xl lg:text-7xl">
-            Find out whether your metric changed because your project changed — or because the chain changed around it.
+          <h1 className="mt-8 max-w-3xl text-5xl font-medium tracking-[-0.05em] text-foreground sm:text-6xl lg:text-7xl">
+            Explain changes in your crypto metrics.
           </h1>
 
           <p className="mt-7 max-w-2xl text-lg leading-8 text-muted-foreground">
-            Urd Atlas turns raw on-chain activity into daily, versioned network-state rows. Join them to
-            app metrics, model results, dashboards or research notes to separate local behaviour from
-            chain-wide conditions.
+            Join one daily regime table to your own data and see whether model errors, users,
+            fees or activity changed during <span className="text-foreground">stable</span>,{" "}
+            <span className="text-foreground">heating</span>, <span className="text-foreground">congested</span>{" "}
+            or <span className="text-foreground">cheap</span> chain conditions.
           </p>
 
-          <div className="mt-6 max-w-2xl rounded-3xl border border-border bg-card/55 p-5">
-            <p className="text-sm font-medium text-foreground">Plain English</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Use it to ask: did my model, app, dashboard or report change because of my own signal,
-              or because Bitcoin, Ethereum, Arbitrum or Base was in a different state?
-            </p>
-          </div>
-
           <div className="mt-8 flex flex-wrap gap-3">
-            <PrimaryLink href="/workflows">Not sure where to start?</PrimaryLink>
-            <SecondaryLink href="/validation">Check evidence first</SecondaryLink>
-            <SecondaryLink href="/analyst-kit">Try the free CSV kit</SecondaryLink>
+            <PrimaryLink href="/analyst-kit">Try the free CSV kit</PrimaryLink>
+            <SecondaryLink href="/validation">See the evidence</SecondaryLink>
+            <SecondaryLink href="/workflows">Show use cases</SecondaryLink>
           </div>
 
           <dl className="mt-10 grid max-w-2xl grid-cols-2 gap-4 sm:grid-cols-4">
@@ -247,7 +240,7 @@ export default async function HomePage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Latest published rows</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">Live product data, not a static marketing card.</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">Live output from the data product.</p>
               </div>
               <Link href="/validation" className="shrink-0 text-xs font-medium text-primary">
                 Validate →
@@ -282,30 +275,26 @@ export default async function HomePage() {
       <section className="border-y border-border bg-card/25">
         <div className="mx-auto grid max-w-7xl gap-6 px-6 py-12 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Evidence before trust</p>
-            <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">Inspect the diagnostics before you rely on the labels.</h2>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">What you get</p>
+            <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">A small table built for one join.</h2>
             <p className="mt-4 text-muted-foreground leading-7">
-              Validation is not hidden in a footnote. It shows observation counts, regime balance,
-              transition structure, confidence coverage and per-chain limitations before a buyer commits
-              the data to a workflow.
+              Each row gives you a date, chain, regime label, confidence score, freshness context,
+              score vector and reproducibility metadata. Use it as context for your own metrics.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-3xl border border-border bg-background/50 p-5">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Coverage</p>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">Rows inspected, history window and chain-level availability.</p>
-            </div>
-            <div className="rounded-3xl border border-border bg-background/50 p-5">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Variation</p>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">Dominant regime share, transitions and low-variation warnings.</p>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Regime</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Stable, heating, congested, cheap or unknown/degraded.</p>
             </div>
             <div className="rounded-3xl border border-border bg-background/50 p-5">
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Confidence</p>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">Good, caution and degraded confidence coverage by chain.</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">A gate for whether the label should be read normally.</p>
             </div>
-          </div>
-          <div className="lg:col-span-2">
-            <PrimaryLink href="/validation">Open Validation diagnostics</PrimaryLink>
+            <div className="rounded-3xl border border-border bg-background/50 p-5">
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">As-of</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Point-in-time context for daily analysis and reports.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -313,21 +302,19 @@ export default async function HomePage() {
       <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
         <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Why not just use a larger on-chain platform?</p>
-            <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">Urd Atlas is narrower by design.</h2>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Why not another dashboard?</p>
+            <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">Urd Atlas does not replace Glassnode, Coin Metrics, Dune or Nansen.</h2>
             <p className="mt-4 text-muted-foreground leading-7">
-              Glassnode, Coin Metrics, Dune and Nansen are useful places to explore metrics, dashboards,
-              entities and queries. Urd Atlas does not try to replace them. It publishes one opinionated
-              reference layer: a daily regime label, confidence score, score vector and reproducibility
-              metadata that can be joined directly to work you already own.
+              Those tools help you explore many metrics, dashboards, entities and queries. Urd Atlas is narrower:
+              it publishes a daily regime feature you can join to app metrics, model results and research workflows.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {[
-              ["Analytics platforms", "Explore many raw metrics, dashboards and entity views."],
-              ["Urd Atlas", "Ship a small, versioned network-state feature layer for joins, reports and monitoring."],
-              ["Your warehouse", "Keep your own app, protocol, model or research data where it already lives."],
-              ["The join", "Use date and chain to test whether behaviour changes by network condition."],
+              ["Broad platforms", "Explore many metrics and dashboards."],
+              ["Urd Atlas", "Add one versioned regime feature to your own data."],
+              ["Your data", "Keep app, model and report metrics where they already live."],
+              ["The value", "Compare your metrics across chain conditions."],
             ].map(([title, body]) => (
               <article key={title} className="rounded-3xl border border-border bg-card/55 p-5">
                 <h3 className="text-lg font-medium tracking-tight">{title}</h3>
@@ -341,28 +328,22 @@ export default async function HomePage() {
       <section className="border-y border-border bg-card/25">
         <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
           <div className="max-w-3xl">
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">The product in one join</p>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">The product in one operation</p>
             <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">
-              One extra table can explain where your own metric behaves differently.
+              Join on date + chain. Then compare behaviour by regime.
             </h2>
-            <p className="mt-4 text-muted-foreground leading-7">
-              The output is a contextual feature layer: date, chain, regime, confidence, component scores
-              and reproducibility metadata. The value appears when it segments analysis, flags weak
-              observations, or explains where a model or dashboard behaves differently.
-            </p>
           </div>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-2">
             <pre className="overflow-x-auto rounded-3xl border border-border bg-background p-5 text-sm leading-7 text-muted-foreground"><code>{`# Your existing data
-date        chain       prediction   actual   error
-2026-07-01  ethereum    0.042        0.018    0.024`}</code></pre>
+date        chain       users   model_error
+2026-07-01  ethereum    18420   0.024`}</code></pre>
             <pre className="overflow-x-auto rounded-3xl border border-border bg-background p-5 text-sm leading-7 text-muted-foreground"><code>{`# After Urd Atlas
-date        chain       prediction   actual   error   regime     confidence
-2026-07-01  ethereum    0.042        0.018    0.024   HEATING    0.84`}</code></pre>
+date        chain       users   model_error   regime    confidence
+2026-07-01  ethereum    18420   0.024         HEATING   0.84`}</code></pre>
           </div>
           <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground">
-            This is the product in one operation: join on <span className="text-foreground">date + chain</span>,
-            then compare model error, app activity, report metrics or dashboard movement by regime and confidence.
+            That extra regime column tells you whether a change happened under normal conditions or during a different chain state.
           </p>
         </div>
       </section>
@@ -372,15 +353,15 @@ date        chain       prediction   actual   error   regime     confidence
           <div className="rounded-[2rem] border border-primary/40 bg-primary/10 p-6">
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Start here</p>
             <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">
-              Not sure what to open first?
+              Test it before you pay.
             </h2>
             <p className="mt-4 text-muted-foreground leading-7">
-              Choose the surface that matches the job you have right now. You do not need an account to inspect
-              the public pages or test the Analyst Kit CSV and notebook path.
+              The Analyst Kit CSV, weekly summary, schema and starter notebook are public. Use them to check whether
+              regime context explains anything useful in your own data.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <PrimaryLink href="/workflows">Match your use case</PrimaryLink>
-              <SecondaryLink href="/analyst-kit">Open free Analyst Kit</SecondaryLink>
+              <PrimaryLink href="/analyst-kit">Open free Analyst Kit</PrimaryLink>
+              <SecondaryLink href="/validation">Inspect diagnostics</SecondaryLink>
             </div>
           </div>
           <div>
@@ -436,18 +417,17 @@ date        chain       prediction   actual   error   regime     confidence
         <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
             <div>
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">From data to decision</p>
-              <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">The first workflow customers should understand.</h2>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Common workflow</p>
+              <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">Use the regime as an explanation layer.</h2>
               <p className="mt-4 text-muted-foreground leading-7">
-                Urd Atlas should answer a concrete question: does my model, report, dashboard or thesis behave
-                differently when the underlying blockchain is stable, heating, congested, cheap or unknown?
+                A regime is not an instruction. It is context for reading your own results.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <WorkflowStep number="1" title="Join" body="Attach Urd Atlas to your data on observation date and chain." />
-              <WorkflowStep number="2" title="Gate" body="Filter or weight observations by confidence and freshness before drawing conclusions." />
-              <WorkflowStep number="3" title="Segment" body="Measure errors, growth, volume, user activity or report metrics by regime." />
-              <WorkflowStep number="4" title="Decide" body="Adjust model trust, annotate dashboards, prioritize research, or explain performance changes." />
+              <WorkflowStep number="2" title="Gate" body="Filter or label observations by confidence and freshness before drawing conclusions." />
+              <WorkflowStep number="3" title="Segment" body="Compare model error, users, fees or activity by regime." />
+              <WorkflowStep number="4" title="Explain" body="Annotate dashboards, research notes and monitoring with chain-state context." />
             </div>
           </div>
         </div>
@@ -456,9 +436,9 @@ date        chain       prediction   actual   error   regime     confidence
       <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
         <div className="grid gap-6 lg:grid-cols-3">
           {[
-            ["For analysts", "A regime calendar and weekly summary reduce the time spent interpreting raw on-chain charts before writing a report."],
-            ["For protocol teams", "Compare app growth against chain-wide network state to separate internal traction from broader ecosystem heat."],
-            ["For data teams", "Use a deterministic feature vector and metadata contract instead of maintaining another bespoke on-chain classification pipeline."],
+            ["For analysts", "Add regime context to reports without rebuilding an on-chain classification model."],
+            ["For app teams", "Check whether user or fee changes line up with chain-wide conditions."],
+            ["For data teams", "Use a deterministic feature table instead of maintaining another bespoke pipeline."],
           ].map(([title, body]) => (
             <article key={title} className="rounded-3xl border border-border bg-card/55 p-6">
               <h3 className="text-xl font-medium tracking-tight">{title}</h3>
@@ -473,15 +453,14 @@ date        chain       prediction   actual   error   regime     confidence
           <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Free versus paid</p>
-              <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">You can test the core join before paying.</h2>
+              <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">Free is for testing the value. Paid is for delivery.</h2>
               <p className="mt-4 text-muted-foreground leading-7">
-                Free access includes the web surface, Explorer, Validation, Workflows, Methodology, Status and
-                the public Analyst Kit CSV, weekly summary, feature schema and starter notebook. Paid access is for
-                authenticated subscriber file delivery, deeper artifact access and production integration.
+                Free access includes Explorer, Validation, Workflows, Methodology, Status and the public Analyst Kit.
+                Paid access is for authenticated subscriber files and production integration.
               </p>
               <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                Chain pricing should be read as access and delivery pricing, not as a claim that every chain has
-                identical variation. Validation shows differences in entropy, transition behaviour and confidence by chain before purchase.
+                Chain access is priced as delivery/access, not as a claim that every chain has identical variation.
+                Validation shows per-chain differences before purchase.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -492,8 +471,8 @@ date        chain       prediction   actual   error   regime     confidence
               </article>
               <article className="rounded-3xl border border-border bg-background/50 p-6">
                 <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Paid</p>
-                <h3 className="mt-3 text-2xl font-medium tracking-tight">Integrate and automate</h3>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground">Authenticated artifact access for users who want the data product in recurring systems.</p>
+                <h3 className="mt-3 text-2xl font-medium tracking-tight">Integrate in production</h3>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">Authenticated artifact access for recurring systems and subscriber delivery.</p>
               </article>
             </div>
           </div>
