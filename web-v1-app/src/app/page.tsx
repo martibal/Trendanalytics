@@ -198,31 +198,40 @@ export default async function HomePage() {
       <section className="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-24">
         <div>
           <div className="flex flex-wrap gap-2">
-            <Pill>Daily network-state data</Pill>
-            <Pill>No price forecasts</Pill>
+            <Pill>Daily reference data</Pill>
+            <Pill>Descriptive only</Pill>
             <Pill>Point-in-time ready</Pill>
           </div>
 
           <h1 className="mt-8 max-w-4xl text-5xl font-medium tracking-[-0.05em] text-foreground sm:text-6xl lg:text-7xl">
-            Add blockchain network state to the work you already do.
+            Find out whether your metric changed because your project changed — or because the chain changed around it.
           </h1>
 
           <p className="mt-7 max-w-2xl text-lg leading-8 text-muted-foreground">
-            Urd Atlas turns raw on-chain activity into a daily network-state layer you can read in the browser,
-            download into analyst workflows, or integrate into models, backtests and monitoring systems.
+            Urd Atlas turns raw on-chain activity into daily, versioned network-state rows. Join them to
+            app metrics, model results, dashboards or research notes to separate local behaviour from
+            chain-wide conditions.
           </p>
 
+          <div className="mt-6 max-w-2xl rounded-3xl border border-border bg-card/55 p-5">
+            <p className="text-sm font-medium text-foreground">Plain English</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Use it to ask: did my model, app, dashboard or report change because of my own signal,
+              or because Bitcoin, Ethereum, Arbitrum or Base was in a different state?
+            </p>
+          </div>
+
           <div className="mt-8 flex flex-wrap gap-3">
-            <PrimaryLink href="/explorer">Read current state</PrimaryLink>
-            <SecondaryLink href="/analyst-kit">Use without a pipeline</SecondaryLink>
-            <SecondaryLink href="/api-docs">Open API docs</SecondaryLink>
+            <PrimaryLink href="/workflows">Not sure where to start?</PrimaryLink>
+            <SecondaryLink href="/validation">Check evidence first</SecondaryLink>
+            <SecondaryLink href="/analyst-kit">Try the free CSV kit</SecondaryLink>
           </div>
 
           <dl className="mt-10 grid max-w-2xl grid-cols-2 gap-4 sm:grid-cols-4">
             {[
               ["4", "chains"],
+              ["public", "CSV kit"],
               ["T+1", "BTC / ETH"],
-              ["weekly", "Base / Arbitrum"],
               [lastRun, "last run"],
             ].map(([value, label]) => (
               <div key={label} className="rounded-2xl border border-border bg-card/40 p-4">
@@ -235,7 +244,15 @@ export default async function HomePage() {
 
         <aside className="rounded-[2rem] border border-border bg-card/70 p-5 shadow-2xl shadow-black/20">
           <div className="rounded-3xl border border-border bg-background/60 p-5">
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Latest published rows</p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Latest published rows</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">Live product data, not a static marketing card.</p>
+              </div>
+              <Link href="/validation" className="shrink-0 text-xs font-medium text-primary">
+                Validate →
+              </Link>
+            </div>
             <div className="mt-5 space-y-3">
               {snapshots.map((chain) => (
                 <Link
@@ -263,16 +280,75 @@ export default async function HomePage() {
       </section>
 
       <section className="border-y border-border bg-card/25">
+        <div className="mx-auto grid max-w-7xl gap-6 px-6 py-12 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Evidence before trust</p>
+            <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">Inspect the diagnostics before you rely on the labels.</h2>
+            <p className="mt-4 text-muted-foreground leading-7">
+              Validation is not hidden in a footnote. It shows observation counts, regime balance,
+              transition structure, confidence coverage and per-chain limitations before a buyer commits
+              the data to a workflow.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-3xl border border-border bg-background/50 p-5">
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Coverage</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Rows inspected, history window and chain-level availability.</p>
+            </div>
+            <div className="rounded-3xl border border-border bg-background/50 p-5">
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Variation</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Dominant regime share, transitions and low-variation warnings.</p>
+            </div>
+            <div className="rounded-3xl border border-border bg-background/50 p-5">
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Confidence</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Good, caution and degraded confidence coverage by chain.</p>
+            </div>
+          </div>
+          <div className="lg:col-span-2">
+            <PrimaryLink href="/validation">Open Validation diagnostics</PrimaryLink>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Why not just use a larger on-chain platform?</p>
+            <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">Urd Atlas is narrower by design.</h2>
+            <p className="mt-4 text-muted-foreground leading-7">
+              Glassnode, Coin Metrics, Dune and Nansen are useful places to explore metrics, dashboards,
+              entities and queries. Urd Atlas does not try to replace them. It publishes one opinionated
+              reference layer: a daily regime label, confidence score, score vector and reproducibility
+              metadata that can be joined directly to work you already own.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              ["Analytics platforms", "Explore many raw metrics, dashboards and entity views."],
+              ["Urd Atlas", "Ship a small, versioned network-state feature layer for joins, reports and monitoring."],
+              ["Your warehouse", "Keep your own app, protocol, model or research data where it already lives."],
+              ["The join", "Use date and chain to test whether behaviour changes by network condition."],
+            ].map(([title, body]) => (
+              <article key={title} className="rounded-3xl border border-border bg-card/55 p-5">
+                <h3 className="text-lg font-medium tracking-tight">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-border bg-card/25">
         <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
           <div className="max-w-3xl">
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">The product in one join</p>
             <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">
-              Urd Atlas becomes useful when it is joined to another workflow.
+              One extra table can explain where your own metric behaves differently.
             </h2>
             <p className="mt-4 text-muted-foreground leading-7">
-              The output is not a trading recommendation. It is a contextual feature layer: date, chain,
-              regime, confidence, component scores and reproducibility metadata. The value appears when it
-              segments analysis, flags weak observations, or explains where a model behaves differently.
+              The output is a contextual feature layer: date, chain, regime, confidence, component scores
+              and reproducibility metadata. The value appears when it segments analysis, flags weak
+              observations, or explains where a model or dashboard behaves differently.
             </p>
           </div>
 
@@ -284,55 +360,75 @@ date        chain       prediction   actual   error
 date        chain       prediction   actual   error   regime     confidence
 2026-07-01  ethereum    0.042        0.018    0.024   HEATING    0.84`}</code></pre>
           </div>
+          <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground">
+            This is the product in one operation: join on <span className="text-foreground">date + chain</span>,
+            then compare model error, app activity, report metrics or dashboard movement by regime and confidence.
+          </p>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
-        <div className="max-w-3xl">
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Start where you are</p>
-          <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">
-            One product surface for each stage of trust.
-          </h2>
-          <p className="mt-4 text-muted-foreground leading-7">
-            First read the current state, then test the table, inspect diagnostics, understand workflows and integrate only when the use case is proven.
-          </p>
-        </div>
-        <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
-          <LevelCard
-            level="Read"
-            title="Explorer"
-            body="See the latest regime, confidence, freshness and recent state path for each supported chain."
-            href="/explorer"
-            cta="Open Explorer"
-          />
-          <LevelCard
-            level="Analyze"
-            title="Analyst Kit"
-            body="Open CSV calendars, weekly summaries, schema and a runnable notebook without owning a pipeline."
-            href="/analyst-kit"
-            cta="Use Analyst Kit"
-          />
-          <LevelCard
-            level="Trust"
-            title="Validation"
-            body="Check observations, regime balance, transition structure and confidence coverage before relying on the data."
-            href="/validation"
-            cta="Check diagnostics"
-          />
-          <LevelCard
-            level="Apply"
-            title="Workflows"
-            body="Map Urd Atlas to report annotation, app metric segmentation, model evaluation and monitoring."
-            href="/workflows"
-            cta="See workflows"
-          />
-          <LevelCard
-            level="Integrate"
-            title="API Docs"
-            body="Use public checks, Analyst Kit endpoints and authenticated artifact delivery once the workflow is proven."
-            href="/api-docs"
-            cta="Open API docs"
-          />
+        <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+          <div className="rounded-[2rem] border border-primary/40 bg-primary/10 p-6">
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Start here</p>
+            <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">
+              Not sure what to open first?
+            </h2>
+            <p className="mt-4 text-muted-foreground leading-7">
+              Choose the surface that matches the job you have right now. You do not need an account to inspect
+              the public pages or test the Analyst Kit CSV and notebook path.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <PrimaryLink href="/workflows">Match your use case</PrimaryLink>
+              <SecondaryLink href="/analyst-kit">Open free Analyst Kit</SecondaryLink>
+            </div>
+          </div>
+          <div>
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              <LevelCard
+                level="Read"
+                title="Explorer"
+                body="See the latest regime, confidence, freshness and recent state path for each supported chain."
+                href="/explorer"
+                cta="Open Explorer"
+              />
+              <LevelCard
+                level="Analyze"
+                title="Analyst Kit"
+                body="Public CSV calendars, weekly summaries, schema and a runnable notebook. No paid account required."
+                href="/analyst-kit"
+                cta="Use Analyst Kit"
+              />
+              <LevelCard
+                level="Trust"
+                title="Validation"
+                body="Check observations, regime balance, transition structure and confidence coverage before relying on the data."
+                href="/validation"
+                cta="Check diagnostics"
+              />
+              <LevelCard
+                level="Apply"
+                title="Workflows"
+                body="Map Urd Atlas to report annotation, app metric segmentation, model evaluation and monitoring."
+                href="/workflows"
+                cta="See workflows"
+              />
+              <LevelCard
+                level="Integrate"
+                title="API Docs"
+                body="Use public checks, Analyst Kit endpoints and authenticated artifact delivery once the workflow is proven."
+                href="/api-docs"
+                cta="Open API docs"
+              />
+              <LevelCard
+                level="Who"
+                title="About"
+                body="Read what the product is, who it is for and why it is intentionally narrow."
+                href="/about"
+                cta="Read About"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -350,8 +446,8 @@ date        chain       prediction   actual   error   regime     confidence
             <div className="grid gap-4 sm:grid-cols-2">
               <WorkflowStep number="1" title="Join" body="Attach Urd Atlas to your data on observation date and chain." />
               <WorkflowStep number="2" title="Gate" body="Filter or weight observations by confidence and freshness before drawing conclusions." />
-              <WorkflowStep number="3" title="Segment" body="Measure errors, returns, growth, volume, user activity or report metrics by regime." />
-              <WorkflowStep number="4" title="Act" body="Adjust model trust, annotate dashboards, prioritize research, or explain performance changes." />
+              <WorkflowStep number="3" title="Segment" body="Measure errors, growth, volume, user activity or report metrics by regime." />
+              <WorkflowStep number="4" title="Decide" body="Adjust model trust, annotate dashboards, prioritize research, or explain performance changes." />
             </div>
           </div>
         </div>
@@ -372,21 +468,53 @@ date        chain       prediction   actual   error   regime     confidence
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 pb-20 lg:px-8">
+      <section className="border-y border-border bg-card/25">
+        <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+          <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Free versus paid</p>
+              <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">You can test the core join before paying.</h2>
+              <p className="mt-4 text-muted-foreground leading-7">
+                Free access includes the web surface, Explorer, Validation, Workflows, Methodology, Status and
+                the public Analyst Kit CSV, weekly summary, feature schema and starter notebook. Paid access is for
+                authenticated subscriber file delivery, deeper artifact access and production integration.
+              </p>
+              <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                Chain pricing should be read as access and delivery pricing, not as a claim that every chain has
+                identical variation. Validation shows differences in entropy, transition behaviour and confidence by chain before purchase.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <article className="rounded-3xl border border-border bg-background/50 p-6">
+                <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Free</p>
+                <h3 className="mt-3 text-2xl font-medium tracking-tight">Inspect and prototype</h3>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">Public pages, diagnostics, CSV calendars, summaries, schema and starter notebook.</p>
+              </article>
+              <article className="rounded-3xl border border-border bg-background/50 p-6">
+                <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Paid</p>
+                <h3 className="mt-3 text-2xl font-medium tracking-tight">Integrate and automate</h3>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">Authenticated artifact access for users who want the data product in recurring systems.</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
         <div className="rounded-[2rem] border border-border bg-card p-8 lg:p-10">
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Validation before persuasion</p>
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Trust model</p>
           <div className="mt-4 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
-              <h2 className="text-3xl font-medium tracking-tight sm:text-4xl">Trust starts with diagnostics, not copy.</h2>
+              <h2 className="text-3xl font-medium tracking-tight sm:text-4xl">No logo wall yet. Inspect the evidence directly.</h2>
               <p className="mt-4 max-w-3xl text-muted-foreground leading-7">
-                The Validation page now shows published-data diagnostics: observations, transition structure,
-                dominant regime share, confidence coverage and per-chain segmentation status. Use it before
-                treating the network-state layer as a downstream control variable.
+                Urd Atlas is an independent early-access reference-data product. The current trust surface is public:
+                live diagnostics, methodology, point-in-time artifacts, API documentation and a free Analyst Kit path
+                that lets a skeptical user test the join before upgrading.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 lg:justify-end">
               <PrimaryLink href="/validation">See validation</PrimaryLink>
-              <SecondaryLink href="/api-docs">Open API docs</SecondaryLink>
+              <SecondaryLink href="/about">Who is behind this?</SecondaryLink>
             </div>
           </div>
         </div>
