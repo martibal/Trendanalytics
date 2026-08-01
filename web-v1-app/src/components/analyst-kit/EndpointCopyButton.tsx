@@ -22,7 +22,7 @@ export default function EndpointCopyButton({ path }: { path: string }) {
     <button
       type="button"
       onClick={copyEndpoint}
-      className="rounded-full border border-border px-3 py-2 text-xs font-medium hover:bg-card"
+      className="inline-flex min-w-[86px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-border px-3 py-2 text-xs font-medium hover:bg-card"
       aria-label={`Copy ${path}`}
     >
       {copied ? "Copied" : "Copy URL"}
