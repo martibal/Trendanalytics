@@ -157,27 +157,27 @@ export default function AnalystKitPage() {
           </div>
         </div>
 
-        <div className="mt-7 grid gap-4 lg:grid-cols-4">
+        <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {chains.map((chain) => {
             const csvPath = `/api/v1/analyst-kit/${chain.id}/regime-calendar`;
             const summaryPath = `/api/v1/analyst-kit/${chain.id}/weekly-summary`;
 
             return (
-              <article key={chain.id} className="rounded-3xl border border-border bg-background/55 p-5">
+              <article key={chain.id} className="min-w-0 rounded-3xl border border-border bg-background/55 p-5">
                 <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">{chain.ticker}</p>
                 <h3 className="mt-2 text-xl font-medium">{chain.label}</h3>
                 <div className="mt-5 grid gap-3 text-sm">
-                  <div className="rounded-2xl border border-border p-3">
+                  <div className="min-w-0 rounded-2xl border border-border p-3">
                     <a href={csvPath} className="font-medium hover:text-primary">CSV regime calendar</a>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <code className="truncate text-xs text-muted-foreground">{csvPath}</code>
+                    <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                      <code className="block min-w-0 truncate text-xs text-muted-foreground" title={csvPath}>{csvPath}</code>
                       <EndpointCopyButton path={csvPath} />
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-border p-3">
+                  <div className="min-w-0 rounded-2xl border border-border p-3">
                     <a href={summaryPath} className="font-medium hover:text-primary">Weekly summary text</a>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <code className="truncate text-xs text-muted-foreground">{summaryPath}</code>
+                    <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                      <code className="block min-w-0 truncate text-xs text-muted-foreground" title={summaryPath}>{summaryPath}</code>
                       <EndpointCopyButton path={summaryPath} />
                     </div>
                   </div>
@@ -189,15 +189,15 @@ export default function AnalystKitPage() {
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           {globalDownloads.map((download) => (
-            <article key={download.href} className="rounded-3xl border border-border bg-background/55 p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+            <article key={download.href} className="min-w-0 rounded-3xl border border-border bg-background/55 p-5">
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <div className="min-w-0">
                   <h3 className="text-xl font-medium">{download.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{download.body}</p>
-                  <code className="mt-3 block truncate text-xs text-primary">{download.href}</code>
+                  <code className="mt-3 block min-w-0 truncate text-xs text-primary" title={download.href}>{download.href}</code>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <a href={download.href} className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground">Open</a>
+                  <a href={download.href} className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground">Open</a>
                   <EndpointCopyButton path={download.href} />
                 </div>
               </div>
@@ -245,12 +245,12 @@ export default function AnalystKitPage() {
         </div>
       </section>
 
-      <section className="mt-12 grid gap-5 lg:grid-cols-4">
+      <section className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {kitItems.map((item) => (
-          <article key={item.title} className="rounded-3xl border border-border bg-card/55 p-6">
+          <article key={item.title} className="min-w-0 rounded-3xl border border-border bg-card/55 p-6">
             <h2 className="text-2xl font-medium tracking-tight">{item.title}</h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">{item.body}</p>
-            <p className="mt-5 rounded-2xl border border-border bg-background/60 p-4 font-mono text-xs leading-6 text-primary">
+            <p className="mt-5 break-all rounded-2xl border border-border bg-background/60 p-4 font-mono text-xs leading-6 text-primary">
               {item.example}
             </p>
           </article>
