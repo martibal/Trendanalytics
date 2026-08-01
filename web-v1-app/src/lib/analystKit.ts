@@ -260,7 +260,7 @@ export async function buildWeeklySummaryText(chain: ChainId): Promise<string> {
     `${config?.name ?? chain} was classified as ${latest.regime} for ${latest.observation_date}, with ${confidenceLanguage(latest.confidence_score)}.`,
     transition,
     `Across the latest ${latestWindow.length} published observations, the regime changed ${changes} time${changes === 1 ? "" : "s"}.`,
-    `Use this as descriptive network-state context for analysis, reporting and model diagnostics; it is not a price forecast or trading recommendation.`,
+    "Use this as descriptive network-state context for analysis, reporting and model diagnostics; it is not an automated instruction or future-state guarantee.",
     `Plain-language state: ${config?.name ?? chain} looked ${labelSentence(latest.regime)} relative to its own published network-state methodology.${oneLiner}${drivers}`,
   ].join("\n\n");
 }
@@ -272,12 +272,12 @@ export function buildFeatureSchema(): JsonRecord {
     primary_key: ["chain", "observation_date"],
     recommended_join_key: ["chain", "observation_date"],
     point_in_time_note:
-      "For backtesting or decision simulation, join using the row's availability timestamp once point-in-time/vintage exports are enabled. Do not assume the observation_date was available before publication.",
+      "For historical simulation or decision review, join using the row's availability timestamp once point-in-time/vintage exports are enabled. Do not assume the observation_date was available before publication.",
     fields: [
       { name: "observation_date", type: "date", use: "Date the network state describes." },
       { name: "chain", type: "string", use: "Canonical chain id: bitcoin, ethereum, arbitrum or base." },
       { name: "regime", type: "category", use: "Human-readable network-state label." },
-      { name: "confidence_score", type: "float", use: "Quality/evidence gate; not a probability of investment outcome." },
+      { name: "confidence_score", type: "float", use: "Quality/evidence gate; not a probability of an external outcome." },
       { name: "data_quality_score", type: "float", use: "Data availability and pipeline quality component when published." },
       { name: "label_confidence_score", type: "float", use: "Evidence strength for the chosen label when published." },
       { name: "freshness_lag_days", type: "integer", use: "Lag versus UTC today when published." },
@@ -298,9 +298,9 @@ export function buildFeatureSchema(): JsonRecord {
       "feature-store ingestion",
     ],
     unsafe_uses: [
-      "intradag trading signal",
-      "buy/sell recommendation",
-      "price forecast",
+      "real-time action trigger",
+      "automated decision without human review",
+      "external outcome guarantee",
       "guaranteed congestion prediction",
     ],
   };
@@ -380,7 +380,7 @@ export function buildStarterNotebook(): JsonRecord {
         metadata: {},
         source: [
           "## Interpretation rule\n",
-          "Urd Atlas is descriptive network-state context. Treat this as a segmentation and diagnostic layer, not a price forecast or trading recommendation.\n",
+          "Urd Atlas is descriptive network-state context. Treat this as a segmentation and diagnostic layer, not an automated instruction or future-state guarantee.\n",
         ],
       },
     ],
