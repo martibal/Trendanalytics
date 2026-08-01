@@ -1,4 +1,4 @@
-﻿// src/app/about/page.tsx
+// src/app/about/page.tsx
 import type { ReactNode } from "react";
 import Link from "next/link";
 
@@ -12,19 +12,73 @@ function InlineCode({ children }: { children: ReactNode }) {
 }
 
 const dataLayers = [
-  { name: "Gold", tag: "raw daily observations", path: "gold/<chain>/<date>.json", desc: "Canonical daily network metrics: transaction counts, fees, gas usage, block times, block counts, and active-address observations where available." },
-  { name: "Meta", tag: "regime interpretation", path: "meta/<chain>/latest.json", desc: "The main product output: regime label, confidence, scorecard, drivers, publication context, and methodology/version anchors." },
-  { name: "Derived", tag: "trend series", path: "derived/<chain>/<date>.json", desc: "Moving-average series built from Gold data, primarily MA7 and MA30 values used for smoothed trend context." },
-  { name: "Briefs", tag: "readable summaries", path: "briefs/chains/<chain>/latest.json", desc: "Short descriptive JSON summaries of latest regime context, generated from Meta and guarded against predictive or advisory language." },
+  {
+    name: "Gold",
+    tag: "daily observations",
+    path: "gold/<chain>/<date>.json",
+    desc: "Canonical daily network metrics: transaction counts, fees, gas usage, block times, block counts, and active-address observations where available.",
+  },
+  {
+    name: "Meta",
+    tag: "network-state layer",
+    path: "meta/<chain>/latest.json",
+    desc: "The main product output: regime label, confidence, scorecard state, drivers, publication context, and methodology/version anchors.",
+  },
+  {
+    name: "Derived",
+    tag: "trend context",
+    path: "derived/<chain>/<date>.json",
+    desc: "Moving-average series built from Gold data, primarily MA7 and MA30 values used for smoothed trend context.",
+  },
+  {
+    name: "Briefs",
+    tag: "readable summaries",
+    path: "briefs/chains/<chain>/latest.json",
+    desc: "Short descriptive JSON summaries of latest regime context, generated from Meta and guarded against predictive or advisory language.",
+  },
+];
+
+const audienceCards = [
+  {
+    label: "Research analysts",
+    desc: "Use a regime calendar and weekly context layer when writing reports, comparing protocols, or explaining unusual observations.",
+  },
+  {
+    label: "Protocol and app teams",
+    desc: "Separate project-specific activity from chain-wide network state before interpreting growth, support load, latency, or usage changes.",
+  },
+  {
+    label: "Data and model teams",
+    desc: "Add a deterministic point-in-time feature to internal tables without maintaining a bespoke chain-classification pipeline.",
+  },
+];
+
+const operatingPrinciples = [
+  {
+    label: "Joinable before beautiful",
+    desc: "The core object is a daily row keyed by observation date and chain. Dashboards explain it; the data product is the row.",
+  },
+  {
+    label: "Evidence before interpretation",
+    desc: "Every label is paired with confidence, component scores, drivers, methodology version, and publication metadata.",
+  },
+  {
+    label: "Bounded by design",
+    desc: "Urd Atlas describes observed network state. It does not provide instructions, forecasts, or portfolio recommendations.",
+  },
+  {
+    label: "Useful without infrastructure",
+    desc: "Explorer and Analyst Kit give value before a team decides to integrate subscriber artifacts into production systems.",
+  },
 ];
 
 const exploreLinks = [
-  { href: "/chains", label: "Chains", desc: "Current regime state across BTC, ETH, ARB, and BASE" },
-  { href: "/status", label: "Status", desc: "Publication freshness and data availability" },
-  { href: "/track-record", label: "Track record", desc: "Historical labels and archive context" },
-  { href: "/thresholds", label: "Thresholds", desc: "Classification bands and rule surfaces" },
-  { href: "/glossary", label: "Glossary", desc: "Metric and methodology definitions" },
-  { href: "/api-docs", label: "API docs", desc: "JSON access, schema, and workflows" },
+  { href: "/explorer", label: "Explorer", desc: "Read the latest network state, confidence and freshness without setup" },
+  { href: "/analyst-kit", label: "Analyst Kit", desc: "Open CSV calendars, summaries, schema and a starter notebook" },
+  { href: "/validation", label: "Validation", desc: "Inspect class balance, transitions and confidence coverage" },
+  { href: "/workflows", label: "Workflows", desc: "See how the data joins to reports, dashboards and models" },
+  { href: "/api-docs", label: "API docs", desc: "Use public checks and authenticated artifact delivery" },
+  { href: "/status", label: "Status", desc: "Publication freshness and current operational state" },
 ];
 
 export default async function AboutPage() {
@@ -32,36 +86,35 @@ export default async function AboutPage() {
 
   return (
     <main className="ua-page">
-
       {/* ── Hero ── */}
       <header className="hero border-b border-[var(--line)]">
         <div className="page-shell">
           <div className="eyebrow mb-4">About Urd Atlas</div>
-          <h1 className="ua-h1">Blockchain regime data, <em>stripped down to evidence.</em></h1>
-          <p className="lead mt-4 max-w-2xl">
-            Urd Atlas is a deterministic, explainable context layer for Bitcoin, Ethereum,
-            Arbitrum, and Base. It answers one narrow question: is current network activity
-            normal noise, or a persistent change in regime?
+          <h1 className="ua-h1">A network-state layer for the work analysts already do.</h1>
+          <p className="lead mt-4 max-w-3xl">
+            Urd Atlas turns public blockchain activity into daily, versioned reference data:
+            a regime label, confidence score, component scores, drivers, and publication metadata
+            that can be read in a browser, opened as CSV, or joined to internal workflows.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/chains" className="btn-ghost">See current regimes →</Link>
+            <Link href="/explorer" className="btn-ghost">Read current state →</Link>
+            <Link href="/analyst-kit" className="btn-ghost">Use Analyst Kit →</Link>
             <Link href="/methodology" className="text-link">Methodology →</Link>
           </div>
         </div>
       </header>
 
       <div className="page-shell py-12 space-y-16">
-
-        {/* ── What it does ── */}
+        {/* ── Positioning ── */}
         <section>
           <div className="section-head mb-8">
             <div>
               <div className="eyebrow mb-3">Mandate</div>
-              <h2 className="ua-h2">Separate regime from noise</h2>
+              <h2 className="ua-h2">Make chain conditions explicit</h2>
             </div>
             <p className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
-              A narrow daily context layer for BTC, ETH, ARB, and BASE. It classifies persistent
-              network-state changes without mixing in price, forecasts, or advice.
+              Most analysis already has dates and chains. Urd Atlas adds the missing context layer:
+              what kind of network state surrounded the observation.
             </p>
           </div>
 
@@ -69,8 +122,8 @@ export default async function AboutPage() {
             {[
               { label: "Labels", value: "STABLE · HEATING · CONGESTED · CHEAP" },
               { label: "Axes", value: "Demand · Friction · Capacity" },
-              { label: "Gate", value: "Confidence-gated labels" },
-              { label: "Evidence", value: "Ranked drivers per day" },
+              { label: "Gate", value: "Confidence-visible rows" },
+              { label: "Evidence", value: "Drivers and metadata" },
             ].map(({ label, value }) => (
               <div key={label} className="fact-item">
                 <strong>{label}</strong>
@@ -79,18 +132,45 @@ export default async function AboutPage() {
             ))}
           </div>
 
-          <div className="border-t border-[var(--line)] pt-8 mt-8">
-            <p className="text-[var(--ink2)] text-sm leading-7 max-w-3xl">
-              Blockchains produce enormous amounts of data every day. Transaction counts, fees,
-              block times, gas usage — all of it is public. But raw numbers are hard to interpret.
-              Is a spike in transactions meaningful or will it reverse tomorrow? Is a fee increase
-              a regime shift or just noise from a single application?
+          <div className="border-t border-[var(--line)] pt-8 mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+            <div>
+              <div className="eyebrow mb-3">Problem</div>
+              <h3 className="ua-h3">Raw on-chain metrics are observable, but not immediately interpretable.</h3>
+            </div>
+            <div className="space-y-4 text-[var(--ink2)] text-sm leading-7">
+              <p>
+                Transaction counts, fees, gas usage, block times and activity metrics are public,
+                but a raw spike or drop does not tell a team whether the whole chain was in a different
+                state that day.
+              </p>
+              <p>
+                Urd Atlas compares each chain against its own recent history, classifies the network-state
+                row, and publishes a compact reference layer that can be joined to the data a user already has.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Who it is for ── */}
+        <section className="border-t border-[var(--line)] pt-10">
+          <div className="section-head mb-8">
+            <div>
+              <div className="eyebrow mb-3">Who uses it</div>
+              <h2 className="ua-h2">Built for analysis, reporting and data systems</h2>
+            </div>
+            <p className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
+              The same published row can support a no-pipeline analyst, a technical evaluator,
+              or a production data team. The access path changes; the reference data stays the same.
             </p>
-            <p className="text-[var(--ink2)] text-sm leading-7 max-w-3xl mt-4">
-              Urd Atlas answers by comparing each chain&apos;s current metrics against its own recent
-              history, applying a documented classification model, and publishing a daily descriptive
-              label along with the full breakdown of why that label was assigned.
-            </p>
+          </div>
+
+          <div className="grid gap-0 md:grid-cols-3">
+            {audienceCards.map(({ label, desc }) => (
+              <div key={label} className="data-row pr-8" style={{ display: "block", padding: "18px 32px 18px 0" }}>
+                <div className="text-[var(--ink)] text-sm font-medium mb-1">{label}</div>
+                <div className="text-[var(--ink2)] text-sm leading-6">{desc}</div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -102,17 +182,17 @@ export default async function AboutPage() {
               <h2 className="ua-h2">Strictly descriptive</h2>
             </div>
             <p className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
-              The product describes observed on-chain conditions. It does not tell users what
-              to buy, sell, hold, expect, or forecast.
+              The product describes observed on-chain conditions. It does not make future-state claims
+              or tell users what action to take.
             </p>
           </div>
 
           <div className="grid gap-0 md:grid-cols-2">
             {[
-              { label: "No price data", desc: "If you want to combine regime state with price, you bring your own price data." },
-              { label: "No forecasts", desc: "The model describes the current state. It makes no claim about what will happen next." },
-              { label: "No trading signals", desc: "CONGESTED is not a sell signal. CHEAP is not a buy signal." },
-              { label: "No opaque outputs", desc: "Every number can be traced back to source artifact, formula, and methodology version." },
+              { label: "No price data", desc: "Users can combine Urd Atlas with their own datasets, but price is not an active product output." },
+              { label: "No forecasts", desc: "The model describes the current published state. It makes no claim about what will happen next." },
+              { label: "No instruction layer", desc: "A regime label is context for analysis, not an automated action rule." },
+              { label: "No opaque outputs", desc: "Published rows carry methodology, confidence and traceability metadata so users can inspect the basis for interpretation." },
             ].map(({ label, desc }) => (
               <div key={label} className="data-row pr-8" style={{ display: "block", padding: "18px 32px 18px 0" }}>
                 <div className="text-[var(--ink)] text-sm font-medium mb-1">{label}</div>
@@ -130,9 +210,8 @@ export default async function AboutPage() {
               <h2 className="ua-h2">Four published JSON layers</h2>
             </div>
             <p className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
-              The product is not a dashboard first and a data service second. The on-chain
-              reference data is the product surface. The website explains, previews, and
-              contextualizes what subscribers can consume directly.
+              The website explains and previews the product, but the durable surface is the data contract:
+              JSON artifacts keyed by chain, date, version and methodology.
             </p>
           </div>
 
@@ -150,29 +229,24 @@ export default async function AboutPage() {
           </div>
         </section>
 
-        {/* ── Transparency ── */}
+        {/* ── Operating principles ── */}
         <section className="border-t border-[var(--line)] pt-10">
           <div className="section-head mb-8">
             <div>
-              <div className="eyebrow mb-3">Trust layer</div>
-              <h2 className="ua-h2">Methodology first</h2>
+              <div className="eyebrow mb-3">Product principles</div>
+              <h2 className="ua-h2">Why this is a reference layer, not just a dashboard</h2>
             </div>
             <p className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
-              Every output is tied to a published method, a source artifact, and a versioned data
-              contract. The aim is reproducibility, not narrative commentary.
+              Urd Atlas is designed to be used downstream: in reports, notebooks, data warehouses,
+              model evaluation, dashboard annotation and workflow monitoring.
             </p>
           </div>
 
-          <div className="fact-row" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
-            {[
-              { label: "Thresholds", value: "Published openly" },
-              { label: "Versions", value: "Methodology versioned" },
-              { label: "Hashes", value: "Determinism-anchored" },
-              { label: "Explanations", value: "Basic + Advanced" },
-            ].map(({ label, value }) => (
-              <div key={label} className="fact-item">
-                <strong>{label}</strong>
-                <div className="mt-2 text-sm text-[var(--ink2)]">{value}</div>
+          <div className="grid gap-0 md:grid-cols-2">
+            {operatingPrinciples.map(({ label, desc }) => (
+              <div key={label} className="data-row pr-8" style={{ display: "block", padding: "18px 32px 18px 0" }}>
+                <div className="text-[var(--ink)] text-sm font-medium mb-1">{label}</div>
+                <div className="text-[var(--ink2)] text-sm leading-6">{desc}</div>
               </div>
             ))}
           </div>
@@ -188,12 +262,12 @@ export default async function AboutPage() {
             <div>
               <p className="text-sm leading-7 text-[var(--ink2)] max-w-xl">
                 The underlying chain data comes from AWS Public Blockchain Data. Urd Atlas adds
-                the analytical layer: daily aggregation, robust historical context, regime
-                classification, confidence gating, and published reference data JSON.
+                the analytical layer: daily aggregation, historical context, regime classification,
+                confidence gating, and published reference-data JSON.
               </p>
               <p className="text-sm leading-7 text-[var(--ink2)] max-w-xl mt-4">
-                The distinction matters: the raw data is public. The product value is the
-                standardized, documented, reproducible interpretation layer built on top of it.
+                The distinction matters: the raw data is public. The product value is the standardized,
+                documented and reproducible interpretation layer built on top of it.
               </p>
             </div>
           </div>
@@ -226,7 +300,7 @@ export default async function AboutPage() {
 
         {/* ── Explore ── */}
         <section className="border-t border-[var(--line)] pt-10">
-          <div className="eyebrow mb-6">Explore the product</div>
+          <div className="eyebrow mb-6">Start here</div>
           <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-3">
             {exploreLinks.map(({ href, label, desc }) => (
               <Link key={href} href={href} className="data-row pr-6" style={{ display: "block", padding: "16px 24px 16px 0" }}>
@@ -246,9 +320,7 @@ export default async function AboutPage() {
             <div>Methodology version: <InlineCode>{dataset?.methodology_version ?? "—"}</InlineCode></div>
           </div>
         </details>
-
       </div>
     </main>
   );
 }
-
