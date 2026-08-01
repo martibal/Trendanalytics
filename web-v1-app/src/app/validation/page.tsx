@@ -327,7 +327,7 @@ export default async function ValidationPage() {
         </div>
         <div className="rounded-3xl border border-border bg-card/55 p-7">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Do not overclaim</p>
-          <h2 className="mt-4 text-3xl font-medium tracking-tight">Validation is not signal marketing.</h2>
+          <h2 className="mt-4 text-3xl font-medium tracking-tight">Validation is not outcome marketing.</h2>
           <p className="mt-4 text-sm leading-7 text-muted-foreground">
             This page should not claim that regimes determine external outcomes. Its job is to make the data product credible: where it varies, when it is reliable, what it can segment and where customers should not use it.
           </p>
