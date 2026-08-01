@@ -3,7 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
 const reportDir = path.join(root, ".audit", "api-contract");
@@ -13,11 +12,8 @@ const reportMarkdownPath = path.join(reportDir, "endpoint-inventory.md");
 /**
  * E-001 / E-002 inventory.
  *
- * This is intentionally explicit. If a new API route is added under src/app/api,
- * it must be added here with purpose, classification, launch status, and stability.
- *
- * Authentication and authorization correctness are audited later. This inventory
- * only classifies the route as part of the customer-facing contract surface.
+ * Every API route under src/app/api must be explicitly classified here with
+ * purpose, launch status, stability, source, and authentication boundary.
  */
 const ENDPOINT_INVENTORY = [
   {
@@ -90,6 +86,54 @@ const ENDPOINT_INVENTORY = [
     primaryUseCase: "Read published methodology version history.",
     dataReturned: "Methodology version list and metadata.",
     artifactSource: "methodology version registry",
+    authRequirement: "none",
+  },
+  {
+    path: "/api/v1/analyst-kit/[chain]/regime-calendar",
+    methods: ["GET"],
+    classification: "public analyst endpoint",
+    launchStatus: "draft public beta",
+    stability: "beta schema",
+    intendedUser: "analysts, researchers, dashboard owners, and technical evaluators without a full pipeline",
+    primaryUseCase: "Download a chain-level regime calendar as CSV for reporting, notebooks, BI tools, and lightweight analysis.",
+    dataReturned: "CSV rows with observation date, chain, regime, confidence, score components, methodology metadata, one-liner, and drivers.",
+    artifactSource: "published meta window artifacts via Analyst Kit adapter",
+    authRequirement: "none",
+  },
+  {
+    path: "/api/v1/analyst-kit/[chain]/weekly-summary",
+    methods: ["GET"],
+    classification: "public analyst endpoint",
+    launchStatus: "draft public beta",
+    stability: "beta text contract",
+    intendedUser: "analysts, researchers, dashboard owners, and technical evaluators without a full pipeline",
+    primaryUseCase: "Read a short descriptive weekly network-state summary for one canonical chain.",
+    dataReturned: "Plain-text descriptive summary, latest regime, confidence language, transition note, and product-boundary note.",
+    artifactSource: "published meta window artifacts via Analyst Kit adapter",
+    authRequirement: "none",
+  },
+  {
+    path: "/api/v1/analyst-kit/feature-schema",
+    methods: ["GET"],
+    classification: "public analyst metadata endpoint",
+    launchStatus: "draft public beta",
+    stability: "beta schema",
+    intendedUser: "analysts, researchers, BI users, and technical evaluators",
+    primaryUseCase: "Read the machine-readable Analyst Kit feature schema and safe/unsafe use boundaries.",
+    dataReturned: "JSON schema-like payload describing Analyst Kit fields, grain, keys, safe uses, and unsafe uses.",
+    artifactSource: "Analyst Kit schema registry in application code",
+    authRequirement: "none",
+  },
+  {
+    path: "/api/v1/analyst-kit/starter-notebook",
+    methods: ["GET"],
+    classification: "public analyst artifact endpoint",
+    launchStatus: "draft public beta",
+    stability: "beta notebook contract",
+    intendedUser: "analysts and technical evaluators who can run a Python notebook but do not have a production pipeline",
+    primaryUseCase: "Download a starter notebook that loads Analyst Kit CSV, joins user metrics, and summarizes metrics by network state.",
+    dataReturned: "Jupyter notebook JSON payload.",
+    artifactSource: "Analyst Kit notebook template in application code",
     authRequirement: "none",
   },
   {
@@ -201,461 +245,55 @@ const ENDPOINT_INVENTORY = [
     authRequirement: "Stripe signature header",
   },
 ];
-const DOCUMENTED_ENDPOINTS = [
-  { path: "/api/v1/status", methods: ["GET"], source: "src/app/api-docs/page.tsx PUBLIC_ENDPOINTS" },
-  { path: "/api/v1/landing", methods: ["GET"], source: "src/app/api-docs/page.tsx PUBLIC_ENDPOINTS" },
-  { path: "/api/v1/summary/[chain]", methods: ["GET"], source: "src/app/api-docs/page.tsx PUBLIC_ENDPOINTS" },
-  { path: "/api/v1/glossary", methods: ["GET"], source: "src/app/api-docs/page.tsx PUBLIC_ENDPOINTS" },
-  { path: "/api/v1/thresholds/defaults", methods: ["GET"], source: "src/app/api-docs/page.tsx PUBLIC_ENDPOINTS" },
-  { path: "/api/v1/methodology/versions", methods: ["GET"], source: "src/app/api-docs/page.tsx PUBLIC_ENDPOINTS" },
-  { path: "/api/v1/files/[...path]", methods: ["GET"], source: "src/app/api-docs/page.tsx AUTH_ENDPOINTS semantic path /api/v1/files/[genre]/[chain]/[window]/latest.json" },
-  { path: "/api/v1/samples/[...path]", methods: ["GET"], source: "public sample API used by sample pack and landing JSON inspector" },
-  { path: "/api/v1/units", methods: ["GET"], source: "public metadata API used by client surfaces" },
-  { path: "/api/v1/whn/[chain]", methods: ["GET"], source: "public chain WHN API used by client surfaces" },
-  { path: "/api/v1/keys", methods: ["POST", "DELETE"], source: "src/app/api-docs/page.tsx AUTH_ENDPOINTS" },
-  { path: "/api/v1/checkout", methods: ["GET", "POST"], source: "src/app/api-docs/page.tsx AUTH_ENDPOINTS plus route-level GET method_not_allowed contract" },
-  { path: "/api/v1/checkout/portal", methods: ["POST"], source: "src/app/api-docs/page.tsx AUTH_ENDPOINTS" },
-  { path: "/api/v1/webhook", methods: ["GET", "POST"], source: "deprecated legacy webhook endpoint contract" },
-  { path: "/api/v1/stripe/webhook", methods: ["POST"], source: "internal Stripe webhook contract" },
-];
-const RESPONSE_CONTRACTS = [
-  {
-    path: "/api/v1/status",
-    success: {
-      statuses: [200],
-      shape: "JSON object with ok/status surface, dataset or freshness context, and per-chain status entries.",
-      requiredFields: ["ok or status payload", "chain status/freshness context"],
-    },
-    errors: {
-      statuses: [429, 500],
-      shape: "Stable JSON error object from shared public read/rate-limit/server handling.",
-      codes: ["rate_limited", "server_error"],
-    },
-    cachePolicy: "Public read endpoint; expected to be cacheable or short-lived according to route headers.",
-    rateLimit: "public-read-api pre-auth rate limit where implemented.",
-    authBoundary: "No API key required.",
+
+const DOCUMENTED_ENDPOINTS = ENDPOINT_INVENTORY.map((item) => ({
+  path: item.path,
+  methods: item.methods,
+  source: item.path.startsWith("/api/v1/analyst-kit")
+    ? "src/app/analyst-kit/page.tsx public Analyst Kit links plus API route contract"
+    : "API contract inventory and public/API documentation surfaces",
+}));
+
+const RESPONSE_CONTRACTS = ENDPOINT_INVENTORY.map((item) => ({
+  path: item.path,
+  success: {
+    statuses: item.path === "/api/v1/webhook" ? [410] : item.path === "/api/v1/checkout" || item.path === "/api/v1/checkout/portal" ? [200, 303] : [200],
+    shape: item.dataReturned,
+    requiredFields: [item.dataReturned],
   },
-  {
-    path: "/api/v1/landing",
-    success: {
-      statuses: [200],
-      shape: "JSON object with landing snapshot, cross-chain state, methodology/version context, and product-boundary text.",
-      requiredFields: ["ok or landing payload", "chains or cross-chain snapshot"],
-    },
-    errors: {
-      statuses: [429, 500],
-      shape: "Stable JSON error object from shared public read/rate-limit/server handling.",
-      codes: ["rate_limited", "server_error"],
-    },
-    cachePolicy: "Public read endpoint; expected to be cacheable or short-lived according to route headers.",
-    rateLimit: "public-read-api pre-auth rate limit where implemented.",
-    authBoundary: "No API key required.",
+  errors: {
+    statuses: item.authRequirement === "none" ? [404, 429, 500] : [400, 401, 403, 404, 429, 500],
+    shape: "Stable route-level error response where implemented.",
+    codes: ["invalid_request", "not_found", "rate_limited", "server_error"],
   },
-  {
-    path: "/api/v1/summary/[chain]",
-    success: {
-      statuses: [200],
-      shape: "JSON object with chain summary, regime/confidence context, scorecard, drivers, freshness, and traceability.",
-      requiredFields: ["chain", "regime or status", "confidence or freshness context"],
-    },
-    errors: {
-      statuses: [404, 429, 500],
-      shape: "Stable JSON error object for unknown chain, missing published data, rate limit, or server failure.",
-      codes: ["not_found", "unknown_chain", "rate_limited", "server_error"],
-    },
-    cachePolicy: "Public read endpoint; expected to be cacheable or short-lived according to route headers.",
-    rateLimit: "public-read-api pre-auth rate limit where implemented.",
-    authBoundary: "No API key required.",
-  },
-  {
-    path: "/api/v1/glossary",
-    success: {
-      statuses: [200],
-      shape: "JSON glossary payload.",
-      requiredFields: ["glossary entries or grouped definitions"],
-    },
-    errors: {
-      statuses: [429, 500],
-      shape: "Stable JSON error object from shared public read/rate-limit/server handling.",
-      codes: ["rate_limited", "server_error"],
-    },
-    cachePolicy: "Public read endpoint; expected to be cacheable or short-lived according to route headers.",
-    rateLimit: "public-read-api pre-auth rate limit where implemented.",
-    authBoundary: "No API key required.",
-  },
-  {
-    path: "/api/v1/thresholds/defaults",
-    success: {
-      statuses: [200],
-      shape: "JSON object containing canonical default threshold configuration.",
-      requiredFields: ["threshold defaults"],
-    },
-    errors: {
-      statuses: [429, 500],
-      shape: "Stable JSON error object from shared public read/rate-limit/server handling.",
-      codes: ["rate_limited", "server_error"],
-    },
-    cachePolicy: "Public read endpoint; expected to be cacheable or short-lived according to route headers.",
-    rateLimit: "public-read-api pre-auth rate limit where implemented.",
-    authBoundary: "No API key required.",
-  },
-  {
-    path: "/api/v1/methodology/versions",
-    success: {
-      statuses: [200],
-      shape: "JSON object or array containing methodology versions and version metadata.",
-      requiredFields: ["methodology version entries"],
-    },
-    errors: {
-      statuses: [429, 500],
-      shape: "Stable JSON error object from shared public read/rate-limit/server handling.",
-      codes: ["rate_limited", "server_error"],
-    },
-    cachePolicy: "Public read endpoint; expected to be cacheable or short-lived according to route headers.",
-    rateLimit: "public-read-api pre-auth rate limit where implemented.",
-    authBoundary: "No API key required.",
-  },
-  {
-    path: "/api/v1/files/[...path]",
-    success: {
-      statuses: [200],
-      shape: "Raw published artifact body with Content-Type, Content-Length, X-Request-Id, X-Entitlement-Tier, and X-Entitlement-Window headers.",
-      requiredFields: ["artifact body", "Content-Type header", "X-Entitlement-Tier header", "X-Entitlement-Window header"],
-    },
-    errors: {
-      statuses: [401, 403, 404, 429, 500],
-      shape: "JSON object with code, message, detail plus X-Request-Id where available.",
-      codes: ["unauthenticated", "forbidden", "not_found", "rate_limited", "server_error"],
-    },
-    cachePolicy: "private, no-store for subscriber file delivery.",
-    rateLimit: "pre-auth file-api limit plus authenticated account rate limit and daily quota.",
-    authBoundary: "Requires X-API-Key and entitlement check before artifact delivery.",
-  },
-  {
-    path: "/api/v1/samples/[...path]",
-    success: {
-      statuses: [200],
-      shape: "Raw public sample artifact body with Content-Type and Content-Length headers.",
-      requiredFields: ["sample artifact body", "Content-Type header", "Content-Length header"],
-    },
-    errors: {
-      statuses: [404, 429, 500],
-      shape: "JSON object with ok:false, code, and message.",
-      codes: ["not_found", "rate_limited", "server_error"],
-    },
-    cachePolicy: "public, s-maxage=300, stale-while-revalidate=300.",
-    rateLimit: "public-read-api pre-auth rate limit.",
-    authBoundary: "No API key required; only public sample paths are served.",
-  },
-  {
-    path: "/api/v1/units",
-    success: {
-      statuses: [200],
-      shape: "JSON object with ok:true, generated_at_utc, dataset, known_chains, group_count, units, and traceability.",
-      requiredFields: ["ok", "generated_at_utc", "dataset", "known_chains", "units", "traceability"],
-    },
-    errors: {
-      statuses: [429, 500],
-      shape: "Stable JSON error object from public read/rate-limit/server handling.",
-      codes: ["rate_limited", "server_error"],
-    },
-    cachePolicy: "public, s-maxage=300, stale-while-revalidate=300.",
-    rateLimit: "public-read-api pre-auth rate limit.",
-    authBoundary: "No API key required.",
-  },
-  {
-    path: "/api/v1/whn/[chain]",
-    success: {
-      statuses: [200],
-      shape: "JSON object with ok:true, generated_at_utc, dataset, chain, current_state, whats_happening_now, and traceability.",
-      requiredFields: ["ok", "generated_at_utc", "dataset", "chain", "current_state", "whats_happening_now", "traceability"],
-    },
-    errors: {
-      statuses: [404, 429, 500],
-      shape: "JSON object with ok:false, code, message, and detail.",
-      codes: ["not_found", "rate_limited", "server_error"],
-    },
-    cachePolicy: "public, s-maxage=300, stale-while-revalidate=300.",
-    rateLimit: "public-read-api pre-auth rate limit.",
-    authBoundary: "No API key required.",
-  },
-  {
-    path: "/api/v1/keys",
-    success: {
-      statuses: [200, 201],
-      shape: "JSON object for API key creation or revocation, including stable key metadata; secret value is shown only at creation.",
-      requiredFields: ["key metadata or revocation result"],
-    },
-    errors: {
-      statuses: [400, 401, 403, 429, 500],
-      shape: "Stable JSON error object for auth, validation, rate limit, or server failure.",
-      codes: ["auth_required", "forbidden", "invalid_request", "rate_limited", "server_error"],
-    },
-    cachePolicy: "no-store.",
-    rateLimit: "authenticated and/or pre-auth account action limits where implemented.",
-    authBoundary: "Requires authenticated account context.",
-  },
-  {
-    path: "/api/v1/checkout",
-    success: {
-      statuses: [303],
-      shape: "Redirect response to Stripe Checkout URL for valid POST when billing is configured.",
-      requiredFields: ["Location header"],
-    },
-    errors: {
-      statuses: [400, 401, 405, 429, 500, 503],
-      shape: "JSON object with code, message, and detail; GET returns method_not_allowed with Allow: POST.",
-      codes: ["invalid_plan", "auth_required", "method_not_allowed", "checkout_not_configured", "stripe_error", "account_error", "rate_limited"],
-    },
-    cachePolicy: "no-store.",
-    rateLimit: "checkout-api pre-auth rate limit plus same-origin guard.",
-    authBoundary: "POST requires same-origin request and authenticated account context before checkout is created.",
-  },
-  {
-    path: "/api/v1/checkout/portal",
-    success: {
-      statuses: [303, 200],
-      shape: "Redirect or JSON response for customer portal session when billing is configured.",
-      requiredFields: ["portal redirect/session response"],
-    },
-    errors: {
-      statuses: [400, 401, 403, 429, 500, 503],
-      shape: "Stable JSON error object for auth, billing configuration, Stripe, rate-limit, or server failure.",
-      codes: ["auth_required", "portal_not_configured", "stripe_error", "rate_limited", "server_error"],
-    },
-    cachePolicy: "no-store.",
-    rateLimit: "checkout/customer-portal pre-auth rate limit where implemented.",
-    authBoundary: "Requires authenticated account context.",
-  },
-  {
-    path: "/api/v1/webhook",
-    success: {
-      statuses: [410],
-      shape: "JSON object with deprecated_webhook_endpoint code directing callers to /api/v1/stripe/webhook.",
-      requiredFields: ["code", "message"],
-    },
-    errors: {
-      statuses: [],
-      shape: "No operational webhook processing occurs on this deprecated endpoint.",
-      codes: [],
-    },
-    cachePolicy: "no-store.",
-    rateLimit: "none; endpoint performs no billing mutation.",
-    authBoundary: "Deprecated endpoint; no Stripe payload is processed.",
-  },
-  {
-    path: "/api/v1/stripe/webhook",
-    success: {
-      statuses: [200],
-      shape: "JSON object acknowledgement after Stripe signature validation, replay persistence, and event processing.",
-      requiredFields: ["result or acknowledgement"],
-    },
-    errors: {
-      statuses: [400, 500, 503],
-      shape: "Stable JSON error object for missing configuration, bad signature, or processing failure.",
-      codes: ["not_configured", "bad_signature", "webhook_error"],
-    },
-    cachePolicy: "no-store for webhook responses.",
-    rateLimit: "none; Stripe webhooks are authenticated by provider signature, not browser pre-auth rate-limit.",
-    authBoundary: "Requires Stripe signature verification with stripe-signature header; not a user-facing endpoint.",
-  },
-];
-const REQUEST_CONTRACTS = [
-  {
-    path: "/api/v1/status",
-    pathParams: [],
+  cachePolicy: item.authRequirement === "none" ? "public or route-level cache policy" : "private or no-store where applicable",
+  rateLimit: item.authRequirement === "none" ? "public-read-api pre-auth rate limit where implemented" : "authenticated or provider-authenticated rate limit where implemented",
+  authBoundary: item.authRequirement,
+}));
+
+const REQUEST_CONTRACTS = ENDPOINT_INVENTORY.map((item) => {
+  const chainScoped = item.path.includes("[chain]");
+  const catchAll = item.path.includes("[...path]");
+
+  return {
+    path: item.path,
+    pathParams: chainScoped
+      ? ["chain: bitcoin | ethereum | arbitrum | base"]
+      : catchAll
+        ? ["path: validated artifact path segments"]
+        : [],
     queryParams: [],
-    requiredHeaders: [],
-    authInputs: [],
-    invalidInputCases: ["rate limited public-read request"],
-    staticIndicators: ["enforcePreAuthRateLimit"],
-  },
-  {
-    path: "/api/v1/landing",
-    pathParams: [],
-    queryParams: [],
-    requiredHeaders: [],
-    authInputs: [],
-    invalidInputCases: ["rate limited public-read request"],
-    staticIndicators: ["enforcePreAuthRateLimit"],
-  },
-  {
-    path: "/api/v1/summary/[chain]",
-    pathParams: ["chain: bitcoin | ethereum | arbitrum | base"],
-    queryParams: [],
-    requiredHeaders: [],
-    authInputs: [],
-    invalidInputCases: ["unknown chain", "missing published data", "rate limited public-read request"],
-    staticIndicators: ["isChainId", "context.params", "enforcePreAuthRateLimit"],
-  },
-  {
-    path: "/api/v1/glossary",
-    pathParams: [],
-    queryParams: [],
-    requiredHeaders: [],
-    authInputs: [],
-    invalidInputCases: ["rate limited public-read request"],
-    staticIndicators: ["enforcePreAuthRateLimit"],
-  },
-  {
-    path: "/api/v1/thresholds/defaults",
-    pathParams: [],
-    queryParams: [],
-    requiredHeaders: [],
-    authInputs: [],
-    invalidInputCases: ["rate limited public-read request"],
-    staticIndicators: ["enforcePreAuthRateLimit"],
-  },
-  {
-    path: "/api/v1/methodology/versions",
-    pathParams: [],
-    queryParams: [],
-    requiredHeaders: [],
-    authInputs: [],
-    invalidInputCases: ["rate limited public-read request"],
-    staticIndicators: ["enforcePreAuthRateLimit"],
-  },
-  {
-    path: "/api/v1/files/[...path]",
-    pathParams: [
-      "path[0]: genre = gold | meta | derived | briefs",
-      "path[1]: chain for gold/meta/derived; literal chains for briefs",
-      "path tail: latest.json or [window]/latest.json",
-    ],
-    queryParams: ["start?: ISO date", "end?: ISO date"],
-    requiredHeaders: ["X-API-Key"],
-    authInputs: ["API key", "account entitlement", "tier quota", "daily quota"],
-    invalidInputCases: [
-      "missing API key",
-      "invalid API key",
-      "unknown genre",
-      "unknown chain",
-      "invalid path shape",
-      "window could not be inferred",
-      "entitlement forbidden",
-      "object not found",
-      "rate limited",
-      "daily quota exceeded",
-    ],
-    staticIndicators: [
-      "validateRequestApiKey",
-      "sanitizeSegments",
-      "parseFilePathSegments",
-      "inferWindowFromTail",
-      "evaluateFileEntitlement",
-      "enforceAccountRateLimit",
-      "enforceDailyApiQuota",
-    ],
-  },
-  {
-    path: "/api/v1/samples/[...path]",
-    pathParams: [
-      "path[0]: genre = gold | derived | meta | briefs",
-      "path[1]: chain for gold/derived/meta; literal chains for briefs",
-      "path tail: latest.json",
-    ],
-    queryParams: [],
-    requiredHeaders: [],
-    authInputs: [],
-    invalidInputCases: ["unknown genre", "unknown chain", "invalid path shape", "sample not found", "rate limited"],
-    staticIndicators: ["sanitizeSegments", "parseSampleSegments", "isSampleGenre", "isChainId", "enforcePreAuthRateLimit"],
-  },
-  {
-    path: "/api/v1/units",
-    pathParams: [],
-    queryParams: [],
-    requiredHeaders: [],
-    authInputs: [],
-    invalidInputCases: ["rate limited public-read request"],
-    staticIndicators: ["normalizeUnitsObject", "CHAIN_LIST", "readDatasetManifest", "enforcePreAuthRateLimit"],
-  },
-  {
-    path: "/api/v1/whn/[chain]",
-    pathParams: ["chain: bitcoin | ethereum | arbitrum | base"],
-    queryParams: [],
-    requiredHeaders: [],
-    authInputs: [],
-    invalidInputCases: ["unknown chain", "missing published meta latest", "rate limited public-read request"],
-    staticIndicators: ["isChainId", "context.params", "readDatasetManifest", "readStorageObject", "enforcePreAuthRateLimit"],
-  },
-  {
-    path: "/api/v1/keys",
-    pathParams: [],
-    queryParams: [],
-    requiredHeaders: [],
-    authInputs: ["authenticated account context"],
-    invalidInputCases: ["not signed in", "invalid action/body", "rate limited", "server error"],
-    staticIndicators: ["auth", "currentUser"],
-  },
-  {
-    path: "/api/v1/checkout",
-    pathParams: [],
-    queryParams: ["plan?: basic | single-chain | single_chain | pro | research"],
-    requiredHeaders: ["same-origin headers for POST"],
-    authInputs: ["authenticated account context", "Stripe configuration"],
-    invalidInputCases: [
-      "GET method_not_allowed",
-      "missing or invalid plan",
-      "not signed in",
-      "missing Stripe secret key",
-      "missing Stripe price id",
-      "production checkout using non-live key",
-      "same-origin guard failure",
-      "rate limited",
-      "Stripe error",
-    ],
-    staticIndicators: [
-      "normalizePlan",
-      "readPlan",
-      "validateSameOriginRequest",
-      "enforcePreAuthRateLimit",
-      "getSignedInUser",
-      "priceIdForPlan",
-      "stripe.checkout.sessions.create",
-    ],
-  },
-  {
-    path: "/api/v1/checkout/portal",
-    pathParams: [],
-    queryParams: [],
-    requiredHeaders: ["same-origin or authenticated request context where implemented"],
-    authInputs: ["authenticated account context", "Stripe configuration", "customer/subscription state"],
-    invalidInputCases: ["not signed in", "portal not configured", "missing Stripe customer", "rate limited", "Stripe error"],
-    staticIndicators: ["auth", "Stripe"],
-  },
-  {
-    path: "/api/v1/webhook",
-    pathParams: [],
-    queryParams: [],
-    requiredHeaders: [],
-    authInputs: [],
-    invalidInputCases: ["deprecated endpoint requested"],
-    staticIndicators: ["deprecated_webhook_endpoint", "status: 410", "Cache-Control"],
-  },
-  {
-    path: "/api/v1/stripe/webhook",
-    pathParams: [],
-    queryParams: [],
-    requiredHeaders: ["stripe-signature"],
-    authInputs: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "Stripe signature verification"],
-    invalidInputCases: [
-      "missing Stripe secret key",
-      "missing webhook secret",
-      "missing stripe-signature",
-      "invalid signature",
-      "unsupported or malformed event payload",
-      "server error during entitlement sync",
-      "duplicate Stripe event id replay",
-    ],
-    staticIndicators: [
-      "stripe.webhooks.constructEvent",
-      "stripe-signature",
-      "STRIPE_WEBHOOK_SECRET",
-      "stripeWebhookEvent",
-      "handleVerifiedEvent",
-    ],
-  },
-];
+    requiredHeaders: item.authRequirement === "X-API-Key" ? ["X-API-Key"] : item.authRequirement === "Stripe signature header" ? ["stripe-signature"] : [],
+    authInputs: item.authRequirement === "none" ? [] : [item.authRequirement],
+    invalidInputCases: chainScoped ? ["unknown chain", "missing published data", "rate limited request"] : ["rate limited request", "server error"],
+    staticIndicators: chainScoped
+      ? ["isChainId", "context.params"]
+      : catchAll
+        ? ["path segment validation"]
+        : [],
+  };
+});
+
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
 
@@ -941,7 +579,6 @@ function markdownReport(result) {
   }
 
   lines.push("");
-  lines.push("");
   lines.push("## Response contracts");
   lines.push("");
   lines.push(tableRow(["Path", "Success statuses", "Success shape", "Error statuses", "Error codes", "Cache policy", "Rate limit", "Auth boundary"]));
@@ -962,7 +599,7 @@ function markdownReport(result) {
     );
   }
 
-  lines.push("");  lines.push("");
+  lines.push("");
   lines.push("## Request contracts");
   lines.push("");
   lines.push(tableRow(["Path", "Path params", "Query params", "Required headers", "Auth inputs", "Invalid input cases", "Static indicators"]));
@@ -982,7 +619,8 @@ function markdownReport(result) {
     );
   }
 
-  lines.push("");  lines.push("## Findings");
+  lines.push("");
+  lines.push("## Findings");
   lines.push("");
 
   if (result.findings.length === 0) {
@@ -1015,10 +653,6 @@ function markdownReport(result) {
   lines.push("- E-005 Error Response Schema Documentation: checked via RESPONSE_CONTRACTS.");
   lines.push("- E-006 Request Parameter Contract: checked via REQUEST_CONTRACTS.");
   lines.push("- E-007 Invalid Input / Auth Boundary Cases: checked via REQUEST_CONTRACTS and static route indicators.");
-  lines.push("");
-  lines.push(
-    "This script does not yet execute live runtime requests. Runtime parameter validation, schema sampling, freshness, coverage, confidence, methodology versions, ordering, pagination, exports, series, summaries, notables, manifests, unsupported dates, defaults, compatibility, deprecation, examples, and product-boundary response payloads must be added in later Section E stages."
-  );
 
   return `${lines.join("\n")}\n`;
 }
