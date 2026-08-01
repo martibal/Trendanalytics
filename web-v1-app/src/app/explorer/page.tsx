@@ -139,7 +139,7 @@ async function getChain(chain: (typeof CHAINS)[number]) {
     labelConfidence: pct(latest?.confidence?.label_confidence_score),
     lagDays: typeof lagDays === "number" && !Number.isNaN(lagDays) ? `${lagDays}d` : "—",
     methodology: latest?.methodology_version ?? "—",
-    oneLiner: latest?.status?.one_liner ?? `${chain.name}'s latest published network-state row is ${latestLabel}.`,
+    oneLiner: latest?.status?.one_liner ?? `${chain.name} latest published network-state row is ${latestLabel}.`,
     labelExplainer: LABEL_EXPLAINER[latestLabel],
     drivers,
     rows: rows.slice(-14).map((row) => ({
@@ -163,7 +163,7 @@ export default async function ExplorerPage() {
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Explorer</p>
           <h1 className="mt-5 text-5xl font-medium tracking-[-0.05em] sm:text-6xl">Read the current network state first.</h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-muted-foreground">
-            Explorer is the no-setup surface for Urd Atlas. Start here to see each chain's latest published regime,
+            Explorer is the no-setup surface for Urd Atlas. Start here to see the latest published regime for each chain,
             confidence level, freshness and recent state path before you download CSVs or integrate the API.
           </p>
         </div>
@@ -276,12 +276,16 @@ export default async function ExplorerPage() {
       </section>
 
       <section className="mt-14 rounded-[2rem] border border-border bg-card p-8 lg:p-10">
-        <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Product boundary</p>
+        <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Boundary</p>
         <h2 className="mt-4 text-3xl font-medium tracking-tight">Explorer is a reading surface, not an automation layer.</h2>
         <p className="mt-4 max-w-4xl text-muted-foreground leading-7">
-          Use this page to understand the latest published network-state context, inspect confidence and decide whether to open a chain page,
-          download Analyst Kit artifacts or review validation diagnostics. It is descriptive reference data, not a live execution system or future-state guarantee.
+          The page helps users understand the latest published network-state rows, confidence and recent path.
+          It is descriptive reference data, not a live execution system or a future-state guarantee.
         </p>
+        <div className="mt-7 flex flex-wrap gap-3">
+          <Link href="/workflows" className="rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground">See workflows</Link>
+          <Link href="/api-docs" className="rounded-full border border-border px-5 py-3 text-sm font-medium">Open API docs</Link>
+        </div>
       </section>
     </main>
   );
