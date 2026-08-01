@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { buildStarterNotebook } from "@/lib/analystKit";
+import { buildRunnableStarterNotebook } from "@/lib/analystKitNotebook";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return new NextResponse(JSON.stringify(buildStarterNotebook(), null, 2), {
+  return new NextResponse(JSON.stringify(buildRunnableStarterNotebook(), null, 2), {
     status: 200,
     headers: {
       "Content-Type": "application/x-ipynb+json; charset=utf-8",

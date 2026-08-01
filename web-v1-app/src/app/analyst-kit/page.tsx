@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import EndpointCopyButton from "@/components/analyst-kit/EndpointCopyButton";
+
 export const metadata: Metadata = {
   title: "Analyst Kit | Urd Atlas",
   description:
@@ -12,6 +14,19 @@ const chains = [
   { id: "ethereum", label: "Ethereum", ticker: "ETH" },
   { id: "arbitrum", label: "Arbitrum", ticker: "ARB" },
   { id: "base", label: "Base", ticker: "BASE" },
+] as const;
+
+const globalDownloads = [
+  {
+    title: "Feature schema JSON",
+    body: "Machine-readable field semantics, primary key, safe uses and unsafe uses for the Analyst Kit table.",
+    href: "/api/v1/analyst-kit/feature-schema",
+  },
+  {
+    title: "Runnable starter notebook",
+    body: "A notebook that runs immediately with example data, then shows exactly where to replace it with your own CSV.",
+    href: "/api/v1/analyst-kit/starter-notebook",
+  },
 ] as const;
 
 const kitItems = [
@@ -32,19 +47,56 @@ const kitItems = [
   },
   {
     title: "Starter notebook",
-    body: "A copy-run-adapt Python notebook for users who can code but do not have infrastructure. Load Urd Atlas, merge with a CSV, calculate metrics by regime and export tables.",
+    body: "A copy-run-adapt Python notebook for users who can code but do not have infrastructure. It includes a synthetic example dataset so the first run produces output immediately.",
     example: "/api/v1/analyst-kit/starter-notebook",
   },
 ];
+
+const previewRows = [
+  {
+    field: "observation_date",
+    example: "2026-07-31",
+    use: "Join key for daily analysis.",
+  },
+  {
+    field: "chain",
+    example: "ethereum",
+    use: "Join key and chain selector.",
+  },
+  {
+    field: "regime",
+    example: "HEATING",
+    use: "Human-readable network-state label.",
+  },
+  {
+    field: "confidence_score",
+    example: "0.842",
+    use: "Quality gate before summarizing.",
+  },
+  {
+    field: "demand_score",
+    example: "73.1",
+    use: "Continuous component for deeper analysis.",
+  },
+  {
+    field: "methodology_version",
+    example: "v2.0",
+    use: "Reproducibility context.",
+  },
+] as const;
 
 const notebook = `import pandas as pd
 
 chain = "ethereum"
 urd = pd.read_csv(f"https://urdatlas.com/api/v1/analyst-kit/{chain}/regime-calendar")
-my_data = pd.read_csv("my_protocol_metrics.csv")
+
+example = urd[["observation_date", "chain"]].tail(30).copy()
+example["daily_active_users"] = [100 + (i % 7) * 8 for i in range(len(example))]
+example["support_tickets"] = [12 + (i % 5) for i in range(len(example))]
+my_data = example.rename(columns={"observation_date": "date"})
 
 df = my_data.merge(
-    urd[["observation_date", "chain", "regime", "confidence_score"]],
+    urd[["observation_date", "chain", "regime", "confidence_score", "demand_score"]],
     left_on=["date", "chain"],
     right_on=["observation_date", "chain"],
     how="left",
@@ -55,12 +107,13 @@ summary = (
     .groupby("regime")
     .agg(
         days=("date", "count"),
-        avg_users=("daily_active_users", "mean"),
-        avg_volume=("volume_usd", "mean"),
+        avg_daily_active_users=("daily_active_users", "mean"),
+        avg_support_tickets=("support_tickets", "mean"),
+        avg_demand_score=("demand_score", "mean"),
     )
 )
 
-summary.to_csv("my_metrics_by_urd_regime.csv")`;
+summary.to_csv("my_metrics_by_urd_network_state.csv")`;
 
 export default function AnalystKitPage() {
   return (
@@ -90,46 +143,114 @@ export default function AnalystKitPage() {
       <section className="mt-12 rounded-[2rem] border border-border bg-card p-7 lg:p-9">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Live Analyst Kit downloads</p>
-            <h2 className="mt-3 text-3xl font-medium tracking-tight">Start with a chain calendar or a report-ready summary.</h2>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Ten-minute path to value</p>
+            <h2 className="mt-3 text-3xl font-medium tracking-tight">Open, copy, join, summarize.</h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-              These endpoints are intentionally simple: open them in a browser, paste them into pandas, or connect them to a spreadsheet/BI workflow.
+              These artifacts are intentionally simple: open them in a browser, paste the URL into pandas, or connect the CSV to spreadsheet and BI workflows.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <a href="/api/v1/analyst-kit/feature-schema" className="rounded-full border border-border px-4 py-2 text-sm font-medium">
-              Feature schema JSON
-            </a>
-            <a href="/api/v1/analyst-kit/starter-notebook" className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-              Download notebook
-            </a>
+          <div className="grid gap-2 text-sm leading-6 text-muted-foreground sm:grid-cols-2 lg:min-w-[420px]">
+            <div><strong className="text-foreground">1.</strong> Pick a chain calendar.</div>
+            <div><strong className="text-foreground">2.</strong> Copy the CSV URL.</div>
+            <div><strong className="text-foreground">3.</strong> Join on date and chain.</div>
+            <div><strong className="text-foreground">4.</strong> Gate by confidence.</div>
           </div>
         </div>
 
-        <div className="mt-7 grid gap-4 lg:grid-cols-4">
-          {chains.map((chain) => (
-            <article key={chain.id} className="rounded-3xl border border-border bg-background/55 p-5">
-              <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">{chain.ticker}</p>
-              <h3 className="mt-2 text-xl font-medium">{chain.label}</h3>
-              <div className="mt-5 grid gap-3 text-sm">
-                <a href={`/api/v1/analyst-kit/${chain.id}/regime-calendar`} className="rounded-2xl border border-border px-4 py-3 hover:bg-card">
-                  CSV regime calendar
-                </a>
-                <a href={`/api/v1/analyst-kit/${chain.id}/weekly-summary`} className="rounded-2xl border border-border px-4 py-3 hover:bg-card">
-                  Weekly summary text
-                </a>
+        <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {chains.map((chain) => {
+            const csvPath = `/api/v1/analyst-kit/${chain.id}/regime-calendar`;
+            const summaryPath = `/api/v1/analyst-kit/${chain.id}/weekly-summary`;
+
+            return (
+              <article key={chain.id} className="min-w-0 rounded-3xl border border-border bg-background/55 p-5">
+                <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">{chain.ticker}</p>
+                <h3 className="mt-2 text-xl font-medium">{chain.label}</h3>
+                <div className="mt-5 grid gap-3 text-sm">
+                  <div className="min-w-0 rounded-2xl border border-border p-3">
+                    <a href={csvPath} className="font-medium hover:text-primary">CSV regime calendar</a>
+                    <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                      <code className="block min-w-0 truncate text-xs text-muted-foreground" title={csvPath}>{csvPath}</code>
+                      <EndpointCopyButton path={csvPath} />
+                    </div>
+                  </div>
+                  <div className="min-w-0 rounded-2xl border border-border p-3">
+                    <a href={summaryPath} className="font-medium hover:text-primary">Weekly summary text</a>
+                    <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                      <code className="block min-w-0 truncate text-xs text-muted-foreground" title={summaryPath}>{summaryPath}</code>
+                      <EndpointCopyButton path={summaryPath} />
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          {globalDownloads.map((download) => (
+            <article key={download.href} className="min-w-0 rounded-3xl border border-border bg-background/55 p-5">
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <div className="min-w-0">
+                  <h3 className="text-xl font-medium">{download.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{download.body}</p>
+                  <code className="mt-3 block min-w-0 truncate text-xs text-primary" title={download.href}>{download.href}</code>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <a href={download.href} className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground">Open</a>
+                  <EndpointCopyButton path={download.href} />
+                </div>
               </div>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="mt-12 grid gap-5 lg:grid-cols-4">
+      <section className="mt-12 grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-3xl border border-border bg-card/55 p-7">
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">CSV preview</p>
+          <h2 className="mt-4 text-3xl font-medium tracking-tight">The table is deliberately boring.</h2>
+          <p className="mt-4 text-sm leading-7 text-muted-foreground">
+            Analyst Kit is valuable because it is easy to join. The CSV is one row per chain and observation date, with human-readable labels, continuous component scores and reproducibility metadata.
+          </p>
+          <div className="mt-6 overflow-x-auto rounded-3xl border border-border bg-background/60">
+            <table className="w-full min-w-[620px] text-left text-sm">
+              <thead className="border-b border-border text-xs uppercase tracking-[0.16em] text-primary">
+                <tr>
+                  <th className="px-4 py-3">Field</th>
+                  <th className="px-4 py-3">Example</th>
+                  <th className="px-4 py-3">Use</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewRows.map((row) => (
+                  <tr key={row.field} className="border-b border-border last:border-0">
+                    <td className="px-4 py-3 font-mono text-xs text-foreground">{row.field}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{row.example}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{row.use}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-border bg-card/55 p-7">
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Runnable notebook</p>
+          <h2 className="mt-4 text-3xl font-medium tracking-tight">First run should produce output.</h2>
+          <p className="mt-4 text-sm leading-7 text-muted-foreground">
+            The starter notebook no longer assumes the user already has a local metrics file. It creates a small example table from the Urd Atlas date range, produces a grouped summary, then shows where to swap in a real CSV.
+          </p>
+          <pre className="mt-6 max-h-[520px] overflow-x-auto rounded-3xl border border-border bg-background p-6 text-sm leading-7 text-muted-foreground"><code>{notebook}</code></pre>
+        </div>
+      </section>
+
+      <section className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {kitItems.map((item) => (
-          <article key={item.title} className="rounded-3xl border border-border bg-card/55 p-6">
+          <article key={item.title} className="min-w-0 rounded-3xl border border-border bg-card/55 p-6">
             <h2 className="text-2xl font-medium tracking-tight">{item.title}</h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">{item.body}</p>
-            <p className="mt-5 rounded-2xl border border-border bg-background/60 p-4 font-mono text-xs leading-6 text-primary">
+            <p className="mt-5 break-all rounded-2xl border border-border bg-background/60 p-4 font-mono text-xs leading-6 text-primary">
               {item.example}
             </p>
           </article>
@@ -139,32 +260,30 @@ export default function AnalystKitPage() {
       <section className="mt-14 grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="rounded-3xl border border-border bg-card/55 p-7">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Example use case</p>
-          <h2 className="mt-4 text-3xl font-medium tracking-tight">Did our protocol grow, or was the whole chain hot?</h2>
+          <h2 className="mt-4 text-3xl font-medium tracking-tight">Did our app improve, or did chain-wide conditions shift?</h2>
           <p className="mt-4 text-sm leading-7 text-muted-foreground">
-            A protocol team can merge its own app metrics with the Urd Atlas regime calendar. If growth only occurs during chain-wide HEATING periods,
-            the story is different than if growth appears during STABLE or CHEAP periods. This does not require a feature store. It requires one CSV join.
+            A protocol or app team can merge its own daily metrics with the Urd Atlas regime calendar. If activity only rises during chain-wide HEATING periods,
+            the interpretation is different than if the same activity appears during STABLE or CHEAP periods. This does not require a feature store. It requires one CSV join.
           </p>
           <ol className="mt-6 space-y-3 text-sm leading-6 text-muted-foreground">
-            <li><strong className="text-foreground">1.</strong> Download chain regime calendar.</li>
-            <li><strong className="text-foreground">2.</strong> Export app metrics from the tool already used by the team.</li>
+            <li><strong className="text-foreground">1.</strong> Download the chain regime calendar.</li>
+            <li><strong className="text-foreground">2.</strong> Export daily app metrics from the tool already used by the team.</li>
             <li><strong className="text-foreground">3.</strong> Join on date and chain.</li>
-            <li><strong className="text-foreground">4.</strong> Compare users, volume or fees by network state.</li>
+            <li><strong className="text-foreground">4.</strong> Compare active users, operational load or support burden by network state.</li>
           </ol>
         </div>
 
-        <pre className="overflow-x-auto rounded-3xl border border-border bg-background p-6 text-sm leading-7 text-muted-foreground"><code>{notebook}</code></pre>
-      </section>
-
-      <section className="mt-14 rounded-[2rem] border border-border bg-card p-8 lg:p-10">
-        <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Product boundary</p>
-        <h2 className="mt-4 text-3xl font-medium tracking-tight">The accessible version must still be rigorous.</h2>
-        <p className="mt-4 max-w-4xl text-muted-foreground leading-7">
-          Analyst Kit should not become retail trading content. It packages deterministic network-state data into artifacts that help users write reports,
-          annotate dashboards, investigate protocol performance and decide what to analyze next. The language should stay descriptive: context, not recommendation.
-        </p>
-        <div className="mt-7 flex flex-wrap gap-3">
-          <Link href="/explorer" className="rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground">Open Explorer</Link>
-          <Link href="/workflows" className="rounded-full border border-border px-5 py-3 text-sm font-medium">Move to technical workflows</Link>
+        <div className="rounded-3xl border border-border bg-card/55 p-7">
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Boundary</p>
+          <h2 className="mt-4 text-3xl font-medium tracking-tight">Accessible should not mean vague.</h2>
+          <p className="mt-4 text-sm leading-7 text-muted-foreground">
+            Analyst Kit packages deterministic network-state data into artifacts that help users write reports,
+            annotate dashboards, investigate protocol performance and decide what to analyze next. The language should stay descriptive: context, not automated action.
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link href="/explorer" className="rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground">Open Explorer</Link>
+            <Link href="/workflows" className="rounded-full border border-border px-5 py-3 text-sm font-medium">Move to technical workflows</Link>
+          </div>
         </div>
       </section>
     </main>
