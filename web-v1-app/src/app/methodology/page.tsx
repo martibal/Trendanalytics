@@ -16,10 +16,18 @@ export default function MethodologyOverviewPage() {
     <MethodologyPageShell>
       <MethodologyHeader
         title="Methodology"
-        description="How Urd Atlas turns daily blockchain observations into on-chain reference data: Gold observations, Derived transforms, Meta regime labels, Briefs summaries, confidence, scorecards, and traceable JSON artifacts."
+        description="How Urd Atlas turns daily blockchain observations into deterministic network-state reference data: observations, transforms, labels, confidence, scorecards, drivers and traceable JSON artifacts."
       />
 
       <MethodologyContent>
+        <Callout title="What this methodology is for">
+          <p>
+            Urd Atlas is a descriptive network-state layer. The methodology explains how daily chain observations
+            become stable JSON rows that can be read, joined, inspected and reproduced across product surfaces.
+            It does not convert chain conditions into instructions or future-state guarantees.
+          </p>
+        </Callout>
+
         <Callout title="Read these first">
           <p>
             First time here? Start with <MethodologyLink href="/methodology/reference">Public Methodology Reference</MethodologyLink>{" "}
@@ -44,8 +52,8 @@ export default function MethodologyOverviewPage() {
         <Callout title="Product boundary">
           <p>
             Methodology pages document descriptive on-chain reference data only: no price data, no forecasts,
-            and no recommendation outputs. Confidence and coverage explain how well the
-            published row is supported; they do not turn regime labels into advice or market predictions.
+            and no recommendation outputs. Confidence and coverage explain how well the published row is
+            supported; they do not turn regime labels into advice, automation rules or future outcomes.
           </p>
         </Callout>
 
@@ -53,29 +61,28 @@ export default function MethodologyOverviewPage() {
           pageKey="methodology-overview"
           summary={
             <>
-              This section documents the Urd Atlas reference data methodology: what gets published,
-              how to read the outputs, what can be checked independently, and where public methodology
-              intentionally stops.
+              This section documents the Urd Atlas trust model: what gets published, what the labels mean,
+              how confidence should be used, what a technical reviewer can verify, and where the public
+              methodology intentionally stops.
             </>
           }
           bullets={[
             <>
-              Reference layer model: <strong>Gold</strong> for daily observations, <strong>Derived</strong> for deterministic transforms, <strong>Meta</strong> for regime, confidence, scorecard state, and drivers, and <strong>Briefs</strong> for readable JSON summaries.
+              Reference layer model: <strong>Gold</strong> stores daily observations, <strong>Derived</strong> stores deterministic transforms, <strong>Meta</strong> stores regime, confidence, scorecard state and drivers, and <strong>Briefs</strong> stores readable JSON summaries.
             </>,
             <>
-              Confidence v2 separates data completeness from label clarity, excludes structurally
-              non-applicable chain fields from data-quality denominators, and explains adjacent
-              scorecard pressure when a stable label remains below a regime-threshold crossing.
+              Label model: a regime is a compact description of observed network state. It should be joined
+              to another workflow, gated by confidence, and interpreted with scorecard context.
             </>,
             <>
-              Trust boundary: outputs should be auditable in meaning and behavior, but the private
-              source-data and implementation chain are not publicly reconstructable.
+              Trust boundary: outputs are designed to be auditable in meaning, versioning and behavior, but
+              the private source-data and implementation chain are not publicly reconstructable.
             </>,
           ]}
           whyItMatters={
             <>
-              A new user should be able to understand the public trust model quickly, while technical
-              users can still expand into the full methodology without losing any detail.
+              A new user should be able to understand why a row exists, what can be trusted about it, and
+              what must still be checked in Validation before using it in a report, model diagnostic or API integration.
             </>
           }
           fullContent={
@@ -99,6 +106,24 @@ export default function MethodologyOverviewPage() {
                 />
               </Section>
 
+              <Section title="The method in one pass">
+                <p>
+                  Urd Atlas starts with daily chain observations, applies deterministic transforms, assigns a
+                  network-state label, computes confidence, and publishes versioned JSON artifacts. The label is
+                  the readable compression. The scores, confidence fields, dates and methodology identifiers are
+                  the machine-readable audit surface around that label.
+                </p>
+                <SimpleTable
+                  headers={["Step", "Question answered", "Published surface"]}
+                  rows={[
+                    ["Observe", "What did the chain look like on this observation date?", <InlineCode key="gold">Gold</InlineCode>],
+                    ["Transform", "What recent and historical context should be compared deterministically?", <InlineCode key="derived">Derived</InlineCode>],
+                    ["Classify", "Which descriptive network-state regime best fits the evidence?", <InlineCode key="meta">Meta</InlineCode>],
+                    ["Explain", "What should a human reader know before using the row?", <InlineCode key="briefs">Briefs</InlineCode>],
+                  ]}
+                />
+              </Section>
+
               <Section title="Reference layer model">
                 <p>
                   Urd Atlas publishes four JSON layers: <InlineCode>Gold</InlineCode>, <InlineCode>Derived</InlineCode>, <InlineCode>Meta</InlineCode>, and <InlineCode>Briefs</InlineCode>. Gold is the daily
@@ -116,16 +141,34 @@ export default function MethodologyOverviewPage() {
               <Section title="Confidence and status model">
                 <p>
                   Confidence answers one narrow question: how well-supported is the current published
-                  analytical state by the data and by the label-specific evidence? It is not a prediction,
-                  a probability of future price movement, or a recommendation signal.
+                  analytical state by the data and by the label-specific evidence? It is not a probability of
+                  a future chain state, a recommendation signal, or a reason to automate a downstream action by itself.
                 </p>
                 <SimpleTable
-                  headers={["Part", "Plain meaning"]}
+                  headers={["Part", "Plain meaning", "How to use it"]}
                   rows={[
-                    [<InlineCode key="dq">data_quality_score</InlineCode>, <>Do the relevant chain-specific fields exist, remain fresh, and cover enough recent/history rows?</>],
-                    [<InlineCode key="lc">label_confidence_score</InlineCode>, <>Does the evidence clearly support the specific label that was assigned?</>],
-                    [<InlineCode key="cs">confidence_score</InlineCode>, <>Composite confidence: <InlineCode>sqrt(data_quality_score × label_confidence_score)</InlineCode>.</>],
-                    [<InlineCode key="status">status.one_liner</InlineCode>, <>Readable explanation that distinguishes the published regime label from adjacent scorecard pressure.</>],
+                    [<InlineCode key="dq">data_quality_score</InlineCode>, <>Do the relevant chain-specific fields exist, remain fresh, and cover enough recent/history rows?</>, <>Use it to avoid over-reading weak or sparse rows.</>],
+                    [<InlineCode key="lc">label_confidence_score</InlineCode>, <>Does the evidence clearly support the specific label that was assigned?</>, <>Use it to separate clear labels from ambiguous labels.</>],
+                    [<InlineCode key="cs">confidence_score</InlineCode>, <>Composite confidence: <InlineCode>sqrt(data_quality_score × label_confidence_score)</InlineCode>.</>, <>Use it as the default gate in analysis and reporting.</>],
+                    [<InlineCode key="status">status.one_liner</InlineCode>, <>Readable explanation that distinguishes the published regime label from adjacent scorecard pressure.</>, <>Use it to explain the row without inventing extra interpretation.</>],
+                  ]}
+                />
+              </Section>
+
+              <Section title="What to verify before relying on the data">
+                <p>
+                  Methodology explains how a row should be interpreted. Validation shows whether the currently
+                  published dataset has enough observations, variation, confidence coverage and transition
+                  structure to support downstream use.
+                </p>
+                <SimpleTable
+                  headers={["Reviewer question", "Where to check"]}
+                  rows={[
+                    ["Is there enough history for the chain and window I care about?", <MethodologyLink key="validation" href="/validation">Validation diagnostics</MethodologyLink>],
+                    ["Do labels vary enough to support segmentation?", <MethodologyLink key="validation-2" href="/validation">Validation diagnostics</MethodologyLink>],
+                    ["Do the fields mean exactly what my integration assumes?", <MethodologyLink key="fields" href="/methodology/fields">Field Dictionary</MethodologyLink>],
+                    ["Can I inspect a simple joined artifact before integrating?", <MethodologyLink key="analyst-kit" href="/analyst-kit">Analyst Kit</MethodologyLink>],
+                    ["Can I fetch the same structure programmatically?", <MethodologyLink key="api" href="/api-docs">API Docs</MethodologyLink>],
                   ]}
                 />
               </Section>
