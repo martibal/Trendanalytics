@@ -204,20 +204,19 @@ export default async function HomePage() {
           </div>
 
           <h1 className="mt-8 max-w-3xl text-5xl font-medium tracking-[-0.05em] text-foreground sm:text-6xl lg:text-7xl">
-            Explain changes in your crypto metrics.
+            Explain why your crypto metrics changed.
           </h1>
 
           <p className="mt-7 max-w-2xl text-lg leading-8 text-muted-foreground">
-            Join one daily regime table to your own data and see whether model errors, users,
-            fees or activity changed during <span className="text-foreground">stable</span>,{" "}
-            <span className="text-foreground">heating</span>, <span className="text-foreground">congested</span>{" "}
-            or <span className="text-foreground">cheap</span> chain conditions.
+            Add daily chain conditions to your own data and see whether changes in users, fees,
+            model errors or activity happened because of your product — or because the whole chain
+            behaved differently.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <PrimaryLink href="/analyst-kit">Try the free CSV kit</PrimaryLink>
-            <SecondaryLink href="/validation">See the evidence</SecondaryLink>
-            <SecondaryLink href="/workflows">Show use cases</SecondaryLink>
+            <PrimaryLink href="/analyst-kit">Try the free CSV</PrimaryLink>
+            <SecondaryLink href="/validation">See validation</SecondaryLink>
+            <SecondaryLink href="/workflows">See use cases</SecondaryLink>
           </div>
 
           <dl className="mt-10 grid max-w-2xl grid-cols-2 gap-4 sm:grid-cols-4">
