@@ -106,8 +106,9 @@ function confidenceGuidance(state: ConfidenceState): string {
   return "Confidence was not available in the latest published row.";
 }
 
-function driverText(driver: { name?: string; label?: string; value?: string | number }): string {
-  const name = driver.label ?? driver.name ?? "Driver";
+function driverText(driver: { name?: string; label?: string; value?: string | number }): string | null {
+  const name = (driver.label ?? driver.name)?.trim();
+  if (!name || name.toLowerCase() === "driver") return null;
   if (driver.value === undefined || driver.value === null || driver.value === "") return name;
   return `${name}: ${driver.value}`;
 }
@@ -125,7 +126,10 @@ async function getChain(chain: (typeof CHAINS)[number]) {
   const confidenceValue = latest?.confidence?.confidence_score;
   const state = confidenceState(confidenceValue);
   const lagDays = latest?.confidence?.lag_days_vs_utc_today;
-  const drivers = latest?.regime?.drivers?.map(driverText).filter(Boolean).slice(0, 4) ?? [];
+  const drivers = latest?.regime?.drivers
+    ?.map(driverText)
+    .filter((driver): driver is string => Boolean(driver))
+    .slice(0, 4) ?? [];
 
   return {
     ...chain,
