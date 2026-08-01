@@ -107,9 +107,11 @@ function confidenceGuidance(state: ConfidenceState): string {
 }
 
 function driverText(driver: { name?: string; label?: string; value?: string | number }): string {
-  const name = driver.label ?? driver.name ?? "Driver";
-  if (driver.value === undefined || driver.value === null || driver.value === "") return name;
-  return `${name}: ${driver.value}`;
+  const name = driver.label ?? driver.name;
+  const value = driver.value;
+  if (value === undefined || value === null || value === "") return name ?? "";
+  if (!name) return String(value);
+  return `${name}: ${value}`;
 }
 
 async function getChain(chain: (typeof CHAINS)[number]) {
