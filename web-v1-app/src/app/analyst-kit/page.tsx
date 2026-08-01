@@ -3,45 +3,44 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Analyst Kit | Urd Atlas",
-  description: "Use Urd Atlas without a data pipeline through calendars, CSV exports, report snippets and notebooks.",
+  description:
+    "Use Urd Atlas without a data pipeline through CSV calendars, report snippets, schema exports and notebooks.",
 };
+
+const chains = [
+  { id: "bitcoin", label: "Bitcoin", ticker: "BTC" },
+  { id: "ethereum", label: "Ethereum", ticker: "ETH" },
+  { id: "arbitrum", label: "Arbitrum", ticker: "ARB" },
+  { id: "base", label: "Base", ticker: "BASE" },
+] as const;
 
 const kitItems = [
   {
-    title: "Regime calendar",
-    body: "A daily table of chain, observation date, regime, confidence, freshness and methodology version. This is the lowest-friction artifact for analysts and BI users.",
-    example: "2026-07-01 · ethereum · HEATING · confidence 0.84",
+    title: "Regime calendar CSV",
+    body: "A daily table of observation date, chain, regime, confidence, component scores, freshness, methodology version and drivers. This is the lowest-friction artifact for analysts and BI users.",
+    example: "/api/v1/analyst-kit/ethereum/regime-calendar",
   },
   {
     title: "Weekly network-state summary",
-    body: "A structured written summary that explains what changed, whether the classification is strong enough to use, and which drivers supported the latest state.",
-    example: "Ethereum moved from STABLE to HEATING during the latest published window.",
+    body: "A plain-text summary that explains the latest state, recent transitions, confidence level and product boundary in language that can be pasted into a report.",
+    example: "/api/v1/analyst-kit/ethereum/weekly-summary",
   },
   {
-    title: "Chart pack",
-    body: "Downloadable views for regime history, transition dates, confidence, demand/friction/capacity scores and distribution by state.",
-    example: "Regime path · confidence line · transition markers · 30/90/365-day distribution",
+    title: "Feature schema",
+    body: "A machine-readable schema for the Analyst Kit feature table, including field semantics, safe uses and unsafe uses.",
+    example: "/api/v1/analyst-kit/feature-schema",
   },
   {
-    title: "Notebook starter",
-    body: "A copy-run-adapt Python notebook for users who can code but do not have infrastructure. Load Urd Atlas, merge with a CSV, calculate metrics by regime, export tables.",
-    example: "Open notebook → paste API key → choose chain → run all cells",
-  },
-  {
-    title: "Google Sheets / Excel path",
-    body: "A spreadsheet-oriented route for users who need charts and report tables before they need an API client or data warehouse integration.",
-    example: "Raw data · Regime calendar · Charts · Notes · Report text",
-  },
-  {
-    title: "Report snippets",
-    body: "Copyable language for methodology, limitation notes and chain-state summaries so non-technical output does not overstate the product.",
-    example: "Network state is descriptive context, not a buy/sell recommendation.",
+    title: "Starter notebook",
+    body: "A copy-run-adapt Python notebook for users who can code but do not have infrastructure. Load Urd Atlas, merge with a CSV, calculate metrics by regime and export tables.",
+    example: "/api/v1/analyst-kit/starter-notebook",
   },
 ];
 
 const notebook = `import pandas as pd
 
-urd = pd.read_csv("urd_atlas_ethereum_daily.csv")
+chain = "ethereum"
+urd = pd.read_csv(f"https://urdatlas.com/api/v1/analyst-kit/{chain}/regime-calendar")
 my_data = pd.read_csv("my_protocol_metrics.csv")
 
 df = my_data.merge(
@@ -69,27 +68,70 @@ export default function AnalystKitPage() {
       <section className="grid gap-10 lg:grid-cols-[1fr_0.85fr] lg:items-end">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Analyst Kit</p>
-          <h1 className="mt-5 text-5xl font-medium tracking-[-0.05em] sm:text-6xl">Use Urd Atlas before you have a pipeline.</h1>
+          <h1 className="mt-5 text-5xl font-medium tracking-[-0.05em] sm:text-6xl">
+            Use Urd Atlas before you have a pipeline.
+          </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-muted-foreground">
             The advanced product is an API and network-state feature layer. But many users need value earlier:
-            a regime calendar, a chart, a weekly summary, a notebook or a table they can put into a report.
+            a CSV regime calendar, a weekly summary, a schema, a notebook, or a table they can put into a report today.
           </p>
         </div>
         <div className="rounded-3xl border border-border bg-card/60 p-6">
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">No-pipeline promise</p>
-          <p className="mt-4 text-2xl font-medium tracking-tight">Read it, download it, then integrate it when the workflow is proven.</p>
+          <p className="mt-4 text-2xl font-medium tracking-tight">
+            Read it, download it, then integrate it when the workflow is proven.
+          </p>
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            This page is the bridge between a technical data product and a customer who only knows they need better blockchain context.
+            Analyst Kit packages the same deterministic data into artifacts that a research analyst, protocol team or BI user can use without owning data infrastructure.
           </p>
         </div>
       </section>
 
-      <section className="mt-12 grid gap-5 lg:grid-cols-3">
+      <section className="mt-12 rounded-[2rem] border border-border bg-card p-7 lg:p-9">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Live Analyst Kit downloads</p>
+            <h2 className="mt-3 text-3xl font-medium tracking-tight">Start with a chain calendar or a report-ready summary.</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
+              These endpoints are intentionally simple: open them in a browser, paste them into pandas, or connect them to a spreadsheet/BI workflow.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <a href="/api/v1/analyst-kit/feature-schema" className="rounded-full border border-border px-4 py-2 text-sm font-medium">
+              Feature schema JSON
+            </a>
+            <a href="/api/v1/analyst-kit/starter-notebook" className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+              Download notebook
+            </a>
+          </div>
+        </div>
+
+        <div className="mt-7 grid gap-4 lg:grid-cols-4">
+          {chains.map((chain) => (
+            <article key={chain.id} className="rounded-3xl border border-border bg-background/55 p-5">
+              <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">{chain.ticker}</p>
+              <h3 className="mt-2 text-xl font-medium">{chain.label}</h3>
+              <div className="mt-5 grid gap-3 text-sm">
+                <a href={`/api/v1/analyst-kit/${chain.id}/regime-calendar`} className="rounded-2xl border border-border px-4 py-3 hover:bg-card">
+                  CSV regime calendar
+                </a>
+                <a href={`/api/v1/analyst-kit/${chain.id}/weekly-summary`} className="rounded-2xl border border-border px-4 py-3 hover:bg-card">
+                  Weekly summary text
+                </a>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-12 grid gap-5 lg:grid-cols-4">
         {kitItems.map((item) => (
           <article key={item.title} className="rounded-3xl border border-border bg-card/55 p-6">
             <h2 className="text-2xl font-medium tracking-tight">{item.title}</h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">{item.body}</p>
-            <p className="mt-5 rounded-2xl border border-border bg-background/60 p-4 font-mono text-xs leading-6 text-primary">{item.example}</p>
+            <p className="mt-5 rounded-2xl border border-border bg-background/60 p-4 font-mono text-xs leading-6 text-primary">
+              {item.example}
+            </p>
           </article>
         ))}
       </section>
@@ -117,7 +159,7 @@ export default function AnalystKitPage() {
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Product boundary</p>
         <h2 className="mt-4 text-3xl font-medium tracking-tight">The accessible version must still be rigorous.</h2>
         <p className="mt-4 max-w-4xl text-muted-foreground leading-7">
-          Analyst Kit should not become retail trading content. It should package the same deterministic network-state data into artifacts that help users write reports,
+          Analyst Kit should not become retail trading content. It packages deterministic network-state data into artifacts that help users write reports,
           annotate dashboards, investigate protocol performance and decide what to analyze next. The language should stay descriptive: context, not recommendation.
         </p>
         <div className="mt-7 flex flex-wrap gap-3">
