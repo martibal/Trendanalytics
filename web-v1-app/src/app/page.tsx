@@ -239,7 +239,7 @@ export default async function HomePage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Latest published rows</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">Live output from the data product.</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">Published on cadence: BTC/ETH T+1, Base/Arbitrum weekly.</p>
               </div>
               <Link href="/validation" className="shrink-0 text-xs font-medium text-primary">
                 Validate →
