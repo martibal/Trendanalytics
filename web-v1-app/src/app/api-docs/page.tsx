@@ -15,8 +15,8 @@ const STARTER_FLOW = [
   },
   {
     step: "2",
-    title: "Prototype the join",
-    body: "Use Analyst Kit when you want a CSV or notebook before wiring authenticated artifact delivery.",
+    title: "Run one public join",
+    body: "Open one Analyst Kit CSV, join one daily metric on date + chain, then summarize the metric by regime.",
     href: "/analyst-kit",
     cta: "Open Analyst Kit",
   },
@@ -88,7 +88,7 @@ export default async function ApiDocsPage() {
       <PageHero
         eyebrow="API documentation"
         title="API Docs"
-        summary="Start with public reference endpoints, prototype with Analyst Kit, then integrate authenticated artifact delivery when the workflow is proven."
+        summary="Start with public reference endpoints, run one Analyst Kit join, then integrate authenticated artifact delivery when the workflow is proven."
       >
         <div className="flex flex-wrap gap-2 text-sm">
           <UrdButtonLink href="/api-docs/getting-started">Getting started</UrdButtonLink>
@@ -112,8 +112,8 @@ export default async function ApiDocsPage() {
         pageKey="api-docs"
         summary={<>Use this page to pick the right entry point: public context, no-pipeline Analyst Kit, or authenticated subscriber artifacts.</>}
         bullets={[
-          <>Start with <strong>Status</strong> and <strong>Summary</strong> if you want to inspect live publication context.</>,
-          <>Use <strong>Analyst Kit</strong> if you want CSV and notebook artifacts without building an integration first.</>,
+          <>Start with <strong>Status</strong> and <strong>Summary</strong> if you want to inspect published context.</>,
+          <>Use <strong>Analyst Kit</strong> to run the first CSV join before building an integration.</>,
           <>Use <strong>Subscriber files</strong> when you need entitled JSON artifacts for production ingestion.</>,
           <>Use <strong>Schema reference</strong> and <strong>Samples</strong> before wiring parsing logic.</>,
         ]}
@@ -141,19 +141,24 @@ export default async function ApiDocsPage() {
         </section>
 
         <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
-          <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">Fastest public checks</h2>
-          <p className="mt-4 text-sm leading-7 text-[var(--urd-text-body)]">These calls require no key and are safe for evaluation, demos and first-pass parsing. They should be the first thing a new technical user tries.</p>
+          <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">First integration check</h2>
+          <p className="mt-4 text-sm leading-7 text-[var(--urd-text-body)]">These calls require no key. Use them to confirm that public status is readable and that a regime-calendar CSV can load directly into a notebook or scheduled data job.</p>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <CodeBlock>{`curl https://www.urdatlas.com/api/v1/status`}</CodeBlock>
-            <CodeBlock>{`python - <<'PY'\nimport pandas as pd\nurl = "https://www.urdatlas.com/api/v1/analyst-kit/ethereum/regime-calendar"\ndf = pd.read_csv(url)\nprint(df.tail())\nPY`}</CodeBlock>
+            <CodeBlock>{`python - <<'PY'
+import pandas as pd
+url = "https://www.urdatlas.com/api/v1/analyst-kit/ethereum/regime-calendar"
+df = pd.read_csv(url)
+print(df.tail())
+PY`}</CodeBlock>
           </div>
         </section>
 
         <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
           <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">Before you buy</h2>
           <div className="mt-4 grid gap-4 lg:grid-cols-3 text-sm leading-7 text-[var(--urd-text-body)]">
-            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">1. Download sample artifacts</div><p className="mt-2">Use the <Link href="/api-docs/samples" className="underline">public sample pack</Link> to inspect real Gold, Derived, Meta, and Briefs reference files.</p></div>
-            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">2. Validate methodology and provenance</div><p className="mt-2">Use the <Link href="/methodology/reference" className="underline">reference</Link>, <Link href="/methodology/verification" className="underline">verification pack</Link>, and <Link href="/methodology/provenance" className="underline">provenance page</Link>.</p></div>
+            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">1. Run one public join</div><p className="mt-2">Use <Link href="/analyst-kit" className="underline">Analyst Kit</Link> to join one chain calendar to one metric you already trust.</p></div>
+            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">2. Inspect sample artifacts</div><p className="mt-2">Use the <Link href="/api-docs/samples" className="underline">public sample pack</Link>, <Link href="/methodology/reference" className="underline">reference</Link>, and <Link href="/methodology/provenance" className="underline">provenance page</Link>.</p></div>
             <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">3. See operational expectations</div><p className="mt-2">Read the <Link href="/service" className="underline">service expectations and revision policy</Link> before subscribing.</p></div>
           </div>
         </section>
