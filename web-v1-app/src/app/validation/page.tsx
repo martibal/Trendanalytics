@@ -13,7 +13,7 @@ export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Validation | Urd Atlas",
-  description: "Live validation diagnostics for Urd Atlas network-state features, class balance, transitions and confidence coverage.",
+  description: "Published validation diagnostics for Urd Atlas network-state features, class balance, transitions and confidence coverage.",
 };
 
 type WindowId = "last365d" | "last180d" | "last90d" | "last30d" | "last7d";
@@ -61,6 +61,25 @@ const proofItems = [
   {
     title: "Explicit limitations",
     body: "Validation should state where the data is sparse, stale, low-confidence or too imbalanced to support a strong conclusion.",
+  },
+];
+
+const statusLegend = [
+  {
+    title: "Usable diagnostic sample",
+    body: "Enough observations, acceptable regime variation and at least half of rows carrying Good confidence.",
+  },
+  {
+    title: "Confidence-limited",
+    body: "There may be enough observations and variation, but fewer than half of rows pass the Good-confidence gate.",
+  },
+  {
+    title: "Low variation",
+    body: "One regime dominates at least 90% of rows, so segmentation may say more about the dominant state than about regime differences.",
+  },
+  {
+    title: "Too sparse",
+    body: "Fewer than 30 observations are available in the best published window, so the diagnostic sample is not yet strong.",
   },
 ];
 
@@ -233,6 +252,26 @@ export default async function ValidationPage() {
           <p className="mt-3 text-4xl font-medium tracking-tight">{pct(averageGoodConfidenceShare(rows))}</p>
           <p className="mt-2 text-sm text-muted-foreground">Average share of rows with confidence ≥ 0.70.</p>
         </article>
+      </section>
+
+      <section className="mt-8 rounded-[2rem] border border-border bg-card/45 p-6 lg:p-8">
+        <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Status legend</p>
+            <h2 className="mt-3 text-2xl font-medium tracking-tight">How to read the chain status labels.</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              These labels are caution flags for using the diagnostic sample. They do not say whether a chain is good or bad; they say how carefully the current published window should be interpreted.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {statusLegend.map((item) => (
+              <article key={item.title} className="rounded-2xl border border-border bg-background/55 p-4">
+                <h3 className="font-medium tracking-tight">{item.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section className="mt-12 rounded-[2rem] border border-border bg-card/60 p-6 lg:p-8">
