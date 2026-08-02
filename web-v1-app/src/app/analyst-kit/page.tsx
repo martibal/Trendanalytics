@@ -6,7 +6,7 @@ import EndpointCopyButton from "@/components/analyst-kit/EndpointCopyButton";
 export const metadata: Metadata = {
   title: "Analyst Kit | Urd Atlas",
   description:
-    "Use Urd Atlas without a data pipeline through CSV calendars, report snippets, schema exports and notebooks.",
+    "Use free public Urd Atlas CSV calendars, report snippets, schema exports and notebooks before building a data pipeline.",
 };
 
 const chains = [
@@ -137,7 +137,7 @@ export default function AnalystKitPage() {
             Find out whether your metric changed because your project changed, or because the whole chain was in a different network state.
           </p>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-muted-foreground">
-            Start with a CSV calendar, a report-ready summary, a machine-readable schema or a notebook that runs without any local dataset.
+            Everything on this page is public and free to inspect. Start with one CSV calendar, join it to one of your daily metrics, and check whether the regime column makes the change easier to explain.
           </p>
         </div>
         <div className="rounded-3xl border border-border bg-card/60 p-6">
@@ -154,10 +154,10 @@ export default function AnalystKitPage() {
       <section className="mt-12 rounded-[2rem] border border-border bg-card p-7 lg:p-9">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Ten-minute path to value</p>
-            <h2 className="mt-3 text-3xl font-medium tracking-tight">Open CSV, join, summarize.</h2>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Your first test</p>
+            <h2 className="mt-3 text-3xl font-medium tracking-tight">Open one CSV, join one metric, summarize by regime.</h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-              These artifacts are intentionally simple: open a chain calendar, paste the URL into pandas, or connect the CSV to spreadsheet and BI workflows.
+              The first useful test is intentionally small: pick one chain, copy the regime calendar URL, join it to a daily metric you already track, then compare that metric across high-confidence regime rows.
             </p>
           </div>
           <div className="grid gap-2 text-sm leading-6 text-muted-foreground sm:grid-cols-2 lg:min-w-[420px]">
@@ -289,7 +289,7 @@ export default function AnalystKitPage() {
           <h2 className="mt-4 text-3xl font-medium tracking-tight">Accessible should not mean vague.</h2>
           <p className="mt-4 text-sm leading-7 text-muted-foreground">
             Analyst Kit packages deterministic network-state data into artifacts that help users write reports,
-            annotate dashboards, investigate protocol performance and decide what to analyze next. The language should stay descriptive: context, not automated action.
+            annotate dashboards, investigate protocol activity and decide what to analyze next. The language should stay descriptive: context, not automated action.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link href="/explorer" className="rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground">Open Explorer</Link>
