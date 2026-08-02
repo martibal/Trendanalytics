@@ -20,6 +20,7 @@ const DESKTOP_ITEMS = [
 ] as const;
 
 const MOBILE_SECONDARY_ITEMS = [
+  { href: "/start", label: "Start Here" },
   { href: "/track-record", label: "Track Record" },
   { href: "/thresholds", label: "Thresholds" },
   { href: "/glossary", label: "Glossary" },
