@@ -272,6 +272,31 @@ export default async function HomePage() {
       </section>
 
       <section className="border-y border-border bg-card/25">
+        <div className="mx-auto grid max-w-7xl gap-6 px-6 py-10 lg:grid-cols-[0.85fr_1.15fr] lg:px-8">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Evidence before trust</p>
+            <h2 className="mt-3 text-2xl font-medium tracking-tight sm:text-3xl">
+              Inspect the rows, diagnostics and free kit before paying.
+            </h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Link href="/validation" className="rounded-3xl border border-border bg-background/50 p-5 transition hover:border-primary/60">
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Validation</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Regime balance, transitions, confidence coverage and per-chain variation.</p>
+            </Link>
+            <Link href="/analyst-kit" className="rounded-3xl border border-border bg-background/50 p-5 transition hover:border-primary/60">
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Free CSV</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Download the public kit and test the date + chain join in your own data.</p>
+            </Link>
+            <Link href="/methodology" className="rounded-3xl border border-border bg-background/50 p-5 transition hover:border-primary/60">
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Method</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Read how the daily labels, confidence and reproducibility metadata are produced.</p>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-border bg-card/25">
         <div className="mx-auto grid max-w-7xl gap-6 px-6 py-12 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">What you get</p>
@@ -334,12 +359,8 @@ export default async function HomePage() {
           </div>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-2">
-            <pre className="overflow-x-auto rounded-3xl border border-border bg-background p-5 text-sm leading-7 text-muted-foreground"><code>{`# Your existing data
-date        chain       users   model_error
-2026-07-01  ethereum    18420   0.024`}</code></pre>
-            <pre className="overflow-x-auto rounded-3xl border border-border bg-background p-5 text-sm leading-7 text-muted-foreground"><code>{`# After Urd Atlas
-date        chain       users   model_error   regime    confidence
-2026-07-01  ethereum    18420   0.024         HEATING   0.84`}</code></pre>
+            <pre className="overflow-x-auto rounded-3xl border border-border bg-background p-5 text-sm leading-7 text-muted-foreground"><code>{`# Your existing data\ndate        chain       users   model_error\n2026-07-01  ethereum    18420   0.024`}</code></pre>
+            <pre className="overflow-x-auto rounded-3xl border border-border bg-background p-5 text-sm leading-7 text-muted-foreground"><code>{`# After Urd Atlas\ndate        chain       users   model_error   regime    confidence\n2026-07-01  ethereum    18420   0.024         HEATING   0.84`}</code></pre>
           </div>
           <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground">
             That extra regime column tells you whether a change happened under normal conditions or during a different chain state.
@@ -486,7 +507,7 @@ date        chain       users   model_error   regime    confidence
               <h2 className="text-3xl font-medium tracking-tight sm:text-4xl">No logo wall yet. Inspect the evidence directly.</h2>
               <p className="mt-4 max-w-3xl text-muted-foreground leading-7">
                 Urd Atlas is an independent early-access reference-data product. The current trust surface is public:
-                live diagnostics, methodology, point-in-time artifacts, API documentation and a free Analyst Kit path
+                published diagnostics, methodology, point-in-time artifacts, API documentation and a free Analyst Kit path
                 that lets a skeptical user test the join before upgrading.
               </p>
             </div>
