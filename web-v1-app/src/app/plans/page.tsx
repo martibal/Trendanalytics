@@ -96,6 +96,10 @@ export default function PlansPage() {
             A skeptical user should be able to inspect diagnostics, download the public Analyst Kit,
             and test the date + chain join before paying for recurring artifact access.
           </p>
+          <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground">
+            Arrived here from the dashboard? Use this page to confirm what is free, what requires an active
+            subscriber entitlement, and when the dashboard becomes the right next step.
+          </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <PrimaryLink href="/analyst-kit">Open free Analyst Kit</PrimaryLink>
             <SecondaryLink href="/validation">Check validation</SecondaryLink>
@@ -130,7 +134,7 @@ export default function PlansPage() {
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Chain access</p>
             <h2 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">
-              Access scope is not a claim that every chain has the same signal variation.
+              Access scope is not a claim that every chain has the same regime variation.
             </h2>
             <p className="mt-4 text-muted-foreground leading-7">
               Bitcoin, Ethereum, Base and Arbitrum do not have identical regime balance, transition frequency
@@ -170,6 +174,7 @@ export default function PlansPage() {
             </div>
             <div className="flex flex-wrap gap-3 lg:justify-end">
               <PrimaryLink href="/validation">See validation</PrimaryLink>
+              <SecondaryLink href="/dashboard">Open dashboard</SecondaryLink>
               <SecondaryLink href="/workflows">See workflows</SecondaryLink>
             </div>
           </div>
