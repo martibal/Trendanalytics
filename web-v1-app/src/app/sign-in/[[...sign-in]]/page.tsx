@@ -17,7 +17,7 @@ import {
   urd,
 } from "@/components/site/UrdDesignSystem";
 
-type SignInSearchParams = Record<string, string | string[] | undefined>;
+type AuthSearchParams = Record<string, string | string[] | undefined>;
 
 function Section({
   title,
@@ -66,7 +66,7 @@ function normalizeRedirectUrl(value: string | null): string | null {
   }
 }
 
-function sanitizeSignInRedirect(searchParams: SignInSearchParams | undefined) {
+function sanitizeSignInRedirect(searchParams: AuthSearchParams | undefined) {
   const rawRedirectUrl = firstSearchParam(searchParams?.redirect_url);
   const normalizedRedirectUrl = normalizeRedirectUrl(rawRedirectUrl);
 
@@ -80,7 +80,7 @@ function sanitizeSignInRedirect(searchParams: SignInSearchParams | undefined) {
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams?: Promise<SignInSearchParams>;
+  searchParams?: Promise<AuthSearchParams>;
 }) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   sanitizeSignInRedirect(resolvedSearchParams);
