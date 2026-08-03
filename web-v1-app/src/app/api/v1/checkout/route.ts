@@ -80,7 +80,7 @@ function getConfiguredAppUrl(): string | null {
 }
 
 function getAppUrl(request: Request): string | null {
-  const configured = getConfiguredAppUrl();
+  const configured = process.env.VERCEL_ENV === "preview" ? null : getConfiguredAppUrl();
 
   if (configured) {
     return configured;
@@ -250,6 +250,14 @@ function checkoutMetadata(params: {
   };
 }
 
+function isPreviewMissingPreAuthBackend(decision: { source: string; detail?: string }): boolean {
+  return (
+    process.env.VERCEL_ENV === "preview" &&
+    decision.source === "fail_closed" &&
+    decision.detail?.includes("backend is not configured") === true
+  );
+}
+
 async function getSignedInUser() {
   const authState = await auth();
 
@@ -395,7 +403,7 @@ async function handleCheckout(request: Request) {
   }
 
   if (!signedInUser) {
-      const returnUrl = `${appUrl}/checkout/start?plan=${plan}`;
+    const returnUrl = `/checkout/start?plan=${plan}`;
     const signInUrl = new URL("/sign-in", appUrl);
     signInUrl.searchParams.set("redirect_url", returnUrl);
 
@@ -532,7 +540,9 @@ export async function POST(request: Request) {
 
   const preAuthRateLimit = await enforcePreAuthRateLimit(request, "checkout-api");
 
-  if (!preAuthRateLimit.ok) {
+  if (!preAuthRateLimit.ok && isPreviewMissingPreAuthBackend(preAuthRateLimit)) {
+    console.warn("[checkout] preview pre-auth rate-limit backend missing; continuing for preview checkout validation only");
+  } else if (!preAuthRateLimit.ok) {
     return preAuthRateLimit.response;
   }
   return handleCheckout(request);

@@ -8,19 +8,19 @@ import { useEffect, useRef, useState } from "react";
 import { CHAIN_LIST } from "@/config/chains";
 
 const DESKTOP_ITEMS = [
-  { href: "/explorer", label: "Explorer" },
-  { href: "/analyst-kit", label: "Analyst Kit" },
+  { href: "/", label: "Overview" },
+  { href: "/api-docs", label: "API" },
+  { href: "/methodology", label: "Docs" },
   { href: "/plans", label: "Plans" },
-  { href: "/workflows", label: "Workflows" },
-  { href: "/validation", label: "Validation" },
-  { href: "/api-docs", label: "API Docs" },
-  { href: "/methodology", label: "Methodology" },
-  { href: "/status", label: "Status" },
-  { href: "/about", label: "About" },
 ] as const;
 
 const MOBILE_SECONDARY_ITEMS = [
-  { href: "/start", label: "Start Here" },
+  { href: "/explorer", label: "Explorer" },
+  { href: "/analyst-kit", label: "Analyst Kit" },
+  { href: "/workflows", label: "Workflows" },
+  { href: "/validation", label: "Validation" },
+  { href: "/status", label: "Status" },
+  { href: "/about", label: "About" },
   { href: "/track-record", label: "Track Record" },
   { href: "/thresholds", label: "Thresholds" },
   { href: "/glossary", label: "Glossary" },
@@ -31,6 +31,23 @@ const CLERK_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 function navLinkClass(active: boolean) {
   return ["ua-site-link", active ? "active" : ""].filter(Boolean).join(" ");
+}
+
+function CopyLatestStateButton() {
+  const [copied, setCopied] = useState(false);
+
+  async function copyLatestState() {
+    const origin = typeof window === "undefined" ? "https://www.urdatlas.com" : window.location.origin;
+    await navigator.clipboard.writeText(`${origin}/api/v1/status`);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  return (
+    <button type="button" className="ua-copy-json" onClick={copyLatestState}>
+      {copied ? "Copied ✓" : "Copy State JSON"}
+    </button>
+  );
 }
 
 function AuthAwareActions({ mobile = false, onNavigate }: { mobile?: boolean; onNavigate?: () => void }) {
@@ -107,12 +124,16 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
         </Link>
 
         <nav aria-label="Primary" className="ua-site-links">
+          {DESKTOP_ITEMS.map((item) => {
+            const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            return <Link key={item.href} href={item.href} onClick={closeMenus} className={navLinkClass(Boolean(active))}>{item.label}</Link>;
+          })}
           <div ref={chainsRef} className="relative">
             <button type="button" aria-haspopup="menu" aria-expanded={chainsOpen} onClick={() => setChainsOpen((prev) => !prev)} className={navLinkClass(Boolean(isChainsActive))}>
-              Chains ·
+              Chains
             </button>
             {chainsOpen ? (
-              <div role="menu" aria-label="Chains" className="context-panel absolute left-0 top-9 z-[90] min-w-[260px] p-3">
+              <div role="menu" aria-label="Chains" className="context-panel absolute left-0 top-11 z-[90] min-w-[260px] p-3">
                 <Link href="/chains" onClick={closeMenus} className="data-row block">All chains overview</Link>
                 {CHAIN_LIST.map((chain) => (
                   <Link key={chain.id} href={`/chains/${chain.id}`} onClick={closeMenus} className="data-row block">
@@ -122,13 +143,12 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
               </div>
             ) : null}
           </div>
-          {DESKTOP_ITEMS.map((item) => {
-            const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
-            return <Link key={item.href} href={item.href} onClick={closeMenus} className={navLinkClass(Boolean(active))}>{item.label}</Link>;
-          })}
         </nav>
 
-        <div className="ua-site-actions">{CLERK_CONFIGURED ? <AuthAwareActions /> : <><Link href="/dashboard" className="btn-ghost">Dashboard</Link><Link href="/sign-in" className="text-link">Log in</Link></>}</div>
+        <div className="ua-site-actions">
+          <CopyLatestStateButton />
+          {CLERK_CONFIGURED ? <AuthAwareActions /> : <Link href="/dashboard" className="btn-ghost">Dashboard</Link>}
+        </div>
 
         <button type="button" aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={mobileOpen} onClick={() => setMobileOpen((prev) => !prev)} className="ua-mobile-toggle">
           {mobileOpen ? "Close" : "Menu"}
@@ -136,10 +156,13 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
       </div>
 
       <div className={`ua-mobile-menu ${mobileOpen ? "is-open" : ""}`}>
-        <Link href="/chains" onClick={closeMenus} className="ua-site-link">Chains</Link>
         {DESKTOP_ITEMS.map((item) => <Link key={item.href} href={item.href} onClick={closeMenus} className="ua-site-link">{item.label}</Link>)}
+        <Link href="/chains" onClick={closeMenus} className="ua-site-link">Chains</Link>
         {MOBILE_SECONDARY_ITEMS.map((item) => <Link key={item.href} href={item.href} onClick={closeMenus} className="ua-site-link">{item.label}</Link>)}
-        <div className="flex flex-wrap gap-3 pt-2">{CLERK_CONFIGURED ? <AuthAwareActions mobile onNavigate={closeMenus} /> : <><Link href="/dashboard" onClick={closeMenus} className="btn-ghost">Dashboard</Link><Link href="/sign-in" onClick={closeMenus} className="text-link">Log in</Link></>}</div>
+        <div className="flex flex-wrap gap-3 pt-2">
+          <CopyLatestStateButton />
+          {CLERK_CONFIGURED ? <AuthAwareActions mobile onNavigate={closeMenus} /> : <Link href="/dashboard" onClick={closeMenus} className="btn-ghost">Dashboard</Link>}
+        </div>
       </div>
     </header>
   );

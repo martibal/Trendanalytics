@@ -1,5 +1,6 @@
 // src/app/sign-in/[[...sign-in]]/page.tsx
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { SignIn } from "@clerk/nextjs";
 
@@ -15,6 +16,8 @@ import {
   cx,
   urd,
 } from "@/components/site/UrdDesignSystem";
+
+type AuthSearchParams = Record<string, string | string[] | undefined>;
 
 function Section({
   title,
@@ -38,8 +41,61 @@ function isClerkConfigured() {
   );
 }
 
-export default function SignInPage() {
+function firstSearchParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value ?? null;
+}
+
+function normalizeRedirectUrl(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  if (value.startsWith("/") && !value.startsWith("//")) {
+    return value;
+  }
+
+  try {
+    const parsed = new URL(value);
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeSignInRedirect(searchParams: AuthSearchParams | undefined) {
+  const rawRedirectUrl = firstSearchParam(searchParams?.redirect_url);
+  const normalizedRedirectUrl = normalizeRedirectUrl(rawRedirectUrl);
+
+  if (rawRedirectUrl && normalizedRedirectUrl && normalizedRedirectUrl !== rawRedirectUrl) {
+    const params = new URLSearchParams();
+    params.set("redirect_url", normalizedRedirectUrl);
+    redirect(`/sign-in?${params.toString()}`);
+  }
+}
+
+function isPreviewCheckoutRedirect(searchParams: AuthSearchParams | undefined): boolean {
+  const redirectUrl = normalizeRedirectUrl(firstSearchParam(searchParams?.redirect_url));
+
+  return (
+    process.env.VERCEL_ENV === "preview" &&
+    typeof redirectUrl === "string" &&
+    redirectUrl.startsWith("/checkout/start")
+  );
+}
+
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams?: Promise<AuthSearchParams>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  sanitizeSignInRedirect(resolvedSearchParams);
   const clerkConfigured = isClerkConfigured();
+  const previewCheckoutRedirect = isPreviewCheckoutRedirect(resolvedSearchParams);
 
   return (
     <UrdPage>
@@ -105,7 +161,7 @@ export default function SignInPage() {
             </Section>
           </div>
 
-          <section className={cx(urd.section, "self-start")}> 
+          <section className={cx(urd.section, "self-start")}>
             <div className="mb-5">
               <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">
                 Identity provider
@@ -119,16 +175,31 @@ export default function SignInPage() {
             </div>
 
             {clerkConfigured ? (
-              <div className="rounded-3xl border border-[#c9d9ea] bg-[#eef6ff] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
-                <div className="flex justify-center">
-                  <SignIn
-                    routing="path"
-                    path="/sign-in"
-                    signUpUrl="/sign-up"
-                    fallbackRedirectUrl="/dashboard"
-                  />
+              previewCheckoutRedirect ? (
+                <UrdCallout title="Preview checkout sign-in is disabled." tone="warning">
+                  <p>
+                    This preview deployment reached the subscriber checkout sign-in step, but the
+                    embedded identity provider is not rendered here to avoid a raw preview runtime
+                    error. Use the production environment for the final Stripe checkout test.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <UrdPillLink href="/#pricing">Back to pricing</UrdPillLink>
+                    <UrdPillLink href="/plans">View plans</UrdPillLink>
+                    <UrdPillLink href="/dashboard">Dashboard</UrdPillLink>
+                  </div>
+                </UrdCallout>
+              ) : (
+                <div className="rounded-3xl border border-[#c9d9ea] bg-[#eef6ff] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+                  <div className="flex justify-center">
+                    <SignIn
+                      routing="path"
+                      path="/sign-in"
+                      signUpUrl="/sign-up"
+                      fallbackRedirectUrl="/dashboard"
+                    />
+                  </div>
                 </div>
-              </div>
+              )
             ) : (
               <UrdCallout title="Clerk is not configured in this environment." tone="warning">
                 <p>
