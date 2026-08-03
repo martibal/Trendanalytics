@@ -1,5 +1,6 @@
 // src/app/sign-in/[[...sign-in]]/page.tsx
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { SignIn } from "@clerk/nextjs";
 
@@ -15,6 +16,8 @@ import {
   cx,
   urd,
 } from "@/components/site/UrdDesignSystem";
+
+type SignInSearchParams = Record<string, string | string[] | undefined>;
 
 function Section({
   title,
@@ -38,7 +41,48 @@ function isClerkConfigured() {
   );
 }
 
-export default function SignInPage() {
+function firstSearchParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value ?? null;
+}
+
+function normalizeRedirectUrl(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  if (value.startsWith("/") && !value.startsWith("//")) {
+    return value;
+  }
+
+  try {
+    const parsed = new URL(value);
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeSignInRedirect(searchParams: SignInSearchParams | undefined) {
+  const rawRedirectUrl = firstSearchParam(searchParams?.redirect_url);
+  const normalizedRedirectUrl = normalizeRedirectUrl(rawRedirectUrl);
+
+  if (rawRedirectUrl && normalizedRedirectUrl && normalizedRedirectUrl !== rawRedirectUrl) {
+    const params = new URLSearchParams();
+    params.set("redirect_url", normalizedRedirectUrl);
+    redirect(`/sign-in?${params.toString()}`);
+  }
+}
+
+export default function SignInPage({
+  searchParams,
+}: {
+  searchParams?: SignInSearchParams;
+}) {
+  sanitizeSignInRedirect(searchParams);
   const clerkConfigured = isClerkConfigured();
 
   return (
