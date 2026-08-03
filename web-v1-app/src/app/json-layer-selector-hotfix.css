@@ -133,6 +133,17 @@ main > section:first-of-type > div:nth-child(2) > p:first-child {
   margin-left: auto;
 }
 
+/* Prevent the interactive state panel from clipping its own controls. */
+main > section:first-of-type > div:nth-child(2) > div,
+main > section:first-of-type > div:nth-child(2) > div > section,
+main > section:first-of-type > div:nth-child(2) > div .ua-home-card {
+  min-width: 0;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section {
+  overflow: visible !important;
+}
+
 /* Put the delivered files before the numeric trust strip, as the files are the product. */
 main {
   display: flex;
@@ -146,6 +157,41 @@ main > section:nth-of-type(4) { order: 4; }
 main > section:nth-of-type(5) { order: 5; }
 main > section:nth-of-type(6) { order: 6; }
 main > section:nth-of-type(7) { order: 7; }
+
+@media (max-width: 1350px) {
+  main > section:first-of-type > div:nth-child(2) > div {
+    grid-template-columns: 1fr !important;
+    max-width: 39rem;
+  }
+
+  main > section:first-of-type .ua-chain-list {
+    display: flex !important;
+    gap: .75rem;
+    overflow-x: auto;
+    padding-bottom: .35rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  main > section:first-of-type .ua-chain-selector {
+    min-width: 10.75rem;
+    scroll-snap-align: start;
+  }
+
+  main > section:first-of-type .ua-chain-selector p {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) {
+    grid-template-columns: 1fr !important;
+  }
+
+  main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) > div:first-child {
+    justify-self: start;
+  }
+}
 
 @media (max-width: 1180px) {
   .ua-mobile-primary-cta {
