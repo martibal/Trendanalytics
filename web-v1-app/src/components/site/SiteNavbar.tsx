@@ -33,20 +33,11 @@ function navLinkClass(active: boolean) {
   return ["ua-site-link", active ? "active" : ""].filter(Boolean).join(" ");
 }
 
-function CopyLatestStateButton() {
-  const [copied, setCopied] = useState(false);
-
-  async function copyLatestState() {
-    const origin = typeof window === "undefined" ? "https://www.urdatlas.com" : window.location.origin;
-    await navigator.clipboard.writeText(`${origin}/api/v1/status`);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  }
-
+function GetStartedLink({ onNavigate, mobile = false }: { onNavigate?: () => void; mobile?: boolean }) {
   return (
-    <button type="button" className="ua-copy-json" onClick={copyLatestState}>
-      {copied ? "Copied ✓" : "Copy State JSON"}
-    </button>
+    <Link href="/start" onClick={onNavigate} className={mobile ? "btn-primary" : "ua-copy-json"}>
+      Get Started
+    </Link>
   );
 }
 
@@ -58,12 +49,7 @@ function AuthAwareActions({ mobile = false, onNavigate }: { mobile?: boolean; on
   if (!isLoaded) return <span className={secondaryClass}>Account</span>;
 
   if (!isSignedIn) {
-    return (
-      <>
-        <Link href="/dashboard" className={dashboardClass} onClick={onNavigate}>Dashboard</Link>
-        <Link href="/sign-in" className={secondaryClass} onClick={onNavigate}>Log in</Link>
-      </>
-    );
+    return <Link href="/sign-in" className={secondaryClass} onClick={onNavigate}>Log in</Link>;
   }
 
   return (
@@ -146,10 +132,11 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
         </nav>
 
         <div className="ua-site-actions">
-          <CopyLatestStateButton />
-          {CLERK_CONFIGURED ? <AuthAwareActions /> : <Link href="/dashboard" className="btn-ghost">Dashboard</Link>}
+          <GetStartedLink />
+          {CLERK_CONFIGURED ? <AuthAwareActions /> : <Link href="/dashboard" className="text-link">Log in</Link>}
         </div>
 
+        <Link href="/start" onClick={closeMenus} className="ua-mobile-primary-cta">Get Started</Link>
         <button type="button" aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={mobileOpen} onClick={() => setMobileOpen((prev) => !prev)} className="ua-mobile-toggle">
           {mobileOpen ? "Close" : "Menu"}
         </button>
@@ -160,8 +147,8 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
         <Link href="/chains" onClick={closeMenus} className="ua-site-link">Chains</Link>
         {MOBILE_SECONDARY_ITEMS.map((item) => <Link key={item.href} href={item.href} onClick={closeMenus} className="ua-site-link">{item.label}</Link>)}
         <div className="flex flex-wrap gap-3 pt-2">
-          <CopyLatestStateButton />
-          {CLERK_CONFIGURED ? <AuthAwareActions mobile onNavigate={closeMenus} /> : <Link href="/dashboard" onClick={closeMenus} className="btn-ghost">Dashboard</Link>}
+          <GetStartedLink mobile onNavigate={closeMenus} />
+          {CLERK_CONFIGURED ? <AuthAwareActions mobile onNavigate={closeMenus} /> : <Link href="/sign-in" onClick={closeMenus} className="text-link">Log in</Link>}
         </div>
       </div>
     </header>
