@@ -53,32 +53,42 @@ type InfoId =
 
 const artifacts: Artifact[] = ["Meta", "Gold", "Derived", "Briefs"];
 
-const pipeline = [
+const pipeline: Array<{
+  key: string;
+  index: string;
+  title: string;
+  body: string;
+  artifact: Artifact;
+}> = [
   {
     key: "raw",
     index: "01",
     title: "Raw evidence",
     body: "Observed chain metrics enter the daily run.",
+    artifact: "Gold",
   },
   {
     key: "features",
     index: "02",
     title: "Feature layer",
     body: "Measurements are normalized into demand, friction and capacity.",
+    artifact: "Derived",
   },
   {
     key: "meta",
     index: "03",
     title: "Meta decision",
     body: "Regime, confidence and score vector are published together.",
+    artifact: "Meta",
   },
   {
     key: "delivery",
     index: "04",
     title: "Delivery",
     body: "CSV, JSON and subscriber artifacts stay joinable by date and chain.",
+    artifact: "Briefs",
   },
-] as const;
+];
 
 const info: Record<InfoId, InfoContent> = {
   regime: {
@@ -334,9 +344,13 @@ function artifactPayload(artifact: Artifact, chain: HomeChainSnapshot) {
     return {
       chain: chain.id,
       date: chain.asOf,
-      demand_score: chain.demand,
-      friction_score: chain.friction,
-      capacity_score: chain.capacity,
+      layer: "gold",
+      scores: {
+        demand_score: chain.demand,
+        friction_score: chain.friction,
+        capacity_score: chain.capacity,
+      },
+      join_keys: ["date", "chain"],
     };
   }
 
@@ -344,21 +358,30 @@ function artifactPayload(artifact: Artifact, chain: HomeChainSnapshot) {
     return {
       chain: chain.id,
       date: chain.asOf,
-      demand_score: chain.demand,
-      friction_score: chain.friction,
-      capacity_score: chain.capacity,
-      data_quality_score: shortConfidence(chain.dataQuality),
-      label_confidence_score: shortConfidence(chain.labelConfidence),
-      confidence_score: shortConfidence(chain.confidenceValue),
-      lag: chain.lag,
+      layer: "derived",
+      normalized_scores: {
+        demand_score: chain.demand,
+        friction_score: chain.friction,
+        capacity_score: chain.capacity,
+      },
+      quality_context: {
+        data_quality_score: shortConfidence(chain.dataQuality),
+        label_confidence_score: shortConfidence(chain.labelConfidence),
+        confidence_score: shortConfidence(chain.confidenceValue),
+      },
+      data_lag: chain.lag,
     };
   }
 
   if (artifact === "Briefs") {
     return {
       chain: chain.id,
+      date: chain.asOf,
+      layer: "briefs",
       title: `${chain.name} ${chain.regime}`,
-      confidence: shortConfidence(chain.confidenceValue),
+      one_liner: chain.oneLiner,
+      confidence_score: shortConfidence(chain.confidenceValue),
+      data_lag: chain.lag,
       note: "Readable context from the same published evidence.",
     };
   }
@@ -366,10 +389,18 @@ function artifactPayload(artifact: Artifact, chain: HomeChainSnapshot) {
   return {
     chain: chain.id,
     date: chain.asOf,
+    layer: "meta",
     regime: chain.regime,
-    confidence_score: shortConfidence(chain.confidenceValue),
-    data_quality_score: shortConfidence(chain.dataQuality),
-    label_confidence_score: shortConfidence(chain.labelConfidence),
+    confidence: {
+      confidence_score: shortConfidence(chain.confidenceValue),
+      data_quality_score: shortConfidence(chain.dataQuality),
+      label_confidence_score: shortConfidence(chain.labelConfidence),
+    },
+    scores: {
+      demand_score: chain.demand,
+      friction_score: chain.friction,
+      capacity_score: chain.capacity,
+    },
     data_lag: chain.lag,
   };
 }
@@ -457,16 +488,54 @@ function FirstReadCard({
   );
 }
 
+function JsonModal({
+  artifact,
+  payload,
+  onClose,
+  onCopy,
+  copied,
+}: {
+  artifact: Artifact;
+  payload: Record<string, unknown>;
+  onClose: () => void;
+  onCopy: () => void;
+  copied: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-[1000] grid place-items-center bg-black/80 px-4 py-8" role="dialog" aria-modal="true" aria-label={`Full ${artifact} JSON preview`}>
+      <div className="flex max-h-[88vh] w-full max-w-4xl flex-col rounded-[2rem] border border-cyan-200/25 bg-[#070B10] shadow-[0_40px_140px_rgba(0,0,0,.92)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">Full artifact JSON</p>
+            <h3 className="mt-1 text-xl font-semibold tracking-tight text-white">{artifact} preview</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={onCopy} className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white transition hover:border-emerald-200/60">
+              {copied ? "Copied ✓" : "Copy JSON"}
+            </button>
+            <button type="button" onClick={onClose} className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-200 transition hover:border-white/25 hover:text-white">
+              Close
+            </button>
+          </div>
+        </div>
+        <pre className="min-h-0 flex-1 overflow-auto p-5 font-mono text-xs leading-6 text-zinc-100"><code>{JSON.stringify(payload, null, 2)}</code></pre>
+      </div>
+    </div>
+  );
+}
+
 export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) {
   const [activeId, setActiveId] = useState(snapshots[0]?.id ?? "bitcoin");
   const [artifact, setArtifact] = useState<Artifact>("Meta");
   const [pipelineStep, setPipelineStep] = useState(2);
   const [copied, setCopied] = useState(false);
+  const [jsonOpen, setJsonOpen] = useState(false);
   const [activeInfo, setActiveInfo] = useState<InfoId | null>(null);
 
   const active = useMemo(() => snapshots.find((chain) => chain.id === activeId) ?? snapshots[0], [activeId, snapshots]);
   const activeTone = tone(active?.regime ?? "UNKNOWN/DEGRADED");
   const payload = active ? artifactPayload(artifact, active) : {};
+  const selectedPipeline = pipeline[pipelineStep] ?? pipeline[2];
 
   async function copyPayload() {
     try {
@@ -476,6 +545,13 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
     } catch {
       setCopied(false);
     }
+  }
+
+  function selectPipelineStep(index: number) {
+    const step = pipeline[index] ?? pipeline[2];
+    setPipelineStep(index);
+    setArtifact(step.artifact);
+    setJsonOpen(false);
   }
 
   if (!active) return null;
@@ -535,6 +611,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
                 onClick={() => {
                   setActiveId(chain.id);
                   setActiveInfo(null);
+                  setJsonOpen(false);
                 }}
               />
             ))}
@@ -591,7 +668,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">How it moves</p>
           <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">Click through the daily evidence path.</h2>
           <p className="mt-5 max-w-xl text-sm leading-7 text-zinc-500">
-            The interface should feel like a product surface, not a static explainer. Pick a step, inspect the layer, copy the example.
+            Pick a pipeline step to switch the preview layer. Open the full JSON to inspect the complete artifact example.
           </p>
         </div>
 
@@ -612,7 +689,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
                   <button
                     key={item.key}
                     type="button"
-                    onClick={() => setPipelineStep(index)}
+                    onClick={() => selectPipelineStep(index)}
                     className="group grid grid-cols-[36px_minmax(0,1fr)] items-center gap-4 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5"
                     style={{ borderColor: selected ? "rgba(56,189,248,.42)" : "rgba(255,255,255,.10)", background: selected ? "rgba(56,189,248,.10)" : "rgba(0,0,0,.25)", boxShadow: selected ? "0 0 34px rgba(56,189,248,.12)" : "none" }}
                   >
@@ -620,6 +697,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
                     <div>
                       <p className="font-mono text-xs uppercase tracking-[0.14em] text-white">{item.title}</p>
                       <p className="mt-1 text-xs text-zinc-500">{item.body}</p>
+                      <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.14em] text-cyan-200">Shows {item.artifact}</p>
                     </div>
                   </button>
                 );
@@ -629,13 +707,19 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
 
           <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 shadow-2xl shadow-black/30 backdrop-blur-2xl">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">Artifact preview</p>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">Artifact preview</p>
+                <p className="mt-1 text-xs text-zinc-500">{selectedPipeline.title} → {artifact}</p>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {artifacts.map((item) => (
                   <button
                     key={item}
                     type="button"
-                    onClick={() => setArtifact(item)}
+                    onClick={() => {
+                      setArtifact(item);
+                      setJsonOpen(false);
+                    }}
                     className="rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] transition"
                     style={{ borderColor: artifact === item ? `${activeTone.color}88` : "rgba(255,255,255,.10)", color: artifact === item ? activeTone.color : "#A1A1AA", background: artifact === item ? activeTone.soft : "rgba(255,255,255,.025)" }}
                   >
@@ -644,8 +728,11 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
                 ))}
               </div>
             </div>
-            <pre className="min-h-[17rem] overflow-x-auto rounded-2xl border border-white/10 bg-black/55 p-5 font-mono text-xs leading-6 text-zinc-200 whitespace-pre-wrap"><code>{JSON.stringify(payload, null, 2)}</code></pre>
+            <pre className="max-h-[14rem] overflow-hidden rounded-2xl border border-white/10 bg-black/55 p-5 font-mono text-xs leading-6 text-zinc-200 whitespace-pre-wrap"><code>{JSON.stringify(payload, null, 2)}</code></pre>
             <div className="mt-4 flex flex-wrap gap-3">
+              <button type="button" onClick={() => setJsonOpen(true)} className="inline-flex items-center justify-center rounded-full border border-cyan-300/35 bg-cyan-300/12 px-5 py-3 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:border-cyan-200/65">
+                Open full JSON
+              </button>
               <button type="button" onClick={copyPayload} className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-300/10 px-5 py-3 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:border-emerald-200/60">
                 {copied ? "Copied ✓" : "Copy preview"}
               </button>
@@ -720,6 +807,16 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
           </div>
         </div>
       </section>
+
+      {jsonOpen ? (
+        <JsonModal
+          artifact={artifact}
+          payload={payload}
+          copied={copied}
+          onCopy={copyPayload}
+          onClose={() => setJsonOpen(false)}
+        />
+      ) : null}
     </main>
   );
 }
