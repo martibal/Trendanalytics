@@ -403,9 +403,8 @@ async function handleCheckout(request: Request) {
   }
 
   if (!signedInUser) {
-      const returnUrl = `${appUrl}/checkout/start?plan=${plan}`;
     const signInUrl = new URL("/sign-in", appUrl);
-    signInUrl.searchParams.set("redirect_url", returnUrl);
+    signInUrl.searchParams.set("redirect_url", `/checkout/start?plan=${plan}`);
 
     const response = NextResponse.redirect(signInUrl);
     response.headers.set("Cache-Control", "no-store");
