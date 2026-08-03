@@ -107,7 +107,7 @@ async function getArtifacts(chainId: string): Promise<Record<ArtifactName, unkno
     readJson<unknown>(`data/published/v1/meta/${chainId}/latest.json`),
     readJson<unknown>(`data/published/v1/gold/${chainId}/latest.json`),
     readJson<unknown>(`data/published/v1/derived/${chainId}/latest.json`),
-    readJson<unknown>(`data/published/v1/briefs/${chainId}/latest.json`),
+    readJson<unknown>(`data/published/v1/briefs/chains/${chainId}/latest.json`),
   ]);
 
   return {
