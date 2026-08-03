@@ -33,6 +33,13 @@ type Props = {
   lastRun: string;
 };
 
+type InfoContent = {
+  title: string;
+  body: string;
+  calculation: string;
+  link?: string;
+};
+
 const artifacts: Artifact[] = ["Meta", "Gold", "Derived", "Briefs"];
 
 const pipeline = [
@@ -62,12 +69,63 @@ const pipeline = [
   },
 ] as const;
 
+const info: Record<string, InfoContent> = {
+  demand: {
+    title: "Demand score",
+    body: "Demand describes how strong activity pressure looks for the selected chain on this published date.",
+    calculation: "It is built from demand-side chain measurements after normalization into the daily scorecard. Higher values indicate more demand pressure relative to the chain's recent baseline.",
+    link: "/methodology",
+  },
+  friction: {
+    title: "Friction score",
+    body: "Friction describes how much resistance users appear to face when using the chain.",
+    calculation: "It is built from friction-related measurements such as fee and congestion pressure after daily normalization. Higher values mean the chain looks more difficult or expensive to use than usual.",
+    link: "/methodology",
+  },
+  capacity: {
+    title: "Capacity score",
+    body: "Capacity describes whether the chain appears to have usable room relative to current activity.",
+    calculation: "It is built from capacity-related measurements in the scorecard. Use it with demand and friction: capacity alone should not be read as a recommendation or future signal.",
+    link: "/methodology",
+  },
+  confidence: {
+    title: "Confidence score",
+    body: "Confidence is the headline reliability score for this published row.",
+    calculation: "It combines Data Quality and Label Confidence using the published confidence formula: sqrt(data_quality_score × label_confidence_score).",
+    link: "/validation",
+  },
+  dataQuality: {
+    title: "Data quality",
+    body: "Data quality tells you whether the row had enough usable evidence to be read responsibly.",
+    calculation: "It reflects quality context such as freshness, missingness and coverage checks for the selected chain and observation date.",
+    link: "/validation",
+  },
+  labelConfidence: {
+    title: "Label confidence",
+    body: "Label confidence tells you how strongly the evidence supports the published regime label.",
+    calculation: "It is produced by the classification layer after the score vector is evaluated. A low value means the label should be treated as weaker context, even when the row exists.",
+    link: "/validation",
+  },
+  dataLag: {
+    title: "Data lag",
+    body: "Data lag tells you how far behind real-world calendar time the published observation is expected to be.",
+    calculation: "Bitcoin and Ethereum are currently published with T+1 lag. Base and Arbitrum are currently published with T+7 lag. This is a delivery/freshness property, not a signal.",
+    link: "/status",
+  },
+  scoreShape: {
+    title: "Score vector shape",
+    body: "This line is a compact visual fingerprint of the selected row, not a forecast and not a decorative placeholder.",
+    calculation: "It is drawn from the actual published row values: demand, friction, capacity, data quality, label confidence and confidence.",
+    link: "/methodology",
+  },
+};
+
 function tone(label: HomeLabel) {
-  if (label === "STABLE") return { color: "#10B981", soft: "rgba(16,185,129,.16)", glow: "rgba(16,185,129,.38)", name: "Emerald" };
-  if (label === "HEATING") return { color: "#F59E0B", soft: "rgba(245,158,11,.16)", glow: "rgba(245,158,11,.34)", name: "Amber" };
-  if (label === "CONGESTED") return { color: "#EF4444", soft: "rgba(239,68,68,.16)", glow: "rgba(239,68,68,.34)", name: "Rose" };
-  if (label === "CHEAP") return { color: "#38BDF8", soft: "rgba(56,189,248,.16)", glow: "rgba(56,189,248,.34)", name: "Cyan" };
-  return { color: "#A78BFA", soft: "rgba(167,139,250,.14)", glow: "rgba(167,139,250,.28)", name: "Violet" };
+  if (label === "STABLE") return { color: "#10B981", soft: "rgba(16,185,129,.16)", glow: "rgba(16,185,129,.38)" };
+  if (label === "HEATING") return { color: "#F59E0B", soft: "rgba(245,158,11,.16)", glow: "rgba(245,158,11,.34)" };
+  if (label === "CONGESTED") return { color: "#EF4444", soft: "rgba(239,68,68,.16)", glow: "rgba(239,68,68,.34)" };
+  if (label === "CHEAP") return { color: "#38BDF8", soft: "rgba(56,189,248,.16)", glow: "rgba(56,189,248,.34)" };
+  return { color: "#A78BFA", soft: "rgba(167,139,250,.14)", glow: "rgba(167,139,250,.28)" };
 }
 
 function percent(value: number | null) {
@@ -85,24 +143,72 @@ function shortConfidence(value: number | null) {
   return Number(value.toFixed(3));
 }
 
-function Sparkline({ seed, color, large = false }: { seed: string; color: string; large?: boolean }) {
-  const base = seed.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  const points = Array.from({ length: large ? 13 : 8 }, (_, index) => {
-    const x = 6 + index * (large ? 12 : 14);
-    const y = (large ? 48 : 30) - ((base + index * 19) % (large ? 34 : 22));
+function normalizeForSpark(value: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value)) return null;
+  return value <= 1 ? value * 100 : value;
+}
+
+function InfoPopover({ id, compact = false }: { id: keyof typeof info; compact?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const item = info[id];
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={`Explain ${item.title}`}
+        onClick={() => setOpen((current) => !current)}
+        className={`inline-flex items-center justify-center rounded-full border border-white/15 bg-white/[0.04] font-mono text-zinc-300 transition hover:border-cyan-200/45 hover:bg-cyan-300/10 hover:text-white ${compact ? "h-5 w-5 text-[10px]" : "px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]"}`}
+      >
+        {compact ? "?" : "info"}
+      </button>
+      {open ? (
+        <span className="absolute left-0 top-7 z-40 w-72 rounded-2xl border border-cyan-200/25 bg-[#0D1117]/95 p-4 text-left shadow-[0_24px_80px_rgba(0,0,0,.55)] backdrop-blur-2xl">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">{item.title}</span>
+          <span className="mt-2 block text-sm leading-6 text-zinc-200">{item.body}</span>
+          <span className="mt-3 block text-xs leading-5 text-zinc-500">{item.calculation}</span>
+          {item.link ? (
+            <Link href={item.link} className="mt-3 inline-flex font-mono text-[10px] uppercase tracking-[0.14em] text-cyan-200 underline-offset-4 hover:underline">
+              Read more
+            </Link>
+          ) : null}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function ValueSparkline({ values, color }: { values: Array<number | null>; color: string }) {
+  const valid = values.map(normalizeForSpark).filter((value): value is number => typeof value === "number");
+
+  if (valid.length < 2) {
+    return (
+      <div className="grid h-16 place-items-center rounded-2xl border border-white/10 bg-black/20 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+        Not enough values
+      </div>
+    );
+  }
+
+  const min = Math.min(...valid);
+  const max = Math.max(...valid);
+  const spread = Math.max(1, max - min);
+  const points = valid.map((value, index) => {
+    const x = 8 + index * (140 / Math.max(1, valid.length - 1));
+    const y = 50 - ((value - min) / spread) * 34;
     return `${x},${y}`;
   }).join(" ");
 
   return (
-    <svg viewBox={large ? "0 0 156 58" : "0 0 110 38"} className={large ? "h-16 w-full" : "h-9 w-full"} aria-hidden="true">
+    <svg viewBox="0 0 156 58" className="h-16 w-full" aria-hidden="true">
       <defs>
-        <linearGradient id={`spark-${seed}`} x1="0" x2="1" y1="0" y2="0">
+        <linearGradient id="score-vector-shape" x1="0" x2="1" y1="0" y2="0">
           <stop offset="0%" stopColor={color} stopOpacity="0.35" />
           <stop offset="100%" stopColor={color} stopOpacity="1" />
         </linearGradient>
       </defs>
-      <polyline points={points} fill="none" stroke={`url(#spark-${seed})`} strokeWidth={large ? 3 : 2} strokeLinecap="round" strokeLinejoin="round" />
-      <polyline points={points} fill="none" stroke={color} strokeWidth={large ? 14 : 8} strokeLinecap="round" strokeLinejoin="round" opacity="0.08" />
+      <polyline points={points} fill="none" stroke="url(#score-vector-shape)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={points} fill="none" stroke={color} strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" opacity="0.08" />
     </svg>
   );
 }
@@ -114,7 +220,15 @@ function Gauge({ value, color }: { value: number | null; color: string }) {
   const dash = (pct / 100) * circumference;
 
   return (
-    <div className="relative grid h-32 w-32 place-items-center rounded-full border border-white/10 bg-black/30 shadow-[inset_0_0_32px_rgba(255,255,255,.035)]">
+    <button
+      type="button"
+      className="relative grid h-32 w-32 place-items-center rounded-full border border-white/10 bg-black/30 text-left shadow-[inset_0_0_32px_rgba(255,255,255,.035)] transition hover:-translate-y-1 hover:border-cyan-200/35"
+      aria-label="Explain confidence score"
+      onClick={(event) => {
+        const target = event.currentTarget.querySelector("button");
+        if (target instanceof HTMLButtonElement) target.click();
+      }}
+    >
       <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
         <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="7" />
         <circle
@@ -129,11 +243,12 @@ function Gauge({ value, color }: { value: number | null; color: string }) {
           style={{ filter: `drop-shadow(0 0 10px ${color})` }}
         />
       </svg>
-      <div className="text-center">
+      <div className="relative text-center">
         <p className="font-mono text-3xl font-semibold text-white">{pct}%</p>
         <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.18em] text-zinc-500">confidence</p>
+        <span className="mt-2 flex justify-center"><InfoPopover id="confidence" compact /></span>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -147,12 +262,17 @@ function RegimeBadge({ label }: { label: HomeLabel }) {
   );
 }
 
-function MetricBar({ label, value, descriptor, color }: { label: string; value: number | null; descriptor: string; color: string }) {
+function MetricBar({ id, label, value, descriptor, color }: { id: "demand" | "friction" | "capacity"; label: string; value: number | null; descriptor: string; color: string }) {
   const pct = percent(value);
   return (
     <div className="group rounded-2xl border border-white/10 bg-white/[0.035] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.055]">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">{label}</p>
+        <div className="flex items-center gap-2">
+          <button type="button" className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60">
+            {label}
+          </button>
+          <InfoPopover id={id} compact />
+        </div>
         <p className="font-mono text-sm text-white">{metric(value)}</p>
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.07]">
@@ -200,8 +320,14 @@ function artifactPayload(artifact: Artifact, chain: HomeChainSnapshot) {
     return {
       chain: chain.id,
       date: chain.asOf,
-      trend_window: "last_7d",
-      regime_path: [chain.regime, chain.regime, chain.regime],
+      score_vector_shape: {
+        demand: chain.demand,
+        friction: chain.friction,
+        capacity: chain.capacity,
+        data_quality: shortConfidence(chain.dataQuality),
+        label_confidence: shortConfidence(chain.labelConfidence),
+        confidence: shortConfidence(chain.confidenceValue),
+      },
       lag: chain.lag,
     };
   }
@@ -223,8 +349,21 @@ function artifactPayload(artifact: Artifact, chain: HomeChainSnapshot) {
     data_quality_score: shortConfidence(chain.dataQuality),
     label_confidence_score: shortConfidence(chain.labelConfidence),
     data_lag: chain.lag,
-    methodology_version: chain.methodologyVersion,
   };
+}
+
+function QualityCard({ id, label, value, suffix = "%" }: { id: "dataQuality" | "labelConfidence" | "dataLag"; label: string; value: string | number; suffix?: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:-translate-y-0.5 hover:border-cyan-200/30 hover:bg-white/[0.04]">
+      <div className="flex items-center gap-2">
+        <button type="button" className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60">
+          {label}
+        </button>
+        <InfoPopover id={id} compact />
+      </div>
+      <p className="mt-1 font-mono text-lg text-white">{value}{suffix}</p>
+    </div>
+  );
 }
 
 export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) {
@@ -236,6 +375,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
   const active = useMemo(() => snapshots.find((chain) => chain.id === activeId) ?? snapshots[0], [activeId, snapshots]);
   const activeTone = tone(active?.regime ?? "UNKNOWN/DEGRADED");
   const payload = active ? artifactPayload(artifact, active) : {};
+  const scoreVector = active ? [active.demand, active.friction, active.capacity, active.dataQuality, active.labelConfidence, active.confidenceValue] : [];
 
   async function copyPayload() {
     try {
@@ -251,10 +391,6 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
 
   return (
     <main className="relative overflow-hidden bg-background text-foreground">
-      <div className="pointer-events-none absolute left-[-12rem] top-20 h-[30rem] w-[30rem] rounded-full bg-emerald-400/10 blur-3xl" />
-      <div className="pointer-events-none absolute right-[-10rem] top-10 h-[34rem] w-[34rem] rounded-full bg-cyan-300/10 blur-3xl" />
-      <div className="pointer-events-none absolute left-[35%] top-[30rem] h-[26rem] w-[26rem] rounded-full bg-amber-300/5 blur-3xl" />
-
       <section className="mx-auto grid max-w-7xl gap-10 px-6 pb-14 pt-16 lg:grid-cols-[0.72fr_1.28fr] lg:px-8 lg:pb-20 lg:pt-24">
         <div className="relative z-10 self-center">
           <div className="flex flex-wrap gap-2">
@@ -318,38 +454,32 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
             <div className="relative mt-7 grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]">
               <Gauge value={active.confidenceValue} color={activeTone.color} />
               <div className="grid gap-3">
-                <MetricBar label="Demand" value={active.demand} descriptor={active.demandLabel} color={activeTone.color} />
-                <MetricBar label="Friction" value={active.friction} descriptor={active.frictionLabel} color={activeTone.color} />
-                <MetricBar label="Capacity" value={active.capacity} descriptor={active.capacityLabel} color={activeTone.color} />
+                <MetricBar id="demand" label="Demand" value={active.demand} descriptor={active.demandLabel} color={activeTone.color} />
+                <MetricBar id="friction" label="Friction" value={active.friction} descriptor={active.frictionLabel} color={activeTone.color} />
+                <MetricBar id="capacity" label="Capacity" value={active.capacity} descriptor={active.capacityLabel} color={activeTone.color} />
               </div>
             </div>
 
             <div className="relative mt-6 rounded-3xl border border-white/10 bg-white/[0.035] p-4">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">Seven-day shape</p>
-                  <p className="mt-1 text-sm text-zinc-400">Visual preview for the selected published row.</p>
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60">Score vector shape</button>
+                    <InfoPopover id="scoreShape" compact />
+                  </div>
+                  <p className="mt-1 text-sm text-zinc-400">Actual row values compressed into one visual fingerprint.</p>
                 </div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: activeTone.color }}>{activeTone.name} state</p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: activeTone.color }}>{active.regime}</p>
               </div>
               <div className="mt-3">
-                <Sparkline seed={`${active.id}-${active.regime}-large`} color={activeTone.color} large />
+                <ValueSparkline values={scoreVector} color={activeTone.color} />
               </div>
             </div>
 
-            <div className="relative mt-5 grid grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">Data</p>
-                <p className="mt-1 font-mono text-lg text-white">{percent(active.dataQuality)}%</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">Label</p>
-                <p className="mt-1 font-mono text-lg text-white">{percent(active.labelConfidence)}%</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">Method</p>
-                <p className="mt-1 font-mono text-lg text-white">{active.methodologyVersion}</p>
-              </div>
+            <div className="relative mt-5 grid gap-3 sm:grid-cols-3">
+              <QualityCard id="dataQuality" label="Data quality" value={percent(active.dataQuality)} />
+              <QualityCard id="labelConfidence" label="Label confidence" value={percent(active.labelConfidence)} />
+              <QualityCard id="dataLag" label="Data lag" value={active.lag} suffix="" />
             </div>
           </section>
         </div>
