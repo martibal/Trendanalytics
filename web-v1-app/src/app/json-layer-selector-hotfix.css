@@ -41,53 +41,60 @@
   display: none;
 }
 
-/* Hero hierarchy correction: compact message, proper line length, no word-by-word wrapping. */
+/* Hero hierarchy correction: real line length, no pseudo-subtitle squeezed into the heading box. */
 main > section:first-of-type {
-  grid-template-columns: minmax(460px, .88fr) minmax(0, 1.12fr) !important;
+  grid-template-columns: minmax(520px, 1fr) minmax(0, 1.05fr) !important;
   align-items: center;
-  gap: clamp(3rem, 5vw, 5rem) !important;
+  gap: clamp(3rem, 5vw, 5.5rem) !important;
   padding-top: clamp(3rem, 5vw, 5rem) !important;
   padding-bottom: clamp(2.5rem, 4.5vw, 4rem) !important;
 }
 
 main > section:first-of-type > div:first-child {
   align-self: center;
-  max-width: 46rem;
+  width: 100%;
+  max-width: 42rem;
+  min-width: 0;
 }
 
 main > section:first-of-type > div:first-child > h1 {
-  max-width: 16ch !important;
+  max-width: 12.8ch !important;
+  margin-top: 1.5rem !important;
   font-size: 0 !important;
   line-height: 1 !important;
   letter-spacing: 0 !important;
-  margin-top: 1.5rem !important;
 }
 
 main > section:first-of-type > div:first-child > h1::before {
   content: "Why did your metric move?";
   display: block;
   color: #fff;
-  font-size: clamp(3.25rem, 4.55vw, 5.25rem);
-  line-height: .94;
-  letter-spacing: -.06em;
+  font-size: clamp(3.35rem, 4.1vw, 4.85rem);
+  line-height: .95;
+  letter-spacing: -.058em;
 }
 
 main > section:first-of-type > div:first-child > h1::after {
-  content: "Urd Atlas tells you whether it was you — or the chain.";
-  display: block;
-  max-width: 34rem;
-  margin-top: 1.05rem;
-  color: #d4d4d8;
-  font-size: clamp(1.2rem, 1.45vw, 1.55rem);
-  line-height: 1.24;
-  letter-spacing: -.035em;
+  content: none !important;
+  display: none !important;
 }
 
 main > section:first-of-type > div:first-child > h1 + p {
-  max-width: 40rem !important;
-  margin-top: 1.5rem !important;
-  font-size: .98rem !important;
-  line-height: 1.65 !important;
+  max-width: 39rem !important;
+  margin-top: 1.55rem !important;
+  font-size: 1rem !important;
+  line-height: 1.62 !important;
+}
+
+main > section:first-of-type > div:first-child > h1 + p::before {
+  content: "Urd Atlas tells you whether it was you — or the chain.";
+  display: block;
+  max-width: 38rem;
+  margin-bottom: .8rem;
+  color: #f4f4f5;
+  font-size: clamp(1.32rem, 1.55vw, 1.75rem);
+  line-height: 1.18;
+  letter-spacing: -.035em;
 }
 
 main > section:first-of-type > div:first-child > h1 + p::after {
@@ -112,6 +119,12 @@ main > section:first-of-type > div:first-child > h1 + p + p {
   margin-top: .9rem !important;
   font-size: .62rem !important;
   line-height: 1.4 !important;
+}
+
+/* Keep the live panel from squeezing the message column on medium desktop widths. */
+main > section:first-of-type > div:nth-child(2) > div {
+  max-width: 46rem;
+  margin-left: auto;
 }
 
 /* Put the delivered files before the numeric trust strip, as the files are the product. */
@@ -148,7 +161,7 @@ main > section:nth-of-type(7) { order: 7; }
   }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1100px) {
   main > section:first-of-type {
     grid-template-columns: 1fr !important;
   }
@@ -158,17 +171,22 @@ main > section:nth-of-type(7) { order: 7; }
   }
 
   main > section:first-of-type > div:first-child > h1 {
-    max-width: 15ch !important;
+    max-width: 12.5ch !important;
   }
 
   main > section:first-of-type > div:first-child > h1::before {
-    font-size: clamp(3rem, 8vw, 4.6rem);
+    font-size: clamp(3rem, 8vw, 4.55rem);
+  }
+
+  main > section:first-of-type > div:nth-child(2) > div {
+    max-width: none;
+    margin-left: 0;
   }
 }
 
 @media (max-width: 760px) {
   main > section:first-of-type > div:first-child > h1 {
-    max-width: 13ch !important;
+    max-width: 12ch !important;
   }
 
   main > section:first-of-type > div:first-child > h1::before {
@@ -176,7 +194,7 @@ main > section:nth-of-type(7) { order: 7; }
     line-height: .96;
   }
 
-  main > section:first-of-type > div:first-child > h1::after {
+  main > section:first-of-type > div:first-child > h1 + p::before {
     max-width: 24rem;
     font-size: clamp(1.05rem, 4.6vw, 1.35rem);
   }
