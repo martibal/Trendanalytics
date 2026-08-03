@@ -122,6 +122,59 @@ main [style*="radial-gradient"] {
   filter: saturate(.72) opacity(.72) !important;
 }
 
+/* Let metric explanation panels escape the active cockpit instead of being clipped by rounded cards. */
+main,
+main > section,
+main > section > div,
+main section[class*="overflow-hidden"],
+main div[class*="overflow-hidden"] {
+  overflow: visible !important;
+}
+
+/* Explanation popovers should sit above the cockpit and stay readable. */
+main span[class*="absolute"][class*="z-40"] {
+  z-index: 999 !important;
+  width: min(20rem, calc(100vw - 2rem)) !important;
+  max-width: calc(100vw - 2rem) !important;
+  white-space: normal !important;
+}
+
+/* Keep popovers opening inward on the right side of the hero panel. */
+main section[style*="box-shadow"] span[class*="relative"][class*="inline-flex"] span[class*="absolute"] {
+  left: auto !important;
+  right: 0 !important;
+}
+
+/* Give the bottom cockpit info tiles enough room for labels and values. */
+main div[class*="relative mt-5 grid"][class*="sm:grid-cols-3"] > div {
+  min-height: 7.4rem !important;
+  padding: 1rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  gap: .75rem !important;
+}
+
+main div[class*="relative mt-5 grid"][class*="sm:grid-cols-3"] > div > div:first-child {
+  align-items: flex-start !important;
+  gap: .45rem !important;
+}
+
+main div[class*="relative mt-5 grid"][class*="sm:grid-cols-3"] button {
+  max-width: 100% !important;
+  text-align: left !important;
+  line-height: 1.25 !important;
+  letter-spacing: .14em !important;
+  text-decoration-thickness: 1px !important;
+}
+
+main div[class*="relative mt-5 grid"][class*="sm:grid-cols-3"] p[class*="text-lg"] {
+  margin-top: 0 !important;
+  font-size: clamp(1.45rem, 2.2vw, 1.9rem) !important;
+  line-height: 1 !important;
+  letter-spacing: -0.035em !important;
+}
+
 /* Make JSON and data previews feel curated instead of clipped. */
 main pre {
   white-space: pre-wrap !important;
@@ -147,6 +200,12 @@ main a:active {
 
   main > section {
     background: linear-gradient(180deg, #080b10 0%, #0c1016 100%) !important;
+  }
+
+  main span[class*="absolute"][class*="z-40"] {
+    left: 0 !important;
+    right: auto !important;
+    width: min(18rem, calc(100vw - 2rem)) !important;
   }
 }
 
