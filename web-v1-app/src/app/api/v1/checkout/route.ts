@@ -80,18 +80,18 @@ function getConfiguredAppUrl(): string | null {
 }
 
 function getAppUrl(request: Request): string | null {
-  if (!isProductionCheckoutRequest(request)) {
-    const url = new URL(request.url);
-    return url.origin.replace(/\/+$/, "");
-  }
-
-  const configured = getConfiguredAppUrl();
+  const configured = process.env.VERCEL_ENV === "preview" ? null : getConfiguredAppUrl();
 
   if (configured) {
     return configured;
   }
 
-  return null;
+  if (isProductionCheckoutRequest(request)) {
+    return null;
+  }
+
+  const url = new URL(request.url);
+  return url.origin.replace(/\/+$/, "");
 }
 function isProductionRuntime(): boolean {
   return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
