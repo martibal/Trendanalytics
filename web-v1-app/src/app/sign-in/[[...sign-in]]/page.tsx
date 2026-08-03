@@ -77,6 +77,16 @@ function sanitizeSignInRedirect(searchParams: AuthSearchParams | undefined) {
   }
 }
 
+function isPreviewCheckoutRedirect(searchParams: AuthSearchParams | undefined): boolean {
+  const redirectUrl = normalizeRedirectUrl(firstSearchParam(searchParams?.redirect_url));
+
+  return (
+    process.env.VERCEL_ENV === "preview" &&
+    typeof redirectUrl === "string" &&
+    redirectUrl.startsWith("/checkout/start")
+  );
+}
+
 export default async function SignInPage({
   searchParams,
 }: {
@@ -85,6 +95,7 @@ export default async function SignInPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   sanitizeSignInRedirect(resolvedSearchParams);
   const clerkConfigured = isClerkConfigured();
+  const previewCheckoutRedirect = isPreviewCheckoutRedirect(resolvedSearchParams);
 
   return (
     <UrdPage>
@@ -164,16 +175,31 @@ export default async function SignInPage({
             </div>
 
             {clerkConfigured ? (
-              <div className="rounded-3xl border border-[#c9d9ea] bg-[#eef6ff] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
-                <div className="flex justify-center">
-                  <SignIn
-                    routing="path"
-                    path="/sign-in"
-                    signUpUrl="/sign-up"
-                    fallbackRedirectUrl="/dashboard"
-                  />
+              previewCheckoutRedirect ? (
+                <UrdCallout title="Preview checkout sign-in is disabled." tone="warning">
+                  <p>
+                    This preview deployment reached the subscriber checkout sign-in step, but the
+                    embedded identity provider is not rendered here to avoid a raw preview runtime
+                    error. Use the production environment for the final Stripe checkout test.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <UrdPillLink href="/#pricing">Back to pricing</UrdPillLink>
+                    <UrdPillLink href="/plans">View plans</UrdPillLink>
+                    <UrdPillLink href="/dashboard">Dashboard</UrdPillLink>
+                  </div>
+                </UrdCallout>
+              ) : (
+                <div className="rounded-3xl border border-[#c9d9ea] bg-[#eef6ff] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+                  <div className="flex justify-center">
+                    <SignIn
+                      routing="path"
+                      path="/sign-in"
+                      signUpUrl="/sign-up"
+                      fallbackRedirectUrl="/dashboard"
+                    />
+                  </div>
                 </div>
-              </div>
+              )
             ) : (
               <UrdCallout title="Clerk is not configured in this environment." tone="warning">
                 <p>
