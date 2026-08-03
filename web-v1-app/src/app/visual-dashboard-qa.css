@@ -3,10 +3,10 @@
 /* The nav dot represents published-state availability, not a live market feed. */
 .ua-site-brand::after {
   animation: none !important;
+  opacity: .82;
   width: 6px !important;
   height: 6px !important;
-  opacity: .72;
-  box-shadow: 0 0 9px rgba(16, 185, 129, .30) !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, .30) !important;
 }
 
 /* Prevent compact KPI values such as "2 Aug" from looking broken or unfinished. */
@@ -18,21 +18,15 @@ main dl dd.truncate {
   line-height: 1.1;
 }
 
-/* Chain summaries should stay compact. The homepage is a dashboard, not a report surface. */
+/* Homepage chain cards should be dashboard cards, not clipped explanatory copy. */
 main a[href^="/chains/"] p.line-clamp-2 {
-  display: -webkit-box !important;
-  min-height: 2.9rem;
-  max-height: 2.9rem;
-  overflow: hidden !important;
-  -webkit-line-clamp: 2 !important;
-  -webkit-box-orient: vertical !important;
-  text-overflow: ellipsis !important;
+  display: none !important;
 }
 
-/* JSON panels should be inspectable without looking visually broken at normal viewport widths. */
-main pre code {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+main a[href^="/chains/"] p.line-clamp-2 + p {
+  margin-top: 1rem !important;
+  border-top: 1px solid rgba(255,255,255,.06);
+  padding-top: .85rem;
 }
 
 /* Slightly reduce the hero card mass so the first fold has more breathing room. */
@@ -47,4 +41,19 @@ main a[href^="/chains/"] h3 {
 /* Keep the right-side dashboard premium without making the product feel neon-heavy. */
 main [style*="radial-gradient"] {
   filter: saturate(.92);
+}
+
+/* JSON preview should look curated, not horizontally clipped. */
+main pre {
+  max-width: 100%;
+}
+
+main pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+section:nth-of-type(3) pre {
+  font-size: 11px;
+  line-height: 1.75;
 }
