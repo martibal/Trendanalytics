@@ -46,8 +46,8 @@ const FAIL_CLOSED_RETRY_AFTER_SECONDS = 60;
 
 const memoryStore = new Map<string, MemoryWindow>();
 
-function isProductionRuntime(): boolean {
-  return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+function shouldFailClosedWhenBackendMissing(): boolean {
+  return process.env.VERCEL_ENV === "production";
 }
 
 function envKeyForScope(scope: string): string {
@@ -277,13 +277,18 @@ export async function enforcePreAuthRateLimit(
   const ratelimit = getRatelimiter(scope, limit);
 
   if (!ratelimit) {
-    if (isProductionRuntime()) {
+    if (shouldFailClosedWhenBackendMissing()) {
       console.error("[preAuthRateLimit] production pre-auth rate-limit backend missing; failing closed", {
         scope,
       });
 
       return buildFailClosedDecision(scope, requestId);
     }
+
+    console.warn("[preAuthRateLimit] durable backend missing; using in-memory fallback", {
+      scope,
+      vercelEnv: process.env.VERCEL_ENV ?? null,
+    });
 
     return applyMemoryRateLimit(key, scope, limit, requestId);
   }
@@ -327,7 +332,7 @@ export async function enforcePreAuthRateLimit(
       error: error instanceof Error ? error.message : String(error),
     });
 
-    if (isProductionRuntime()) {
+    if (shouldFailClosedWhenBackendMissing()) {
       return buildFailClosedDecision(scope, requestId);
     }
 
