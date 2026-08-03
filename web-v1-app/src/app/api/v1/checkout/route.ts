@@ -250,6 +250,14 @@ function checkoutMetadata(params: {
   };
 }
 
+function isPreviewMissingPreAuthBackend(decision: { source: string; detail?: string }): boolean {
+  return (
+    process.env.VERCEL_ENV === "preview" &&
+    decision.source === "fail_closed" &&
+    decision.detail?.includes("backend is not configured") === true
+  );
+}
+
 async function getSignedInUser() {
   const authState = await auth();
 
@@ -532,7 +540,9 @@ export async function POST(request: Request) {
 
   const preAuthRateLimit = await enforcePreAuthRateLimit(request, "checkout-api");
 
-  if (!preAuthRateLimit.ok) {
+  if (!preAuthRateLimit.ok && isPreviewMissingPreAuthBackend(preAuthRateLimit)) {
+    console.warn("[checkout] preview pre-auth rate-limit backend missing; continuing for preview checkout validation only");
+  } else if (!preAuthRateLimit.ok) {
     return preAuthRateLimit.response;
   }
   return handleCheckout(request);
