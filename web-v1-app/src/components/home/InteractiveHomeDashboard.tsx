@@ -27,6 +27,7 @@ export type HomeChainSnapshot = {
 };
 
 type Artifact = "Meta" | "Gold" | "Derived" | "Briefs";
+type JsonPayload = unknown;
 
 type Props = {
   snapshots: HomeChainSnapshot[];
@@ -155,6 +156,10 @@ function tone(label: HomeLabel) {
   return { color: "#A78BFA", soft: "rgba(167,139,250,.14)", glow: "rgba(167,139,250,.28)" };
 }
 
+function artifactPath(artifact: Artifact, chainId: string) {
+  return `/data/published/v1/${artifact.toLowerCase()}/${chainId}/latest.json`;
+}
+
 function percent(value: number | null) {
   if (typeof value !== "number" || Number.isNaN(value)) return 0;
   return Math.max(0, Math.min(100, value <= 1 ? Math.round(value * 100) : Math.round(value)));
@@ -168,6 +173,10 @@ function metric(value: number | null) {
 function shortConfidence(value: number | null) {
   if (typeof value !== "number" || Number.isNaN(value)) return null;
   return Number(value.toFixed(3));
+}
+
+function stringifyJson(value: JsonPayload) {
+  return JSON.stringify(value, null, 2);
 }
 
 function InfoPopover({
@@ -490,27 +499,36 @@ function FirstReadCard({
 
 function JsonModal({
   artifact,
+  artifactUrl,
   payload,
+  status,
+  error,
   onClose,
   onCopy,
   copied,
 }: {
   artifact: Artifact;
-  payload: Record<string, unknown>;
+  artifactUrl: string;
+  payload: JsonPayload;
+  status: "loading" | "success" | "error";
+  error: string | null;
   onClose: () => void;
   onCopy: () => void;
   copied: boolean;
 }) {
+  const body = status === "success" ? stringifyJson(payload) : status === "loading" ? "Loading published JSON artifact…" : error ?? "Could not load published JSON artifact.";
+
   return (
     <div className="fixed inset-0 z-[1000] grid place-items-center bg-black/80 px-4 py-8" role="dialog" aria-modal="true" aria-label={`Full ${artifact} JSON preview`}>
-      <div className="flex max-h-[88vh] w-full max-w-4xl flex-col rounded-[2rem] border border-cyan-200/25 bg-[#070B10] shadow-[0_40px_140px_rgba(0,0,0,.92)]">
+      <div className="flex max-h-[88vh] w-full max-w-5xl flex-col rounded-[2rem] border border-cyan-200/25 bg-[#070B10] shadow-[0_40px_140px_rgba(0,0,0,.92)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">Full artifact JSON</p>
-            <h3 className="mt-1 text-xl font-semibold tracking-tight text-white">{artifact} preview</h3>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">Full published JSON</p>
+            <h3 className="mt-1 text-xl font-semibold tracking-tight text-white">{artifact} latest.json</h3>
+            <p className="mt-1 font-mono text-[10px] text-zinc-500">{artifactUrl}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={onCopy} className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white transition hover:border-emerald-200/60">
+            <button type="button" onClick={onCopy} disabled={status !== "success"} className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white transition hover:border-emerald-200/60 disabled:cursor-not-allowed disabled:opacity-40">
               {copied ? "Copied ✓" : "Copy JSON"}
             </button>
             <button type="button" onClick={onClose} className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-200 transition hover:border-white/25 hover:text-white">
@@ -518,7 +536,7 @@ function JsonModal({
             </button>
           </div>
         </div>
-        <pre className="min-h-0 flex-1 overflow-auto p-5 font-mono text-xs leading-6 text-zinc-100"><code>{JSON.stringify(payload, null, 2)}</code></pre>
+        <pre className="min-h-0 flex-1 overflow-auto p-5 font-mono text-xs leading-6 text-zinc-100"><code>{body}</code></pre>
       </div>
     </div>
   );
@@ -530,20 +548,54 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
   const [pipelineStep, setPipelineStep] = useState(2);
   const [copied, setCopied] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [fullJson, setFullJson] = useState<JsonPayload>(null);
+  const [fullJsonStatus, setFullJsonStatus] = useState<"loading" | "success" | "error">("loading");
+  const [fullJsonError, setFullJsonError] = useState<string | null>(null);
   const [activeInfo, setActiveInfo] = useState<InfoId | null>(null);
 
   const active = useMemo(() => snapshots.find((chain) => chain.id === activeId) ?? snapshots[0], [activeId, snapshots]);
   const activeTone = tone(active?.regime ?? "UNKNOWN/DEGRADED");
   const payload = active ? artifactPayload(artifact, active) : {};
   const selectedPipeline = pipeline[pipelineStep] ?? pipeline[2];
+  const currentArtifactUrl = active ? artifactPath(artifact, active.id) : "";
 
-  async function copyPayload() {
+  async function copyText(value: string) {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      await navigator.clipboard.writeText(value);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
       setCopied(false);
+    }
+  }
+
+  async function copyPayload() {
+    await copyText(stringifyJson(payload));
+  }
+
+  async function copyFullJson() {
+    if (fullJsonStatus !== "success") return;
+    await copyText(stringifyJson(fullJson));
+  }
+
+  async function openFullJson() {
+    if (!active) return;
+
+    const url = artifactPath(artifact, active.id);
+    setJsonOpen(true);
+    setFullJson(null);
+    setFullJsonStatus("loading");
+    setFullJsonError(null);
+
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const parsed = await response.json();
+      setFullJson(parsed);
+      setFullJsonStatus("success");
+    } catch (error) {
+      setFullJsonStatus("error");
+      setFullJsonError(error instanceof Error ? error.message : "Unknown error");
     }
   }
 
@@ -668,7 +720,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">How it moves</p>
           <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">Click through the daily evidence path.</h2>
           <p className="mt-5 max-w-xl text-sm leading-7 text-zinc-500">
-            Pick a pipeline step to switch the preview layer. Open the full JSON to inspect the complete artifact example.
+            Pick a pipeline step to switch the preview layer. Open the full JSON to inspect the complete published artifact.
           </p>
         </div>
 
@@ -728,9 +780,10 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
                 ))}
               </div>
             </div>
-            <pre className="max-h-[14rem] overflow-hidden rounded-2xl border border-white/10 bg-black/55 p-5 font-mono text-xs leading-6 text-zinc-200 whitespace-pre-wrap"><code>{JSON.stringify(payload, null, 2)}</code></pre>
+            <pre className="max-h-[14rem] overflow-hidden rounded-2xl border border-white/10 bg-black/55 p-5 font-mono text-xs leading-6 text-zinc-200 whitespace-pre-wrap"><code>{stringifyJson(payload)}</code></pre>
+            <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">Compact preview. Full file opens from {currentArtifactUrl}</p>
             <div className="mt-4 flex flex-wrap gap-3">
-              <button type="button" onClick={() => setJsonOpen(true)} className="inline-flex items-center justify-center rounded-full border border-cyan-300/35 bg-cyan-300/12 px-5 py-3 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:border-cyan-200/65">
+              <button type="button" onClick={openFullJson} className="inline-flex items-center justify-center rounded-full border border-cyan-300/35 bg-cyan-300/12 px-5 py-3 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:border-cyan-200/65">
                 Open full JSON
               </button>
               <button type="button" onClick={copyPayload} className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-300/10 px-5 py-3 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:border-emerald-200/60">
@@ -811,9 +864,12 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
       {jsonOpen ? (
         <JsonModal
           artifact={artifact}
-          payload={payload}
+          artifactUrl={currentArtifactUrl}
+          payload={fullJson}
+          status={fullJsonStatus}
+          error={fullJsonError}
           copied={copied}
-          onCopy={copyPayload}
+          onCopy={copyFullJson}
           onClose={() => setJsonOpen(false)}
         />
       ) : null}
