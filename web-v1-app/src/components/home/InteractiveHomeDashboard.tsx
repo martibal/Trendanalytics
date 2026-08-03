@@ -40,6 +40,17 @@ type InfoContent = {
   link?: string;
 };
 
+type InfoId =
+  | "regime"
+  | "demand"
+  | "friction"
+  | "capacity"
+  | "confidence"
+  | "dataQuality"
+  | "labelConfidence"
+  | "dataLag"
+  | "firstRead";
+
 const artifacts: Artifact[] = ["Meta", "Gold", "Derived", "Briefs"];
 
 const pipeline = [
@@ -69,7 +80,13 @@ const pipeline = [
   },
 ] as const;
 
-const info: Record<string, InfoContent> = {
+const info: Record<InfoId, InfoContent> = {
+  regime: {
+    title: "Regime label",
+    body: "The regime is the readable network-state label for the selected chain and date.",
+    calculation: "It is produced from the daily demand, friction and capacity scorecard. Read it together with confidence: the label says what kind of state was published, while confidence says how strongly the evidence supports it.",
+    link: "/methodology",
+  },
   demand: {
     title: "Demand score",
     body: "Demand describes how strong activity pressure looks for the selected chain on this published date.",
@@ -112,11 +129,11 @@ const info: Record<string, InfoContent> = {
     calculation: "Bitcoin and Ethereum are currently published with T+1 lag. Base and Arbitrum are currently published with T+7 lag. This is a delivery/freshness property, not a signal.",
     link: "/status",
   },
-  scoreShape: {
-    title: "Score vector shape",
-    body: "This line is a compact visual fingerprint of the selected row, not a forecast and not a decorative placeholder.",
-    calculation: "It is drawn from the actual published row values: demand, friction, capacity, data quality, label confidence and confidence.",
-    link: "/methodology",
+  firstRead: {
+    title: "Recommended first read",
+    body: "This panel tells a new user how to use the selected published state first: read the regime, check confidence, then join the row to their own daily metric.",
+    calculation: "It is not a model output. It is a workflow hint built from the currently selected chain, regime, confidence and lag.",
+    link: "/analyst-kit",
   },
 };
 
@@ -143,13 +160,18 @@ function shortConfidence(value: number | null) {
   return Number(value.toFixed(3));
 }
 
-function normalizeForSpark(value: number | null) {
-  if (typeof value !== "number" || Number.isNaN(value)) return null;
-  return value <= 1 ? value * 100 : value;
-}
-
-function InfoPopover({ id, compact = false }: { id: keyof typeof info; compact?: boolean }) {
-  const [open, setOpen] = useState(false);
+function InfoPopover({
+  id,
+  activeInfo,
+  setActiveInfo,
+  compact = false,
+}: {
+  id: InfoId;
+  activeInfo: InfoId | null;
+  setActiveInfo: (id: InfoId | null) => void;
+  compact?: boolean;
+}) {
+  const open = activeInfo === id;
   const item = info[id];
 
   return (
@@ -158,16 +180,19 @@ function InfoPopover({ id, compact = false }: { id: keyof typeof info; compact?:
         type="button"
         aria-expanded={open}
         aria-label={`Explain ${item.title}`}
-        onClick={() => setOpen((current) => !current)}
+        onClick={(event) => {
+          event.stopPropagation();
+          setActiveInfo(open ? null : id);
+        }}
         className={`inline-flex items-center justify-center rounded-full border border-white/15 bg-white/[0.04] font-mono text-zinc-300 transition hover:border-cyan-200/45 hover:bg-cyan-300/10 hover:text-white ${compact ? "h-5 w-5 text-[10px]" : "px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]"}`}
       >
         {compact ? "?" : "info"}
       </button>
       {open ? (
-        <span className="absolute left-0 top-7 z-40 w-72 rounded-2xl border border-cyan-200/25 bg-[#0D1117]/95 p-4 text-left shadow-[0_24px_80px_rgba(0,0,0,.55)] backdrop-blur-2xl">
+        <span className="absolute left-0 top-7 z-40 w-72 rounded-2xl border border-cyan-200/25 bg-[#0A0F15] p-4 text-left shadow-[0_24px_80px_rgba(0,0,0,.85)]">
           <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">{item.title}</span>
-          <span className="mt-2 block text-sm leading-6 text-zinc-200">{item.body}</span>
-          <span className="mt-3 block text-xs leading-5 text-zinc-500">{item.calculation}</span>
+          <span className="mt-2 block text-sm leading-6 text-zinc-100">{item.body}</span>
+          <span className="mt-3 block text-xs leading-5 text-zinc-400">{item.calculation}</span>
           {item.link ? (
             <Link href={item.link} className="mt-3 inline-flex font-mono text-[10px] uppercase tracking-[0.14em] text-cyan-200 underline-offset-4 hover:underline">
               Read more
@@ -179,56 +204,24 @@ function InfoPopover({ id, compact = false }: { id: keyof typeof info; compact?:
   );
 }
 
-function ValueSparkline({ values, color }: { values: Array<number | null>; color: string }) {
-  const valid = values.map(normalizeForSpark).filter((value): value is number => typeof value === "number");
-
-  if (valid.length < 2) {
-    return (
-      <div className="grid h-16 place-items-center rounded-2xl border border-white/10 bg-black/20 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">
-        Not enough values
-      </div>
-    );
-  }
-
-  const min = Math.min(...valid);
-  const max = Math.max(...valid);
-  const spread = Math.max(1, max - min);
-  const points = valid.map((value, index) => {
-    const x = 8 + index * (140 / Math.max(1, valid.length - 1));
-    const y = 50 - ((value - min) / spread) * 34;
-    return `${x},${y}`;
-  }).join(" ");
-
-  return (
-    <svg viewBox="0 0 156 58" className="h-16 w-full" aria-hidden="true">
-      <defs>
-        <linearGradient id="score-vector-shape" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="1" />
-        </linearGradient>
-      </defs>
-      <polyline points={points} fill="none" stroke="url(#score-vector-shape)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      <polyline points={points} fill="none" stroke={color} strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" opacity="0.08" />
-    </svg>
-  );
-}
-
-function Gauge({ value, color }: { value: number | null; color: string }) {
+function Gauge({
+  value,
+  color,
+  activeInfo,
+  setActiveInfo,
+}: {
+  value: number | null;
+  color: string;
+  activeInfo: InfoId | null;
+  setActiveInfo: (id: InfoId | null) => void;
+}) {
   const pct = percent(value);
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
   const dash = (pct / 100) * circumference;
 
   return (
-    <button
-      type="button"
-      className="relative grid h-32 w-32 place-items-center rounded-full border border-white/10 bg-black/30 text-left shadow-[inset_0_0_32px_rgba(255,255,255,.035)] transition hover:-translate-y-1 hover:border-cyan-200/35"
-      aria-label="Explain confidence score"
-      onClick={(event) => {
-        const target = event.currentTarget.querySelector("button");
-        if (target instanceof HTMLButtonElement) target.click();
-      }}
-    >
+    <div className="relative grid h-32 w-32 place-items-center rounded-full border border-white/10 bg-black/30 text-left shadow-[inset_0_0_32px_rgba(255,255,255,.035)] transition hover:-translate-y-1 hover:border-cyan-200/35">
       <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
         <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="7" />
         <circle
@@ -246,32 +239,63 @@ function Gauge({ value, color }: { value: number | null; color: string }) {
       <div className="relative text-center">
         <p className="font-mono text-3xl font-semibold text-white">{pct}%</p>
         <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.18em] text-zinc-500">confidence</p>
-        <span className="mt-2 flex justify-center"><InfoPopover id="confidence" compact /></span>
+        <span className="mt-2 flex justify-center">
+          <InfoPopover id="confidence" activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact />
+        </span>
       </div>
-    </button>
+    </div>
   );
 }
 
-function RegimeBadge({ label }: { label: HomeLabel }) {
+function RegimeBadge({
+  label,
+  activeInfo,
+  setActiveInfo,
+}: {
+  label: HomeLabel;
+  activeInfo: InfoId | null;
+  setActiveInfo: (id: InfoId | null) => void;
+}) {
   const t = tone(label);
   return (
     <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: t.color, borderColor: `${t.color}66`, background: t.soft, boxShadow: `0 0 28px ${t.glow}` }}>
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: t.color, boxShadow: `0 0 16px ${t.color}` }} />
       {label}
+      <InfoPopover id="regime" activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact />
     </span>
   );
 }
 
-function MetricBar({ id, label, value, descriptor, color }: { id: "demand" | "friction" | "capacity"; label: string; value: number | null; descriptor: string; color: string }) {
+function MetricBar({
+  id,
+  label,
+  value,
+  descriptor,
+  color,
+  activeInfo,
+  setActiveInfo,
+}: {
+  id: "demand" | "friction" | "capacity";
+  label: string;
+  value: number | null;
+  descriptor: string;
+  color: string;
+  activeInfo: InfoId | null;
+  setActiveInfo: (id: InfoId | null) => void;
+}) {
   const pct = percent(value);
   return (
     <div className="group rounded-2xl border border-white/10 bg-white/[0.035] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.055]">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <button type="button" className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60">
+          <button
+            type="button"
+            onClick={() => setActiveInfo(activeInfo === id ? null : id)}
+            className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60"
+          >
             {label}
           </button>
-          <InfoPopover id={id} compact />
+          <InfoPopover id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact />
         </div>
         <p className="font-mono text-sm text-white">{metric(value)}</p>
       </div>
@@ -320,14 +344,12 @@ function artifactPayload(artifact: Artifact, chain: HomeChainSnapshot) {
     return {
       chain: chain.id,
       date: chain.asOf,
-      score_vector_shape: {
-        demand: chain.demand,
-        friction: chain.friction,
-        capacity: chain.capacity,
-        data_quality: shortConfidence(chain.dataQuality),
-        label_confidence: shortConfidence(chain.labelConfidence),
-        confidence: shortConfidence(chain.confidenceValue),
-      },
+      demand_score: chain.demand,
+      friction_score: chain.friction,
+      capacity_score: chain.capacity,
+      data_quality_score: shortConfidence(chain.dataQuality),
+      label_confidence_score: shortConfidence(chain.labelConfidence),
+      confidence_score: shortConfidence(chain.confidenceValue),
       lag: chain.lag,
     };
   }
@@ -352,16 +374,85 @@ function artifactPayload(artifact: Artifact, chain: HomeChainSnapshot) {
   };
 }
 
-function QualityCard({ id, label, value, suffix = "%" }: { id: "dataQuality" | "labelConfidence" | "dataLag"; label: string; value: string | number; suffix?: string }) {
+function QualityCard({
+  id,
+  label,
+  value,
+  activeInfo,
+  setActiveInfo,
+  suffix = "%",
+}: {
+  id: "dataQuality" | "labelConfidence" | "dataLag";
+  label: string;
+  value: string | number;
+  activeInfo: InfoId | null;
+  setActiveInfo: (id: InfoId | null) => void;
+  suffix?: string;
+}) {
   return (
     <div className="rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:-translate-y-0.5 hover:border-cyan-200/30 hover:bg-white/[0.04]">
       <div className="flex items-center gap-2">
-        <button type="button" className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60">
+        <button
+          type="button"
+          onClick={() => setActiveInfo(activeInfo === id ? null : id)}
+          className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60"
+        >
           {label}
         </button>
-        <InfoPopover id={id} compact />
+        <InfoPopover id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact />
       </div>
       <p className="mt-1 font-mono text-lg text-white">{value}{suffix}</p>
+    </div>
+  );
+}
+
+function FirstReadCard({
+  chain,
+  activeInfo,
+  setActiveInfo,
+}: {
+  chain: HomeChainSnapshot;
+  activeInfo: InfoId | null;
+  setActiveInfo: (id: InfoId | null) => void;
+}) {
+  const confidence = percent(chain.confidenceValue);
+  const labelConfidence = percent(chain.labelConfidence);
+  const shouldGate = confidence < 70 || labelConfidence < 70;
+  const guidance = shouldGate
+    ? "Use this row as context, but keep confidence visible before drawing conclusions."
+    : "This row is a cleaner candidate for a first join test against your own metric.";
+
+  return (
+    <div className="relative mt-6 rounded-3xl border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,.055),rgba(255,255,255,.02))] p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveInfo(activeInfo === "firstRead" ? null : "firstRead")}
+              className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60"
+            >
+              Recommended first read
+            </button>
+            <InfoPopover id="firstRead" activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact />
+          </div>
+          <p className="mt-2 text-sm leading-6 text-zinc-300">{guidance}</p>
+        </div>
+        <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-300">
+          {chain.lag}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <Link href="/analyst-kit" className="rounded-2xl border border-cyan-200/25 bg-cyan-300/10 px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-cyan-100 transition hover:border-cyan-100/60 hover:bg-cyan-300/15">
+          Join CSV
+        </Link>
+        <Link href="/validation" className="rounded-2xl border border-emerald-200/25 bg-emerald-300/10 px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-100 transition hover:border-emerald-100/60 hover:bg-emerald-300/15">
+          Check confidence
+        </Link>
+        <Link href={`/chains/${chain.id}`} className="rounded-2xl border border-white/10 bg-black/25 px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-300 transition hover:border-white/25 hover:text-white">
+          Open chain
+        </Link>
+      </div>
     </div>
   );
 }
@@ -371,11 +462,11 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
   const [artifact, setArtifact] = useState<Artifact>("Meta");
   const [pipelineStep, setPipelineStep] = useState(2);
   const [copied, setCopied] = useState(false);
+  const [activeInfo, setActiveInfo] = useState<InfoId | null>(null);
 
   const active = useMemo(() => snapshots.find((chain) => chain.id === activeId) ?? snapshots[0], [activeId, snapshots]);
   const activeTone = tone(active?.regime ?? "UNKNOWN/DEGRADED");
   const payload = active ? artifactPayload(artifact, active) : {};
-  const scoreVector = active ? [active.demand, active.friction, active.capacity, active.dataQuality, active.labelConfidence, active.confidenceValue] : [];
 
   async function copyPayload() {
     try {
@@ -437,7 +528,15 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
         <div className="relative z-10 grid gap-4 rounded-[2.25rem] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,.075),rgba(255,255,255,.025))] p-4 shadow-[0_40px_120px_rgba(0,0,0,.45)] backdrop-blur-2xl lg:grid-cols-[0.86fr_1.14fr]">
           <div className="grid gap-3 self-start">
             {snapshots.map((chain) => (
-              <ChainSelector key={chain.id} chain={chain} active={chain.id === active.id} onClick={() => setActiveId(chain.id)} />
+              <ChainSelector
+                key={chain.id}
+                chain={chain}
+                active={chain.id === active.id}
+                onClick={() => {
+                  setActiveId(chain.id);
+                  setActiveInfo(null);
+                }}
+              />
             ))}
           </div>
 
@@ -448,38 +547,24 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
                 <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">{active.ticker} · {active.asOf} · {active.lag}</p>
                 <h2 className="mt-2 text-4xl font-semibold tracking-[-0.04em] text-white">{active.name}</h2>
               </div>
-              <RegimeBadge label={active.regime} />
+              <RegimeBadge label={active.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
             </div>
 
             <div className="relative mt-7 grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]">
-              <Gauge value={active.confidenceValue} color={activeTone.color} />
+              <Gauge value={active.confidenceValue} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
               <div className="grid gap-3">
-                <MetricBar id="demand" label="Demand" value={active.demand} descriptor={active.demandLabel} color={activeTone.color} />
-                <MetricBar id="friction" label="Friction" value={active.friction} descriptor={active.frictionLabel} color={activeTone.color} />
-                <MetricBar id="capacity" label="Capacity" value={active.capacity} descriptor={active.capacityLabel} color={activeTone.color} />
+                <MetricBar id="demand" label="Demand" value={active.demand} descriptor={active.demandLabel} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+                <MetricBar id="friction" label="Friction" value={active.friction} descriptor={active.frictionLabel} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+                <MetricBar id="capacity" label="Capacity" value={active.capacity} descriptor={active.capacityLabel} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
               </div>
             </div>
 
-            <div className="relative mt-6 rounded-3xl border border-white/10 bg-white/[0.035] p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <button type="button" className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60">Score vector shape</button>
-                    <InfoPopover id="scoreShape" compact />
-                  </div>
-                  <p className="mt-1 text-sm text-zinc-400">Actual row values compressed into one visual fingerprint.</p>
-                </div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: activeTone.color }}>{active.regime}</p>
-              </div>
-              <div className="mt-3">
-                <ValueSparkline values={scoreVector} color={activeTone.color} />
-              </div>
-            </div>
+            <FirstReadCard chain={active} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
 
             <div className="relative mt-5 grid gap-3 sm:grid-cols-3">
-              <QualityCard id="dataQuality" label="Data quality" value={percent(active.dataQuality)} />
-              <QualityCard id="labelConfidence" label="Label confidence" value={percent(active.labelConfidence)} />
-              <QualityCard id="dataLag" label="Data lag" value={active.lag} suffix="" />
+              <QualityCard id="dataQuality" label="Data quality" value={percent(active.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+              <QualityCard id="labelConfidence" label="Label confidence" value={percent(active.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+              <QualityCard id="dataLag" label="Data lag" value={active.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} suffix="" />
             </div>
           </section>
         </div>
