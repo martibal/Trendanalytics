@@ -77,12 +77,13 @@ function sanitizeSignInRedirect(searchParams: SignInSearchParams | undefined) {
   }
 }
 
-export default function SignInPage({
+export default async function SignInPage({
   searchParams,
 }: {
-  searchParams?: SignInSearchParams;
+  searchParams?: Promise<SignInSearchParams>;
 }) {
-  sanitizeSignInRedirect(searchParams);
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  sanitizeSignInRedirect(resolvedSearchParams);
   const clerkConfigured = isClerkConfigured();
 
   return (
@@ -149,7 +150,7 @@ export default function SignInPage({
             </Section>
           </div>
 
-          <section className={cx(urd.section, "self-start")}> 
+          <section className={cx(urd.section, "self-start")}>
             <div className="mb-5">
               <div className="text-xs font-black uppercase tracking-[0.14em] text-[#557099]">
                 Identity provider
