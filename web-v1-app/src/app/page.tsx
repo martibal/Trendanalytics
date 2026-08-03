@@ -1,3 +1,4 @@
+import CheckoutRedirectGuard from "@/components/home/CheckoutRedirectGuard";
 import InteractiveHomeDashboard, { type HomeChainSnapshot, type HomeLabel } from "@/components/home/InteractiveHomeDashboard";
 import { readStorageObject } from "@/lib/storage";
 
@@ -160,5 +161,10 @@ export default async function HomePage() {
     getLastRun(),
   ]);
 
-  return <InteractiveHomeDashboard snapshots={snapshots} lastRun={lastRun} />;
+  return (
+    <>
+      <CheckoutRedirectGuard />
+      <InteractiveHomeDashboard snapshots={snapshots} lastRun={lastRun} />
+    </>
+  );
 }
