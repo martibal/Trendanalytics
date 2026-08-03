@@ -4,13 +4,12 @@
 .ua-site-brand::after {
   animation: none !important;
   opacity: .82;
-  width: 6px !important;
-  height: 6px !important;
-  box-shadow: 0 0 10px rgba(16, 185, 129, .30) !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, .28) !important;
 }
 
 /* Prevent compact KPI values such as "2 Aug" from looking broken or unfinished. */
-main dl dd.truncate {
+main dl dd.truncate,
+main dl dd {
   overflow: visible !important;
   text-overflow: clip !important;
   white-space: normal !important;
@@ -18,18 +17,11 @@ main dl dd.truncate {
   line-height: 1.1;
 }
 
-/* Homepage chain cards should be dashboard cards, not clipped explanatory copy. */
+/* Legacy homepage chain-card guard kept for older preview snapshots. */
 main a[href^="/chains/"] p.line-clamp-2 {
   display: none !important;
 }
 
-main a[href^="/chains/"] p.line-clamp-2 + p {
-  margin-top: 1rem !important;
-  border-top: 1px solid rgba(255,255,255,.06);
-  padding-top: .85rem;
-}
-
-/* Slightly reduce the hero card mass so the first fold has more breathing room. */
 main a[href^="/chains/"] {
   border-radius: 1.65rem;
 }
@@ -38,22 +30,33 @@ main a[href^="/chains/"] h3 {
   font-size: clamp(1.25rem, 1.8vw, 1.55rem);
 }
 
-/* Keep the right-side dashboard premium without making the product feel neon-heavy. */
+/* Keep the dashboard rich without making the product feel like a gimmick. */
 main [style*="radial-gradient"] {
-  filter: saturate(.92);
+  filter: saturate(.96);
 }
 
-/* JSON preview should look curated, not horizontally clipped. */
+/* Make JSON and data previews feel curated instead of clipped. */
 main pre {
-  max-width: 100%;
-}
-
-main pre code {
-  white-space: pre-wrap;
+  white-space: pre-wrap !important;
   overflow-wrap: anywhere;
+  word-break: normal;
 }
 
-section:nth-of-type(3) pre {
-  font-size: 11px;
-  line-height: 1.75;
+/* Add tactile feedback to the new interactive surface. */
+main button,
+main a {
+  transform-style: preserve-3d;
+}
+
+main button:active,
+main a:active {
+  transform: translateY(0) scale(.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main *,
+  .ua-site-nav * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
