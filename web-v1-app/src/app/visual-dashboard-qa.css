@@ -7,6 +7,93 @@
   box-shadow: 0 0 10px rgba(16, 185, 129, .28) !important;
 }
 
+/* Calm the site-level surface: page architecture should carry the rhythm, not decorative noise. */
+html,
+body {
+  background: #07090c !important;
+}
+
+body {
+  background:
+    linear-gradient(180deg, #07090c 0%, #090c11 24%, #0d1117 24%, #0d1117 46%, #080b10 46%, #080b10 68%, #10141b 68%, #10141b 86%, #07090c 86%, #07090c 100%) !important;
+}
+
+body::before {
+  opacity: .20 !important;
+  background:
+    linear-gradient(rgba(255,255,255,.010) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.010) 1px, transparent 1px) !important;
+  background-size: 72px 72px, 72px 72px !important;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.10) 34%, transparent 72%) !important;
+}
+
+/* Remove the large ambient color blocks that made the page feel noisy/template-like. */
+main::before,
+main::after {
+  display: none !important;
+}
+
+/* Horizontal product bands: cleaner contrast than floating blobs and global grid. */
+main > section {
+  position: relative;
+  isolation: isolate;
+  border-top: 1px solid rgba(255,255,255,.055);
+  border-bottom: 1px solid rgba(0,0,0,.38);
+}
+
+main > section:nth-of-type(1) {
+  background:
+    linear-gradient(90deg, rgba(7,9,12,.96) 0%, rgba(9,12,16,.96) 44%, rgba(11,18,20,.98) 100%) !important;
+}
+
+main > section:nth-of-type(2) {
+  background: linear-gradient(180deg, #10141a 0%, #0c1016 100%) !important;
+}
+
+main > section:nth-of-type(3) {
+  background: linear-gradient(180deg, #080b10 0%, #07090c 100%) !important;
+}
+
+main > section:nth-of-type(4) {
+  background: linear-gradient(180deg, #11161d 0%, #0c1117 100%) !important;
+}
+
+main > section:nth-of-type(5),
+main > section:nth-of-type(6),
+main > section:nth-of-type(7) {
+  background: linear-gradient(180deg, #080b10 0%, #07090c 100%) !important;
+}
+
+/* Keep a single controlled hero spotlight, anchored to the product cockpit rather than the page background. */
+main > section:first-of-type::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 72% 36%, rgba(56,189,248,.10), transparent 24rem),
+    linear-gradient(90deg, transparent 0%, rgba(16,185,129,.025) 100%);
+}
+
+main > section:not(:first-of-type)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(255,255,255,.026), transparent 18rem);
+}
+
+/* Make cards read as deliberate modules against the calmer bands. */
+main article,
+main [class*="rounded-[2rem]"],
+main [class*="rounded-3xl"] {
+  box-shadow:
+    0 18px 60px rgba(0,0,0,.18),
+    inset 0 1px 0 rgba(255,255,255,.035);
+}
+
 /* Prevent compact KPI values such as "2 Aug" from looking broken or unfinished. */
 main dl dd.truncate,
 main dl dd {
@@ -32,7 +119,7 @@ main a[href^="/chains/"] h3 {
 
 /* Keep the dashboard rich without making the product feel like a gimmick. */
 main [style*="radial-gradient"] {
-  filter: saturate(.96);
+  filter: saturate(.72) opacity(.72) !important;
 }
 
 /* Make JSON and data previews feel curated instead of clipped. */
@@ -51,6 +138,16 @@ main a {
 main button:active,
 main a:active {
   transform: translateY(0) scale(.99);
+}
+
+@media (max-width: 760px) {
+  body::before {
+    opacity: .10 !important;
+  }
+
+  main > section {
+    background: linear-gradient(180deg, #080b10 0%, #0c1016 100%) !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
