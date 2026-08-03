@@ -3,6 +3,8 @@ import { readStorageObject } from "@/lib/storage";
 
 export const revalidate = 0;
 
+type ArtifactName = "Meta" | "Gold" | "Derived" | "Briefs";
+
 type MetaLatest = {
   chain?: string;
   date?: string;
@@ -99,8 +101,25 @@ function normalizeDimensionLabel(value: string | undefined, fallback: string): s
     .join(" ");
 }
 
+async function getArtifacts(chainId: string): Promise<Record<ArtifactName, unknown | null>> {
+  const [meta, gold, derived, briefs] = await Promise.all([
+    readJson<unknown>(`data/published/v1/meta/${chainId}/latest.json`),
+    readJson<unknown>(`data/published/v1/gold/${chainId}/latest.json`),
+    readJson<unknown>(`data/published/v1/derived/${chainId}/latest.json`),
+    readJson<unknown>(`data/published/v1/briefs/${chainId}/latest.json`),
+  ]);
+
+  return {
+    Meta: meta,
+    Gold: gold,
+    Derived: derived,
+    Briefs: briefs,
+  };
+}
+
 async function getSnapshot(chain: (typeof CHAINS)[number]): Promise<HomeChainSnapshot> {
-  const meta = await readJson<MetaLatest>(`data/published/v1/meta/${chain.id}/latest.json`);
+  const artifacts = await getArtifacts(chain.id);
+  const meta = artifacts.Meta as MetaLatest | null;
   const regime = normalizeLabel(meta?.status?.label ?? meta?.regime?.label);
   const dimensions = meta?.scorecard?.dimensions;
   const confidenceValue = typeof meta?.confidence?.confidence_score === "number" ? meta.confidence.confidence_score : null;
@@ -126,6 +145,7 @@ async function getSnapshot(chain: (typeof CHAINS)[number]): Promise<HomeChainSna
     capacity: typeof dimensions?.capacity?.score === "number" ? dimensions.capacity.score : null,
     capacityLabel: normalizeDimensionLabel(dimensions?.capacity?.label, "Capacity context"),
     methodologyVersion: meta?.methodology_version ?? "—",
+    artifacts,
   };
 }
 
