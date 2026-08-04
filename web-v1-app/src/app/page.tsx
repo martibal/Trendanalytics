@@ -1,5 +1,4 @@
 import CheckoutRedirectGuard from "@/components/home/CheckoutRedirectGuard";
-import HeroNetworkStatePanel from "@/components/home/HeroNetworkStatePanel";
 import InteractiveHomeDashboard, { type HomeChainSnapshot, type HomeConfidenceExample, type HomeLabel } from "@/components/home/InteractiveHomeDashboard";
 import { readStorageObject } from "@/lib/storage";
 
@@ -198,20 +197,20 @@ export default async function HomePage() {
   return (
     <>
       <CheckoutRedirectGuard />
-      <InteractiveHomeDashboard snapshots={snapshots} lastRun={lastRun} examples={examples} />
-      {ethereumSnapshot ? (
-        <HeroNetworkStatePanel
-          snapshot={{
-            name: ethereumSnapshot.name,
-            asOf: ethereumSnapshot.asOf,
-            lag: ethereumSnapshot.lag,
-            regime: ethereumSnapshot.regime,
-            confidence: ethereumSnapshot.confidence,
-            confidenceValue: ethereumSnapshot.confidenceValue,
-            oneLiner: ethereumSnapshot.oneLiner,
-          }}
-        />
-      ) : null}
+      <InteractiveHomeDashboard
+        snapshots={snapshots}
+        lastRun={lastRun}
+        examples={examples}
+        heroSnapshot={ethereumSnapshot ? {
+          name: ethereumSnapshot.name,
+          asOf: ethereumSnapshot.asOf,
+          lag: ethereumSnapshot.lag,
+          regime: ethereumSnapshot.regime,
+          confidence: ethereumSnapshot.confidence,
+          confidenceValue: ethereumSnapshot.confidenceValue,
+          oneLiner: ethereumSnapshot.oneLiner,
+        } : undefined}
+      />
     </>
   );
 }
