@@ -43,7 +43,7 @@
 
 /* Hero hierarchy correction: wider horizontal rhythm, no word-by-word stacking. */
 main > section:first-of-type {
-  grid-template-columns: minmax(600px, 1.16fr) minmax(480px, .84fr) !important;
+  grid-template-columns: minmax(600px, 1.1fr) minmax(560px, .9fr) !important;
   align-items: center;
   gap: clamp(2rem, 3.5vw, 3.75rem) !important;
   padding-top: clamp(3rem, 5vw, 5rem) !important;
@@ -122,15 +122,58 @@ main > section:first-of-type > div:first-child > h1 + p + p {
   line-height: 1.4 !important;
 }
 
-/* Keep the live panel from squeezing the message column on desktop widths. */
+/* Keep the live panel wide enough for real labels and controls. */
 main > section:first-of-type > div:nth-child(2) > div {
-  max-width: 42rem;
+  grid-template-columns: 1fr !important;
+  max-width: 43rem;
   margin-left: auto;
 }
 
 main > section:first-of-type > div:nth-child(2) > p:first-child {
-  max-width: 42rem;
+  max-width: 43rem;
   margin-left: auto;
+}
+
+/* The chain selector is a horizontal switcher; it must not become a clipped vertical rail. */
+main > section:first-of-type .ua-chain-list {
+  display: flex !important;
+  gap: .75rem;
+  overflow-x: auto;
+  padding-bottom: .35rem;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+main > section:first-of-type .ua-chain-selector {
+  min-width: 10.75rem;
+  flex: 0 0 10.75rem;
+  scroll-snap-align: start;
+}
+
+main > section:first-of-type .ua-chain-selector p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Make the selected-chain detail card use its full width before stacking internals. */
+main > section:first-of-type > div:nth-child(2) > div > section {
+  overflow: visible !important;
+  width: 100%;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) {
+  grid-template-columns: minmax(7.5rem, .8fr) minmax(0, 1.5fr) !important;
+  align-items: start;
+  gap: 1rem !important;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) > div:first-child {
+  justify-self: start;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) > div:nth-child(2) {
+  min-width: 0;
 }
 
 /* Prevent the interactive state panel from clipping its own controls. */
@@ -138,10 +181,6 @@ main > section:first-of-type > div:nth-child(2) > div,
 main > section:first-of-type > div:nth-child(2) > div > section,
 main > section:first-of-type > div:nth-child(2) > div .ua-home-card {
   min-width: 0;
-}
-
-main > section:first-of-type > div:nth-child(2) > div > section {
-  overflow: visible !important;
 }
 
 /* Put the delivered files before the numeric trust strip, as the files are the product. */
@@ -157,41 +196,6 @@ main > section:nth-of-type(4) { order: 4; }
 main > section:nth-of-type(5) { order: 5; }
 main > section:nth-of-type(6) { order: 6; }
 main > section:nth-of-type(7) { order: 7; }
-
-@media (max-width: 1350px) {
-  main > section:first-of-type > div:nth-child(2) > div {
-    grid-template-columns: 1fr !important;
-    max-width: 39rem;
-  }
-
-  main > section:first-of-type .ua-chain-list {
-    display: flex !important;
-    gap: .75rem;
-    overflow-x: auto;
-    padding-bottom: .35rem;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  main > section:first-of-type .ua-chain-selector {
-    min-width: 10.75rem;
-    scroll-snap-align: start;
-  }
-
-  main > section:first-of-type .ua-chain-selector p {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) {
-    grid-template-columns: 1fr !important;
-  }
-
-  main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) > div:first-child {
-    justify-self: start;
-  }
-}
 
 /* Live preview control fixes: no circular fixed buttons, no label/help collisions, less dead vertical space. */
 main > section:first-of-type > div:nth-child(2) > div > section > .ua-home-card.relative.mt-6 {
@@ -259,6 +263,26 @@ main > section:first-of-type > div:nth-child(2) > div > section > .relative.mt-5
   font-size: .95rem !important;
 }
 
+@media (max-width: 1280px) {
+  main > section:first-of-type {
+    grid-template-columns: 1fr !important;
+  }
+
+  main > section:first-of-type > div:first-child {
+    max-width: 46rem;
+  }
+
+  main > section:first-of-type > div:first-child > h1::before {
+    font-size: clamp(3rem, 8vw, 4.55rem);
+  }
+
+  main > section:first-of-type > div:nth-child(2) > div,
+  main > section:first-of-type > div:nth-child(2) > p:first-child {
+    max-width: none;
+    margin-left: 0;
+  }
+}
+
 @media (max-width: 1180px) {
   .ua-mobile-primary-cta {
     display: inline-flex;
@@ -276,26 +300,6 @@ main > section:first-of-type > div:nth-child(2) > div > section > .relative.mt-5
     letter-spacing: .12em;
     text-transform: uppercase;
     white-space: nowrap;
-  }
-}
-
-@media (max-width: 1180px) {
-  main > section:first-of-type {
-    grid-template-columns: 1fr !important;
-  }
-
-  main > section:first-of-type > div:first-child {
-    max-width: 46rem;
-  }
-
-  main > section:first-of-type > div:first-child > h1::before {
-    font-size: clamp(3rem, 8vw, 4.55rem);
-  }
-
-  main > section:first-of-type > div:nth-child(2) > div,
-  main > section:first-of-type > div:nth-child(2) > p:first-child {
-    max-width: none;
-    margin-left: 0;
   }
 }
 
@@ -332,6 +336,10 @@ main > section:first-of-type > div:nth-child(2) > div > section > .relative.mt-5
   .ua-chain-selector {
     min-width: 13rem;
     scroll-snap-align: start;
+  }
+
+  main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) {
+    grid-template-columns: 1fr !important;
   }
 
   main [role="dialog"] {
