@@ -33,7 +33,7 @@ function methodologyLine(value: string | null | undefined) {
 export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPanelSnapshot }) {
   return (
     <>
-      <aside className="ua3-hero-network-panel" aria-label="Dataset at a glance">
+      <aside className="ua3-hero-network-panel" data-panel-kind="dataset-glance" aria-label="Dataset at a glance">
         <p className="ua3-hero-panel-label">DATASET AT A GLANCE</p>
 
         <div className="ua3-hero-panel-lines" aria-label="Dataset summary">
