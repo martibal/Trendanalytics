@@ -1,6 +1,7 @@
 /* Homepage chain selector placement hotfix.
-   Move the chain switcher out of the cramped live-preview panel and place it visually
-   under the primary hero CTA so all four chains are visible without horizontal scroll. */
+   The selector belongs under the primary hero CTA, not inside the live-preview card.
+   Keep the interactive source in the component, but anchor it to the hero section so
+   it cannot overlap Recommended First Read in the selected-chain panel. */
 
 @media (min-width: 1281px) {
   main > section:first-of-type {
@@ -13,6 +14,19 @@
     padding-bottom: 12rem;
   }
 
+  /* Critical: the chain selector is rendered inside the right column in JSX.
+     Make that column non-positioned so the absolute selector anchors to the
+     hero section, not the live-preview panel. */
+  main > section:first-of-type > div:nth-child(2) {
+    position: static !important;
+  }
+
+  main > section:first-of-type > div:nth-child(2) > p:first-child,
+  main > section:first-of-type > div:nth-child(2) > div {
+    position: relative;
+    z-index: 12;
+  }
+
   main > section:first-of-type > div:nth-child(2) > div {
     max-width: 39rem;
     padding-top: 1.1rem !important;
@@ -20,11 +34,11 @@
 
   main > section:first-of-type .ua-chain-list {
     position: absolute !important;
-    left: 1.5rem;
-    top: calc(50% + 9.5rem);
-    z-index: 30;
+    left: clamp(1.5rem, 2vw, 2rem);
+    top: calc(50% + 8.25rem);
+    z-index: 8;
     display: grid !important;
-    width: min(39.5rem, calc(50% - 3rem));
+    width: min(42rem, calc(50% - 2.75rem));
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: .75rem;
     overflow: visible !important;
