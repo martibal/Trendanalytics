@@ -74,7 +74,7 @@ const info: Record<InfoId, { title: string; body: string }> = {
   },
   demand: {
     title: "Demand",
-    body: "Demand describes how strong chain activity looked compared with that chain&apos;s own recent baseline.",
+    body: "Demand describes how strong chain activity looked compared with that chain’s own recent baseline.",
   },
   friction: {
     title: "Friction",
@@ -163,14 +163,11 @@ function statusTone(label: HomeLabel) {
   };
 }
 
-function ProgressBar({ value, color, subtle = false }: { value: number | null; color: string; subtle?: boolean }) {
+function ProgressBar({ value, color }: { value: number | null; color: string }) {
   const width = clampPercent(value);
   return (
-    <div className={`mt-4 h-2 overflow-hidden rounded-full ${subtle ? "bg-black/35" : "bg-white/[0.07]"}`}>
-      <div
-        className="h-full rounded-full transition-[width] duration-300"
-        style={{ width: `${width}%`, background: color, boxShadow: `0 0 18px ${color}` }}
-      />
+    <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.07]">
+      <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${width}%`, background: color, boxShadow: `0 0 18px ${color}` }} />
     </div>
   );
 }
@@ -203,7 +200,7 @@ function InfoButton({ id, activeInfo, setActiveInfo }: { id: InfoId; activeInfo:
       {open ? (
         <span className="absolute left-0 top-7 z-50 w-80 rounded-2xl border border-white/14 bg-[#080C11] p-4 text-left shadow-[0_24px_90px_rgba(0,0,0,.88)]">
           <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-sky-200">{info[id].title}</span>
-          <span className="mt-2 block text-sm leading-6 text-zinc-100" dangerouslySetInnerHTML={{ __html: info[id].body }} />
+          <span className="mt-2 block text-sm leading-6 text-zinc-100">{info[id].body}</span>
         </span>
       ) : null}
     </span>
@@ -227,29 +224,6 @@ function CheckoutButton({ plan, children }: { plan: CheckoutPlan; children: stri
         {children}
       </button>
     </form>
-  );
-}
-
-function PrimaryMetric({ chain, activeInfo, setActiveInfo }: { chain: HomeChainSnapshot; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
-  const tone = statusTone(chain.regime);
-  const value = clampPercent(chain.confidenceValue);
-  return (
-    <div className={`rounded-[1.75rem] border bg-white/[0.055] p-6 ${tone.edge}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-400">Confidence</p>
-          <p className="mt-3 font-mono text-5xl font-bold tracking-[-0.05em] text-white">{chain.confidence}</p>
-        </div>
-        <InfoButton id="confidence" activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-      </div>
-      <div
-        className="mt-6 h-3 rounded-full bg-white/[0.07] p-[2px]"
-        style={{ boxShadow: `inset 0 0 0 1px rgba(255,255,255,.05)` }}
-      >
-        <div className="h-full rounded-full" style={{ width: `${value}%`, background: tone.fill, boxShadow: `0 0 22px ${tone.soft}` }} />
-      </div>
-      <p className="mt-4 text-sm leading-6 text-zinc-400">The headline reliability score for this published row.</p>
-    </div>
   );
 }
 
@@ -373,12 +347,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
               const tone = statusTone(chain.regime);
               const active = chain.id === selectedChainId;
               return (
-                <button
-                  key={chain.id}
-                  type="button"
-                  onClick={() => setSelectedChainId(chain.id)}
-                  className={`ua-home-focus group rounded-[1.5rem] border bg-white/[0.035] p-5 text-left backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/[0.055] ${active ? tone.edge : "border-white/10"}`}
-                >
+                <button key={chain.id} type="button" onClick={() => setSelectedChainId(chain.id)} className={`ua-home-focus group rounded-[1.5rem] border bg-white/[0.035] p-5 text-left backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/[0.055] ${active ? tone.edge : "border-white/10"}`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] font-mono text-sm text-white">{chain.ticker.slice(0, 1)}</span>
@@ -450,15 +419,10 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {artifactCards.map((artifact) => (
-              <button
-                key={artifact.name}
-                type="button"
-                onClick={() => setSelectedArtifact(artifact.name)}
-                className={`ua-home-focus rounded-[1.5rem] border bg-white/[0.035] p-5 text-left backdrop-blur transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.055] ${selectedArtifact === artifact.name ? "border-white/24 shadow-[0_12px_40px_rgba(0,0,0,.30)]" : "border-white/10"}`}
-              >
+              <button key={artifact.name} type="button" onClick={() => setSelectedArtifact(artifact.name)} className={`ua-home-focus rounded-[1.5rem] border bg-white/[0.035] p-5 text-left backdrop-blur transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.055] ${selectedArtifact === artifact.name ? "border-white/24 shadow-[0_12px_40px_rgba(0,0,0,.30)]" : "border-white/10"}`}>
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-sm text-zinc-100">{artifact.icon}</span>
-                  <h3 className="text-[24px] font-semibold tracking-[-0.03em]">{artifact.title}</h3>
+                  <h3 className="text-[24px] font-semibold tracking-[-0.03em]">{artifact.name}</h3>
                 </div>
                 <p className="mt-4 text-[16px] leading-7 text-zinc-300">{artifact.what}</p>
                 <p className="mt-3 text-sm leading-6 text-zinc-500">{artifact.use}</p>
