@@ -1,30 +1,23 @@
 import CheckoutRedirectGuard from "@/components/home/CheckoutRedirectGuard";
-import InteractiveHomeDashboard, { type HomeChainSnapshot, type HomeLabel } from "@/components/home/InteractiveHomeDashboard";
+import InteractiveHomeDashboard, { type HomeChainSnapshot, type HomeConfidenceExample, type HomeLabel } from "@/components/home/InteractiveHomeDashboard";
 import { readStorageObject } from "@/lib/storage";
 
 export const revalidate = 0;
 
 type ArtifactName = "Meta" | "Gold" | "Derived" | "Briefs";
+type ScoreShape = number | { score?: number; label?: string } | undefined;
 
 type MetaLatest = {
   chain?: string;
   date?: string;
   updated_through?: string;
-  status?: {
-    label?: string;
-    one_liner?: string;
-  };
-  regime?: {
-    label?: string;
-    asof_date?: string;
-  };
-  confidence?: {
-    confidence_score?: number;
-    data_quality_score?: number;
-    label_confidence_score?: number;
-    lag_days_vs_utc_today?: number;
-  };
+  status?: { label?: string; one_liner?: string };
+  regime?: { label?: string; asof_date?: string; demand_score?: number; friction_score?: number; capacity_score?: number };
+  confidence?: { confidence_score?: number; data_quality_score?: number; label_confidence_score?: number; lag_days_vs_utc_today?: number };
   scorecard?: {
+    demand?: ScoreShape;
+    friction?: ScoreShape;
+    capacity?: ScoreShape;
     dimensions?: {
       demand?: { score?: number; label?: string };
       friction?: { score?: number; label?: string };
@@ -34,10 +27,7 @@ type MetaLatest = {
   methodology_version?: string;
 };
 
-type DatasetJson = {
-  published_at?: string;
-  computed_at_utc?: string;
-};
+type DatasetJson = { published_at?: string; computed_at_utc?: string };
 
 const CHAINS = [
   { id: "bitcoin", ticker: "BTC", name: "Bitcoin", lag: "T+1" },
@@ -54,10 +44,8 @@ async function readJson<T>(storagePath: string): Promise<T | null> {
   try {
     const result = await readStorageObject(storagePath);
     if (!result) return null;
-
     const raw = arrayBufferToUtf8(result.body);
     const parsed = JSON.parse(raw);
-
     if (!parsed || typeof parsed !== "object") return null;
     return parsed as T;
   } catch {
@@ -83,23 +71,32 @@ function formatDate(value: string | undefined): string {
   if (!value) return "—";
   const parsed = new Date(value.includes("T") ? value : `${value}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
 
-  return parsed.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+function rawDate(row: MetaLatest): string {
+  return row.date ?? row.updated_through ?? row.regime?.asof_date ?? "";
 }
 
 function normalizeDimensionLabel(value: string | undefined, fallback: string): string {
   if (!value) return fallback;
-  return value
-    .toLowerCase()
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-    .join(" ");
+  return value.toLowerCase().split(/[_\s-]+/).filter(Boolean).map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`).join(" ");
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function scoreValue(value: ScoreShape): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (value && typeof value === "object") return numberOrNull(value.score);
+  return null;
+}
+
+function score(row: MetaLatest, axis: "demand" | "friction" | "capacity"): number | null {
+  if (axis === "demand") return numberOrNull(row.regime?.demand_score) ?? numberOrNull(row.scorecard?.dimensions?.demand?.score) ?? scoreValue(row.scorecard?.demand);
+  if (axis === "friction") return numberOrNull(row.regime?.friction_score) ?? numberOrNull(row.scorecard?.dimensions?.friction?.score) ?? scoreValue(row.scorecard?.friction);
+  return numberOrNull(row.regime?.capacity_score) ?? numberOrNull(row.scorecard?.dimensions?.capacity?.score) ?? scoreValue(row.scorecard?.capacity);
 }
 
 async function getArtifacts(chainId: string): Promise<Record<ArtifactName, unknown | null>> {
@@ -109,13 +106,7 @@ async function getArtifacts(chainId: string): Promise<Record<ArtifactName, unkno
     readJson<unknown>(`data/published/v1/derived/${chainId}/latest.json`),
     readJson<unknown>(`data/published/v1/briefs/chains/${chainId}/latest.json`),
   ]);
-
-  return {
-    Meta: meta,
-    Gold: gold,
-    Derived: derived,
-    Briefs: briefs,
-  };
+  return { Meta: meta, Gold: gold, Derived: derived, Briefs: briefs };
 }
 
 async function getSnapshot(chain: (typeof CHAINS)[number]): Promise<HomeChainSnapshot> {
@@ -133,21 +124,61 @@ async function getSnapshot(chain: (typeof CHAINS)[number]): Promise<HomeChainSna
     regime,
     confidence: pct(confidenceValue),
     confidenceValue,
-    dataQuality: typeof meta?.confidence?.data_quality_score === "number" ? meta.confidence.data_quality_score : null,
-    labelConfidence: typeof meta?.confidence?.label_confidence_score === "number" ? meta.confidence.label_confidence_score : null,
+    dataQuality: numberOrNull(meta?.confidence?.data_quality_score),
+    labelConfidence: numberOrNull(meta?.confidence?.label_confidence_score),
     asOf: formatDate(meta?.date ?? meta?.updated_through ?? meta?.regime?.asof_date),
-    oneLiner:
-      meta?.status?.one_liner ??
-      `${chain.name} latest published network-state row is ${regime}.`,
-    demand: typeof dimensions?.demand?.score === "number" ? dimensions.demand.score : null,
+    oneLiner: meta?.status?.one_liner ?? `${chain.name} latest published network-state row is ${regime}.`,
+    demand: typeof dimensions?.demand?.score === "number" ? dimensions.demand.score : score(meta ?? {}, "demand"),
     demandLabel: normalizeDimensionLabel(dimensions?.demand?.label, "Demand context"),
-    friction: typeof dimensions?.friction?.score === "number" ? dimensions.friction.score : null,
+    friction: typeof dimensions?.friction?.score === "number" ? dimensions.friction.score : score(meta ?? {}, "friction"),
     frictionLabel: normalizeDimensionLabel(dimensions?.friction?.label, "Friction context"),
-    capacity: typeof dimensions?.capacity?.score === "number" ? dimensions.capacity.score : null,
+    capacity: typeof dimensions?.capacity?.score === "number" ? dimensions.capacity.score : score(meta ?? {}, "capacity"),
     capacityLabel: normalizeDimensionLabel(dimensions?.capacity?.label, "Capacity context"),
     methodologyVersion: meta?.methodology_version ?? "—",
     artifacts,
   };
+}
+
+async function getMetaRows(chainId: string): Promise<MetaLatest[]> {
+  for (const window of ["last365d", "last180d", "last90d", "last30d", "last7d"]) {
+    const rows = await readJson<MetaLatest[]>(`data/published/v1/meta/${chainId}/${window}.json`);
+    if (Array.isArray(rows) && rows.length > 0) return rows.filter((row) => row && rawDate(row));
+  }
+  const latest = await readJson<MetaLatest>(`data/published/v1/meta/${chainId}/latest.json`);
+  return latest ? [latest] : [];
+}
+
+function toExample(kind: "high" | "low", row: MetaLatest, chain: (typeof CHAINS)[number]): HomeConfidenceExample {
+  return {
+    kind,
+    chain: chain.id,
+    chainLabel: chain.name,
+    date: formatDate(rawDate(row)),
+    regime: normalizeLabel(row.status?.label ?? row.regime?.label),
+    confidenceScore: numberOrNull(row.confidence?.confidence_score),
+    dataQualityScore: numberOrNull(row.confidence?.data_quality_score),
+    labelConfidenceScore: numberOrNull(row.confidence?.label_confidence_score),
+    demandScore: score(row, "demand"),
+    frictionScore: score(row, "friction"),
+    capacityScore: score(row, "capacity"),
+    dataLag: chain.lag,
+    oneLiner: row.status?.one_liner ?? `${chain.name} published ${normalizeLabel(row.status?.label ?? row.regime?.label)} for ${formatDate(rawDate(row))}.`,
+  };
+}
+
+async function getConfidenceExamples(): Promise<{ high: HomeConfidenceExample | null; low: HomeConfidenceExample | null }> {
+  const allRows: Array<{ row: MetaLatest; chain: (typeof CHAINS)[number]; confidence: number }> = [];
+  for (const chain of CHAINS) {
+    const rows = await getMetaRows(chain.id);
+    for (const row of rows) {
+      const confidence = numberOrNull(row.confidence?.confidence_score);
+      if (confidence != null) allRows.push({ row, chain, confidence });
+    }
+  }
+  if (allRows.length === 0) return { high: null, low: null };
+  const high = [...allRows].sort((a, b) => b.confidence - a.confidence)[0];
+  const low = [...allRows].sort((a, b) => a.confidence - b.confidence)[0];
+  return { high: high ? toExample("high", high.row, high.chain) : null, low: low ? toExample("low", low.row, low.chain) : null };
 }
 
 async function getLastRun(): Promise<string> {
@@ -156,15 +187,16 @@ async function getLastRun(): Promise<string> {
 }
 
 export default async function HomePage() {
-  const [snapshots, lastRun] = await Promise.all([
+  const [snapshots, lastRun, examples] = await Promise.all([
     Promise.all(CHAINS.map((chain) => getSnapshot(chain))),
     getLastRun(),
+    getConfidenceExamples(),
   ]);
 
   return (
     <>
       <CheckoutRedirectGuard />
-      <InteractiveHomeDashboard snapshots={snapshots} lastRun={lastRun} />
+      <InteractiveHomeDashboard snapshots={snapshots} lastRun={lastRun} examples={examples} />
     </>
   );
 }
