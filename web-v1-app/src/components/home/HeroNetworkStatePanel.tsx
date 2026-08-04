@@ -2,19 +2,19 @@
 
 import type { CSSProperties } from "react";
 
-import type { HomeLabel } from "./InteractiveHomeDashboard";
+export type HeroPanelLabel = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 
-type HeroPanelSnapshot = {
+export type HeroPanelSnapshot = {
   name: string;
   asOf: string;
   lag: string;
-  regime: HomeLabel;
+  regime: HeroPanelLabel;
   confidence: string;
   confidenceValue: number | null;
   oneLiner: string;
 };
 
-function statusColor(label: HomeLabel) {
+function statusColor(label: HeroPanelLabel) {
   if (label === "STABLE") return "var(--status-stable)";
   if (label === "CHEAP") return "var(--status-cheap)";
   if (label === "HEATING") return "var(--status-heating)";
@@ -37,7 +37,9 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
 
         <div className="ua3-hero-panel-identity">
           <h2>{snapshot.name}</h2>
-          <p>{snapshot.asOf} · {snapshot.lag}</p>
+          <p>
+            {snapshot.asOf} · {snapshot.lag}
+          </p>
         </div>
 
         <div className="ua3-hero-panel-status-row">
@@ -53,9 +55,17 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
 
         <pre className="ua3-hero-panel-code" aria-label="Meta teaser fields">
           <code>
-            <span className="ua3-json-property">regime</span><span className="ua3-json-punctuation">: </span><span className="ua3-json-string">&quot;{snapshot.regime}&quot;</span>{"\n"}
-            <span className="ua3-json-property">confidence_score</span><span className="ua3-json-punctuation">: </span><span className="ua3-json-number">{confidenceDecimal(snapshot.confidenceValue)}</span>{"\n"}
-            <span className="ua3-json-property">one_liner</span><span className="ua3-json-punctuation">: </span><span className="ua3-json-string ua3-json-oneliner">&quot;{snapshot.oneLiner}&quot;</span>
+            <span className="ua3-json-property">regime</span>
+            <span className="ua3-json-punctuation">: </span>
+            <span className="ua3-json-string">&quot;{snapshot.regime}&quot;</span>
+            {"\n"}
+            <span className="ua3-json-property">confidence_score</span>
+            <span className="ua3-json-punctuation">: </span>
+            <span className="ua3-json-number">{confidenceDecimal(snapshot.confidenceValue)}</span>
+            {"\n"}
+            <span className="ua3-json-property">one_liner</span>
+            <span className="ua3-json-punctuation">: </span>
+            <span className="ua3-json-string ua3-json-oneliner">&quot;{snapshot.oneLiner}&quot;</span>
           </code>
         </pre>
 
@@ -69,7 +79,9 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
           </div>
         </div>
 
-        <a className="ua3-hero-panel-link" href="#files-title">See all fields →</a>
+        <a className="ua3-hero-panel-link" href="#files-title">
+          See all fields →
+        </a>
       </aside>
       <style>{styles}</style>
     </>
@@ -77,20 +89,8 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
 }
 
 const styles = `
-.ua3-hero-grid {
-  grid-template-columns: minmax(0, 0.62fr) minmax(444px, 0.38fr) !important;
-  gap: 80px !important;
-}
-.ua3-hero-glow {
-  min-height: 420px !important;
-  background: radial-gradient(circle at center, var(--accent-depth-glow), transparent 62%) !important;
-}
 .ua3-hero-network-panel {
-  position: absolute;
-  z-index: 5;
-  top: 156px;
-  right: max(64px, calc((100vw - 1440px) / 2 + 64px));
-  width: min(380px, calc(100vw - 128px));
+  width: 100%;
   max-width: 380px;
   border: 1px solid var(--border-emphasis);
   border-radius: 16px;
@@ -215,28 +215,10 @@ const styles = `
   line-height: 1.5;
   text-decoration: none;
 }
-@media (max-width: 1240px) and (min-width: 768px) {
-  .ua3-hero-network-panel {
-    top: 176px;
-    right: 32px;
-    width: 340px;
-  }
-  .ua3-hero-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.42fr) !important;
-    gap: 40px !important;
-  }
-}
 @media (max-width: 767px) {
-  .ua3-hero-grid {
-    grid-template-columns: 1fr !important;
-    gap: 40px !important;
-  }
   .ua3-hero-network-panel {
-    display: block;
-    position: static;
-    width: calc(100% - 32px);
+    width: 100%;
     max-width: none;
-    margin: -48px auto 48px;
   }
   .ua3-hero-panel-status-row {
     align-items: flex-start;
