@@ -5,6 +5,8 @@ import Script from "next/script";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import HeroNetworkStatePanel, { type HeroPanelSnapshot } from "./HeroNetworkStatePanel";
+
 export type HomeLabel = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 export type Artifact = "Meta" | "Gold" | "Derived" | "Briefs";
 type CheckoutPlan = "basic" | "pro";
@@ -59,16 +61,17 @@ type Props = {
   snapshots: HomeChainSnapshot[];
   lastRun: string;
   examples: { high: HomeConfidenceExample | null; low: HomeConfidenceExample | null };
+  heroSnapshot?: HeroPanelSnapshot;
 };
 
 type InfoId = "regime" | "confidence" | "demand" | "friction" | "capacity" | "dataQuality" | "labelConfidence" | "dataLag";
 
 const info: Record<InfoId, { title: string; body: string }> = {
-  regime: { title: "Regime / status", body: "The regime is the daily state label for a chain. It is produced from network activity, friction and capacity evidence. It is not a price view." },
+  regime: { title: "Regime / status", body: "The regime is the daily network-state label for a chain. It is produced from network activity, friction and capacity evidence. It is not a price view." },
   confidence: { title: "Confidence", body: "Headline reliability for the published row. It combines data quality with how clearly the row supports the published label." },
-  demand: { title: "Demand", body: "Demand describes how strong chain activity looked compared with that chain's own recent baseline." },
-  friction: { title: "Friction", body: "Friction describes how difficult or costly the chain was to use that day, using fee and failure evidence." },
-  capacity: { title: "Capacity", body: "Capacity describes whether the chain appeared to have usable room relative to current activity." },
+  demand: { title: "Demand", body: "Demand describes how strong network activity looked compared with that network&apos;s own recent baseline." },
+  friction: { title: "Friction", body: "Friction describes how difficult or costly the network was to use that day, using fee and failure evidence." },
+  capacity: { title: "Capacity", body: "Capacity describes whether the network appeared to have usable room relative to current activity." },
   dataQuality: { title: "Data quality", body: "Completeness and freshness context for the raw evidence behind the row." },
   labelConfidence: { title: "Label confidence", body: "How clearly the evidence supports one published label instead of sitting between labels." },
   dataLag: { title: "Data lag", body: "How old the underlying observation is at publication time. BTC and ETH are normally T+1; ARB and Base are normally T+7." },
@@ -148,8 +151,12 @@ function toneStyle(label: HomeLabel): CSSProperties {
 }
 
 function LucideIcon({ name }: { name: "card" | "plug" | "code" }) {
-  if (name === "card") return <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2" /><path d="M2 10h20M6 15h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
-  if (name === "plug") return <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 22v-5M9 8V2M15 8V2M7 8h10v4a5 5 0 0 1-10 0V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "card") {
+    return <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2" /><path d="M2 10h20M6 15h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
+  }
+  if (name === "plug") {
+    return <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 22v-5M9 8V2M15 8V2M7 8h10v4a5 5 0 0 1-10 0V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  }
   return <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
@@ -159,18 +166,21 @@ function FieldCode({ children }: { children: string }) {
 
 function HeroValueStrip() {
   return (
-    <div className="ua3-value-strip" aria-label="What you get">
-      <div className="ua3-value-column">
-        <h2>Your model&apos;s error rate doubled on Tuesday.</h2>
-        <p>Join <FieldCode>regime</FieldCode> and <FieldCode>confidence_score</FieldCode> from Meta on that date. If Ethereum was CONGESTED with confidence above 70%, the spike is explained by the chain — not your model. If it wasn&apos;t, keep debugging your own code.</p>
-      </div>
-      <div className="ua3-value-column">
-        <h2>You need one sentence for a report explaining why gas fees jumped.</h2>
-        <p>Copy the <FieldCode>one_liner</FieldCode> field from Briefs for that date and chain. It already says why — e.g. &quot;Demand-led heating: elevated transaction count.&quot; Nothing to write.</p>
-      </div>
-      <div className="ua3-value-column">
-        <h2>You want to show chain status on an internal dashboard, but have no engineer free to build it.</h2>
-        <p>Open Explorer, pick a chain, read today&apos;s label and confidence. No API key, no code, no CSV to parse.</p>
+    <div className="ua3-value-wrap">
+      <p className="ua3-value-title">What is Urd Atlas used for?</p>
+      <div className="ua3-value-strip" aria-label="What you get">
+        <div className="ua3-value-column">
+          <h2>Your model&apos;s error rate doubled on Tuesday.</h2>
+          <p>Join <FieldCode>regime</FieldCode> and <FieldCode>confidence_score</FieldCode> from Meta on that date. If Ethereum was CONGESTED with confidence above 70%, the spike is explained by the chain — not your model. If it wasn&apos;t, keep debugging your own code.</p>
+        </div>
+        <div className="ua3-value-column">
+          <h2>You need one sentence for a report explaining why gas fees jumped.</h2>
+          <p>Copy the <FieldCode>one_liner</FieldCode> field from Briefs for that date and chain. It already says why — e.g. &quot;Demand-led heating: elevated transaction count.&quot; Nothing to write.</p>
+        </div>
+        <div className="ua3-value-column">
+          <h2>You want to show chain status on an internal dashboard, but have no engineer free to build it.</h2>
+          <p>Open Explorer, pick a chain, read today&apos;s label and confidence. No API key, no code, no CSV to parse.</p>
+        </div>
       </div>
     </div>
   );
@@ -246,7 +256,19 @@ function JsonBlock({ payload, prismReady, complete = false }: { payload: JsonPay
   return <pre ref={containerRef} className={complete ? "ua3-json ua3-json-complete" : "ua3-json"}><code className="language-json">{jsonText}</code></pre>;
 }
 
-export default function InteractiveHomeDashboard({ snapshots, lastRun, examples }: Props) {
+function toHeroPanelSnapshot(chain: HomeChainSnapshot): HeroPanelSnapshot {
+  return {
+    name: chain.name,
+    asOf: chain.asOf,
+    lag: chain.lag,
+    regime: chain.regime,
+    confidence: chain.confidence,
+    confidenceValue: chain.confidenceValue,
+    oneLiner: chain.oneLiner,
+  };
+}
+
+export default function InteractiveHomeDashboard({ snapshots, lastRun, examples, heroSnapshot }: Props) {
   const [selectedChainId, setSelectedChainId] = useState(snapshots[0]?.id ?? "bitcoin");
   const [activeInfo, setActiveInfo] = useState<InfoId | null>(null);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact>("Meta");
@@ -259,6 +281,8 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
   const selectedExample = exampleKind === "high" ? examples.high : examples.low;
   const preview = useMemo(() => (selectedChain ? previewPayload(selectedArtifact, selectedExample, selectedChain) : null), [selectedArtifact, selectedChain, selectedExample]);
   const completeJson = useMemo(() => (selectedChain ? selectedChain.artifacts[selectedArtifact] : null), [selectedArtifact, selectedChain]);
+  const ethereumSnapshot = snapshots.find((snapshot) => snapshot.id === "ethereum") ?? snapshots[1] ?? selectedChain;
+  const heroPanelSnapshot = heroSnapshot ?? (ethereumSnapshot ? toHeroPanelSnapshot(ethereumSnapshot) : null);
 
   useEffect(() => {
     if (!activeInfo) return;
@@ -294,15 +318,17 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
 
       <section className="ua3-section ua3-hero" aria-labelledby="hero-title">
         <div className="ua3-wrap ua3-hero-grid">
-          <div>
+          <div className="ua3-hero-left">
             <p className="ua3-category">DAILY REFERENCE DATA</p>
-            <h1 id="hero-title" className="ua3-display">Urd Atlas is a daily state report for Bitcoin, Ethereum, Arbitrum and Base.</h1>
+            <h1 id="hero-title" className="ua3-display">Urd Atlas is a daily network-state report for the Bitcoin, Ethereum, Arbitrum and Base networks.</h1>
             <p className="ua3-body ua3-hero-copy">Built for analysts and data teams that need to explain why a number changed, not predict what it becomes.</p>
             <HeroValueStrip />
             <div className="ua3-compliance-row" aria-label="Product boundary"><span className="ua3-compliance-pill">No price data</span><span className="ua3-compliance-pill">No forecasts</span><span className="ua3-compliance-pill">No recommendations</span></div>
             <a href="#today-status" className="ua3-button ua3-button-primary">See today&apos;s status →</a>
           </div>
-          <div className="ua3-hero-glow" aria-hidden="true" />
+          <div className="ua3-hero-glow" aria-label="Hero network-state row preview">
+            {heroPanelSnapshot ? <HeroNetworkStatePanel snapshot={heroPanelSnapshot} /> : null}
+          </div>
         </div>
       </section>
 
@@ -334,6 +360,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
 const ua3Styles = `
 .ua3 { --radius-card: 12px; --radius-badge: 6px; --radius-button: 999px; min-height: 100vh; background: var(--bg-base); color: var(--text-primary); overflow: hidden; }
 .ua3-wrap { width: min(1440px, calc(100% - 48px)); margin: 0 auto; }
+.ua3-hero .ua3-wrap { width: min(1312px, calc(100% - 128px)); }
 .ua3-section { padding: 96px 0; }
 .ua3-hero { padding: 80px 0; min-height: auto; display: block; background: radial-gradient(circle at 78% 42%, var(--accent-depth-glow), transparent 44%), var(--bg-base); }
 .ua3-start { background: linear-gradient(rgba(16, 224, 160, 0.03), rgba(16, 224, 160, 0.03)), var(--bg-base); }
@@ -341,8 +368,9 @@ const ua3Styles = `
 .ua3-files { background: linear-gradient(rgba(76, 110, 245, 0.04), rgba(76, 110, 245, 0.04)), var(--bg-base); }
 .ua3-pricing { background: linear-gradient(rgba(245, 247, 248, 0.02), rgba(245, 247, 248, 0.02)), var(--bg-base); }
 .ua3-transition { height: 1px; width: 100%; background: linear-gradient(to bottom, transparent 0%, var(--accent-depth-line) 50%, transparent 100%); opacity: 0.4; }
-.ua3-hero-grid { display: grid; grid-template-columns: minmax(0, 0.68fr) minmax(240px, 0.32fr); align-items: center; gap: 64px; }
-.ua3-hero-glow { min-height: 360px; background: radial-gradient(circle at center, var(--accent-depth-glow), transparent 60%); }
+.ua3-hero-grid { display: grid; grid-template-columns: minmax(0, 760px) minmax(380px, 1fr); align-items: stretch; gap: 80px; }
+.ua3-hero-left { min-width: 0; }
+.ua3-hero-glow { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 100%; background: radial-gradient(circle at center, var(--accent-depth-glow), transparent 62%); }
 .ua3-category { display: inline-flex; align-items: center; border-radius: var(--radius-badge); padding: 4px 10px; border: 1px solid rgba(16, 224, 160, 0.3); background: rgba(16, 224, 160, 0.12); color: var(--accent-action); font-size: 11px; font-weight: 500; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--mono); }
 .ua3-display { max-width: 860px; margin: 24px 0 0; color: var(--text-primary); font-size: 52px; font-weight: 600; line-height: 1.1; letter-spacing: -0.045em; }
 .ua3-step-title { margin: 0; color: var(--text-primary); font-size: 36px; font-weight: 600; line-height: 1.2; letter-spacing: -0.035em; }
@@ -352,7 +380,9 @@ const ua3Styles = `
 .ua3-label { margin: 0; color: var(--text-tertiary); font-family: var(--mono); font-size: 11px; font-weight: 500; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; }
 .ua3-step-label { margin-bottom: 12px; color: var(--accent-action); }
 .ua3-hero-copy { max-width: 640px; }
-.ua3-value-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; padding: 32px 0; margin-top: 40px; margin-bottom: 40px; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.ua3-value-wrap { padding: 32px 0; margin-top: 40px; margin-bottom: 40px; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.ua3-value-title { margin: 0 0 18px; color: var(--text-primary); font-size: 16px; font-weight: 600; line-height: 1.5; }
+.ua3-value-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
 .ua3-value-column h2 { margin: 0 0 8px; color: var(--text-primary); font-size: 16px; font-weight: 600; line-height: 1.5; letter-spacing: 0; }
 .ua3-value-column p { margin: 0; color: var(--text-secondary); font-size: 14px; font-weight: 400; line-height: 1.5; }
 .ua3-value-field { font-family: var(--mono); font-size: 13px; color: #7DD3FC; background: rgba(125, 211, 252, 0.08); padding: 1px 5px; border-radius: 4px; }
@@ -362,77 +392,92 @@ const ua3Styles = `
 .ua3-button:hover { transform: translateY(-1px); }
 .ua3-button-primary { margin-top: 32px; border: 1px solid var(--accent-action); background: var(--accent-action); color: var(--accent-action-text); }
 .ua3-button-primary:hover { background: var(--accent-action-hover); border-color: var(--accent-action-hover); }
-.ua3-button-quiet { margin-top: 20px; border: 1px solid var(--border-subtle); background: var(--bg-elevated-2); color: var(--text-primary); }
+.ua3-button-quiet { margin-top: 24px; border: 1px solid var(--border-subtle); background: rgba(255,255,255,0.04); color: var(--text-primary); }
 .ua3-button-full { width: 100%; }
-.ua3-card { border-radius: var(--radius-card); border: 1px solid var(--border-subtle); background: var(--bg-elevated-1); }
-.ua3-start-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 32px; }
-.ua3-step-card { padding: 28px 24px; }
-.ua3-step-number { margin: 0 0 12px; color: var(--accent-action); font-family: var(--mono); font-size: 40px; font-weight: 700; line-height: 1; }
-.ua3-step-heading { display: flex; align-items: center; gap: 12px; }
-.ua3-step-icon { width: 20px; height: 20px; flex: 0 0 auto; color: var(--text-secondary); }
-.ua3-section-head { display: flex; align-items: end; justify-content: space-between; gap: 32px; }
-.ua3-help-copy { max-width: 420px; margin: 0; }
-.ua3-chain-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin-top: 32px; }
-.ua3-chain-card { min-height: 160px; padding: 20px; text-align: left; border-left: 2px solid var(--status-color); cursor: pointer; }
-.ua3-chain-card-active { background: var(--bg-elevated-2); border-color: var(--border-emphasis); border-left-color: var(--status-color); }
-.ua3-chain-top, .ua3-chain-bottom, .ua3-detail-head, .ua3-metric-head, .ua3-plan-head, .ua3-modal-head, .ua3-modal-actions { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.ua3-chain-bottom { align-items: flex-end; margin-top: 28px; }
-.ua3-data-medium { margin: 18px 0 0; color: var(--text-primary); font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1; }
-.ua3-data-small { margin: 18px 0 0; color: var(--text-primary); font-family: var(--mono); font-size: 18px; font-weight: 600; line-height: 1; }
-.ua3-sparkline { width: 120px; height: 34px; }
-.ua3-status-badge, .ua3-plan-badge { display: inline-flex; align-items: center; gap: 8px; border-radius: var(--radius-badge); border: 1px solid var(--status-color); padding: 4px 8px; color: var(--status-color); background: color-mix(in srgb, var(--status-color) 12%, transparent); font-family: var(--mono); font-size: 11px; font-weight: 500; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; }
-.ua3-status-dot { width: 6px; height: 6px; border-radius: var(--radius-button); background: currentColor; }
-.ua3-detail-panel { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 24px; margin-top: 24px; padding: 24px; border-radius: var(--radius-card); border: 1px solid var(--border-subtle); background: var(--bg-elevated-1); }
-.ua3-detail-summary, .ua3-metric-card, .ua3-mini-card { padding: 24px; }
-.ua3-one-liner { margin-top: 24px; }
-.ua3-confidence-block { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 24px; align-items: center; margin-top: 28px; }
-.ua3-gauge { width: 140px; height: 140px; border-radius: var(--radius-button); padding: 10px; background: conic-gradient(var(--accent-action) var(--pct), rgba(255,255,255,0.08) 0); box-shadow: 0 0 32px rgba(16, 224, 160, 0.16); }
-.ua3-gauge-inner { display: grid; place-items: center; position: relative; width: 100%; height: 100%; border-radius: var(--radius-button); background: var(--bg-elevated-1); }
-.ua3-gauge-value { color: var(--text-primary); font-family: var(--mono); font-size: 40px; font-weight: 700; line-height: 1; }
-.ua3-gauge-label { color: var(--text-tertiary); font-family: var(--mono); font-size: 11px; font-weight: 500; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; }
+.ua3-card { border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--bg-elevated-1); }
+.ua3-start-grid, .ua3-chain-grid, .ua3-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 32px; }
+.ua3-chain-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ua3-step-card, .ua3-plan-card { padding: 24px; }
+.ua3-step-number { margin: 0; color: var(--accent-action); font-family: var(--mono); font-size: 12px; }
+.ua3-step-heading { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+.ua3-step-icon { width: 22px; height: 22px; color: var(--accent-action); }
+.ua3-section-head { display: flex; align-items: end; justify-content: space-between; gap: 48px; }
+.ua3-help-copy { max-width: 320px; }
+.ua3-chain-card { padding: 22px; text-align: left; cursor: pointer; }
+.ua3-chain-card-active { border-color: var(--status-color); box-shadow: 0 0 0 1px color-mix(in srgb, var(--status-color) 45%, transparent), 0 24px 64px rgba(0,0,0,0.26); }
+.ua3-chain-top, .ua3-chain-bottom, .ua3-detail-head, .ua3-metric-head, .ua3-plan-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.ua3-chain-bottom { align-items: end; margin-top: 34px; }
+.ua3-status-badge { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--status-color) 48%, transparent); background: color-mix(in srgb, var(--status-color) 16%, transparent); color: var(--status-color); font-family: var(--mono); font-size: 11px; font-weight: 700; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.ua3-status-dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; box-shadow: 0 0 14px currentColor; }
+.ua3-data-medium { margin: 16px 0 0; color: var(--text-primary); font-size: 28px; font-weight: 700; line-height: 1; }
+.ua3-data-small { margin: 16px 0 0; color: var(--text-primary); font-size: 22px; font-weight: 700; line-height: 1; }
+.ua3-sparkline { width: 118px; max-width: 44%; height: auto; opacity: .9; }
+.ua3-detail-panel { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 20px; margin-top: 24px; padding: 24px; border: 1px solid var(--border-subtle); border-radius: 20px; background: rgba(255,255,255,0.03); }
+.ua3-detail-summary { padding: 24px; }
+.ua3-one-liner { margin-top: 28px; max-width: 520px; }
+.ua3-confidence-block { display: flex; align-items: center; gap: 20px; margin-top: 32px; }
+.ua3-gauge { width: 138px; height: 138px; flex: 0 0 auto; border-radius: 999px; background: conic-gradient(var(--accent-action) var(--pct), rgba(255,255,255,0.08) 0); padding: 10px; }
+.ua3-gauge-inner { display: grid; place-items: center; align-content: center; height: 100%; border-radius: 999px; background: var(--bg-elevated-1); text-align: center; }
+.ua3-gauge-value { color: var(--text-primary); font-size: 32px; font-weight: 700; line-height: 1; }
+.ua3-gauge-label { margin-top: 8px; color: var(--text-tertiary); font-family: var(--mono); font-size: 11px; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; }
 .ua3-confidence-text p:last-child { margin: 8px 0 0; color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
 .ua3-status-metrics { display: grid; gap: 16px; }
-.ua3-secondary-grid, .ua3-tertiary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.ua3-metric-card { background: var(--bg-elevated-2); }
-.ua3-mini-card { background: var(--bg-elevated-1); }
-.ua3-progress { height: 8px; margin-top: 18px; overflow: hidden; border-radius: var(--radius-button); background: rgba(255,255,255,0.08); }
-.ua3-progress-fill { height: 100%; border-radius: var(--radius-button); background: var(--accent-action); }
-.ua3-files-grid { display: grid; grid-template-columns: minmax(0, 0.42fr) minmax(0, 0.58fr); gap: 56px; align-items: start; }
-.ua3-artifact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
-.ua3-artifact-card { padding: 24px; text-align: left; cursor: pointer; }
-.ua3-artifact-card-active { background: var(--bg-elevated-2); border-color: var(--border-emphasis); }
-.ua3-artifact-icon { display: inline-flex; margin-bottom: 16px; color: var(--text-secondary); font-size: 20px; }
-.ua3-card-note { margin: 14px 0 0; color: var(--text-tertiary); font-size: 14px; line-height: 1.5; }
-.ua3-preview-panel { display: grid; grid-template-columns: minmax(0, 0.34fr) minmax(0, 0.66fr); gap: 24px; margin-top: 32px; padding: 24px; border-radius: var(--radius-card); border: 1px solid var(--border-subtle); background: var(--bg-elevated-1); }
-.ua3-toggle-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-.ua3-toggle { border-radius: var(--radius-button); border: 1px solid var(--border-subtle); background: var(--bg-elevated-2); color: var(--text-secondary); padding: 8px 12px; font-family: var(--mono); font-size: 11px; font-weight: 500; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
-.ua3-toggle-active { border-color: var(--accent-action); color: var(--accent-action-text); background: var(--accent-action); }
-.ua3-json { max-height: 320px; overflow: auto; margin: 0; border-radius: var(--radius-card); border: 1px solid var(--border-subtle); background: var(--bg-base); padding: 20px; color: var(--text-secondary); font-family: var(--mono); font-size: 13px; line-height: 1.5; }
-.ua3-json-complete { max-height: 62vh; }
-.ua3-json-open { margin-top: 16px; }
+.ua3-secondary-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
+.ua3-tertiary-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
+.ua3-metric-card, .ua3-mini-card { padding: 20px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--bg-elevated-2); }
+.ua3-mini-card { background: rgba(255,255,255,0.035); }
+.ua3-progress { height: 6px; margin-top: 22px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.ua3-progress-fill { height: 100%; border-radius: inherit; background: var(--accent-action); }
+.ua3-info { position: relative; display: inline-flex; }
+.ua3-info-button, .ua3-info-close { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--border-subtle); border-radius: 999px; background: rgba(255,255,255,0.06); color: var(--text-secondary); font: inherit; cursor: pointer; }
+.ua3-info-popover { position: absolute; z-index: 50; top: calc(100% + 10px); right: 0; width: min(300px, calc(100vw - 32px)); padding: 18px; border: 1px solid var(--border-emphasis); border-radius: 14px; background: var(--bg-elevated-2); box-shadow: 0 24px 64px rgba(0,0,0,0.45); color: var(--text-secondary); }
+.ua3-info-close { position: absolute; top: 10px; right: 10px; }
+.ua3-info-title { display: block; padding-right: 28px; color: var(--text-primary); font-weight: 700; }
+.ua3-info-body { display: block; margin-top: 8px; font-size: 13px; line-height: 1.5; }
+.ua3-files-grid { display: grid; grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr); gap: 48px; }
+.ua3-artifact-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+.ua3-artifact-card { padding: 20px; text-align: left; cursor: pointer; }
+.ua3-artifact-card-active { border-color: var(--accent-action); background: var(--bg-elevated-2); }
+.ua3-artifact-icon { display: inline-flex; margin-bottom: 18px; color: var(--accent-action); font-size: 22px; }
+.ua3-card-note { margin: 16px 0 0; color: var(--text-tertiary); font-size: 13px; line-height: 1.45; }
+.ua3-preview-panel { display: grid; grid-template-columns: minmax(260px, .6fr) minmax(0, 1.4fr); gap: 32px; margin-top: 32px; padding: 24px; border: 1px solid var(--border-subtle); border-radius: 18px; background: rgba(255,255,255,0.03); }
+.ua3-toggle-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.ua3-toggle { border: 1px solid var(--border-subtle); border-radius: 999px; background: transparent; color: var(--text-secondary); padding: 8px 12px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; cursor: pointer; }
+.ua3-toggle-active { border-color: var(--accent-action); color: var(--accent-action); background: rgba(16,224,160,.08); }
+.ua3-json { margin: 0; min-height: 320px; max-height: 520px; overflow: auto; border: 1px solid var(--border-subtle); border-radius: 8px; background: #0A0C0E; padding: 18px; color: var(--text-secondary); font-family: var(--mono); font-size: 13px; line-height: 1.55; }
+.ua3-json-complete { max-height: 70vh; }
 .ua3-json .token.property { color: #7DD3FC; }
 .ua3-json .token.string { color: #86EFAC; }
 .ua3-json .token.number, .ua3-json .token.boolean, .ua3-json .token.null { color: #FCD34D; }
 .ua3-json .token.punctuation, .ua3-json .token.operator { color: #6B7280; }
-.ua3-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 32px; }
-.ua3-plan-card { display: flex; flex-direction: column; padding: 28px 24px; opacity: 0.92; background: var(--bg-elevated-1); border: 1px solid var(--border-subtle); }
-.ua3-plan-card-recommended { background: var(--bg-elevated-2); border: 1px solid var(--accent-action); opacity: 1; transform: scale(1.03); box-shadow: 0 8px 32px rgba(16, 224, 160, 0.15); }
-.ua3-plan-badge { border-color: var(--accent-action); background: rgba(16, 224, 160, 0.12); color: var(--accent-action); }
-.ua3-plan-price { margin: 28px 0 0; color: var(--text-primary); font-family: var(--mono); font-size: 40px; font-weight: 700; line-height: 1; }
-.ua3-pricing-note { max-width: 720px; margin-top: 24px; }
+.ua3-json-open { margin-top: 16px; }
+.ua3-plan-card-recommended { transform: scale(1.03); border-color: var(--accent-action); background: var(--bg-elevated-2); box-shadow: 0 24px 64px rgba(16,224,160,.14); }
+.ua3-plan-badge { border: 1px solid var(--accent-action); border-radius: 999px; padding: 5px 10px; color: var(--accent-action); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+.ua3-plan-price { margin: 28px 0 0; color: var(--text-primary); font-size: 40px; font-weight: 700; line-height: 1; }
+.ua3-pricing-note { max-width: 760px; }
 .ua3-form { margin: 0; }
-.ua3-info { position: relative; display: inline-flex; flex: 0 0 auto; }
-.ua3-info-button { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: var(--radius-button); border: 1px solid var(--border-subtle); background: var(--bg-elevated-2); color: var(--text-secondary); font-family: var(--mono); font-size: 11px; cursor: pointer; }
-.ua3-info-popover { position: absolute; left: 0; top: 28px; z-index: 20; width: 320px; border-radius: var(--radius-card); border: 1px solid var(--border-emphasis); background: var(--bg-elevated-2); padding: 16px 40px 16px 16px; box-shadow: 0 24px 80px rgba(0,0,0,0.8); }
-.ua3-info-close { position: absolute; right: 10px; top: 8px; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1px solid var(--border-subtle); border-radius: var(--radius-button); background: var(--bg-elevated-1); color: var(--text-secondary); cursor: pointer; }
-.ua3-info-title { display: block; color: var(--accent-action); font-family: var(--mono); font-size: 11px; font-weight: 500; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; }
-.ua3-info-body { display: block; margin-top: 8px; color: var(--text-primary); font-size: 14px; line-height: 1.5; }
-.ua3-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(8,9,10,0.82); }
-.ua3-modal { width: min(800px, 100%); max-height: calc(100vh - 48px); overflow: auto; border-radius: var(--radius-card); border: 1px solid var(--border-emphasis); background: var(--bg-elevated-2); padding: 24px; }
-.ua3-modal-head { margin-bottom: 18px; }
-.ua3-modal-actions { align-items: center; }
-.ua3-modal .ua3-button-primary, .ua3-modal .ua3-button-quiet { margin-top: 0; }
-.ua-home-focus:focus-visible, .ua3 button:focus-visible, .ua3 a:focus-visible { outline: 2px solid var(--accent-action); outline-offset: 3px; }
-@media (max-width: 900px) { .ua3-wrap { width: min(100% - 32px, 720px); } .ua3-section { padding: 72px 0; } .ua3-hero { padding: 80px 0; } .ua3-hero-grid, .ua3-files-grid, .ua3-preview-panel, .ua3-detail-panel { grid-template-columns: 1fr; } .ua3-hero-glow { display: none; } .ua3-start-grid, .ua3-chain-grid, .ua3-plan-grid { grid-template-columns: 1fr; } .ua3-secondary-grid, .ua3-tertiary-grid, .ua3-artifact-grid { grid-template-columns: 1fr; } .ua3-section-head { align-items: start; flex-direction: column; } .ua3-confidence-block { grid-template-columns: 1fr; } .ua3-info-popover { left: auto; right: 0; width: min(320px, calc(100vw - 48px)); } .ua3-modal-head, .ua3-modal-actions { flex-direction: column; align-items: stretch; } }
-@media (max-width: 767px) { .ua3-value-strip { grid-template-columns: 1fr; gap: 24px; } .ua3-display { font-size: 34px; line-height: 1.1; } .ua3-step-title { font-size: 26px; line-height: 1.2; } .ua3 h3 { font-size: 19px; } .ua3-body { font-size: 15px; } .ua3-body-small { font-size: 13px; } .ua3-gauge-value, .ua3-plan-price, .ua3-step-number { font-size: 32px; } .ua3-data-medium { font-size: 24px; } .ua3-data-small { font-size: 16px; } }
+.ua3-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,.7); }
+.ua3-modal { width: min(800px, 100%); max-height: calc(100vh - 48px); overflow: hidden; border: 1px solid var(--border-emphasis); border-radius: 16px; background: var(--bg-base); padding: 22px; box-shadow: 0 32px 100px rgba(0,0,0,.6); }
+.ua3-modal-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.ua3-modal-head h2 { margin: 6px 0 0; font-size: 24px; }
+.ua3-modal-actions { display: flex; gap: 10px; }
+@media (max-width: 1120px) {
+  .ua3-hero .ua3-wrap { width: min(1000px, calc(100% - 48px)); }
+  .ua3-hero-grid { grid-template-columns: 1fr; gap: 44px; }
+  .ua3-hero-glow { justify-content: flex-start; min-height: auto; }
+  .ua3-start-grid, .ua3-chain-grid, .ua3-plan-grid, .ua3-secondary-grid, .ua3-tertiary-grid, .ua3-artifact-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .ua3-detail-panel, .ua3-files-grid, .ua3-preview-panel { grid-template-columns: 1fr; }
+}
+@media (max-width: 767px) {
+  .ua3-wrap, .ua3-hero .ua3-wrap { width: calc(100% - 32px); }
+  .ua3-section { padding: 64px 0; }
+  .ua3-hero { padding: 64px 0; }
+  .ua3-display { font-size: 40px; }
+  .ua3-step-title { font-size: 30px; }
+  .ua3-value-strip { grid-template-columns: 1fr; gap: 24px; }
+  .ua3-start-grid, .ua3-chain-grid, .ua3-plan-grid, .ua3-secondary-grid, .ua3-tertiary-grid, .ua3-artifact-grid { grid-template-columns: 1fr; }
+  .ua3-section-head, .ua3-modal-head, .ua3-modal-actions, .ua3-confidence-block { flex-direction: column; align-items: flex-start; }
+  .ua3-gauge { width: 128px; height: 128px; }
+  .ua3-plan-card-recommended { transform: none; }
+}
 `;
