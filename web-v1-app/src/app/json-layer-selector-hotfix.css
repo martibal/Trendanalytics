@@ -1,114 +1,381 @@
-/* Collapse duplicate JSON controls and make the artifact selector sell the product value. */
+/* Homepage landing spec polish: class-based glass, status glow, focus states and mobile behavior. */
 
-main > section:nth-of-type(4) > div:nth-child(2) {
-  align-items: stretch;
+.ua-home-card,
+.ua-chain-selector,
+.ua-json-layer-card {
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(255, 255, 255, .08);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .055);
+  transition: transform .2s ease, border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
 }
 
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:first-child > p {
+.ua-home-card:hover,
+.ua-chain-selector:hover,
+.ua-json-layer-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .045);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .075);
+}
+
+.ua-status-badge {
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.ua-home-focus:focus-visible,
+.ua-chain-selector:focus-visible,
+.ua-json-layer-card:focus-visible,
+.ua-mobile-primary-cta:focus-visible {
+  outline: 2px solid rgba(143, 217, 255, .95);
+  outline-offset: 3px;
+}
+
+.ua-chain-list {
+  min-width: 0;
+}
+
+.ua-mobile-primary-cta {
+  display: none;
+}
+
+/* Hero hierarchy correction: wider horizontal rhythm, no word-by-word stacking. */
+main > section:first-of-type {
+  grid-template-columns: minmax(600px, 1.1fr) minmax(560px, .9fr) !important;
+  align-items: center;
+  gap: clamp(2rem, 3.5vw, 3.75rem) !important;
+  padding-top: clamp(3rem, 5vw, 5rem) !important;
+  padding-bottom: clamp(2.5rem, 4.5vw, 4rem) !important;
+}
+
+main > section:first-of-type > div:first-child {
+  align-self: center;
+  width: 100%;
+  max-width: 50rem;
+  min-width: 0;
+}
+
+main > section:first-of-type > div:first-child > h1 {
+  max-width: 42rem !important;
+  margin-top: 1.5rem !important;
   font-size: 0 !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
 }
 
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:first-child > p::after {
-  content: "JSON layer selector";
-  font-size: .625rem;
-  letter-spacing: .18em;
+main > section:first-of-type > div:first-child > h1::before {
+  content: "Why did your metric move?";
+  display: block;
+  max-width: 11.8em;
+  color: #fff;
+  font-size: clamp(3rem, 3.45vw, 4.25rem);
+  line-height: .98;
+  letter-spacing: -.055em;
 }
 
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) {
-  gap: .85rem !important;
-}
-
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button {
-  align-items: start !important;
-  min-height: 7.25rem;
-  padding: 1rem !important;
-}
-
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button > div:last-child > p {
+main > section:first-of-type > div:first-child > h1::after {
+  content: none !important;
   display: none !important;
 }
 
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button > div:last-child::before {
+main > section:first-of-type > div:first-child > h1 + p {
+  max-width: 44rem !important;
+  margin-top: 1.45rem !important;
+  font-size: 1rem !important;
+  line-height: 1.62 !important;
+}
+
+main > section:first-of-type > div:first-child > h1 + p::before {
+  content: "Urd Atlas tells you whether it was you — or the chain.";
   display: block;
+  max-width: 44rem;
+  margin-bottom: .75rem;
+  color: #f4f4f5;
+  font-size: clamp(1.25rem, 1.35vw, 1.55rem);
+  line-height: 1.22;
+  letter-spacing: -.03em;
+}
+
+main > section:first-of-type > div:first-child > h1 + p::after {
+  content: " Meta · Gold · Derived · Briefs — see what each gives you below.";
+  display: block;
+  margin-top: .95rem;
   font-family: var(--mono);
-  font-size: .78rem;
-  font-weight: 700;
-  line-height: 1.1;
+  font-size: .68rem;
+  line-height: 1.5;
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: #ffffff;
+  color: #8fd9ff;
 }
 
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button > div:last-child::after {
-  display: block;
-  margin-top: .55rem;
-  font-size: .78rem;
-  line-height: 1.55;
-  color: #a1a1aa;
-}
-
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button:nth-child(1) > div:last-child::before {
-  content: "Gold JSON";
-}
-
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button:nth-child(1) > div:last-child::after {
-  content: "Measurement layer. Use it to inspect the observed chain values behind the published state and verify what changed before interpretation.";
-}
-
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button:nth-child(2) > div:last-child::before {
-  content: "Derived JSON";
-}
-
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button:nth-child(2) > div:last-child::after {
-  content: "Normalized feature layer. Use demand, friction and capacity scores directly in analysis, dashboards or data workflows without rebuilding the transforms.";
-}
-
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button:nth-child(3) > div:last-child::before {
-  content: "Meta JSON";
-}
-
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button:nth-child(3) > div:last-child::after {
-  content: "Decision layer. Join regime, confidence, data quality, label support and drivers to your own daily table by date and chain.";
-}
-
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button:nth-child(4) > div:last-child::before {
-  content: "Briefs JSON";
-}
-
-main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button:nth-child(4) > div:last-child::after {
-  content: "Readable context layer. Use it for reports, internal notes and dashboard explanations when the full scorecard would be too heavy.";
-}
-
-/* Remove the second duplicate set of Meta/Gold/Derived/Briefs buttons. */
-main > section:nth-of-type(4) > div:nth-child(2) > div:last-child > div:first-child > div:last-child {
+/* Remove the duplicated differentiation line from hero; it belongs lower on the page. */
+main > section:first-of-type > div:first-child > p:last-child {
   display: none !important;
 }
 
-main > section:nth-of-type(4) > div:nth-child(2) > div:last-child > div:first-child > div:first-child > p:last-child {
-  display: none !important;
+/* Keep compliance compact; it should not become a separate visual section. */
+main > section:first-of-type > div:first-child > h1 + p + p {
+  margin-top: .9rem !important;
+  font-size: .62rem !important;
+  line-height: 1.4 !important;
 }
 
-main > section:nth-of-type(4) > div:nth-child(2) > div:last-child > div:first-child > div:first-child::after {
-  content: "The selected JSON layer controls both the compact preview and the full file modal.";
-  display: block;
-  margin-top: .4rem;
-  max-width: 24rem;
-  font-size: .78rem;
-  line-height: 1.55;
-  color: #a1a1aa;
+/* Keep the live panel wide enough for real labels and controls. */
+main > section:first-of-type > div:nth-child(2) > div {
+  grid-template-columns: 1fr !important;
+  max-width: 43rem;
+  margin-left: auto;
 }
 
-main > section:nth-of-type(4) > div:nth-child(2) > div:last-child pre {
-  margin-top: .25rem;
+main > section:first-of-type > div:nth-child(2) > p:first-child {
+  max-width: 43rem;
+  margin-left: auto;
 }
 
-/* The raw storage path is implementation detail and can be misleading because Briefs uses a nested published path. */
-main div[role="dialog"] h3 + p {
-  display: none !important;
+/* The chain selector is a horizontal switcher; it must not become a clipped vertical rail. */
+main > section:first-of-type .ua-chain-list {
+  display: flex !important;
+  gap: .75rem;
+  overflow-x: auto;
+  padding-bottom: .35rem;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+main > section:first-of-type .ua-chain-selector {
+  min-width: 10.75rem;
+  flex: 0 0 10.75rem;
+  scroll-snap-align: start;
+}
+
+main > section:first-of-type .ua-chain-selector p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Make the selected-chain detail card use its full width before stacking internals. */
+main > section:first-of-type > div:nth-child(2) > div > section {
+  overflow: visible !important;
+  width: 100%;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) {
+  grid-template-columns: minmax(7.5rem, .8fr) minmax(0, 1.5fr) !important;
+  align-items: start;
+  gap: 1rem !important;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) > div:first-child {
+  justify-self: start;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) > div:nth-child(2) {
+  min-width: 0;
+}
+
+/* Prevent the interactive state panel from clipping its own controls. */
+main > section:first-of-type > div:nth-child(2) > div,
+main > section:first-of-type > div:nth-child(2) > div > section,
+main > section:first-of-type > div:nth-child(2) > div .ua-home-card {
+  min-width: 0;
+}
+
+/* Put the delivered files before the numeric trust strip, as the files are the product. */
+main {
+  display: flex;
+  flex-direction: column;
+}
+
+main > section:nth-of-type(1) { order: 1; }
+main > section:nth-of-type(3) { order: 2; }
+main > section:nth-of-type(2) { order: 3; }
+main > section:nth-of-type(4) { order: 4; }
+main > section:nth-of-type(5) { order: 5; }
+main > section:nth-of-type(6) { order: 6; }
+main > section:nth-of-type(7) { order: 7; }
+
+/* Live preview control fixes: no circular fixed buttons, no label/help collisions, less dead vertical space. */
+main > section:first-of-type > div:nth-child(2) > div > section > .ua-home-card.relative.mt-6 {
+  margin-top: 1rem !important;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > .ua-home-card.relative.mt-6 > .mt-4.grid {
+  display: flex !important;
+  flex-wrap: wrap;
+  grid-template-columns: none !important;
+  gap: .6rem !important;
+  align-items: center;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > .ua-home-card.relative.mt-6 > .mt-4.grid > a {
+  width: auto !important;
+  min-width: max-content;
+  min-height: 2.4rem;
+  border-radius: 9999px !important;
+  padding: .55rem .9rem !important;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.1 !important;
+  letter-spacing: .1em !important;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > .ua-home-card.relative.mt-6 > .mt-4.grid > a:nth-child(2) {
+  min-width: 9.5rem;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > .relative.mt-5.grid {
+  margin-top: .95rem !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > .relative.mt-5.grid > .ua-home-card {
+  position: relative;
+  min-height: 4.9rem !important;
+  padding: .75rem .7rem !important;
+  overflow: visible;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > .relative.mt-5.grid > .ua-home-card > div:first-child {
+  display: block !important;
+  padding-right: 1.45rem;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > .relative.mt-5.grid > .ua-home-card > div:first-child > button:first-child {
+  max-width: none !important;
+  padding-right: .15rem;
+  font-size: .52rem !important;
+  line-height: 1.05 !important;
+  letter-spacing: .08em !important;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > .relative.mt-5.grid > .ua-home-card > div:first-child > span {
+  position: absolute !important;
+  top: .58rem;
+  right: .55rem;
+  z-index: 5;
+}
+
+main > section:first-of-type > div:nth-child(2) > div > section > .relative.mt-5.grid > .ua-home-card > p {
+  margin-top: .85rem !important;
+  font-size: .95rem !important;
+}
+
+@media (max-width: 1280px) {
+  main > section:first-of-type {
+    grid-template-columns: 1fr !important;
+  }
+
+  main > section:first-of-type > div:first-child {
+    max-width: 46rem;
+  }
+
+  main > section:first-of-type > div:first-child > h1::before {
+    font-size: clamp(3rem, 8vw, 4.55rem);
+  }
+
+  main > section:first-of-type > div:nth-child(2) > div,
+  main > section:first-of-type > div:nth-child(2) > p:first-child {
+    max-width: none;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 1180px) {
+  .ua-mobile-primary-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    border-radius: 9999px;
+    border: 1px solid rgba(143, 217, 255, .34);
+    background: rgba(143, 217, 255, .12);
+    padding: 8px 12px;
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 760px) {
-  main > section:nth-of-type(4) > div:nth-child(2) > div:first-child > div:nth-child(2) > button {
-    min-height: auto;
+  main > section:first-of-type > div:first-child > h1::before {
+    font-size: clamp(2.55rem, 11vw, 3.75rem);
+    line-height: .96;
+  }
+
+  main > section:first-of-type > div:first-child > h1 + p::before {
+    max-width: 24rem;
+    font-size: clamp(1.05rem, 4.6vw, 1.35rem);
+  }
+
+  main > section:first-of-type > div:first-child > div:first-of-type a,
+  main > section:first-of-type > div:first-child > div:first-of-type button {
+    width: 100%;
+  }
+
+  main > section:first-of-type > div:first-child > div:nth-of-type(2) {
+    display: grid !important;
+    gap: .75rem !important;
+  }
+
+  .ua-chain-list {
+    display: flex !important;
+    gap: .75rem;
+    overflow-x: auto;
+    padding-bottom: .4rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ua-chain-selector {
+    min-width: 13rem;
+    scroll-snap-align: start;
+  }
+
+  main > section:first-of-type > div:nth-child(2) > div > section > div:nth-of-type(2) {
+    grid-template-columns: 1fr !important;
+  }
+
+  main [role="dialog"] {
+    align-items: end;
+    padding: .75rem;
+  }
+
+  main [role="dialog"] > div {
+    max-height: 88svh;
+    border-radius: 1.5rem;
+  }
+
+  main [role="dialog"] pre {
+    font-size: .7rem;
+    line-height: 1.55;
+  }
+}
+
+@media (max-width: 420px) {
+  .ua-mobile-primary-cta {
+    padding-inline: 10px;
+    font-size: 9px;
+    letter-spacing: .09em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ua-home-card,
+  .ua-chain-selector,
+  .ua-json-layer-card {
+    transition: none;
+  }
+
+  .ua-home-card:hover,
+  .ua-chain-selector:hover,
+  .ua-json-layer-card:hover {
+    transform: none;
   }
 }
