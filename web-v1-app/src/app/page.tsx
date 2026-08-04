@@ -1,5 +1,6 @@
 import CheckoutRedirectGuard from "@/components/home/CheckoutRedirectGuard";
 import InteractiveHomeDashboard, { type HomeChainSnapshot, type HomeConfidenceExample, type HomeLabel } from "@/components/home/InteractiveHomeDashboard";
+import type { HeroPanelSnapshot } from "@/components/home/HeroNetworkStatePanel";
 import { readStorageObject } from "@/lib/storage";
 
 export const revalidate = 0;
@@ -35,6 +36,23 @@ const CHAINS = [
   { id: "arbitrum", ticker: "ARB", name: "Arbitrum", lag: "T+7" },
   { id: "base", ticker: "BASE", name: "Base", lag: "T+7" },
 ] as const;
+
+const BITCOIN_META_HISTORY_PATHS = [
+  "data/published/v1/meta/bitcoin/history.json",
+  "data/published/v1/meta/bitcoin/all.json",
+  "data/published/v1/meta/bitcoin/daily.json",
+  "data/published/v1/meta/bitcoin/rows.json",
+  "data/published/v1/meta/bitcoin/timeseries.json",
+  "data/published/v1/meta/bitcoin/last1000d.json",
+  "data/published/v1/meta/bitcoin/last730d.json",
+  "data/published/v1/meta/bitcoin/last365d.json",
+  "data/published/v1/meta/bitcoin/last180d.json",
+  "data/published/v1/meta/bitcoin/last90d.json",
+  "data/published/v1/meta/bitcoin/last30d.json",
+  "data/published/v1/meta/bitcoin/last7d.json",
+] as const;
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 function arrayBufferToUtf8(buffer: ArrayBuffer): string {
   return new TextDecoder("utf-8").decode(new Uint8Array(buffer));
@@ -99,6 +117,75 @@ function score(row: MetaLatest, axis: "demand" | "friction" | "capacity"): numbe
   return numberOrNull(row.regime?.capacity_score) ?? numberOrNull(row.scorecard?.dimensions?.capacity?.score) ?? scoreValue(row.scorecard?.capacity);
 }
 
+function extractRows(value: unknown): MetaLatest[] {
+  if (Array.isArray(value)) return value.filter((row): row is MetaLatest => Boolean(row) && typeof row === "object");
+  if (!value || typeof value !== "object") return [];
+  const candidate = value as { rows?: unknown; data?: unknown; items?: unknown; records?: unknown };
+  for (const key of [candidate.rows, candidate.data, candidate.items, candidate.records]) {
+    if (Array.isArray(key)) return key.filter((row): row is MetaLatest => Boolean(row) && typeof row === "object");
+  }
+  return [];
+}
+
+function utcDayNumber(value: string): number | null {
+  const datePart = value.includes("T") ? value.slice(0, 10) : value;
+  const parsed = new Date(`${datePart}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return Math.floor(parsed.getTime() / ONE_DAY_MS);
+}
+
+function formatDayNumber(value: number): string {
+  return new Date(value * ONE_DAY_MS).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+function consecutiveDailyWindow(rows: MetaLatest[]): { count: number | null; firstPublishedLabel: string | null } {
+  const days = Array.from(new Set(rows.map((row) => utcDayNumber(rawDate(row))).filter((value): value is number => typeof value === "number"))).sort((a, b) => a - b);
+  if (days.length === 0) return { count: null, firstPublishedLabel: null };
+
+  let startIndex = days.length - 1;
+  for (let index = days.length - 1; index > 0; index -= 1) {
+    if (days[index] - days[index - 1] !== 1) break;
+    startIndex = index - 1;
+  }
+
+  return {
+    count: days.length - startIndex,
+    firstPublishedLabel: formatDayNumber(days[startIndex]),
+  };
+}
+
+function formatMethodologyVersion(value: string | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return /^v/i.test(trimmed) ? trimmed : `v${trimmed}`;
+}
+
+async function getBitcoinMetaHistory(): Promise<MetaLatest[]> {
+  for (const path of BITCOIN_META_HISTORY_PATHS) {
+    const payload = await readJson<unknown>(path);
+    const rows = extractRows(payload);
+    if (rows.length > 0) return rows.filter((row) => rawDate(row));
+  }
+  const latest = await readJson<MetaLatest>("data/published/v1/meta/bitcoin/latest.json");
+  return latest && rawDate(latest) ? [latest] : [];
+}
+
+async function getDatasetGlance(): Promise<HeroPanelSnapshot> {
+  const [historyRows, latest] = await Promise.all([
+    getBitcoinMetaHistory(),
+    readJson<MetaLatest>("data/published/v1/meta/bitcoin/latest.json"),
+  ]);
+  const window = consecutiveDailyWindow(historyRows);
+  const latestFromHistory = [...historyRows].sort((a, b) => rawDate(a).localeCompare(rawDate(b))).at(-1);
+
+  return {
+    consecutiveRows: window.count,
+    firstPublishedLabel: window.firstPublishedLabel,
+    methodologyVersionLabel: formatMethodologyVersion(latest?.methodology_version ?? latestFromHistory?.methodology_version),
+  };
+}
+
 async function getArtifacts(chainId: string): Promise<Record<ArtifactName, unknown | null>> {
   const [meta, gold, derived, briefs] = await Promise.all([
     readJson<unknown>(`data/published/v1/meta/${chainId}/latest.json`),
@@ -140,8 +227,8 @@ async function getSnapshot(chain: (typeof CHAINS)[number]): Promise<HomeChainSna
 }
 
 async function getMetaRows(chainId: string): Promise<MetaLatest[]> {
-  for (const window of ["last365d", "last180d", "last90d", "last30d", "last7d"]) {
-    const rows = await readJson<MetaLatest[]>(`data/published/v1/meta/${chainId}/${window}.json`);
+  for (const windowName of ["last365d", "last180d", "last90d", "last30d", "last7d"]) {
+    const rows = await readJson<MetaLatest[]>(`data/published/v1/meta/${chainId}/${windowName}.json`);
     if (Array.isArray(rows) && rows.length > 0) return rows.filter((row) => row && rawDate(row));
   }
   const latest = await readJson<MetaLatest>(`data/published/v1/meta/${chainId}/latest.json`);
@@ -187,12 +274,12 @@ async function getLastRun(): Promise<string> {
 }
 
 export default async function HomePage() {
-  const [snapshots, lastRun, examples] = await Promise.all([
+  const [snapshots, lastRun, examples, heroSnapshot] = await Promise.all([
     Promise.all(CHAINS.map((chain) => getSnapshot(chain))),
     getLastRun(),
     getConfidenceExamples(),
+    getDatasetGlance(),
   ]);
-  const ethereumSnapshot = snapshots.find((snapshot) => snapshot.id === "ethereum") ?? snapshots[1] ?? snapshots[0];
 
   return (
     <>
@@ -201,15 +288,7 @@ export default async function HomePage() {
         snapshots={snapshots}
         lastRun={lastRun}
         examples={examples}
-        heroSnapshot={ethereumSnapshot ? {
-          name: ethereumSnapshot.name,
-          asOf: ethereumSnapshot.asOf,
-          lag: ethereumSnapshot.lag,
-          regime: ethereumSnapshot.regime,
-          confidence: ethereumSnapshot.confidence,
-          confidenceValue: ethereumSnapshot.confidenceValue,
-          oneLiner: ethereumSnapshot.oneLiner,
-        } : undefined}
+        heroSnapshot={heroSnapshot}
       />
     </>
   );
