@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import Script from "next/script";
+import { useEffect, useMemo, useState } from "react";
 
 export type HomeLabel = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 export type Artifact = "Meta" | "Gold" | "Derived" | "Briefs";
@@ -63,6 +64,17 @@ type InfoId =
   | "labelConfidence"
   | "dataLag";
 
+type PrismLike = {
+  languages: { json?: unknown };
+  highlight: (code: string, grammar: unknown, language: string) => string;
+};
+
+declare global {
+  interface Window {
+    Prism?: PrismLike;
+  }
+}
+
 const info: Record<InfoId, { title: string; body: string }> = {
   regime: {
     title: "Regime / status",
@@ -74,7 +86,7 @@ const info: Record<InfoId, { title: string; body: string }> = {
   },
   demand: {
     title: "Demand",
-    body: "Demand describes how strong chain activity looked compared with that chain’s own recent baseline.",
+    body: "Demand describes how strong chain activity looked compared with that chain's own recent baseline.",
   },
   friction: {
     title: "Friction",
@@ -227,6 +239,33 @@ function CheckoutButton({ plan, children }: { plan: CheckoutPlan; children: stri
   );
 }
 
+function ConfidenceGauge({ chain, activeInfo, setActiveInfo }: { chain: HomeChainSnapshot; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
+  const tone = statusTone(chain.regime);
+  const value = clampPercent(chain.confidenceValue);
+  return (
+    <div className="flex items-center gap-5 rounded-[1.5rem] border border-white/10 bg-black/25 p-5">
+      <div
+        className="grid h-32 w-32 shrink-0 place-items-center rounded-full p-[10px] shadow-[0_0_44px_rgba(0,0,0,.45)]"
+        style={{ background: `conic-gradient(${tone.fill} ${value}%, rgba(255,255,255,.08) 0)` }}
+      >
+        <div className="grid h-full w-full place-items-center rounded-full border border-white/10 bg-[#0A0E12] text-center">
+          <div>
+            <p className="font-mono text-[32px] font-bold leading-none tracking-[-0.05em] text-white">{chain.confidence}</p>
+            <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.18em] text-zinc-400">Confidence</p>
+          </div>
+        </div>
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-zinc-500">Headline reliability</p>
+          <InfoButton id="confidence" activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+        </div>
+        <p className="mt-3 text-[16px] leading-7 text-zinc-300">The circular gauge is the primary reliability read for this published row.</p>
+      </div>
+    </div>
+  );
+}
+
 function SecondaryMetric({ id, label, icon, value, color, activeInfo, setActiveInfo }: { id: InfoId; label: string; icon: string; value: string; color: string; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
   return (
     <div className="group rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5 shadow-[0_8px_32px_rgba(0,0,0,.24)] backdrop-blur transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06]" style={{ borderLeft: `2px solid ${color}` }}>
@@ -245,7 +284,7 @@ function SecondaryMetric({ id, label, icon, value, color, activeInfo, setActiveI
 
 function TertiaryMetric({ id, label, value, activeInfo, setActiveInfo }: { id: InfoId; label: string; value: string; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
   return (
-    <div className="rounded-[1.25rem] border border-white/8 bg-black/25 p-4 backdrop-blur transition hover:-translate-y-0.5 hover:border-white/16">
+    <div className="rounded-[1.25rem] border border-white/10 bg-black/25 p-4 backdrop-blur transition hover:-translate-y-0.5 hover:border-white/16">
       <div className="flex items-start justify-between gap-3">
         <p className="pr-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">{label}</p>
         <InfoButton id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
@@ -272,11 +311,36 @@ function JsonPreview({ selectedArtifact, selectedExample, chain }: { selectedArt
           one_liner: selectedExample.oneLiner,
         }
       : chain.artifacts[selectedArtifact];
+  const json = compactJson(payload);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+
+  useEffect(() => {
+    function applyHighlighting() {
+      const prism = window.Prism;
+      if (!prism?.languages?.json) {
+        setHighlighted(null);
+        return;
+      }
+      setHighlighted(prism.highlight(json, prism.languages.json, "json"));
+    }
+
+    applyHighlighting();
+    window.addEventListener("urd-prism-ready", applyHighlighting);
+    return () => window.removeEventListener("urd-prism-ready", applyHighlighting);
+  }, [json]);
 
   return (
-    <pre className="max-h-80 overflow-auto rounded-3xl border border-white/10 bg-black/45 p-5 font-mono text-xs leading-6 text-zinc-100">
-      {compactJson(payload)}
-    </pre>
+    <>
+      <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" strategy="afterInteractive" />
+      <Script
+        src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"
+        strategy="afterInteractive"
+        onLoad={() => window.dispatchEvent(new Event("urd-prism-ready"))}
+      />
+      <pre className="ua-json-preview max-h-80 overflow-auto rounded-3xl border border-white/10 bg-black/45 p-5 font-mono text-xs leading-6 text-zinc-100">
+        {highlighted ? <code className="language-json" dangerouslySetInnerHTML={{ __html: highlighted }} /> : <code>{json}</code>}
+      </pre>
+    </>
   );
 }
 
@@ -286,54 +350,61 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact>("Meta");
   const [exampleKind, setExampleKind] = useState<ExampleKind>("high");
 
-  const selectedChain = snapshots.find((snapshot) => snapshot.id === selectedChainId) ?? snapshots[0];
+  const selectedChain = snapshots.find((snapshot) => snapshot.id === selectedChainId) ?? snapshots[0] ?? null;
   const selectedExample = exampleKind === "high" ? examples.high : examples.low;
   const selectedTone = useMemo(() => statusTone(selectedChain?.regime ?? "UNKNOWN/DEGRADED"), [selectedChain?.regime]);
 
   return (
-    <main className="min-h-screen overflow-hidden text-white">
-      <section className="relative mx-auto grid w-[min(1440px,calc(100%-48px))] gap-16 py-24 md:grid-cols-[0.92fr_1.08fr] md:items-center md:py-28" aria-labelledby="hero-title">
-        <div className="absolute inset-y-16 right-0 hidden w-1/2 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,.10),transparent_66%)] blur-3xl md:block" aria-hidden="true" />
-        <div className="relative z-10">
-          <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Daily reference data</p>
-          <h1 id="hero-title" className="mt-6 max-w-3xl text-balance text-[40px] font-semibold leading-[1.02] tracking-[-0.05em] text-white md:text-[64px]">
-            Urd Atlas is a daily state report for Bitcoin, Ethereum, Arbitrum and Base.
-          </h1>
-          <p className="mt-6 max-w-2xl text-[16px] leading-8 text-zinc-300">
-            Built for analysts and data teams that need to explain why a number changed, not predict what it becomes.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3 font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-400">
-            <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2">No price data</span>
-            <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2">No forecasts</span>
-            <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2">No recommendations</span>
+    <main className="min-h-screen overflow-hidden bg-[#08090A] text-white">
+      <style>{`
+        .ua-json-preview .token.property { color: #7dd3fc; }
+        .ua-json-preview .token.string { color: #86efac; }
+        .ua-json-preview .token.number, .ua-json-preview .token.boolean, .ua-json-preview .token.null { color: #fbbf24; }
+        .ua-json-preview .token.punctuation, .ua-json-preview .token.operator { color: rgba(212,212,216,.55); }
+      `}</style>
+
+      <section className="relative bg-[linear-gradient(to_bottom,#08090A_0%,#0B1015_88%,#0F1319_100%)]">
+        <div className="relative mx-auto grid w-[min(1440px,calc(100%-48px))] gap-16 py-24 md:grid-cols-[0.92fr_1.08fr] md:items-center md:py-28" aria-labelledby="hero-title">
+          <div className="absolute inset-y-16 right-0 hidden w-1/2 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,.10),transparent_66%)] blur-3xl md:block" aria-hidden="true" />
+          <div className="relative z-10">
+            <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Daily reference data</p>
+            <h1 id="hero-title" className="mt-6 max-w-3xl text-balance text-[40px] font-semibold leading-[1.02] tracking-[-0.05em] text-white md:text-[64px]">
+              Urd Atlas is a daily state report for Bitcoin, Ethereum, Arbitrum and Base.
+            </h1>
+            <p className="mt-6 max-w-2xl text-[16px] leading-8 text-zinc-300">
+              Built for analysts and data teams that need to explain why a number changed, not predict what it becomes.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3 font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-400">
+              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2">No price data</span>
+              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2">No forecasts</span>
+              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2">No recommendations</span>
+            </div>
+            <a href="#today-status" className="ua-home-focus mt-9 inline-flex rounded-full border border-white/75 bg-white px-7 py-4 font-mono text-[12px] font-semibold uppercase tracking-[0.12em] text-black transition hover:-translate-y-0.5 hover:bg-zinc-200">
+              See today&apos;s status →
+            </a>
           </div>
-          <a href="#today-status" className="ua-home-focus mt-9 inline-flex rounded-full border border-white/75 bg-white px-7 py-4 font-mono text-[12px] font-semibold uppercase tracking-[0.12em] text-black transition hover:-translate-y-0.5 hover:bg-zinc-200">
-            See today&apos;s status →
-          </a>
-        </div>
-        <div className="relative z-10 min-h-[360px] rounded-[2rem] border border-white/10 bg-white/[0.03] p-8 backdrop-blur">
-          <div className="absolute inset-8 rounded-full border border-sky-200/10" aria-hidden="true" />
-          <div className="absolute inset-16 rounded-full border border-emerald-200/10" aria-hidden="true" />
-          <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-200/20 bg-sky-300/5 shadow-[0_0_80px_rgba(56,189,248,.16)]" aria-hidden="true" />
-          <div className="grid h-full min-h-[304px] grid-cols-2 place-items-center gap-6">
-            {snapshots.map((chain) => {
-              const tone = statusTone(chain.regime);
-              return (
-                <div key={chain.id} className="rounded-3xl border border-white/10 bg-black/25 px-5 py-4 shadow-[0_12px_46px_rgba(0,0,0,.35)] backdrop-blur">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">{chain.ticker}</p>
-                  <p className="mt-1 text-lg font-semibold">{chain.name}</p>
-                  <p className="mt-2 font-mono text-sm" style={{ color: tone.fill }}>{chain.regime}</p>
-                </div>
-              );
-            })}
+          <div className="relative z-10 min-h-[360px] rounded-[2rem] border border-white/10 bg-white/[0.03] p-8 backdrop-blur">
+            <div className="absolute inset-8 rounded-full border border-sky-200/10" aria-hidden="true" />
+            <div className="absolute inset-16 rounded-full border border-emerald-200/10" aria-hidden="true" />
+            <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-200/20 bg-sky-300/5 shadow-[0_0_80px_rgba(56,189,248,.16)]" aria-hidden="true" />
+            <div className="grid h-full min-h-[304px] grid-cols-2 place-items-center gap-6">
+              {snapshots.map((chain) => {
+                const tone = statusTone(chain.regime);
+                return (
+                  <div key={chain.id} className="rounded-3xl border border-white/10 bg-black/25 px-5 py-4 shadow-[0_12px_46px_rgba(0,0,0,.35)] backdrop-blur">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">{chain.ticker}</p>
+                    <p className="mt-1 text-lg font-semibold">{chain.name}</p>
+                    <p className="mt-2 font-mono text-sm" style={{ color: tone.fill }}>{chain.regime}</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="mx-auto h-px w-[min(1440px,calc(100%-48px))] bg-gradient-to-r from-transparent via-white/12 to-transparent" aria-hidden="true" />
-
-      <section id="today-status" className="mx-auto w-[min(1440px,calc(100%-48px))] scroll-mt-24 py-24" aria-labelledby="status-title">
-        <div className="rounded-[2rem] border border-white/10 bg-[#0F1319] p-8 shadow-[0_18px_70px_rgba(0,0,0,.38)] md:p-12">
+      <section id="today-status" className="scroll-mt-24 bg-[linear-gradient(to_bottom,#0F1319_0%,#0E1218_88%,#0A0D11_100%)] py-24" aria-labelledby="status-title">
+        <div className="mx-auto w-[min(1440px,calc(100%-48px))] rounded-[2rem] border border-white/10 bg-[#0F1319] p-8 shadow-[0_18px_70px_rgba(0,0,0,.38)] md:p-12">
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <div>
               <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Today&apos;s state — four chains</p>
@@ -381,11 +452,8 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
                   <StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
                 </div>
                 <p className="mt-6 max-w-2xl text-[16px] leading-8 text-zinc-300">{selectedChain.oneLiner}</p>
-                <div className="mt-7 grid grid-cols-2 gap-4">
-                  <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                    <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-zinc-500">Confidence</p>
-                    <p className="mt-3 font-mono text-[32px] font-bold text-white">{selectedChain.confidence}</p>
-                  </div>
+                <div className="mt-7 grid gap-4">
+                  <ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
                   <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
                     <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-zinc-500">Data lag</p>
                     <p className="mt-3 font-mono text-[32px] font-bold text-white">{selectedChain.lag}</p>
@@ -410,90 +478,94 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
         </div>
       </section>
 
-      <section className="mx-auto w-[min(1440px,calc(100%-48px))] py-24" aria-labelledby="files-title">
-        <div className="grid gap-8 md:grid-cols-[0.45fr_0.55fr] md:items-start">
-          <div>
-            <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Step 3</p>
-            <h2 id="files-title" className="mt-3 text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] md:text-[40px]">One daily row. Four delivered files.</h2>
-            <p className="mt-5 text-[16px] leading-8 text-zinc-400">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {artifactCards.map((artifact) => (
-              <button key={artifact.name} type="button" onClick={() => setSelectedArtifact(artifact.name)} className={`ua-home-focus rounded-[1.5rem] border bg-white/[0.035] p-5 text-left backdrop-blur transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.055] ${selectedArtifact === artifact.name ? "border-white/24 shadow-[0_12px_40px_rgba(0,0,0,.30)]" : "border-white/10"}`}>
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-sm text-zinc-100">{artifact.icon}</span>
-                  <h3 className="text-[24px] font-semibold tracking-[-0.03em]">{artifact.name}</h3>
-                </div>
-                <p className="mt-4 text-[16px] leading-7 text-zinc-300">{artifact.what}</p>
-                <p className="mt-3 text-sm leading-6 text-zinc-500">{artifact.use}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-8 grid gap-6 rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 md:grid-cols-[0.35fr_0.65fr]">
-          <div>
-            <p className="font-mono text-[12px] uppercase tracking-[0.08em] text-zinc-500">Example preview</p>
-            <div className="mt-4 flex gap-2">
-              {(["high", "low"] as const).map((kind) => (
-                <button key={kind} type="button" onClick={() => setExampleKind(kind)} className={`ua-home-focus rounded-full border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition ${exampleKind === kind ? "border-white/50 bg-white text-black" : "border-white/10 bg-black/20 text-zinc-300 hover:border-white/25"}`}>
-                  {kind} confidence
+      <section className="bg-[linear-gradient(to_bottom,#0A0D11_0%,#0B0F14_88%,#090B0F_100%)] py-24" aria-labelledby="files-title">
+        <div className="mx-auto w-[min(1440px,calc(100%-48px))]">
+          <div className="grid gap-8 md:grid-cols-[0.45fr_0.55fr] md:items-start">
+            <div>
+              <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Step 3</p>
+              <h2 id="files-title" className="mt-3 text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] md:text-[40px]">One daily row. Four delivered files.</h2>
+              <p className="mt-5 text-[16px] leading-8 text-zinc-400">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {artifactCards.map((artifact) => (
+                <button key={artifact.name} type="button" onClick={() => setSelectedArtifact(artifact.name)} className={`ua-home-focus rounded-[1.5rem] border bg-white/[0.035] p-5 text-left backdrop-blur transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.055] ${selectedArtifact === artifact.name ? "border-white/25 shadow-[0_12px_40px_rgba(0,0,0,.30)]" : "border-white/10"}`}>
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-sm text-zinc-100">{artifact.icon}</span>
+                    <h3 className="text-[24px] font-semibold tracking-[-0.03em]">{artifact.name}</h3>
+                  </div>
+                  <p className="mt-4 text-[16px] leading-7 text-zinc-300">{artifact.what}</p>
+                  <p className="mt-3 text-sm leading-6 text-zinc-500">{artifact.use}</p>
                 </button>
               ))}
             </div>
-            <p className="mt-5 text-[16px] leading-7 text-zinc-400">Switch the confidence example, then inspect how the selected JSON layer changes.</p>
           </div>
-          {selectedChain ? <JsonPreview selectedArtifact={selectedArtifact} selectedExample={selectedExample} chain={selectedChain} /> : null}
+
+          <div className="mt-8 grid gap-6 rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 md:grid-cols-[0.35fr_0.65fr]">
+            <div>
+              <p className="font-mono text-[12px] uppercase tracking-[0.08em] text-zinc-500">Example preview</p>
+              <div className="mt-4 flex gap-2">
+                {(["high", "low"] as const).map((kind) => (
+                  <button key={kind} type="button" onClick={() => setExampleKind(kind)} className={`ua-home-focus rounded-full border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition ${exampleKind === kind ? "border-white/50 bg-white text-black" : "border-white/10 bg-black/20 text-zinc-300 hover:border-white/25"}`}>
+                    {kind} confidence
+                  </button>
+                ))}
+              </div>
+              <p className="mt-5 text-[16px] leading-7 text-zinc-400">Switch the confidence example, then inspect how the selected JSON layer changes.</p>
+            </div>
+            {selectedChain ? <JsonPreview selectedArtifact={selectedArtifact} selectedExample={selectedExample} chain={selectedChain} /> : null}
+          </div>
         </div>
       </section>
 
-      <div className="mx-auto h-px w-[min(1440px,calc(100%-48px))] bg-gradient-to-r from-sky-300/0 via-sky-300/20 to-emerald-300/0" aria-hidden="true" />
-
-      <section className="mx-auto w-[min(1440px,calc(100%-48px))] py-24" aria-labelledby="start-title">
-        <div className="grid gap-5 md:grid-cols-3">
-          <div className="md:col-span-3">
-            <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Step 4</p>
-            <h2 id="start-title" className="mt-3 text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] md:text-[40px]">Get started without building a pipeline.</h2>
-          </div>
-          {["Open the public CSV", "Join on date + chain", "Keep confidence visible"].map((item, index) => (
-            <div key={item} className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-6 transition hover:-translate-y-0.5 hover:border-white/20">
-              <p className="font-mono text-[12px] uppercase tracking-[0.08em] text-zinc-500">0{index + 1}</p>
-              <h3 className="mt-4 text-[24px] font-semibold tracking-[-0.03em]">{item}</h3>
+      <section className="bg-[linear-gradient(to_bottom,#090B0F_0%,#0A0D11_100%)] py-14" aria-labelledby="start-title">
+        <div className="mx-auto w-[min(1440px,calc(100%-48px))]">
+          <div className="grid gap-5 md:grid-cols-3">
+            <div className="md:col-span-3">
+              <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Step 4</p>
+              <h2 id="start-title" className="mt-3 text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] md:text-[40px]">Get started without building a pipeline.</h2>
             </div>
-          ))}
+            {["Open the public CSV", "Join on date + chain", "Keep confidence visible"].map((item, index) => (
+              <div key={item} className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-6 transition hover:-translate-y-0.5 hover:border-white/20">
+                <p className="font-mono text-[12px] uppercase tracking-[0.08em] text-zinc-500">0{index + 1}</p>
+                <h3 className="mt-4 text-[24px] font-semibold tracking-[-0.03em]">{item}</h3>
+              </div>
+            ))}
+          </div>
+          <Link href="/getting-started" className="ua-home-focus mt-8 inline-flex rounded-full border border-white/70 bg-white px-6 py-3 font-mono text-[12px] font-semibold uppercase tracking-[0.12em] text-black transition hover:-translate-y-0.5 hover:bg-zinc-200">
+            Open getting started →
+          </Link>
         </div>
-        <Link href="/getting-started" className="ua-home-focus mt-8 inline-flex rounded-full border border-white/70 bg-white px-6 py-3 font-mono text-[12px] font-semibold uppercase tracking-[0.12em] text-black transition hover:-translate-y-0.5 hover:bg-zinc-200">
-          Open getting started →
-        </Link>
       </section>
 
-      <section id="pricing" className="mx-auto w-[min(1440px,calc(100%-48px))] py-24" aria-labelledby="pricing-title">
-        <div className="mb-8">
-          <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Step 5</p>
-          <h2 id="pricing-title" className="mt-3 text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] md:text-[40px]">Pricing.</h2>
-        </div>
-        <div className="grid items-stretch gap-5 md:grid-cols-3">
-          {plans.map((plan) => (
-            <div key={plan.id} className={`rounded-[1.75rem] border p-6 transition hover:-translate-y-0.5 ${plan.recommended ? "scale-[1.03] border-white/22 bg-white/[0.065] shadow-[0_18px_70px_rgba(0,0,0,.40)]" : "border-white/10 bg-white/[0.03]"}`}>
-              <div className="flex min-h-8 items-center justify-between gap-4">
-                <h3 className="text-[24px] font-semibold tracking-[-0.03em]">{plan.name}</h3>
-                {plan.recommended ? <span className="rounded-full border border-white/20 bg-white/[0.08] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-200">Recommended start</span> : null}
+      <section id="pricing" className="bg-[linear-gradient(to_bottom,#0A0D11_0%,#08090A_100%)] py-24" aria-labelledby="pricing-title">
+        <div className="mx-auto w-[min(1440px,calc(100%-48px))]">
+          <div className="mb-8">
+            <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Step 5</p>
+            <h2 id="pricing-title" className="mt-3 text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] md:text-[40px]">Pricing.</h2>
+          </div>
+          <div className="grid items-stretch gap-5 md:grid-cols-3">
+            {plans.map((plan) => (
+              <div key={plan.id} className={`rounded-[1.75rem] border p-6 transition hover:-translate-y-0.5 ${plan.recommended ? "scale-[1.03] border-cyan-200/55 bg-cyan-300/10 shadow-[0_22px_90px_rgba(34,211,238,.16)]" : "border-white/10 bg-white/[0.025]"}`}>
+                <div className="flex min-h-8 items-center justify-between gap-4">
+                  <h3 className="text-[24px] font-semibold tracking-[-0.03em]">{plan.name}</h3>
+                  {plan.recommended ? <span className="rounded-full border border-cyan-100/40 bg-cyan-300/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-cyan-100">Recommended start</span> : null}
+                </div>
+                <p className="mt-5 font-mono text-[40px] font-bold tracking-[-0.04em]">{plan.price}</p>
+                <p className="mt-4 min-h-14 text-[16px] leading-7 text-zinc-400">{plan.summary}</p>
+                <div className="mt-6">
+                  {plan.id === "free" ? (
+                    <Link href="/analyst-kit" className="ua-home-focus inline-flex w-full items-center justify-center rounded-full border border-white/16 bg-white/[0.06] px-5 py-3 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:bg-white/[0.10]">
+                      {plan.cta}
+                    </Link>
+                  ) : (
+                    <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>
+                  )}
+                </div>
               </div>
-              <p className="mt-5 font-mono text-[40px] font-bold tracking-[-0.04em]">{plan.price}</p>
-              <p className="mt-4 min-h-14 text-[16px] leading-7 text-zinc-400">{plan.summary}</p>
-              <div className="mt-6">
-                {plan.id === "free" ? (
-                  <Link href="/analyst-kit" className="ua-home-focus inline-flex w-full items-center justify-center rounded-full border border-white/16 bg-white/[0.06] px-5 py-3 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:bg-white/[0.10]">
-                    {plan.cta}
-                  </Link>
-                ) : (
-                  <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>
-                )}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          <p className="mt-7 max-w-3xl text-sm leading-6 text-zinc-500">Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p>
         </div>
-        <p className="mt-7 max-w-3xl text-sm leading-6 text-zinc-500">Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p>
       </section>
     </main>
   );
