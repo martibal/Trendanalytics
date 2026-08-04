@@ -1,12 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import Script from "next/script";
+import type { CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type HomeLabel = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 export type Artifact = "Meta" | "Gold" | "Derived" | "Briefs";
-type JsonPayload = unknown;
 type CheckoutPlan = "basic" | "pro";
+type JsonPayload = unknown;
+type ExampleKind = "high" | "low";
+
+declare global {
+  interface Window {
+    Prism?: {
+      highlightAllUnder?: (container: Element) => void;
+    };
+  }
+}
 
 export type HomeChainSnapshot = {
   id: string;
@@ -30,470 +41,368 @@ export type HomeChainSnapshot = {
   artifacts: Record<Artifact, JsonPayload | null>;
 };
 
+export type HomeConfidenceExample = {
+  kind: ExampleKind;
+  chain: string;
+  chainLabel: string;
+  date: string;
+  regime: HomeLabel;
+  confidenceScore: number | null;
+  dataQualityScore: number | null;
+  labelConfidenceScore: number | null;
+  demandScore: number | null;
+  frictionScore: number | null;
+  capacityScore: number | null;
+  dataLag: string;
+  oneLiner: string;
+};
+
 type Props = {
   snapshots: HomeChainSnapshot[];
   lastRun: string;
+  examples: { high: HomeConfidenceExample | null; low: HomeConfidenceExample | null };
 };
 
-type InfoId = "regime" | "demand" | "friction" | "capacity" | "confidence" | "dataQuality" | "labelConfidence" | "dataLag" | "firstRead";
+type InfoId =
+  | "regime"
+  | "confidence"
+  | "demand"
+  | "friction"
+  | "capacity"
+  | "dataQuality"
+  | "labelConfidence"
+  | "dataLag";
 
-type InfoContent = {
-  title: string;
-  body: string;
-  calculation: string;
-  link?: string;
-};
-
-type Plan = {
-  id: "free" | "basic" | "pro";
-  name: string;
-  price: string;
-  cadence: string;
-  summary: string;
-  action: string;
-  href?: string;
-  checkoutPlan?: CheckoutPlan;
-  accent: "emerald" | "cyan" | "amber";
-};
-
-type ArtifactCard = {
-  artifact: Artifact;
-  title: string;
-  contains: string;
-  value: string;
-  accent: "emerald" | "cyan" | "amber" | "violet";
-};
-
-const artifactCards: ArtifactCard[] = [
-  {
-    artifact: "Meta",
-    title: "Meta",
-    contains: "Regime label, confidence score, scorecard and revision ID.",
-    value: "The answer you join into reports and models: what state the chain was in, and how strongly the evidence supports it.",
-    accent: "emerald",
-  },
-  {
-    artifact: "Gold",
-    title: "Gold",
-    contains: "Normalized on-chain measurements: transactions, fees, block timing, active addresses and failure context.",
-    value: "The evidence behind the answer, useful when you want to verify the published state or build your own calculations.",
-    accent: "cyan",
-  },
-  {
-    artifact: "Derived",
-    title: "Derived",
-    contains: "Pre-computed 7- and 30-day rolling windows with formula and source hash.",
-    value: "Feature engineering you do not have to rebuild: versioned rolling windows ready for analysis, dashboards or model inputs.",
-    accent: "amber",
-  },
-  {
-    artifact: "Briefs",
-    title: "Briefs",
-    contains: "Readable summary: headline, short explanation and recent movement pattern.",
-    value: "The sentence-level context you paste into a report, internal note or dashboard when a full JSON object is too heavy.",
-    accent: "violet",
-  },
-];
-
-const plans: Plan[] = [
-  {
-    id: "free",
-    name: "Free",
-    price: "$0",
-    cadence: "inspect first",
-    summary: "Inspect the product and test the CSV join before paying.",
-    action: "Download Free Sample CSV",
-    href: "/analyst-kit",
-    accent: "emerald",
-  },
-  {
-    id: "basic",
-    name: "Basic",
-    price: "$49/mo",
-    cadence: "one chain",
-    summary: "Authenticated delivery for one selected chain.",
-    action: "Subscribe to one chain",
-    checkoutPlan: "basic",
-    accent: "cyan",
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "$149/mo",
-    cadence: "all chains",
-    summary: "Authenticated delivery across all four supported chains.",
-    action: "Subscribe to all chains",
-    checkoutPlan: "pro",
-    accent: "amber",
-  },
-];
-
-const info: Record<InfoId, InfoContent> = {
+const info: Record<InfoId, { title: string; body: string }> = {
   regime: {
-    title: "Regime label",
-    body: "The regime is the readable network-state label for the selected chain and date.",
-    calculation: "It is produced from demand, friction and capacity evidence. Read it together with confidence: the label says what was published, while confidence says how strongly the evidence supports it.",
-    link: "/methodology",
-  },
-  demand: {
-    title: "Demand score",
-    body: "Demand describes how strong activity pressure looks for this chain on the published date.",
-    calculation: "Demand-side chain measurements are normalized into the daily scorecard. Higher values mean stronger activity pressure relative to recent context.",
-    link: "/methodology",
-  },
-  friction: {
-    title: "Friction score",
-    body: "Friction describes how much resistance users appear to face when using the chain.",
-    calculation: "Friction-related measurements such as fee and congestion pressure are normalized into the daily scorecard.",
-    link: "/methodology",
-  },
-  capacity: {
-    title: "Capacity score",
-    body: "Capacity describes whether the chain appears to have usable room relative to current activity.",
-    calculation: "Capacity-related measurements are normalized into the scorecard. It is context, not a recommendation.",
-    link: "/methodology",
+    title: "Regime / status",
+    body: "The regime is the daily state label for a chain. It is produced from network activity, friction and capacity evidence. It is not a price view.",
   },
   confidence: {
-    title: "Confidence score",
-    body: "Confidence is the headline reliability score for this published row.",
-    calculation: "It combines data quality and label confidence using sqrt(data_quality_score × label_confidence_score).",
-    link: "/validation",
+    title: "Confidence",
+    body: "Headline reliability for the published row. It combines data quality with how clearly the row supports the published label.",
+  },
+  demand: {
+    title: "Demand",
+    body: "Demand describes how strong chain activity looked compared with that chain's own recent baseline.",
+  },
+  friction: {
+    title: "Friction",
+    body: "Friction describes how difficult or costly the chain was to use that day, using fee and failure evidence.",
+  },
+  capacity: {
+    title: "Capacity",
+    body: "Capacity describes whether the chain appeared to have usable room relative to current activity.",
   },
   dataQuality: {
     title: "Data quality",
-    body: "Data quality tells you whether the row had enough usable evidence to be read responsibly.",
-    calculation: "It reflects freshness, missingness and coverage checks for the selected chain and observation date.",
-    link: "/validation",
+    body: "Completeness and freshness context for the raw evidence behind the row.",
   },
   labelConfidence: {
     title: "Label confidence",
-    body: "Label confidence tells you how strongly the evidence supports the published regime label.",
-    calculation: "A low value means the label should be treated as weaker context, even when the row exists.",
-    link: "/validation",
+    body: "How clearly the evidence supports one published label instead of sitting between labels.",
   },
   dataLag: {
     title: "Data lag",
-    body: "Data lag tells you how far behind calendar time the observation is expected to be.",
-    calculation: "Bitcoin and Ethereum are T+1. Base and Arbitrum are T+7. This is a delivery/freshness property, not a signal.",
-    link: "/status",
-  },
-  firstRead: {
-    title: "Recommended first read",
-    body: "This panel tells a new user how to read the selected published state first.",
-    calculation: "Read the regime, check confidence, then join the row to your own daily table by date and chain.",
-    link: "/analyst-kit",
+    body: "How old the underlying observation is at publication time. BTC and ETH are normally T+1; ARB and Base are normally T+7.",
   },
 };
 
-function tone(label: HomeLabel) {
-  if (label === "STABLE") return { color: "#10B981", soft: "rgba(16,185,129,.16)", glow: "rgba(16,185,129,.38)" };
-  if (label === "HEATING") return { color: "#F59E0B", soft: "rgba(245,158,11,.16)", glow: "rgba(245,158,11,.34)" };
-  if (label === "CONGESTED") return { color: "#EF4444", soft: "rgba(239,68,68,.16)", glow: "rgba(239,68,68,.34)" };
-  if (label === "CHEAP") return { color: "#38BDF8", soft: "rgba(56,189,248,.16)", glow: "rgba(56,189,248,.34)" };
-  return { color: "#A78BFA", soft: "rgba(167,139,250,.14)", glow: "rgba(167,139,250,.28)" };
+const artifactCards: Array<{ name: Artifact; icon: string; what: string; use: string }> = [
+  { name: "Meta", icon: "◎", what: "Regime, confidence and score vector.", use: "Use it as the daily state row you join to your own data." },
+  { name: "Gold", icon: "▦", what: "Daily measurements behind the state row.", use: "Use it to inspect the raw evidence behind the label." },
+  { name: "Derived", icon: "⌁", what: "Moving averages and feature context.", use: "Use it when you want feature engineering without rebuilding it." },
+  { name: "Briefs", icon: "✦", what: "Readable context from the same evidence.", use: "Use it in reports, internal notes and dashboards." },
+];
+
+const plans: Array<{ id: "free" | CheckoutPlan; name: string; price: string; summary: string; cta: string; recommended?: boolean }> = [
+  { id: "free", name: "Free", price: "$0", summary: "Inspect the public CSV and examples before paying.", cta: "Open free kit" },
+  { id: "basic", name: "Basic", price: "$49/mo", summary: "Authenticated daily delivery for one selected chain.", cta: "Start Basic", recommended: true },
+  { id: "pro", name: "Pro", price: "$149/mo", summary: "Authenticated daily delivery for all four chains.", cta: "Start Pro" },
+];
+
+const gettingStarted = [
+  {
+    number: "01",
+    title: "Choose a subscription",
+    body: "Pick one chain ($49/mo) or all four ($149/mo). No lock-in period.",
+    cta: "See pricing →",
+    href: "#pricing",
+    icon: "card",
+  },
+  {
+    number: "02",
+    title: "Connect the JSON via API",
+    body: "Authenticate with your API key and pull daily updated files — Meta, Gold, Derived and Briefs — straight into your own pipeline.",
+    cta: "Open API docs →",
+    href: "/api-docs",
+    icon: "plug",
+  },
+  {
+    number: "03",
+    title: "Build your own output",
+    body: "Join on date + chain against your own data, or use Briefs directly in a report. No classification model to build yourself.",
+    cta: "See code example →",
+    href: "/analyst-kit",
+    icon: "code",
+  },
+] as const;
+
+function clampPercent(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value * 100)));
 }
 
-function accentClass(accent: "emerald" | "cyan" | "amber" | "violet") {
-  if (accent === "emerald") return "text-emerald-200 border-emerald-300/25 bg-emerald-300/10";
-  if (accent === "cyan") return "text-cyan-200 border-cyan-300/25 bg-cyan-300/10";
-  if (accent === "amber") return "text-amber-200 border-amber-300/25 bg-amber-300/10";
-  return "text-violet-200 border-violet-300/25 bg-violet-300/10";
-}
-
-function storagePath(artifact: Artifact, chainId: string) {
-  if (artifact === "Briefs") return `data/published/v1/briefs/chains/${chainId}/latest.json`;
-  return `data/published/v1/${artifact.toLowerCase()}/${chainId}/latest.json`;
-}
-
-function percent(value: number | null) {
-  if (typeof value !== "number" || Number.isNaN(value)) return 0;
-  return Math.max(0, Math.min(100, value <= 1 ? Math.round(value * 100) : Math.round(value)));
+function pct(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${clampPercent(value)}%`;
 }
 
 function metric(value: number | null) {
-  if (typeof value !== "number" || Number.isNaN(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return "—";
   return value.toFixed(1);
 }
 
-function shortConfidence(value: number | null) {
-  if (typeof value !== "number" || Number.isNaN(value)) return null;
-  return Number(value.toFixed(3));
-}
-
-function stringifyJson(value: JsonPayload) {
+function prettyJson(value: JsonPayload) {
   return JSON.stringify(value ?? null, null, 2);
 }
 
-function compactPayload(artifact: Artifact, chain: HomeChainSnapshot) {
-  if (artifact === "Gold") {
-    return {
-      chain: chain.id,
-      date: chain.asOf,
-      layer: "gold",
-      measurements: {
-        demand_score: chain.demand,
-        friction_score: chain.friction,
-        capacity_score: chain.capacity,
-      },
-      join_keys: ["date", "chain"],
-    };
-  }
-
-  if (artifact === "Derived") {
-    return {
-      chain: chain.id,
-      date: chain.asOf,
-      layer: "derived",
-      rolling_windows: ["7d", "30d"],
-      normalized_scores: {
-        demand_score: chain.demand,
-        friction_score: chain.friction,
-        capacity_score: chain.capacity,
-      },
-      methodology_version: chain.methodologyVersion,
-    };
-  }
-
-  if (artifact === "Briefs") {
-    return {
-      chain: chain.id,
-      date: chain.asOf,
-      layer: "briefs",
-      title: `${chain.name} ${chain.regime}`,
-      one_liner: chain.oneLiner,
-      confidence_score: shortConfidence(chain.confidenceValue),
-    };
-  }
-
-  return {
-    chain: chain.id,
-    date: chain.asOf,
-    layer: "meta",
-    regime: chain.regime,
-    confidence: {
-      confidence_score: shortConfidence(chain.confidenceValue),
-      data_quality_score: shortConfidence(chain.dataQuality),
-      label_confidence_score: shortConfidence(chain.labelConfidence),
-    },
-    data_lag: chain.lag,
-  };
+function compactJson(value: JsonPayload) {
+  return prettyJson(value).slice(0, 1200);
 }
 
-function CheckoutButton({ plan, children }: { plan: CheckoutPlan; children: string }) {
+function previewPayload(selectedArtifact: Artifact, selectedExample: HomeConfidenceExample | null, chain: HomeChainSnapshot) {
+  if (selectedArtifact === "Meta" && selectedExample) {
+    return {
+      chain: selectedExample.chain,
+      date: selectedExample.date,
+      regime: selectedExample.regime,
+      confidence_score: selectedExample.confidenceScore,
+      data_quality_score: selectedExample.dataQualityScore,
+      label_confidence_score: selectedExample.labelConfidenceScore,
+      demand_score: selectedExample.demandScore,
+      friction_score: selectedExample.frictionScore,
+      capacity_score: selectedExample.capacityScore,
+      data_lag: selectedExample.dataLag,
+      one_liner: selectedExample.oneLiner,
+    };
+  }
+  return chain.artifacts[selectedArtifact];
+}
+
+function completePayload(selectedArtifact: Artifact, chain: HomeChainSnapshot) {
+  return chain.artifacts[selectedArtifact];
+}
+
+function statusColor(label: HomeLabel) {
+  if (label === "STABLE") return "var(--status-stable)";
+  if (label === "CHEAP") return "var(--status-cheap)";
+  if (label === "HEATING") return "var(--status-heating)";
+  if (label === "CONGESTED") return "var(--status-congested)";
+  return "var(--status-unknown)";
+}
+
+function toneStyle(label: HomeLabel): CSSProperties {
+  return { "--status-color": statusColor(label) } as CSSProperties;
+}
+
+function LucideIcon({ name }: { name: "card" | "plug" | "code" }) {
+  if (name === "card") {
+    return (
+      <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
+        <path d="M2 10h20M6 15h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === "plug") {
+    return (
+      <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 22v-5M9 8V2M15 8V2M7 8h10v4a5 5 0 0 1-10 0V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
   return (
-    <form action={`/api/v1/checkout?plan=${plan}`} method="post" className="m-0">
-      <button type="submit" className="ua-home-focus inline-flex w-full items-center justify-center rounded-full border border-cyan-200/40 bg-cyan-300/15 px-5 py-3 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:border-cyan-100/70 hover:bg-cyan-300/20">
-        {children}
-      </button>
-    </form>
+    <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
-function InfoPopover({ id, activeInfo, setActiveInfo, compact = false }: { id: InfoId; activeInfo: InfoId | null; setActiveInfo: (id: InfoId | null) => void; compact?: boolean }) {
+function InfoButton({ id, activeInfo, setActiveInfo }: { id: InfoId; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
   const open = activeInfo === id;
-  const item = info[id];
-
   return (
-    <span className="relative inline-flex">
+    <span className="ua3-info">
       <button
         type="button"
+        aria-label={`Explain ${info[id].title}`}
         aria-expanded={open}
-        aria-label={`Explain ${item.title}`}
         onClick={(event) => {
           event.stopPropagation();
           setActiveInfo(open ? null : id);
         }}
-        className={`ua-home-focus inline-flex items-center justify-center rounded-full border border-white/15 bg-white/[0.04] font-mono text-zinc-300 transition hover:border-cyan-200/45 hover:bg-cyan-300/10 hover:text-white ${compact ? "h-5 w-5 text-[10px]" : "px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]"}`}
+        className="ua3-info-button"
       >
-        {compact ? "?" : "info"}
+        ?
       </button>
       {open ? (
-        <span className="absolute left-0 top-7 z-40 w-72 rounded-2xl border border-cyan-200/25 bg-[#0A0F15] p-4 text-left shadow-[0_24px_80px_rgba(0,0,0,.85)]">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">{item.title}</span>
-          <span className="mt-2 block text-sm leading-6 text-zinc-100">{item.body}</span>
-          <span className="mt-3 block text-xs leading-5 text-zinc-400">{item.calculation}</span>
-          {item.link ? (
-            <Link href={item.link} className="mt-3 inline-flex font-mono text-[10px] uppercase tracking-[0.14em] text-cyan-200 underline-offset-4 hover:underline">
-              Read more
-            </Link>
-          ) : null}
+        <span className="ua3-info-popover" role="dialog" aria-label={info[id].title}>
+          <button
+            type="button"
+            aria-label="Close explanation"
+            className="ua3-info-close"
+            onClick={(event) => {
+              event.stopPropagation();
+              setActiveInfo(null);
+            }}
+          >
+            ×
+          </button>
+          <span className="ua3-info-title">{info[id].title}</span>
+          <span className="ua3-info-body">{info[id].body}</span>
         </span>
       ) : null}
     </span>
   );
 }
 
-function Gauge({ value, color, activeInfo, setActiveInfo }: { value: number | null; color: string; activeInfo: InfoId | null; setActiveInfo: (id: InfoId | null) => void }) {
-  const pct = percent(value);
-  const radius = 42;
-  const circumference = 2 * Math.PI * radius;
-  const dash = (pct / 100) * circumference;
-
+function StatusBadge({ label, activeInfo, setActiveInfo }: { label: HomeLabel; activeInfo?: InfoId | null; setActiveInfo?: (value: InfoId | null) => void }) {
   return (
-    <div className="relative grid h-32 w-32 shrink-0 place-items-center rounded-full border border-white/10 bg-black/30 text-left shadow-[inset_0_0_32px_rgba(255,255,255,.035)] transition hover:-translate-y-1 hover:border-cyan-200/35">
-      <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true">
-        <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="7" />
-        <circle cx="50" cy="50" r={radius} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round" strokeDasharray={`${dash} ${circumference - dash}`} style={{ filter: `drop-shadow(0 0 10px ${color})` }} />
-      </svg>
-      <div className="relative text-center">
-        <p className="font-mono text-3xl font-semibold text-white">{pct}%</p>
-        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.18em] text-zinc-500">confidence</p>
-        <span className="mt-2 flex justify-center"><InfoPopover id="confidence" activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact /></span>
-      </div>
-    </div>
-  );
-}
-
-function RegimeBadge({ label, activeInfo, setActiveInfo }: { label: HomeLabel; activeInfo: InfoId | null; setActiveInfo: (id: InfoId | null) => void }) {
-  const t = tone(label);
-  return (
-    <span className="ua-status-badge inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: t.color, borderColor: `${t.color}66`, background: t.soft, boxShadow: `0 0 22px ${t.glow}` }}>
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: t.color, boxShadow: `0 0 16px ${t.color}` }} aria-hidden="true" />
+    <span className="ua3-status-badge" style={toneStyle(label)}>
+      <span className="ua3-status-dot" />
       {label}
-      <InfoPopover id="regime" activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact />
+      {activeInfo !== undefined && setActiveInfo ? <InfoButton id="regime" activeInfo={activeInfo} setActiveInfo={setActiveInfo} /> : null}
     </span>
   );
 }
 
-function MetricBar({ id, label, value, descriptor, color, activeInfo, setActiveInfo }: { id: "demand" | "friction" | "capacity"; label: string; value: number | null; descriptor: string; color: string; activeInfo: InfoId | null; setActiveInfo: (id: InfoId | null) => void }) {
-  const pct = percent(value);
-
+function ProgressBar({ value }: { value: number | null }) {
+  const width = clampPercent(value);
   return (
-    <div className="ua-home-card rounded-2xl p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setActiveInfo(activeInfo === id ? null : id)} className="ua-home-focus font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60">{label}</button>
-          <InfoPopover id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact />
-        </div>
-        <p className="font-mono text-sm text-white">{metric(value)}</p>
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.07]"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color, boxShadow: `0 0 18px ${color}` }} /></div>
-      <p className="mt-3 text-xs leading-5 text-zinc-400">{descriptor}</p>
+    <div className="ua3-progress">
+      <div className="ua3-progress-fill" style={{ width: `${width}%` }} />
     </div>
   );
 }
 
-function HeroChainSelector({ chain, active, onClick }: { chain: HomeChainSnapshot; active: boolean; onClick: () => void }) {
-  const t = tone(chain.regime);
-
+function Sparkline() {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="ua-home-focus ua-hero-chain-card rounded-2xl border p-4 text-left transition hover:-translate-y-0.5"
-      style={{
-        borderColor: active ? `${t.color}88` : "rgba(255,255,255,.10)",
-        background: active ? `linear-gradient(135deg, ${t.soft}, rgba(255,255,255,.035))` : "rgba(255,255,255,.025)",
-        boxShadow: active ? `0 0 30px ${t.glow}` : "inset 0 1px 0 rgba(255,255,255,.04)",
-      }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">{chain.ticker}</p>
-          <p className="mt-1 text-lg font-semibold tracking-tight text-white">{chain.name}</p>
-        </div>
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: t.color, boxShadow: `0 0 16px ${t.color}` }} aria-hidden="true" />
-      </div>
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="font-mono text-xs text-zinc-500">{chain.confidence}</p>
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em]" style={{ color: t.color }}>{chain.regime}</p>
-      </div>
-    </button>
+    <svg aria-hidden="true" viewBox="0 0 120 34" className="ua3-sparkline">
+      <path d="M2 24 L14 22 L25 16 L36 18 L48 9 L60 22 L73 17 L86 23 L99 11 L118 13" fill="none" stroke="var(--accent-action)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 24 L14 22 L25 16 L36 18 L48 9 L60 22 L73 17 L86 23 L99 11 L118 13" fill="none" stroke="var(--accent-action)" strokeOpacity="0.18" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
-function QualityCard({ id, label, value, activeInfo, setActiveInfo, suffix = "%" }: { id: "dataQuality" | "labelConfidence" | "dataLag"; label: string; value: string | number; activeInfo: InfoId | null; setActiveInfo: (id: InfoId | null) => void; suffix?: string }) {
+function ConfidenceGauge({ chain, activeInfo, setActiveInfo }: { chain: HomeChainSnapshot; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
+  const percent = clampPercent(chain.confidenceValue);
   return (
-    <div className="ua-home-card min-h-[5.5rem] rounded-2xl p-3">
-      <div className="flex items-start justify-between gap-2">
-        <button type="button" onClick={() => setActiveInfo(activeInfo === id ? null : id)} className="ua-home-focus max-w-[7rem] text-left font-mono text-[9px] uppercase leading-4 tracking-[0.14em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60">{label}</button>
-        <InfoPopover id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact />
-      </div>
-      <p className="mt-2 whitespace-nowrap font-mono text-base text-white">{value}{suffix}</p>
-    </div>
-  );
-}
-
-function FirstReadCard({ chain, activeInfo, setActiveInfo }: { chain: HomeChainSnapshot; activeInfo: InfoId | null; setActiveInfo: (id: InfoId | null) => void }) {
-  const confidence = percent(chain.confidenceValue);
-  const labelConfidence = percent(chain.labelConfidence);
-  const shouldGate = confidence < 70 || labelConfidence < 70;
-  const guidance = shouldGate ? "Use this row as context, but keep confidence visible before drawing conclusions." : "This row is a cleaner candidate for a first join test against your own metric.";
-
-  return (
-    <div className="ua-home-card relative mt-4 rounded-3xl p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2"><button type="button" onClick={() => setActiveInfo(activeInfo === "firstRead" ? null : "firstRead")} className="ua-home-focus font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60">Recommended first read</button><InfoPopover id="firstRead" activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact /></div>
-          <p className="mt-2 text-sm leading-6 text-zinc-300">{guidance}</p>
+    <div className="ua3-confidence-block">
+      <div className="ua3-gauge" style={{ "--pct": `${percent}%` } as CSSProperties}>
+        <div className="ua3-gauge-inner">
+          <span className="ua3-gauge-value">{chain.confidence}</span>
+          <span className="ua3-gauge-label">Confidence</span>
+          <InfoButton id="confidence" activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
         </div>
-        <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-300">{chain.lag}</span>
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link href="/analyst-kit" className="ua-home-focus rounded-full border border-cyan-200/25 bg-cyan-300/10 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:border-cyan-100/60 hover:bg-cyan-300/15">Join CSV</Link>
-        <Link href="/validation" className="ua-home-focus rounded-full border border-emerald-200/25 bg-emerald-300/10 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-emerald-100 transition hover:border-emerald-100/60 hover:bg-emerald-300/15">Check confidence</Link>
-        <Link href={`/chains/${chain.id}`} className="ua-home-focus rounded-full border border-white/10 bg-black/25 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-300 transition hover:border-white/25 hover:text-white">Open chain</Link>
+      <div className="ua3-confidence-text">
+        <p className="ua3-label">Headline reliability</p>
+        <p>Use confidence to decide how much weight to place on the published row.</p>
       </div>
     </div>
   );
 }
 
-function PricingCard({ plan }: { plan: Plan }) {
-  const accent = accentClass(plan.accent);
+function SecondaryMetric({ id, label, value, activeInfo, setActiveInfo }: { id: InfoId; label: string; value: number | null; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
   return (
-    <article className="ua-home-card flex min-h-full flex-col rounded-[2rem] p-6">
-      <p className={`inline-flex w-fit rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] ${accent}`}>{plan.name}</p>
-      <div className="mt-5 flex items-end justify-between gap-4">
-        <p className="font-mono text-3xl font-semibold text-white">{plan.price}</p>
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">{plan.cadence}</p>
+    <div className="ua3-metric-card">
+      <div className="ua3-metric-head">
+        <p className="ua3-label">{label}</p>
+        <InfoButton id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
       </div>
-      <p className="mt-5 text-sm leading-7 text-zinc-300">{plan.summary}</p>
-      <div className="mt-auto pt-7">
-        {plan.checkoutPlan ? (
-          <CheckoutButton plan={plan.checkoutPlan}>{plan.action}</CheckoutButton>
-        ) : (
-          <Link href={plan.href ?? "/analyst-kit"} className="ua-home-focus inline-flex w-full items-center justify-center rounded-full border border-emerald-200/35 bg-emerald-300/12 px-5 py-3 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:border-emerald-100/70 hover:bg-emerald-300/18">
-            {plan.action}
-          </Link>
-        )}
-      </div>
-    </article>
-  );
-}
-
-function JsonModal({ artifact, path, payload, copied, onClose, onCopy }: { artifact: Artifact; path: string; payload: JsonPayload; copied: boolean; onClose: () => void; onCopy: () => void }) {
-  const unavailable = payload === null || typeof payload === "undefined";
-
-  return (
-    <div className="fixed inset-0 z-[1000] grid place-items-center bg-black/80 px-4 py-8" role="dialog" aria-modal="true" aria-label={`Full ${artifact} JSON preview`}>
-      <div className="flex max-h-[88vh] w-full max-w-5xl flex-col rounded-[2rem] border border-cyan-200/25 bg-[#070B10] shadow-[0_40px_140px_rgba(0,0,0,.92)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
-          <div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">Full published JSON</p><h3 className="mt-1 text-xl font-semibold tracking-tight text-white">{artifact} latest.json</h3><p className="mt-1 font-mono text-[10px] text-zinc-500">{path}</p></div>
-          <div className="flex flex-wrap gap-2"><button type="button" onClick={onCopy} disabled={unavailable} className="ua-home-focus rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white transition hover:border-emerald-200/60 disabled:cursor-not-allowed disabled:opacity-40">{copied ? "Copied ✓" : "Copy JSON"}</button><button type="button" onClick={onClose} className="ua-home-focus rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-200 transition hover:border-white/25 hover:text-white">Close</button></div>
-        </div>
-        <pre className="min-h-0 flex-1 overflow-auto p-5 font-mono text-xs leading-6 text-zinc-100"><code>{unavailable ? stringifyJson({ error: "Published artifact unavailable in this preview", path }) : stringifyJson(payload)}</code></pre>
-      </div>
+      <p className="ua3-data-medium">{metric(value)}</p>
+      <ProgressBar value={value == null ? null : value / 100} />
     </div>
   );
 }
 
-export default function InteractiveHomeDashboard({ snapshots }: Props) {
-  const [activeId, setActiveId] = useState(snapshots[0]?.id ?? "bitcoin");
-  const [artifact, setArtifact] = useState<Artifact>("Meta");
-  const [copied, setCopied] = useState(false);
-  const [jsonOpen, setJsonOpen] = useState(false);
+function TertiaryMetric({ id, label, value, activeInfo, setActiveInfo }: { id: InfoId; label: string; value: string; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
+  return (
+    <div className="ua3-mini-card">
+      <div className="ua3-metric-head">
+        <p className="ua3-label">{label}</p>
+        <InfoButton id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+      </div>
+      <p className="ua3-data-small">{value}</p>
+    </div>
+  );
+}
+
+function CheckoutButton({ plan, children }: { plan: CheckoutPlan; children: string }) {
+  return (
+    <form action={`/api/v1/checkout?plan=${plan}`} method="post" className="ua3-form">
+      <button type="submit" className="ua3-button ua3-button-primary ua3-button-full">
+        {children}
+      </button>
+    </form>
+  );
+}
+
+function JsonBlock({ payload, prismReady, complete = false }: { payload: JsonPayload; prismReady: boolean; complete?: boolean }) {
+  const containerRef = useRef<HTMLPreElement | null>(null);
+  const jsonText = complete ? prettyJson(payload) : compactJson(payload);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      window.Prism?.highlightAllUnder?.(containerRef.current);
+    }
+  }, [jsonText, prismReady]);
+
+  return (
+    <pre ref={containerRef} className={complete ? "ua3-json ua3-json-complete" : "ua3-json"}>
+      <code className="language-json">{jsonText}</code>
+    </pre>
+  );
+}
+
+export default function InteractiveHomeDashboard({ snapshots, lastRun, examples }: Props) {
+  const [selectedChainId, setSelectedChainId] = useState(snapshots[0]?.id ?? "bitcoin");
   const [activeInfo, setActiveInfo] = useState<InfoId | null>(null);
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact>("Meta");
+  const [exampleKind, setExampleKind] = useState<ExampleKind>("high");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [prismReady, setPrismReady] = useState(false);
 
-  const active = useMemo(() => snapshots.find((chain) => chain.id === activeId) ?? snapshots[0], [activeId, snapshots]);
-  const activeTone = tone(active?.regime ?? "UNKNOWN/DEGRADED");
-  const compact = active ? compactPayload(artifact, active) : {};
-  const fullArtifact = active?.artifacts?.[artifact] ?? null;
-  const fullPath = active ? storagePath(artifact, active.id) : "";
-  const selectedArtifact = artifactCards.find((item) => item.artifact === artifact) ?? artifactCards[0];
+  const selectedChain = snapshots.find((snapshot) => snapshot.id === selectedChainId) ?? snapshots[0];
+  const selectedExample = exampleKind === "high" ? examples.high : examples.low;
+  const preview = useMemo(() => (selectedChain ? previewPayload(selectedArtifact, selectedExample, selectedChain) : null), [selectedArtifact, selectedChain, selectedExample]);
+  const completeJson = useMemo(() => (selectedChain ? completePayload(selectedArtifact, selectedChain) : null), [selectedArtifact, selectedChain]);
 
-  async function copyText(value: string) {
+  useEffect(() => {
+    if (!activeInfo) return;
+    function closeOnOutsidePointer(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Element && !target.closest(".ua3-info")) {
+        setActiveInfo(null);
+      }
+    }
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [activeInfo]);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setModalOpen(false);
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [modalOpen]);
+
+  async function copyModalJson() {
     try {
-      await navigator.clipboard.writeText(value);
+      await navigator.clipboard?.writeText(prettyJson(completeJson));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -501,107 +410,876 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
     }
   }
 
-  if (!active) return null;
+  if (!selectedChain) return null;
 
   return (
-    <main className="relative overflow-hidden bg-background text-foreground">
-      <section className="mx-auto grid max-w-7xl gap-10 px-6 pb-10 pt-16 lg:grid-cols-[0.72fr_1.28fr] lg:px-8 lg:pb-16 lg:pt-24">
-        <div className="relative z-10 self-center">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">Daily reference data · Public CSV kit · Descriptive only</p>
-          <h1 className="mt-8 max-w-4xl text-5xl font-semibold tracking-[-0.07em] text-white sm:text-7xl lg:text-8xl">Know whether your metric moved because of you — or because the chain did.</h1>
-          <p className="mt-7 max-w-2xl text-lg leading-8 text-zinc-400">A daily state label for Bitcoin, Ethereum, Arbitrum and Base that you join to your own data — users, fees, model error and activity. Built for analysts, data teams and researchers who need to explain results inside a descriptive data boundary.</p>
-          <p className="mt-4 w-fit rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-200">No price data · No forecasts · No recommendations</p>
-          <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
-            <Link href="/analyst-kit" className="ua-home-focus inline-flex items-center justify-center rounded-full border border-cyan-300/40 bg-cyan-300/15 px-6 py-4 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white shadow-[0_0_34px_rgba(56,189,248,.24)] transition hover:-translate-y-0.5 hover:border-cyan-200/70 hover:bg-cyan-300/20">Download Free Sample CSV</Link>
+    <main className="ua3">
+      <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" strategy="afterInteractive" onLoad={() => setPrismReady(true)} />
+      <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js" strategy="afterInteractive" onLoad={() => setPrismReady(true)} />
+
+      <section className="ua3-section ua3-hero" aria-labelledby="hero-title">
+        <div className="ua3-wrap ua3-hero-grid">
+          <div>
+            <p className="ua3-category">DAILY REFERENCE DATA</p>
+            <h1 id="hero-title" className="ua3-display">
+              Urd Atlas is a daily state report for Bitcoin, Ethereum, Arbitrum and Base.
+            </h1>
+            <p className="ua3-body ua3-hero-copy">Built for analysts and data teams that need to explain why a number changed, not predict what it becomes.</p>
+            <div className="ua3-compliance-row" aria-label="Product boundary">
+              <span className="ua3-compliance-pill">No price data</span>
+              <span className="ua3-compliance-pill">No forecasts</span>
+              <span className="ua3-compliance-pill">No recommendations</span>
+            </div>
+            <a href="#today-status" className="ua3-button ua3-button-primary">
+              See today&apos;s status →
+            </a>
           </div>
-          <p className="mt-6 text-sm leading-6 text-zinc-300">Click on a chain for more information.</p>
-          <div className="ua-hero-chain-list mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {snapshots.map((chain) => (
-              <HeroChainSelector
-                key={chain.id}
-                chain={chain}
-                active={chain.id === active.id}
-                onClick={() => {
-                  setActiveId(chain.id);
-                  setActiveInfo(null);
-                  setJsonOpen(false);
-                }}
-              />
+          <div className="ua3-hero-glow" aria-hidden="true" />
+        </div>
+      </section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section className="ua3-section ua3-start" aria-labelledby="start-title">
+        <div className="ua3-wrap">
+          <h2 id="start-title" className="ua3-step-title">Get started.</h2>
+          <div className="ua3-start-grid">
+            {gettingStarted.map((step) => (
+              <article key={step.number} className="ua3-card ua3-step-card">
+                <p className="ua3-step-number">{step.number}</p>
+                <div className="ua3-step-heading">
+                  <LucideIcon name={step.icon} />
+                  <h3>{step.title}</h3>
+                </div>
+                <p className="ua3-body-small">{step.body}</p>
+                <Link href={step.href} className="ua3-button ua3-button-quiet">
+                  {step.cta}
+                </Link>
+              </article>
             ))}
           </div>
-          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[11px] uppercase tracking-[0.13em] text-zinc-400">
-            <Link href="/validation" className="ua-home-focus underline-offset-4 hover:text-white hover:underline">Inspect diagnostics →</Link>
-            <Link href="/api-docs" className="ua-home-focus underline-offset-4 hover:text-white hover:underline">API Docs →</Link>
-            <a href="#pricing" className="ua-home-focus underline-offset-4 hover:text-white hover:underline">View pricing ↓</a>
+        </div>
+      </section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section id="today-status" className="ua3-section ua3-status" aria-labelledby="status-title">
+        <div className="ua3-wrap">
+          <div className="ua3-section-head">
+            <div>
+              <p className="ua3-label ua3-step-label">Step 3</p>
+              <h2 id="status-title" className="ua3-step-title">Today&apos;s state — four chains, updated {lastRun}.</h2>
+            </div>
+            <p className="ua3-body-small ua3-help-copy">Tap any term marked with ? to see a plain-language explanation.</p>
+          </div>
+
+          <div className="ua3-chain-grid">
+            {snapshots.map((chain) => {
+              const active = chain.id === selectedChainId;
+              return (
+                <button key={chain.id} type="button" onClick={() => setSelectedChainId(chain.id)} className={active ? "ua3-card ua3-chain-card ua3-chain-card-active" : "ua3-card ua3-chain-card"} style={toneStyle(chain.regime)}>
+                  <div className="ua3-chain-top">
+                    <div>
+                      <p className="ua3-label">{chain.ticker}</p>
+                      <h3>{chain.name}</h3>
+                    </div>
+                    <StatusBadge label={chain.regime} />
+                  </div>
+                  <div className="ua3-chain-bottom">
+                    <div>
+                      <p className="ua3-data-medium">{chain.confidence}</p>
+                      <p className="ua3-body-small">confidence</p>
+                    </div>
+                    <Sparkline />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="ua3-detail-panel">
+            <div className="ua3-card ua3-detail-summary">
+              <div className="ua3-detail-head">
+                <div>
+                  <p className="ua3-label">{selectedChain.ticker} · {selectedChain.asOf} · {selectedChain.lag}</p>
+                  <h3>{selectedChain.name}</h3>
+                </div>
+                <StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+              </div>
+              <p className="ua3-body-small ua3-one-liner">{selectedChain.oneLiner}</p>
+              <ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+            </div>
+
+            <div className="ua3-status-metrics">
+              <div className="ua3-secondary-grid">
+                <SecondaryMetric id="demand" label="Demand" value={selectedChain.demand} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+                <SecondaryMetric id="friction" label="Friction" value={selectedChain.friction} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+                <SecondaryMetric id="capacity" label="Capacity" value={selectedChain.capacity} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+              </div>
+              <div className="ua3-tertiary-grid">
+                <TertiaryMetric id="dataQuality" label="Data quality" value={pct(selectedChain.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+                <TertiaryMetric id="labelConfidence" label="Label confidence" value={pct(selectedChain.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+                <TertiaryMetric id="dataLag" label="Data lag" value={selectedChain.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section className="ua3-section ua3-files" aria-labelledby="files-title">
+        <div className="ua3-wrap ua3-files-grid">
+          <div>
+            <p className="ua3-label ua3-step-label">Step 4</p>
+            <h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2>
+            <p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p>
+          </div>
+          <div className="ua3-artifact-grid">
+            {artifactCards.map((artifact) => (
+              <button key={artifact.name} type="button" onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}>
+                <span className="ua3-artifact-icon">{artifact.icon}</span>
+                <h3>{artifact.name}</h3>
+                <p className="ua3-body-small">{artifact.what}</p>
+                <p className="ua3-card-note">{artifact.use}</p>
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="relative z-10">
-          <p className="mb-4 text-sm leading-7 text-zinc-400">These three scores explain the regime label — Demand, Friction, Capacity. Hover or tap any metric for a plain-language definition.</p>
-          <div className="grid gap-4 rounded-[2.25rem] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,.075),rgba(255,255,255,.025))] p-4 shadow-[0_40px_120px_rgba(0,0,0,.45)] backdrop-blur-2xl">
-            <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-black/30 p-5" style={{ boxShadow: `inset 0 1px 0 rgba(255,255,255,.06), 0 0 70px ${activeTone.glow}` }}>
-              <div className="absolute inset-x-0 top-0 h-32 opacity-70" style={{ background: `radial-gradient(circle at 50% 0%, ${activeTone.soft}, transparent 70%)` }} />
-              <div className="relative flex items-start justify-between gap-5"><div><p className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">{active.ticker} · {active.asOf} · {active.lag}</p><h2 className="mt-2 text-4xl font-semibold tracking-[-0.04em] text-white">{active.name}</h2></div><RegimeBadge label={active.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div>
-              <div className="relative mt-7 grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]"><Gauge value={active.confidenceValue} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><div className="grid gap-3"><MetricBar id="demand" label="Demand" value={active.demand} descriptor={active.demandLabel} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><MetricBar id="friction" label="Friction" value={active.friction} descriptor={active.frictionLabel} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><MetricBar id="capacity" label="Capacity" value={active.capacity} descriptor={active.capacityLabel} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div></div>
-              <FirstReadCard chain={active} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-              <div className="relative mt-4 grid gap-3 sm:grid-cols-3"><QualityCard id="dataQuality" label="Data quality" value={percent(active.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><QualityCard id="labelConfidence" label="Label confidence" value={percent(active.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><QualityCard id="dataLag" label="Data lag" value={active.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} suffix="" /></div>
-            </section>
+        <div className="ua3-wrap ua3-preview-panel">
+          <div>
+            <p className="ua3-label">Example preview</p>
+            <div className="ua3-toggle-row" aria-label="Confidence example selector">
+              {(["high", "low"] as const).map((kind) => (
+                <button key={kind} type="button" onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>
+                  {kind} confidence
+                </button>
+              ))}
+            </div>
+            <p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p>
+          </div>
+          <div>
+            <JsonBlock payload={preview} prismReady={prismReady} />
+            <button type="button" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>
+              View complete JSON →
+            </button>
           </div>
         </div>
       </section>
 
-      <section className="border-y border-white/10 bg-white/[0.018]">
-        <div className="mx-auto grid max-w-7xl gap-4 px-6 py-8 lg:grid-cols-4 lg:px-8">
-          {[["Chains", "4"], ["Free kit", "CSV"], ["Basic from", "$49"], ["Pro from", "$149"]].map(([label, value]) => (
-            <div key={label} className="ua-home-card rounded-3xl p-5"><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">{label}</p><p className="mt-2 text-3xl font-semibold tracking-tight text-white">{value}</p></div>
-          ))}
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title">
+        <div className="ua3-wrap">
+          <p className="ua3-label ua3-step-label">Step 5</p>
+          <h2 id="pricing-title" className="ua3-step-title">Pricing.</h2>
+          <div className="ua3-plan-grid">
+            {plans.map((plan) => (
+              <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}>
+                <div className="ua3-plan-head">
+                  <h3>{plan.name}</h3>
+                  {plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}
+                </div>
+                <p className="ua3-plan-price">{plan.price}</p>
+                <p className="ua3-body-small">{plan.summary}</p>
+                {plan.id === "free" ? (
+                  <Link href="/analyst-kit" className="ua3-button ua3-button-quiet ua3-button-full">
+                    {plan.cta}
+                  </Link>
+                ) : (
+                  <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>
+                )}
+              </article>
+            ))}
+          </div>
+          <p className="ua3-card-note ua3-pricing-note">Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
-        <div className="max-w-4xl"><p className="font-mono text-xs uppercase tracking-[0.18em] text-emerald-200">Four delivered files</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">One subscription, four layers — from raw numbers to a sentence you can paste into a report.</h2><p className="mt-5 text-sm leading-7 text-zinc-400">Use the layer that matches how much engineering time you have.</p></div>
-        <div className="mt-10 grid gap-5 lg:grid-cols-4">
-          {artifactCards.map((item) => (
-            <article key={item.artifact} className="ua-home-card rounded-[2rem] p-5">
-              <p className={`inline-flex rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] ${accentClass(item.accent)}`}>{item.title}</p>
-              <h3 className="mt-5 text-lg font-semibold tracking-tight text-white">What it contains</h3>
-              <p className="mt-2 text-sm leading-6 text-zinc-400">{item.contains}</p>
-              <h3 className="mt-5 text-lg font-semibold tracking-tight text-white">What it gives you</h3>
-              <p className="mt-2 text-sm leading-6 text-zinc-400">{item.value}</p>
-            </article>
-          ))}
+      <div className="ua3-transition" aria-hidden="true" />
+
+      {modalOpen ? (
+        <div className="ua3-modal-backdrop" role="dialog" aria-modal="true" aria-label="Complete JSON preview" onClick={() => setModalOpen(false)}>
+          <div className="ua3-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="ua3-modal-head">
+              <div>
+                <p className="ua3-label">Complete JSON</p>
+                <h2>{selectedArtifact} latest.json</h2>
+              </div>
+              <div className="ua3-modal-actions">
+                <button type="button" className="ua3-button ua3-button-quiet" onClick={copyModalJson}>
+                  {copied ? "Copied" : "Copy to clipboard"}
+                </button>
+                <button type="button" className="ua3-button ua3-button-primary" onClick={() => setModalOpen(false)}>
+                  Close
+                </button>
+              </div>
+            </div>
+            <JsonBlock payload={completeJson} prismReady={prismReady} complete />
+          </div>
         </div>
-        <Link href="/analyst-kit" className="ua-home-focus mt-8 inline-flex rounded-full border border-cyan-300/35 bg-cyan-300/12 px-5 py-3 font-mono text-xs uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:border-cyan-200/65">See a real example →</Link>
-      </section>
+      ) : null}
 
-      <section className="border-y border-white/10 bg-white/[0.018]">
-        <div className="mx-auto grid max-w-7xl gap-6 px-6 py-16 lg:grid-cols-2 lg:px-8">
-          <article className="ua-home-card rounded-[2rem] p-7"><p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">You already have data</p><h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white">Join Urd Atlas on date + chain.</h2><p className="mt-5 text-sm leading-7 text-zinc-400">Use Gold and Derived to build features, or Meta to segment model diagnostics, user counts or fee context by regime. No classification pipeline to build or maintain.</p><Link href="/analyst-kit" className="ua-home-focus mt-6 inline-flex rounded-full border border-cyan-300/35 bg-cyan-300/12 px-5 py-3 font-mono text-xs uppercase tracking-[0.12em] text-white">Open Analyst Kit →</Link></article>
-          <article className="ua-home-card rounded-[2rem] p-7"><p className="font-mono text-xs uppercase tracking-[0.18em] text-emerald-200">No pipeline yet</p><h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white">Read the current state without code.</h2><p className="mt-5 text-sm leading-7 text-zinc-400">Use Explorer to see the published state for each chain, or copy Briefs into a report, internal note or dashboard. No join required to get started.</p><Link href="/explorer" className="ua-home-focus mt-6 inline-flex rounded-full border border-emerald-300/35 bg-emerald-300/12 px-5 py-3 font-mono text-xs uppercase tracking-[0.12em] text-white">Open Explorer →</Link></article>
-        </div>
-      </section>
-
-      <section className="mx-auto grid max-w-7xl gap-8 px-6 py-16 lg:grid-cols-[0.72fr_1.28fr] lg:px-8">
-        <div><p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">How it works</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">Raw data → Gold → Derived and Meta → Briefs.</h2><p className="mt-5 max-w-xl text-sm leading-7 text-zinc-500">Select one JSON layer. The compact preview and full JSON modal both follow the selected layer.</p></div>
-        <div className="grid gap-5 lg:grid-cols-[0.94fr_1.06fr]">
-          <div className="ua-home-card rounded-[2rem] p-5"><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">JSON layer selector</p><div className="mt-5 grid gap-3">{artifactCards.map((item, index) => { const selected = artifact === item.artifact; return (<button key={item.artifact} type="button" onClick={() => { setArtifact(item.artifact); setJsonOpen(false); }} className="ua-home-focus ua-json-layer-card grid grid-cols-[38px_minmax(0,1fr)] gap-4 rounded-2xl border p-4 text-left" style={{ borderColor: selected ? activeTone.color : "rgba(255,255,255,.10)", background: selected ? activeTone.soft : "rgba(0,0,0,.25)" }}><div className="grid h-9 w-9 place-items-center rounded-full border border-cyan-200/25 bg-cyan-200/10 font-mono text-xs text-cyan-100">0{index + 1}</div><div><p className="font-mono text-xs uppercase tracking-[0.14em] text-white">{item.title} JSON</p><p className="mt-1 text-xs leading-5 text-zinc-400">{item.value}</p></div></button>); })}</div></div>
-          <div className="ua-home-card rounded-[2rem] p-5"><div className="mb-4 border-b border-white/10 pb-4"><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">Artifact preview</p><h3 className="mt-2 text-2xl font-semibold tracking-tight text-white">{selectedArtifact.title} latest.json</h3><p className="mt-2 text-xs leading-5 text-zinc-500">{selectedArtifact.contains}</p></div><pre className="max-h-[14rem] overflow-hidden rounded-2xl border border-white/10 bg-black/55 p-5 font-mono text-xs leading-6 text-zinc-200 whitespace-pre-wrap"><code>{stringifyJson(compact)}</code></pre><p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">Compact preview.</p><div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={() => setJsonOpen(true)} className="ua-home-focus inline-flex items-center justify-center rounded-full border border-cyan-300/35 bg-cyan-300/12 px-5 py-3 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:border-cyan-200/65">Open full JSON</button><button type="button" onClick={() => copyText(stringifyJson(compact))} className="ua-home-focus inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-300/10 px-5 py-3 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:border-emerald-200/60">{copied ? "Copied ✓" : "Copy preview"}</button></div></div>
-        </div>
-      </section>
-
-      <section className="border-y border-white/10 bg-white/[0.018]">
-        <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8"><p className="font-mono text-xs uppercase tracking-[0.18em] text-emerald-200">Evidence before trust</p><h2 className="mt-4 max-w-3xl text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">Check the data product before you pay for delivery.</h2><div className="mt-10 grid gap-5 lg:grid-cols-3">{[["Validation", "Regime balance, transitions, confidence coverage and per-chain variation.", "/validation"], ["Free CSV", "Download the public kit and test the date + chain join in your own data.", "/analyst-kit"], ["Method", "Read how daily labels, confidence and reproducibility metadata are produced.", "/methodology"]].map(([title, body, href]) => (<Link key={title} href={href} className="ua-home-focus ua-home-card rounded-[2rem] p-6"><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200">{title}</p><p className="mt-4 text-sm leading-7 text-zinc-400">{body}</p></Link>))}</div></div>
-      </section>
-
-      <section id="pricing" className="scroll-mt-28 bg-[linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.055))]">
-        <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8 lg:py-20">
-          <div className="grid gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:items-end"><div><p className="font-mono text-xs uppercase tracking-[0.18em] text-amber-200">Pricing</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">Choose the delivery level after the proof works.</h2></div><p className="max-w-3xl text-sm leading-7 text-zinc-400 lg:justify-self-end">Free is for inspection and prototype joins. Basic and Pro are for authenticated recurring delivery.</p></div>
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">{plans.map((plan) => <PricingCard key={plan.id} plan={plan} />)}</div>
-          <p className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 text-xs leading-6 text-zinc-400">Chain access is priced as delivery and access, not as a claim that every chain has identical variation. See <Link href="/validation" className="text-cyan-200 underline-offset-4 hover:underline">Validation</Link> for per-chain differences before you choose.</p>
-        </div>
-      </section>
-
-      {jsonOpen ? <JsonModal artifact={artifact} path={fullPath} payload={fullArtifact} copied={copied} onCopy={() => copyText(stringifyJson(fullArtifact))} onClose={() => setJsonOpen(false)} /> : null}
+      <style>{ua3Styles}</style>
     </main>
   );
 }
+
+const ua3Styles = `
+.ua3 {
+  --radius-card: 12px;
+  --radius-badge: 6px;
+  --radius-button: 999px;
+  min-height: 100vh;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+.ua3-wrap {
+  width: min(1440px, calc(100% - 48px));
+  margin: 0 auto;
+}
+.ua3-section {
+  padding: 96px 0;
+}
+.ua3-hero {
+  padding: 80px 0;
+  min-height: auto;
+  display: block;
+  background: radial-gradient(circle at 78% 42%, var(--accent-depth-glow), transparent 44%), var(--bg-base);
+}
+.ua3-start {
+  background: linear-gradient(rgba(16, 224, 160, 0.03), rgba(16, 224, 160, 0.03)), var(--bg-base);
+}
+.ua3-status {
+  background: var(--bg-base);
+}
+.ua3-files {
+  background: linear-gradient(rgba(76, 110, 245, 0.04), rgba(76, 110, 245, 0.04)), var(--bg-base);
+}
+.ua3-pricing {
+  background: linear-gradient(rgba(245, 247, 248, 0.02), rgba(245, 247, 248, 0.02)), var(--bg-base);
+}
+.ua3-transition {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(to bottom, transparent 0%, var(--accent-depth-line) 50%, transparent 100%);
+  opacity: 0.4;
+}
+.ua3-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.58fr) minmax(320px, 0.42fr);
+  align-items: center;
+  gap: 64px;
+}
+.ua3-hero-glow {
+  min-height: 360px;
+  background: radial-gradient(circle at center, var(--accent-depth-glow), transparent 60%);
+}
+.ua3-category {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-badge);
+  padding: 4px 10px;
+  border: 1px solid rgba(16, 224, 160, 0.3);
+  background: rgba(16, 224, 160, 0.12);
+  color: var(--accent-action);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+.ua3-display {
+  max-width: 860px;
+  margin: 24px 0 0;
+  color: var(--text-primary);
+  font-size: 52px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+}
+.ua3-step-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+.ua3 h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+.ua3-body {
+  max-width: 720px;
+  margin: 24px 0 0;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.ua3-body-small {
+  margin: 16px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.ua3-label {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ua3-step-label {
+  margin-bottom: 12px;
+  color: var(--accent-action);
+}
+.ua3-hero-copy {
+  max-width: 640px;
+}
+.ua3-compliance-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+.ua3-compliance-pill {
+  border-radius: 20px;
+  padding: 6px 14px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ua3-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border-radius: var(--radius-button);
+  padding: 12px 18px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: transform .2s ease, background-color .2s ease, border-color .2s ease;
+  cursor: pointer;
+}
+.ua3-button:hover {
+  transform: translateY(-1px);
+}
+.ua3-button-primary {
+  margin-top: 32px;
+  border: 1px solid var(--accent-action);
+  background: var(--accent-action);
+  color: var(--accent-action-text);
+}
+.ua3-button-primary:hover {
+  background: var(--accent-action-hover);
+  border-color: var(--accent-action-hover);
+}
+.ua3-button-quiet {
+  margin-top: 20px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-2);
+  color: var(--text-primary);
+}
+.ua3-button-full {
+  width: 100%;
+}
+.ua3-card {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-1);
+}
+.ua3-start-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+.ua3-step-card {
+  padding: 28px 24px;
+}
+.ua3-step-number {
+  margin: 0 0 12px;
+  color: var(--accent-action);
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ua3-step-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ua3-step-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+.ua3-section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 32px;
+}
+.ua3-help-copy {
+  max-width: 420px;
+  margin: 0;
+}
+.ua3-chain-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+.ua3-chain-card {
+  min-height: 160px;
+  padding: 20px;
+  text-align: left;
+  border-left: 2px solid var(--status-color);
+  cursor: pointer;
+}
+.ua3-chain-card-active {
+  background: var(--bg-elevated-2);
+  border-color: var(--border-emphasis);
+  border-left-color: var(--status-color);
+}
+.ua3-chain-top,
+.ua3-chain-bottom,
+.ua3-detail-head,
+.ua3-metric-head,
+.ua3-plan-head,
+.ua3-modal-head,
+.ua3-modal-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ua3-chain-bottom {
+  align-items: flex-end;
+  margin-top: 28px;
+}
+.ua3-data-medium {
+  margin: 18px 0 0;
+  color: var(--text-primary);
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ua3-data-small {
+  margin: 18px 0 0;
+  color: var(--text-primary);
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+}
+.ua3-sparkline {
+  width: 120px;
+  height: 34px;
+}
+.ua3-status-badge,
+.ua3-plan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--status-color);
+  padding: 4px 8px;
+  color: var(--status-color);
+  background: color-mix(in srgb, var(--status-color) 12%, transparent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ua3-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-button);
+  background: currentColor;
+}
+.ua3-detail-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 24px;
+  margin-top: 24px;
+  padding: 24px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-1);
+}
+.ua3-detail-summary,
+.ua3-metric-card,
+.ua3-mini-card {
+  padding: 24px;
+}
+.ua3-one-liner {
+  margin-top: 24px;
+}
+.ua3-confidence-block {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  margin-top: 28px;
+}
+.ua3-gauge {
+  width: 140px;
+  height: 140px;
+  border-radius: var(--radius-button);
+  padding: 10px;
+  background: conic-gradient(var(--accent-action) var(--pct), rgba(255,255,255,0.08) 0);
+  box-shadow: 0 0 32px rgba(16, 224, 160, 0.16);
+}
+.ua3-gauge-inner {
+  display: grid;
+  place-items: center;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-button);
+  background: var(--bg-elevated-1);
+}
+.ua3-gauge-value {
+  color: var(--text-primary);
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ua3-gauge-label {
+  color: var(--text-tertiary);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ua3-confidence-text p:last-child {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ua3-status-metrics {
+  display: grid;
+  gap: 16px;
+}
+.ua3-secondary-grid,
+.ua3-tertiary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.ua3-metric-card {
+  background: var(--bg-elevated-2);
+}
+.ua3-mini-card {
+  background: var(--bg-elevated-1);
+}
+.ua3-progress {
+  height: 8px;
+  margin-top: 18px;
+  overflow: hidden;
+  border-radius: var(--radius-button);
+  background: rgba(255,255,255,0.08);
+}
+.ua3-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-button);
+  background: var(--accent-action);
+}
+.ua3-files-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.42fr) minmax(0, 0.58fr);
+  gap: 56px;
+  align-items: start;
+}
+.ua3-artifact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.ua3-artifact-card {
+  padding: 24px;
+  text-align: left;
+  cursor: pointer;
+}
+.ua3-artifact-card-active {
+  background: var(--bg-elevated-2);
+  border-color: var(--border-emphasis);
+}
+.ua3-artifact-icon {
+  display: inline-flex;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+  font-size: 20px;
+}
+.ua3-card-note {
+  margin: 14px 0 0;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ua3-preview-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.34fr) minmax(0, 0.66fr);
+  gap: 24px;
+  margin-top: 32px;
+  padding: 24px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-1);
+}
+.ua3-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.ua3-toggle {
+  border-radius: var(--radius-button);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-2);
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ua3-toggle-active {
+  border-color: var(--accent-action);
+  color: var(--accent-action-text);
+  background: var(--accent-action);
+}
+.ua3-json {
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+  padding: 20px;
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ua3-json-complete {
+  max-height: 62vh;
+}
+.ua3-json-open {
+  margin-top: 16px;
+}
+.ua3-json .token.property { color: #7DD3FC; }
+.ua3-json .token.string { color: #86EFAC; }
+.ua3-json .token.number,
+.ua3-json .token.boolean,
+.ua3-json .token.null { color: #FCD34D; }
+.ua3-json .token.punctuation,
+.ua3-json .token.operator { color: #6B7280; }
+.ua3-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+.ua3-plan-card {
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px;
+  opacity: 0.92;
+  background: var(--bg-elevated-1);
+  border: 1px solid var(--border-subtle);
+}
+.ua3-plan-card-recommended {
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--accent-action);
+  opacity: 1;
+  transform: scale(1.03);
+  box-shadow: 0 8px 32px rgba(16, 224, 160, 0.15);
+}
+.ua3-plan-badge {
+  border-color: var(--accent-action);
+  background: rgba(16, 224, 160, 0.12);
+  color: var(--accent-action);
+}
+.ua3-plan-price {
+  margin: 28px 0 0;
+  color: var(--text-primary);
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ua3-pricing-note {
+  max-width: 720px;
+  margin-top: 24px;
+}
+.ua3-form {
+  margin: 0;
+}
+.ua3-info {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.ua3-info-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-button);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-2);
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+.ua3-info-popover {
+  position: absolute;
+  left: 0;
+  top: 28px;
+  z-index: 20;
+  width: 320px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-emphasis);
+  background: var(--bg-elevated-2);
+  padding: 16px 40px 16px 16px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.8);
+}
+.ua3-info-close {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-button);
+  background: var(--bg-elevated-1);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.ua3-info-title {
+  display: block;
+  color: var(--accent-action);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ua3-info-body {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ua3-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8,9,10,0.82);
+}
+.ua3-modal {
+  width: min(800px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-emphasis);
+  background: var(--bg-elevated-2);
+  padding: 24px;
+}
+.ua3-modal-head {
+  margin-bottom: 18px;
+}
+.ua3-modal-actions {
+  align-items: center;
+}
+.ua3-modal .ua3-button-primary,
+.ua3-modal .ua3-button-quiet {
+  margin-top: 0;
+}
+.ua-home-focus:focus-visible,
+.ua3 button:focus-visible,
+.ua3 a:focus-visible {
+  outline: 2px solid var(--accent-action);
+  outline-offset: 3px;
+}
+@media (max-width: 900px) {
+  .ua3-wrap { width: min(100% - 32px, 720px); }
+  .ua3-section { padding: 72px 0; }
+  .ua3-hero { padding: 80px 0; }
+  .ua3-hero-grid,
+  .ua3-files-grid,
+  .ua3-preview-panel,
+  .ua3-detail-panel { grid-template-columns: 1fr; }
+  .ua3-hero-glow { display: none; }
+  .ua3-start-grid,
+  .ua3-chain-grid,
+  .ua3-plan-grid { grid-template-columns: 1fr; }
+  .ua3-secondary-grid,
+  .ua3-tertiary-grid,
+  .ua3-artifact-grid { grid-template-columns: 1fr; }
+  .ua3-section-head { align-items: start; flex-direction: column; }
+  .ua3-confidence-block { grid-template-columns: 1fr; }
+  .ua3-info-popover { left: auto; right: 0; width: min(320px, calc(100vw - 48px)); }
+  .ua3-modal-head,
+  .ua3-modal-actions { flex-direction: column; align-items: stretch; }
+}
+@media (max-width: 767px) {
+  .ua3-display { font-size: 34px; line-height: 1.1; }
+  .ua3-step-title { font-size: 26px; line-height: 1.2; }
+  .ua3 h3 { font-size: 19px; }
+  .ua3-body { font-size: 15px; }
+  .ua3-body-small { font-size: 13px; }
+  .ua3-gauge-value,
+  .ua3-plan-price,
+  .ua3-step-number { font-size: 32px; }
+  .ua3-data-medium { font-size: 24px; }
+  .ua3-data-small { font-size: 16px; }
+}
+`;

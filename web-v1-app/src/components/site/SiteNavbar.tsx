@@ -28,6 +28,8 @@ const MOBILE_SECONDARY_ITEMS = [
 ] as const;
 
 const CLERK_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+const primaryCtaClass = "inline-flex items-center justify-center rounded-full border border-white/70 bg-white px-4 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:-translate-y-0.5 hover:bg-zinc-200";
+const secondaryAuthClass = "inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-300 transition hover:border-white/24 hover:text-white";
 
 function navLinkClass(active: boolean) {
   return ["ua-site-link", active ? "active" : ""].filter(Boolean).join(" ");
@@ -35,7 +37,7 @@ function navLinkClass(active: boolean) {
 
 function GetStartedLink({ onNavigate, mobile = false }: { onNavigate?: () => void; mobile?: boolean }) {
   return (
-    <Link href="/start" onClick={onNavigate} className={mobile ? "btn-primary" : "ua-copy-json"}>
+    <Link href="/start" onClick={onNavigate} className={mobile ? "btn-primary" : primaryCtaClass}>
       Get Started
     </Link>
   );
@@ -43,8 +45,8 @@ function GetStartedLink({ onNavigate, mobile = false }: { onNavigate?: () => voi
 
 function AuthAwareActions({ mobile = false, onNavigate }: { mobile?: boolean; onNavigate?: () => void }) {
   const { isLoaded, isSignedIn } = useAuth();
-  const dashboardClass = mobile ? "btn-ghost" : "btn-ghost";
-  const secondaryClass = mobile ? "text-link" : "text-link";
+  const dashboardClass = mobile ? "btn-ghost" : secondaryAuthClass;
+  const secondaryClass = mobile ? "text-link" : secondaryAuthClass;
 
   if (!isLoaded) return <span className={secondaryClass}>Account</span>;
 
@@ -132,11 +134,10 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
         </nav>
 
         <div className="ua-site-actions">
+          {CLERK_CONFIGURED ? <AuthAwareActions /> : <Link href="/sign-in" className={secondaryAuthClass}>Log in</Link>}
           <GetStartedLink />
-          {CLERK_CONFIGURED ? <AuthAwareActions /> : <Link href="/dashboard" className="text-link">Log in</Link>}
         </div>
 
-        <Link href="/start" onClick={closeMenus} className="ua-mobile-primary-cta">Get Started</Link>
         <button type="button" aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={mobileOpen} onClick={() => setMobileOpen((prev) => !prev)} className="ua-mobile-toggle">
           {mobileOpen ? "Close" : "Menu"}
         </button>
@@ -147,8 +148,8 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
         <Link href="/chains" onClick={closeMenus} className="ua-site-link">Chains</Link>
         {MOBILE_SECONDARY_ITEMS.map((item) => <Link key={item.href} href={item.href} onClick={closeMenus} className="ua-site-link">{item.label}</Link>)}
         <div className="flex flex-wrap gap-3 pt-2">
-          <GetStartedLink mobile onNavigate={closeMenus} />
           {CLERK_CONFIGURED ? <AuthAwareActions mobile onNavigate={closeMenus} /> : <Link href="/sign-in" onClick={closeMenus} className="text-link">Log in</Link>}
+          <GetStartedLink mobile onNavigate={closeMenus} />
         </div>
       </div>
     </header>
