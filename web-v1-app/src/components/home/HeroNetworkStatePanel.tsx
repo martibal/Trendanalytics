@@ -1,7 +1,6 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { createPortal } from "react-dom";
 
 import type { HomeLabel } from "./InteractiveHomeDashboard";
 
@@ -29,14 +28,9 @@ function confidenceDecimal(value: number | null) {
 }
 
 export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPanelSnapshot }) {
-  if (typeof document === "undefined") return null;
-
-  const mountNode = document.querySelector(".ua3-hero-glow");
-  if (!mountNode) return null;
-
   const statusStyle = { "--status-color": statusColor(snapshot.regime) } as CSSProperties;
 
-  return createPortal(
+  return (
     <>
       <aside className="ua3-hero-network-panel" aria-label="Today's network-state row">
         <p className="ua3-hero-panel-label">TODAY&apos;S NETWORK-STATE ROW</p>
@@ -78,8 +72,7 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
         <a className="ua3-hero-panel-link" href="#files-title">See all fields →</a>
       </aside>
       <style>{styles}</style>
-    </>,
-    mountNode,
+    </>
   );
 }
 
@@ -89,14 +82,15 @@ const styles = `
   gap: 80px !important;
 }
 .ua3-hero-glow {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
   min-height: 420px !important;
   background: radial-gradient(circle at center, var(--accent-depth-glow), transparent 62%) !important;
 }
 .ua3-hero-network-panel {
-  width: min(100%, 380px);
+  position: absolute;
+  z-index: 5;
+  top: 156px;
+  right: max(64px, calc((100vw - 1440px) / 2 + 64px));
+  width: min(380px, calc(100vw - 128px));
   max-width: 380px;
   border: 1px solid var(--border-emphasis);
   border-radius: 16px;
@@ -221,25 +215,22 @@ const styles = `
   line-height: 1.5;
   text-decoration: none;
 }
-@media (max-width: 900px) {
+@media (max-width: 1120px) {
+  .ua3-hero-network-panel {
+    display: none;
+  }
   .ua3-hero-grid {
     grid-template-columns: 1fr !important;
     gap: 40px !important;
   }
 }
 @media (max-width: 767px) {
-  .ua3-hero-glow {
-    display: flex !important;
-    width: 100% !important;
-    min-height: auto !important;
-  }
   .ua3-hero-network-panel {
-    width: 100%;
+    display: block;
+    position: static;
+    width: calc(100% - 32px);
     max-width: none;
-  }
-  .ua3-hero-panel-status-row {
-    align-items: flex-start;
-    flex-direction: column;
+    margin: -48px auto 48px;
   }
 }
 `;
