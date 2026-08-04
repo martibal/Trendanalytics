@@ -1,7 +1,6 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type { HomeLabel } from "./InteractiveHomeDashboard";
@@ -30,12 +29,9 @@ function confidenceDecimal(value: number | null) {
 }
 
 export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPanelSnapshot }) {
-  const [mountNode, setMountNode] = useState<Element | null>(null);
+  if (typeof document === "undefined") return null;
 
-  useEffect(() => {
-    setMountNode(document.querySelector(".ua3-hero-glow"));
-  }, []);
-
+  const mountNode = document.querySelector(".ua3-hero-glow");
   if (!mountNode) return null;
 
   const statusStyle = { "--status-color": statusColor(snapshot.regime) } as CSSProperties;
