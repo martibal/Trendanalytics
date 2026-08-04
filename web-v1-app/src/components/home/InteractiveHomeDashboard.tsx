@@ -124,25 +124,25 @@ const plans: Array<{ id: "free" | CheckoutPlan; name: string; price: string; sum
 const gettingStarted = [
   {
     number: "01",
-    title: "Velg abonnement",
-    body: "Velg én kjede ($49/mo) eller alle fire ($149/mo). Ingen bindingstid.",
-    cta: "Se priser →",
+    title: "Choose a subscription",
+    body: "Pick one chain ($49/mo) or all four ($149/mo). No lock-in period.",
+    cta: "See pricing →",
     href: "#pricing",
     icon: "card",
   },
   {
     number: "02",
-    title: "Koble på JSON via API",
-    body: "Autentiser med din API-nøkkel og hent daglig oppdaterte filer — Meta, Gold, Derived og Briefs — direkte inn i din egen pipeline.",
-    cta: "Åpne API-dokumentasjon →",
+    title: "Connect the JSON via API",
+    body: "Authenticate with your API key and pull daily updated files — Meta, Gold, Derived and Briefs — straight into your own pipeline.",
+    cta: "Open API docs →",
     href: "/api-docs",
     icon: "plug",
   },
   {
     number: "03",
-    title: "Bygg din egen output",
-    body: "Join på dato + kjede mot dine egne data, eller bruk Briefs direkte i en rapport. Ingen klassifiseringsmodell å bygge selv.",
-    cta: "Se kodeeksempel →",
+    title: "Build your own output",
+    body: "Join on date + chain against your own data, or use Briefs directly in a report. No classification model to build yourself.",
+    cta: "See code example →",
     href: "/analyst-kit",
     icon: "code",
   },
@@ -171,6 +171,29 @@ function compactJson(value: JsonPayload) {
   return prettyJson(value).slice(0, 1200);
 }
 
+function previewPayload(selectedArtifact: Artifact, selectedExample: HomeConfidenceExample | null, chain: HomeChainSnapshot) {
+  if (selectedArtifact === "Meta" && selectedExample) {
+    return {
+      chain: selectedExample.chain,
+      date: selectedExample.date,
+      regime: selectedExample.regime,
+      confidence_score: selectedExample.confidenceScore,
+      data_quality_score: selectedExample.dataQualityScore,
+      label_confidence_score: selectedExample.labelConfidenceScore,
+      demand_score: selectedExample.demandScore,
+      friction_score: selectedExample.frictionScore,
+      capacity_score: selectedExample.capacityScore,
+      data_lag: selectedExample.dataLag,
+      one_liner: selectedExample.oneLiner,
+    };
+  }
+  return chain.artifacts[selectedArtifact];
+}
+
+function completePayload(selectedArtifact: Artifact, chain: HomeChainSnapshot) {
+  return chain.artifacts[selectedArtifact];
+}
+
 function statusColor(label: HomeLabel) {
   if (label === "STABLE") return "var(--status-stable)";
   if (label === "CHEAP") return "var(--status-cheap)";
@@ -181,6 +204,29 @@ function statusColor(label: HomeLabel) {
 
 function toneStyle(label: HomeLabel): CSSProperties {
   return { "--status-color": statusColor(label) } as CSSProperties;
+}
+
+function LucideIcon({ name }: { name: "card" | "plug" | "code" }) {
+  if (name === "card") {
+    return (
+      <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
+        <path d="M2 10h20M6 15h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === "plug") {
+    return (
+      <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 22v-5M9 8V2M15 8V2M7 8h10v4a5 5 0 0 1-10 0V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 function InfoButton({ id, activeInfo, setActiveInfo }: { id: InfoId; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
@@ -200,7 +246,18 @@ function InfoButton({ id, activeInfo, setActiveInfo }: { id: InfoId; activeInfo:
         ?
       </button>
       {open ? (
-        <span className="ua3-info-popover">
+        <span className="ua3-info-popover" role="dialog" aria-label={info[id].title}>
+          <button
+            type="button"
+            aria-label="Close explanation"
+            className="ua3-info-close"
+            onClick={(event) => {
+              event.stopPropagation();
+              setActiveInfo(null);
+            }}
+          >
+            ×
+          </button>
           <span className="ua3-info-title">{info[id].title}</span>
           <span className="ua3-info-body">{info[id].body}</span>
         </span>
@@ -233,29 +290,6 @@ function Sparkline() {
     <svg aria-hidden="true" viewBox="0 0 120 34" className="ua3-sparkline">
       <path d="M2 24 L14 22 L25 16 L36 18 L48 9 L60 22 L73 17 L86 23 L99 11 L118 13" fill="none" stroke="var(--accent-action)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M2 24 L14 22 L25 16 L36 18 L48 9 L60 22 L73 17 L86 23 L99 11 L118 13" fill="none" stroke="var(--accent-action)" strokeOpacity="0.18" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function LucideIcon({ name }: { name: "card" | "plug" | "code" }) {
-  if (name === "card") {
-    return (
-      <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
-        <path d="M2 10h20M6 15h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    );
-  }
-  if (name === "plug") {
-    return (
-      <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 22v-5M9 8V2M15 8V2M7 8h10v4a5 5 0 0 1-10 0V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  return (
-    <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -314,34 +348,15 @@ function CheckoutButton({ plan, children }: { plan: CheckoutPlan; children: stri
   );
 }
 
-function JsonPreview({ selectedArtifact, selectedExample, chain, complete = false }: { selectedArtifact: Artifact; selectedExample: HomeConfidenceExample | null; chain: HomeChainSnapshot; complete?: boolean }) {
+function JsonBlock({ payload, prismReady, complete = false }: { payload: JsonPayload; prismReady: boolean; complete?: boolean }) {
   const containerRef = useRef<HTMLPreElement | null>(null);
-  const payload = useMemo(
-    () =>
-      selectedArtifact === "Meta" && selectedExample
-        ? {
-            chain: selectedExample.chain,
-            date: selectedExample.date,
-            regime: selectedExample.regime,
-            confidence_score: selectedExample.confidenceScore,
-            data_quality_score: selectedExample.dataQualityScore,
-            label_confidence_score: selectedExample.labelConfidenceScore,
-            demand_score: selectedExample.demandScore,
-            friction_score: selectedExample.frictionScore,
-            capacity_score: selectedExample.capacityScore,
-            data_lag: selectedExample.dataLag,
-            one_liner: selectedExample.oneLiner,
-          }
-        : chain.artifacts[selectedArtifact],
-    [chain.artifacts, selectedArtifact, selectedExample],
-  );
   const jsonText = complete ? prettyJson(payload) : compactJson(payload);
 
   useEffect(() => {
     if (containerRef.current) {
       window.Prism?.highlightAllUnder?.(containerRef.current);
     }
-  }, [jsonText]);
+  }, [jsonText, prismReady]);
 
   return (
     <pre ref={containerRef} className={complete ? "ua3-json ua3-json-complete" : "ua3-json"}>
@@ -357,38 +372,50 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
   const [exampleKind, setExampleKind] = useState<ExampleKind>("high");
   const [modalOpen, setModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [prismReady, setPrismReady] = useState(false);
 
   const selectedChain = snapshots.find((snapshot) => snapshot.id === selectedChainId) ?? snapshots[0];
   const selectedExample = exampleKind === "high" ? examples.high : examples.low;
-  const modalPayload =
-    selectedArtifact === "Meta" && selectedExample
-      ? {
-          chain: selectedExample.chain,
-          date: selectedExample.date,
-          regime: selectedExample.regime,
-          confidence_score: selectedExample.confidenceScore,
-          data_quality_score: selectedExample.dataQualityScore,
-          label_confidence_score: selectedExample.labelConfidenceScore,
-          demand_score: selectedExample.demandScore,
-          friction_score: selectedExample.frictionScore,
-          capacity_score: selectedExample.capacityScore,
-          data_lag: selectedExample.dataLag,
-          one_liner: selectedExample.oneLiner,
-        }
-      : selectedChain?.artifacts[selectedArtifact];
+  const preview = useMemo(() => (selectedChain ? previewPayload(selectedArtifact, selectedExample, selectedChain) : null), [selectedArtifact, selectedChain, selectedExample]);
+  const completeJson = useMemo(() => (selectedChain ? completePayload(selectedArtifact, selectedChain) : null), [selectedArtifact, selectedChain]);
+
+  useEffect(() => {
+    if (!activeInfo) return;
+    function closeOnOutsidePointer(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Element && !target.closest(".ua3-info")) {
+        setActiveInfo(null);
+      }
+    }
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [activeInfo]);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setModalOpen(false);
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [modalOpen]);
 
   async function copyModalJson() {
-    await navigator.clipboard?.writeText(prettyJson(modalPayload));
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+    try {
+      await navigator.clipboard?.writeText(prettyJson(completeJson));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
   }
 
   if (!selectedChain) return null;
 
   return (
     <main className="ua3">
-      <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" strategy="afterInteractive" />
-      <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js" strategy="afterInteractive" />
+      <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" strategy="afterInteractive" onLoad={() => setPrismReady(true)} />
+      <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js" strategy="afterInteractive" onLoad={() => setPrismReady(true)} />
 
       <section className="ua3-section ua3-hero" aria-labelledby="hero-title">
         <div className="ua3-wrap ua3-hero-grid">
@@ -533,7 +560,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
             <p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p>
           </div>
           <div>
-            <JsonPreview selectedArtifact={selectedArtifact} selectedExample={selectedExample} chain={selectedChain} />
+            <JsonBlock payload={preview} prismReady={prismReady} />
             <button type="button" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>
               View complete JSON →
             </button>
@@ -589,7 +616,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples 
                 </button>
               </div>
             </div>
-            <JsonPreview selectedArtifact={selectedArtifact} selectedExample={selectedExample} chain={selectedChain} complete />
+            <JsonBlock payload={completeJson} prismReady={prismReady} complete />
           </div>
         </div>
       ) : null}
@@ -617,9 +644,9 @@ const ua3Styles = `
   padding: 96px 0;
 }
 .ua3-hero {
-  min-height: calc(100vh - 72px);
-  display: grid;
-  align-items: center;
+  padding: 80px 0;
+  min-height: auto;
+  display: block;
   background: radial-gradient(circle at 78% 42%, var(--accent-depth-glow), transparent 44%), var(--bg-base);
 }
 .ua3-start {
@@ -647,7 +674,7 @@ const ua3Styles = `
   gap: 64px;
 }
 .ua3-hero-glow {
-  height: 420px;
+  min-height: 360px;
   background: radial-gradient(circle at center, var(--accent-depth-glow), transparent 60%);
 }
 .ua3-category {
@@ -1095,6 +1122,8 @@ const ua3Styles = `
   flex-direction: column;
   padding: 28px 24px;
   opacity: 0.92;
+  background: var(--bg-elevated-1);
+  border: 1px solid var(--border-subtle);
 }
 .ua3-plan-card-recommended {
   background: var(--bg-elevated-2);
@@ -1151,8 +1180,23 @@ const ua3Styles = `
   border-radius: var(--radius-card);
   border: 1px solid var(--border-emphasis);
   background: var(--bg-elevated-2);
-  padding: 16px;
+  padding: 16px 40px 16px 16px;
   box-shadow: 0 24px 80px rgba(0,0,0,0.8);
+}
+.ua3-info-close {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-button);
+  background: var(--bg-elevated-1);
+  color: var(--text-secondary);
+  cursor: pointer;
 }
 .ua3-info-title {
   display: block;
@@ -1208,11 +1252,11 @@ const ua3Styles = `
 @media (max-width: 900px) {
   .ua3-wrap { width: min(100% - 32px, 720px); }
   .ua3-section { padding: 72px 0; }
+  .ua3-hero { padding: 80px 0; }
   .ua3-hero-grid,
   .ua3-files-grid,
   .ua3-preview-panel,
   .ua3-detail-panel { grid-template-columns: 1fr; }
-  .ua3-hero { min-height: auto; }
   .ua3-hero-glow { display: none; }
   .ua3-start-grid,
   .ua3-chain-grid,
