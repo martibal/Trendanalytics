@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -37,7 +38,7 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
 
   if (!mountNode) return null;
 
-  const statusStyle = { "--status-color": statusColor(snapshot.regime) } as React.CSSProperties;
+  const statusStyle = { "--status-color": statusColor(snapshot.regime) } as CSSProperties;
 
   return createPortal(
     <>
