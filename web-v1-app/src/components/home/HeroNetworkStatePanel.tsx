@@ -215,22 +215,32 @@ const styles = `
   line-height: 1.5;
   text-decoration: none;
 }
-@media (max-width: 1120px) {
+@media (max-width: 1240px) and (min-width: 768px) {
   .ua3-hero-network-panel {
-    display: none;
+    top: 176px;
+    right: 32px;
+    width: 340px;
   }
   .ua3-hero-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.42fr) !important;
     gap: 40px !important;
   }
 }
 @media (max-width: 767px) {
+  .ua3-hero-grid {
+    grid-template-columns: 1fr !important;
+    gap: 40px !important;
+  }
   .ua3-hero-network-panel {
     display: block;
     position: static;
     width: calc(100% - 32px);
     max-width: none;
     margin: -48px auto 48px;
+  }
+  .ua3-hero-panel-status-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 `;
