@@ -2,13 +2,22 @@
 
 import Link from "next/link";
 import Script from "next/script";
-import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type HomeLabel = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 export type Artifact = "Meta" | "Gold" | "Derived" | "Briefs";
 type CheckoutPlan = "basic" | "pro";
 type JsonPayload = unknown;
 type ExampleKind = "high" | "low";
+
+declare global {
+  interface Window {
+    Prism?: {
+      highlightAllUnder?: (container: Element) => void;
+    };
+  }
+}
 
 export type HomeChainSnapshot = {
   id: string;
@@ -64,17 +73,6 @@ type InfoId =
   | "labelConfidence"
   | "dataLag";
 
-type PrismLike = {
-  languages: { json?: unknown };
-  highlight: (code: string, grammar: unknown, language: string) => string;
-};
-
-declare global {
-  interface Window {
-    Prism?: PrismLike;
-  }
-}
-
 const info: Record<InfoId, { title: string; body: string }> = {
   regime: {
     title: "Regime / status",
@@ -123,6 +121,33 @@ const plans: Array<{ id: "free" | CheckoutPlan; name: string; price: string; sum
   { id: "pro", name: "Pro", price: "$149/mo", summary: "Authenticated daily delivery for all four chains.", cta: "Start Pro" },
 ];
 
+const gettingStarted = [
+  {
+    number: "01",
+    title: "Velg abonnement",
+    body: "Velg én kjede ($49/mo) eller alle fire ($149/mo). Ingen bindingstid.",
+    cta: "Se priser →",
+    href: "#pricing",
+    icon: "card",
+  },
+  {
+    number: "02",
+    title: "Koble på JSON via API",
+    body: "Autentiser med din API-nøkkel og hent daglig oppdaterte filer — Meta, Gold, Derived og Briefs — direkte inn i din egen pipeline.",
+    cta: "Åpne API-dokumentasjon →",
+    href: "/api-docs",
+    icon: "plug",
+  },
+  {
+    number: "03",
+    title: "Bygg din egen output",
+    body: "Join på dato + kjede mot dine egne data, eller bruk Briefs direkte i en rapport. Ingen klassifiseringsmodell å bygge selv.",
+    cta: "Se kodeeksempel →",
+    href: "/analyst-kit",
+    icon: "code",
+  },
+] as const;
+
 function clampPercent(value: number | null) {
   if (value == null || !Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(value * 100)));
@@ -138,65 +163,30 @@ function metric(value: number | null) {
   return value.toFixed(1);
 }
 
+function prettyJson(value: JsonPayload) {
+  return JSON.stringify(value ?? null, null, 2);
+}
+
 function compactJson(value: JsonPayload) {
-  return JSON.stringify(value ?? null, null, 2).slice(0, 1200);
+  return prettyJson(value).slice(0, 1200);
 }
 
-function statusTone(label: HomeLabel) {
-  if (label === "STABLE") {
-    return {
-      badge: "border-emerald-300/40 bg-emerald-300/10 text-emerald-200 shadow-[0_0_26px_rgba(16,185,129,.20)]",
-      edge: "border-emerald-300/40 shadow-[0_0_40px_rgba(16,185,129,.10)]",
-      fill: "#10B981",
-      soft: "rgba(16,185,129,.18)",
-    };
-  }
-  if (label === "HEATING") {
-    return {
-      badge: "border-amber-300/45 bg-amber-300/10 text-amber-200 shadow-[0_0_26px_rgba(245,158,11,.20)]",
-      edge: "border-amber-300/40 shadow-[0_0_40px_rgba(245,158,11,.10)]",
-      fill: "#F59E0B",
-      soft: "rgba(245,158,11,.18)",
-    };
-  }
-  if (label === "CONGESTED" || label === "UNKNOWN/DEGRADED") {
-    return {
-      badge: "border-rose-300/45 bg-rose-300/10 text-rose-200 shadow-[0_0_26px_rgba(239,68,68,.20)]",
-      edge: "border-rose-300/40 shadow-[0_0_40px_rgba(239,68,68,.10)]",
-      fill: "#EF4444",
-      soft: "rgba(239,68,68,.18)",
-    };
-  }
-  return {
-    badge: "border-sky-300/45 bg-sky-300/10 text-sky-200 shadow-[0_0_26px_rgba(56,189,248,.20)]",
-    edge: "border-sky-300/40 shadow-[0_0_40px_rgba(56,189,248,.10)]",
-    fill: "#38BDF8",
-    soft: "rgba(56,189,248,.18)",
-  };
+function statusColor(label: HomeLabel) {
+  if (label === "STABLE") return "var(--status-stable)";
+  if (label === "CHEAP") return "var(--status-cheap)";
+  if (label === "HEATING") return "var(--status-heating)";
+  if (label === "CONGESTED") return "var(--status-congested)";
+  return "var(--status-unknown)";
 }
 
-function ProgressBar({ value, color }: { value: number | null; color: string }) {
-  const width = clampPercent(value);
-  return (
-    <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.07]">
-      <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${width}%`, background: color, boxShadow: `0 0 18px ${color}` }} />
-    </div>
-  );
-}
-
-function Sparkline({ color }: { color: string }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 120 34" className="h-8 w-32 max-w-full opacity-90">
-      <path d="M2 24 L14 22 L25 16 L36 18 L48 9 L60 22 L73 17 L86 23 L99 11 L118 13" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M2 24 L14 22 L25 16 L36 18 L48 9 L60 22 L73 17 L86 23 L99 11 L118 13" fill="none" stroke={color} strokeOpacity="0.18" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+function toneStyle(label: HomeLabel): CSSProperties {
+  return { "--status-color": statusColor(label) } as CSSProperties;
 }
 
 function InfoButton({ id, activeInfo, setActiveInfo }: { id: InfoId; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
   const open = activeInfo === id;
   return (
-    <span className="relative inline-flex shrink-0">
+    <span className="ua3-info">
       <button
         type="button"
         aria-label={`Explain ${info[id].title}`}
@@ -205,97 +195,172 @@ function InfoButton({ id, activeInfo, setActiveInfo }: { id: InfoId; activeInfo:
           event.stopPropagation();
           setActiveInfo(open ? null : id);
         }}
-        className="ua-home-focus inline-flex h-5 w-5 min-w-5 items-center justify-center rounded-full border border-white/18 bg-white/[0.06] font-mono text-[10px] text-zinc-200 transition hover:border-white/35 hover:bg-white/[0.10] hover:text-white"
+        className="ua3-info-button"
       >
         ?
       </button>
       {open ? (
-        <span className="absolute left-0 top-7 z-50 w-80 rounded-2xl border border-white/14 bg-[#080C11] p-4 text-left shadow-[0_24px_90px_rgba(0,0,0,.88)]">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-sky-200">{info[id].title}</span>
-          <span className="mt-2 block text-sm leading-6 text-zinc-100">{info[id].body}</span>
+        <span className="ua3-info-popover">
+          <span className="ua3-info-title">{info[id].title}</span>
+          <span className="ua3-info-body">{info[id].body}</span>
         </span>
       ) : null}
     </span>
   );
 }
 
-function StatusBadge({ label, activeInfo, setActiveInfo }: { label: HomeLabel; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
+function StatusBadge({ label, activeInfo, setActiveInfo }: { label: HomeLabel; activeInfo?: InfoId | null; setActiveInfo?: (value: InfoId | null) => void }) {
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] ${statusTone(label).badge}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+    <span className="ua3-status-badge" style={toneStyle(label)}>
+      <span className="ua3-status-dot" />
       {label}
-      <InfoButton id="regime" activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+      {activeInfo !== undefined && setActiveInfo ? <InfoButton id="regime" activeInfo={activeInfo} setActiveInfo={setActiveInfo} /> : null}
     </span>
   );
 }
 
-function CheckoutButton({ plan, children }: { plan: CheckoutPlan; children: string }) {
+function ProgressBar({ value }: { value: number | null }) {
+  const width = clampPercent(value);
   return (
-    <form action={`/api/v1/checkout?plan=${plan}`} method="post" className="m-0">
-      <button type="submit" className="ua-home-focus inline-flex w-full items-center justify-center rounded-full border border-white/75 bg-white px-5 py-3 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:-translate-y-0.5 hover:bg-zinc-200">
-        {children}
-      </button>
-    </form>
+    <div className="ua3-progress">
+      <div className="ua3-progress-fill" style={{ width: `${width}%` }} />
+    </div>
+  );
+}
+
+function Sparkline() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 120 34" className="ua3-sparkline">
+      <path d="M2 24 L14 22 L25 16 L36 18 L48 9 L60 22 L73 17 L86 23 L99 11 L118 13" fill="none" stroke="var(--accent-action)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 24 L14 22 L25 16 L36 18 L48 9 L60 22 L73 17 L86 23 L99 11 L118 13" fill="none" stroke="var(--accent-action)" strokeOpacity="0.18" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function LucideIcon({ name }: { name: "card" | "plug" | "code" }) {
+  if (name === "card") {
+    return (
+      <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
+        <path d="M2 10h20M6 15h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === "plug") {
+    return (
+      <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 22v-5M9 8V2M15 8V2M7 8h10v4a5 5 0 0 1-10 0V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
 function ConfidenceGauge({ chain, activeInfo, setActiveInfo }: { chain: HomeChainSnapshot; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
-  const tone = statusTone(chain.regime);
-  const value = clampPercent(chain.confidenceValue);
+  const percent = clampPercent(chain.confidenceValue);
   return (
-    <div className="flex items-center gap-5 rounded-[1.5rem] border border-white/10 bg-black/25 p-5">
-      <div
-        className="grid h-32 w-32 shrink-0 place-items-center rounded-full p-[10px] shadow-[0_0_44px_rgba(0,0,0,.45)]"
-        style={{ background: `conic-gradient(${tone.fill} ${value}%, rgba(255,255,255,.08) 0)` }}
-      >
-        <div className="grid h-full w-full place-items-center rounded-full border border-white/10 bg-[#0A0E12] text-center">
-          <div>
-            <p className="font-mono text-[32px] font-bold leading-none tracking-[-0.05em] text-white">{chain.confidence}</p>
-            <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.18em] text-zinc-400">Confidence</p>
-          </div>
-        </div>
-      </div>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-zinc-500">Headline reliability</p>
+    <div className="ua3-confidence-block">
+      <div className="ua3-gauge" style={{ "--pct": `${percent}%` } as CSSProperties}>
+        <div className="ua3-gauge-inner">
+          <span className="ua3-gauge-value">{chain.confidence}</span>
+          <span className="ua3-gauge-label">Confidence</span>
           <InfoButton id="confidence" activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
         </div>
-        <p className="mt-3 text-[16px] leading-7 text-zinc-300">The circular gauge is the primary reliability read for this published row.</p>
+      </div>
+      <div className="ua3-confidence-text">
+        <p className="ua3-label">Headline reliability</p>
+        <p>Use confidence to decide how much weight to place on the published row.</p>
       </div>
     </div>
   );
 }
 
-function SecondaryMetric({ id, label, icon, value, color, activeInfo, setActiveInfo }: { id: InfoId; label: string; icon: string; value: string; color: string; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
+function SecondaryMetric({ id, label, value, activeInfo, setActiveInfo }: { id: InfoId; label: string; value: number | null; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
   return (
-    <div className="group rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5 shadow-[0_8px_32px_rgba(0,0,0,.24)] backdrop-blur transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06]" style={{ borderLeft: `2px solid ${color}` }}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.055] text-lg text-zinc-100">{icon}</span>
-          <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-zinc-400">{label}</p>
-        </div>
+    <div className="ua3-metric-card">
+      <div className="ua3-metric-head">
+        <p className="ua3-label">{label}</p>
         <InfoButton id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
       </div>
-      <p className="mt-5 font-mono text-[36px] font-bold leading-none tracking-[-0.04em] text-white">{value}</p>
-      <ProgressBar value={Number.isFinite(Number(value)) ? Number(value) / 100 : null} color={color} />
+      <p className="ua3-data-medium">{metric(value)}</p>
+      <ProgressBar value={value == null ? null : value / 100} />
     </div>
   );
 }
 
 function TertiaryMetric({ id, label, value, activeInfo, setActiveInfo }: { id: InfoId; label: string; value: string; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
   return (
-    <div className="rounded-[1.25rem] border border-white/10 bg-black/25 p-4 backdrop-blur transition hover:-translate-y-0.5 hover:border-white/16">
-      <div className="flex items-start justify-between gap-3">
-        <p className="pr-3 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">{label}</p>
+    <div className="ua3-mini-card">
+      <div className="ua3-metric-head">
+        <p className="ua3-label">{label}</p>
         <InfoButton id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
       </div>
-      <p className="mt-4 font-mono text-2xl font-bold text-zinc-100">{value}</p>
+      <p className="ua3-data-small">{value}</p>
     </div>
   );
 }
 
-function JsonPreview({ selectedArtifact, selectedExample, chain }: { selectedArtifact: Artifact; selectedExample: HomeConfidenceExample | null; chain: HomeChainSnapshot }) {
-  const payload =
+function CheckoutButton({ plan, children }: { plan: CheckoutPlan; children: string }) {
+  return (
+    <form action={`/api/v1/checkout?plan=${plan}`} method="post" className="ua3-form">
+      <button type="submit" className="ua3-button ua3-button-primary ua3-button-full">
+        {children}
+      </button>
+    </form>
+  );
+}
+
+function JsonPreview({ selectedArtifact, selectedExample, chain, complete = false }: { selectedArtifact: Artifact; selectedExample: HomeConfidenceExample | null; chain: HomeChainSnapshot; complete?: boolean }) {
+  const containerRef = useRef<HTMLPreElement | null>(null);
+  const payload = useMemo(
+    () =>
+      selectedArtifact === "Meta" && selectedExample
+        ? {
+            chain: selectedExample.chain,
+            date: selectedExample.date,
+            regime: selectedExample.regime,
+            confidence_score: selectedExample.confidenceScore,
+            data_quality_score: selectedExample.dataQualityScore,
+            label_confidence_score: selectedExample.labelConfidenceScore,
+            demand_score: selectedExample.demandScore,
+            friction_score: selectedExample.frictionScore,
+            capacity_score: selectedExample.capacityScore,
+            data_lag: selectedExample.dataLag,
+            one_liner: selectedExample.oneLiner,
+          }
+        : chain.artifacts[selectedArtifact],
+    [chain.artifacts, selectedArtifact, selectedExample],
+  );
+  const jsonText = complete ? prettyJson(payload) : compactJson(payload);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      window.Prism?.highlightAllUnder?.(containerRef.current);
+    }
+  }, [jsonText]);
+
+  return (
+    <pre ref={containerRef} className={complete ? "ua3-json ua3-json-complete" : "ua3-json"}>
+      <code className="language-json">{jsonText}</code>
+    </pre>
+  );
+}
+
+export default function InteractiveHomeDashboard({ snapshots, lastRun, examples }: Props) {
+  const [selectedChainId, setSelectedChainId] = useState(snapshots[0]?.id ?? "bitcoin");
+  const [activeInfo, setActiveInfo] = useState<InfoId | null>(null);
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact>("Meta");
+  const [exampleKind, setExampleKind] = useState<ExampleKind>("high");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const selectedChain = snapshots.find((snapshot) => snapshot.id === selectedChainId) ?? snapshots[0];
+  const selectedExample = exampleKind === "high" ? examples.high : examples.low;
+  const modalPayload =
     selectedArtifact === "Meta" && selectedExample
       ? {
           chain: selectedExample.chain,
@@ -310,263 +375,867 @@ function JsonPreview({ selectedArtifact, selectedExample, chain }: { selectedArt
           data_lag: selectedExample.dataLag,
           one_liner: selectedExample.oneLiner,
         }
-      : chain.artifacts[selectedArtifact];
-  const json = compactJson(payload);
-  const [highlighted, setHighlighted] = useState<string | null>(null);
+      : selectedChain?.artifacts[selectedArtifact];
 
-  useEffect(() => {
-    function applyHighlighting() {
-      const prism = window.Prism;
-      if (!prism?.languages?.json) {
-        setHighlighted(null);
-        return;
-      }
-      setHighlighted(prism.highlight(json, prism.languages.json, "json"));
-    }
+  async function copyModalJson() {
+    await navigator.clipboard?.writeText(prettyJson(modalPayload));
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
 
-    applyHighlighting();
-    window.addEventListener("urd-prism-ready", applyHighlighting);
-    return () => window.removeEventListener("urd-prism-ready", applyHighlighting);
-  }, [json]);
+  if (!selectedChain) return null;
 
   return (
-    <>
+    <main className="ua3">
       <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" strategy="afterInteractive" />
-      <Script
-        src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"
-        strategy="afterInteractive"
-        onLoad={() => window.dispatchEvent(new Event("urd-prism-ready"))}
-      />
-      <pre className="ua-json-preview max-h-80 overflow-auto rounded-3xl border border-white/10 bg-black/45 p-5 font-mono text-xs leading-6 text-zinc-100">
-        {highlighted ? <code className="language-json" dangerouslySetInnerHTML={{ __html: highlighted }} /> : <code>{json}</code>}
-      </pre>
-    </>
-  );
-}
+      <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js" strategy="afterInteractive" />
 
-export default function InteractiveHomeDashboard({ snapshots, lastRun, examples }: Props) {
-  const [selectedChainId, setSelectedChainId] = useState(snapshots[0]?.id ?? "bitcoin");
-  const [activeInfo, setActiveInfo] = useState<InfoId | null>(null);
-  const [selectedArtifact, setSelectedArtifact] = useState<Artifact>("Meta");
-  const [exampleKind, setExampleKind] = useState<ExampleKind>("high");
-
-  const selectedChain = snapshots.find((snapshot) => snapshot.id === selectedChainId) ?? snapshots[0] ?? null;
-  const selectedExample = exampleKind === "high" ? examples.high : examples.low;
-  const selectedTone = useMemo(() => statusTone(selectedChain?.regime ?? "UNKNOWN/DEGRADED"), [selectedChain?.regime]);
-
-  return (
-    <main className="min-h-screen overflow-hidden bg-[#08090A] text-white">
-      <style>{`
-        .ua-json-preview .token.property { color: #7dd3fc; }
-        .ua-json-preview .token.string { color: #86efac; }
-        .ua-json-preview .token.number, .ua-json-preview .token.boolean, .ua-json-preview .token.null { color: #fbbf24; }
-        .ua-json-preview .token.punctuation, .ua-json-preview .token.operator { color: rgba(212,212,216,.55); }
-      `}</style>
-
-      <section className="relative bg-[linear-gradient(to_bottom,#08090A_0%,#0B1015_88%,#0F1319_100%)]">
-        <div className="relative mx-auto grid w-[min(1440px,calc(100%-48px))] gap-16 py-24 md:grid-cols-[0.92fr_1.08fr] md:items-center md:py-28" aria-labelledby="hero-title">
-          <div className="absolute inset-y-16 right-0 hidden w-1/2 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,.10),transparent_66%)] blur-3xl md:block" aria-hidden="true" />
-          <div className="relative z-10">
-            <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Daily reference data</p>
-            <h1 id="hero-title" className="mt-6 max-w-3xl text-balance text-[40px] font-semibold leading-[1.02] tracking-[-0.05em] text-white md:text-[64px]">
+      <section className="ua3-section ua3-hero" aria-labelledby="hero-title">
+        <div className="ua3-wrap ua3-hero-grid">
+          <div>
+            <p className="ua3-category">DAILY REFERENCE DATA</p>
+            <h1 id="hero-title" className="ua3-display">
               Urd Atlas is a daily state report for Bitcoin, Ethereum, Arbitrum and Base.
             </h1>
-            <p className="mt-6 max-w-2xl text-[16px] leading-8 text-zinc-300">
-              Built for analysts and data teams that need to explain why a number changed, not predict what it becomes.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3 font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-400">
-              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2">No price data</span>
-              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2">No forecasts</span>
-              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2">No recommendations</span>
+            <p className="ua3-body ua3-hero-copy">Built for analysts and data teams that need to explain why a number changed, not predict what it becomes.</p>
+            <div className="ua3-compliance-row" aria-label="Product boundary">
+              <span className="ua3-compliance-pill">No price data</span>
+              <span className="ua3-compliance-pill">No forecasts</span>
+              <span className="ua3-compliance-pill">No recommendations</span>
             </div>
-            <a href="#today-status" className="ua-home-focus mt-9 inline-flex rounded-full border border-white/75 bg-white px-7 py-4 font-mono text-[12px] font-semibold uppercase tracking-[0.12em] text-black transition hover:-translate-y-0.5 hover:bg-zinc-200">
+            <a href="#today-status" className="ua3-button ua3-button-primary">
               See today&apos;s status →
             </a>
           </div>
-          <div className="relative z-10 min-h-[360px] rounded-[2rem] border border-white/10 bg-white/[0.03] p-8 backdrop-blur">
-            <div className="absolute inset-8 rounded-full border border-sky-200/10" aria-hidden="true" />
-            <div className="absolute inset-16 rounded-full border border-emerald-200/10" aria-hidden="true" />
-            <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-200/20 bg-sky-300/5 shadow-[0_0_80px_rgba(56,189,248,.16)]" aria-hidden="true" />
-            <div className="grid h-full min-h-[304px] grid-cols-2 place-items-center gap-6">
-              {snapshots.map((chain) => {
-                const tone = statusTone(chain.regime);
-                return (
-                  <div key={chain.id} className="rounded-3xl border border-white/10 bg-black/25 px-5 py-4 shadow-[0_12px_46px_rgba(0,0,0,.35)] backdrop-blur">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">{chain.ticker}</p>
-                    <p className="mt-1 text-lg font-semibold">{chain.name}</p>
-                    <p className="mt-2 font-mono text-sm" style={{ color: tone.fill }}>{chain.regime}</p>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="ua3-hero-glow" aria-hidden="true" />
+        </div>
+      </section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section className="ua3-section ua3-start" aria-labelledby="start-title">
+        <div className="ua3-wrap">
+          <h2 id="start-title" className="ua3-step-title">Get started.</h2>
+          <div className="ua3-start-grid">
+            {gettingStarted.map((step) => (
+              <article key={step.number} className="ua3-card ua3-step-card">
+                <p className="ua3-step-number">{step.number}</p>
+                <div className="ua3-step-heading">
+                  <LucideIcon name={step.icon} />
+                  <h3>{step.title}</h3>
+                </div>
+                <p className="ua3-body-small">{step.body}</p>
+                <Link href={step.href} className="ua3-button ua3-button-quiet">
+                  {step.cta}
+                </Link>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      <section id="today-status" className="scroll-mt-24 bg-[linear-gradient(to_bottom,#0F1319_0%,#0E1218_88%,#0A0D11_100%)] py-24" aria-labelledby="status-title">
-        <div className="mx-auto w-[min(1440px,calc(100%-48px))] rounded-[2rem] border border-white/10 bg-[#0F1319] p-8 shadow-[0_18px_70px_rgba(0,0,0,.38)] md:p-12">
-          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section id="today-status" className="ua3-section ua3-status" aria-labelledby="status-title">
+        <div className="ua3-wrap">
+          <div className="ua3-section-head">
             <div>
-              <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Today&apos;s state — four chains</p>
-              <h2 id="status-title" className="mt-3 text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] md:text-[40px]">Updated {lastRun}.</h2>
+              <p className="ua3-label ua3-step-label">Step 3</p>
+              <h2 id="status-title" className="ua3-step-title">Today&apos;s state — four chains, updated {lastRun}.</h2>
             </div>
-            <p className="max-w-md text-[16px] leading-7 text-zinc-400">Tap any term marked with ? to see a plain-language explanation.</p>
+            <p className="ua3-body-small ua3-help-copy">Tap any term marked with ? to see a plain-language explanation.</p>
           </div>
 
-          <div className="mt-8 grid gap-5 lg:grid-cols-4">
+          <div className="ua3-chain-grid">
             {snapshots.map((chain) => {
-              const tone = statusTone(chain.regime);
               const active = chain.id === selectedChainId;
               return (
-                <button key={chain.id} type="button" onClick={() => setSelectedChainId(chain.id)} className={`ua-home-focus group rounded-[1.5rem] border bg-white/[0.035] p-5 text-left backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/[0.055] ${active ? tone.edge : "border-white/10"}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] font-mono text-sm text-white">{chain.ticker.slice(0, 1)}</span>
-                      <div>
-                        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">{chain.ticker}</p>
-                        <p className="mt-1 text-xl font-semibold text-white">{chain.name}</p>
-                      </div>
-                    </div>
-                    <span className={`rounded-full border px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] ${tone.badge}`}>{chain.regime}</span>
-                  </div>
-                  <div className="mt-6 flex items-end justify-between gap-4">
+                <button key={chain.id} type="button" onClick={() => setSelectedChainId(chain.id)} className={active ? "ua3-card ua3-chain-card ua3-chain-card-active" : "ua3-card ua3-chain-card"} style={toneStyle(chain.regime)}>
+                  <div className="ua3-chain-top">
                     <div>
-                      <p className="font-mono text-[32px] font-bold tracking-[-0.05em] text-white">{chain.confidence}</p>
-                      <p className="mt-1 text-sm text-zinc-500">confidence</p>
+                      <p className="ua3-label">{chain.ticker}</p>
+                      <h3>{chain.name}</h3>
                     </div>
-                    <Sparkline color={tone.fill} />
+                    <StatusBadge label={chain.regime} />
+                  </div>
+                  <div className="ua3-chain-bottom">
+                    <div>
+                      <p className="ua3-data-medium">{chain.confidence}</p>
+                      <p className="ua3-body-small">confidence</p>
+                    </div>
+                    <Sparkline />
                   </div>
                 </button>
               );
             })}
           </div>
 
-          {selectedChain ? (
-            <div className="mt-6 grid gap-6 rounded-[1.75rem] border border-white/10 bg-black/20 p-6 md:grid-cols-[0.86fr_1.14fr]">
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-6">
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                  <div>
-                    <p className="font-mono text-[12px] uppercase tracking-[0.08em] text-zinc-500">{selectedChain.ticker} · {selectedChain.asOf} · {selectedChain.lag}</p>
-                    <h3 className="mt-3 text-[24px] font-semibold tracking-[-0.03em] md:text-[32px]">{selectedChain.name}</h3>
-                  </div>
-                  <StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+          <div className="ua3-detail-panel">
+            <div className="ua3-card ua3-detail-summary">
+              <div className="ua3-detail-head">
+                <div>
+                  <p className="ua3-label">{selectedChain.ticker} · {selectedChain.asOf} · {selectedChain.lag}</p>
+                  <h3>{selectedChain.name}</h3>
                 </div>
-                <p className="mt-6 max-w-2xl text-[16px] leading-8 text-zinc-300">{selectedChain.oneLiner}</p>
-                <div className="mt-7 grid gap-4">
-                  <ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-                  <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                    <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-zinc-500">Data lag</p>
-                    <p className="mt-3 font-mono text-[32px] font-bold text-white">{selectedChain.lag}</p>
-                  </div>
-                </div>
+                <StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
               </div>
+              <p className="ua3-body-small ua3-one-liner">{selectedChain.oneLiner}</p>
+              <ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+            </div>
 
-              <div className="grid gap-5">
-                <div className="grid gap-5 lg:grid-cols-3">
-                  <SecondaryMetric id="demand" label="Demand" icon="↗" value={metric(selectedChain.demand)} color={selectedTone.fill} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-                  <SecondaryMetric id="friction" label="Friction" icon="≈" value={metric(selectedChain.friction)} color={selectedTone.fill} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-                  <SecondaryMetric id="capacity" label="Capacity" icon="▤" value={metric(selectedChain.capacity)} color={selectedTone.fill} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-                </div>
-                <div className="grid gap-3 lg:grid-cols-3">
-                  <TertiaryMetric id="dataQuality" label="Data quality" value={pct(selectedChain.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-                  <TertiaryMetric id="labelConfidence" label="Label confidence" value={pct(selectedChain.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-                  <TertiaryMetric id="dataLag" label="Data lag" value={selectedChain.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-                </div>
+            <div className="ua3-status-metrics">
+              <div className="ua3-secondary-grid">
+                <SecondaryMetric id="demand" label="Demand" value={selectedChain.demand} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+                <SecondaryMetric id="friction" label="Friction" value={selectedChain.friction} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+                <SecondaryMetric id="capacity" label="Capacity" value={selectedChain.capacity} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+              </div>
+              <div className="ua3-tertiary-grid">
+                <TertiaryMetric id="dataQuality" label="Data quality" value={pct(selectedChain.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+                <TertiaryMetric id="labelConfidence" label="Label confidence" value={pct(selectedChain.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
+                <TertiaryMetric id="dataLag" label="Data lag" value={selectedChain.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
               </div>
             </div>
-          ) : null}
+          </div>
         </div>
       </section>
 
-      <section className="bg-[linear-gradient(to_bottom,#0A0D11_0%,#0B0F14_88%,#090B0F_100%)] py-24" aria-labelledby="files-title">
-        <div className="mx-auto w-[min(1440px,calc(100%-48px))]">
-          <div className="grid gap-8 md:grid-cols-[0.45fr_0.55fr] md:items-start">
-            <div>
-              <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Step 3</p>
-              <h2 id="files-title" className="mt-3 text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] md:text-[40px]">One daily row. Four delivered files.</h2>
-              <p className="mt-5 text-[16px] leading-8 text-zinc-400">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {artifactCards.map((artifact) => (
-                <button key={artifact.name} type="button" onClick={() => setSelectedArtifact(artifact.name)} className={`ua-home-focus rounded-[1.5rem] border bg-white/[0.035] p-5 text-left backdrop-blur transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.055] ${selectedArtifact === artifact.name ? "border-white/25 shadow-[0_12px_40px_rgba(0,0,0,.30)]" : "border-white/10"}`}>
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-sm text-zinc-100">{artifact.icon}</span>
-                    <h3 className="text-[24px] font-semibold tracking-[-0.03em]">{artifact.name}</h3>
-                  </div>
-                  <p className="mt-4 text-[16px] leading-7 text-zinc-300">{artifact.what}</p>
-                  <p className="mt-3 text-sm leading-6 text-zinc-500">{artifact.use}</p>
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section className="ua3-section ua3-files" aria-labelledby="files-title">
+        <div className="ua3-wrap ua3-files-grid">
+          <div>
+            <p className="ua3-label ua3-step-label">Step 4</p>
+            <h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2>
+            <p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p>
+          </div>
+          <div className="ua3-artifact-grid">
+            {artifactCards.map((artifact) => (
+              <button key={artifact.name} type="button" onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}>
+                <span className="ua3-artifact-icon">{artifact.icon}</span>
+                <h3>{artifact.name}</h3>
+                <p className="ua3-body-small">{artifact.what}</p>
+                <p className="ua3-card-note">{artifact.use}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="ua3-wrap ua3-preview-panel">
+          <div>
+            <p className="ua3-label">Example preview</p>
+            <div className="ua3-toggle-row" aria-label="Confidence example selector">
+              {(["high", "low"] as const).map((kind) => (
+                <button key={kind} type="button" onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>
+                  {kind} confidence
                 </button>
               ))}
             </div>
+            <p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p>
           </div>
-
-          <div className="mt-8 grid gap-6 rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 md:grid-cols-[0.35fr_0.65fr]">
-            <div>
-              <p className="font-mono text-[12px] uppercase tracking-[0.08em] text-zinc-500">Example preview</p>
-              <div className="mt-4 flex gap-2">
-                {(["high", "low"] as const).map((kind) => (
-                  <button key={kind} type="button" onClick={() => setExampleKind(kind)} className={`ua-home-focus rounded-full border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition ${exampleKind === kind ? "border-white/50 bg-white text-black" : "border-white/10 bg-black/20 text-zinc-300 hover:border-white/25"}`}>
-                    {kind} confidence
-                  </button>
-                ))}
-              </div>
-              <p className="mt-5 text-[16px] leading-7 text-zinc-400">Switch the confidence example, then inspect how the selected JSON layer changes.</p>
-            </div>
-            {selectedChain ? <JsonPreview selectedArtifact={selectedArtifact} selectedExample={selectedExample} chain={selectedChain} /> : null}
+          <div>
+            <JsonPreview selectedArtifact={selectedArtifact} selectedExample={selectedExample} chain={selectedChain} />
+            <button type="button" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>
+              View complete JSON →
+            </button>
           </div>
         </div>
       </section>
 
-      <section className="bg-[linear-gradient(to_bottom,#090B0F_0%,#0A0D11_100%)] py-14" aria-labelledby="start-title">
-        <div className="mx-auto w-[min(1440px,calc(100%-48px))]">
-          <div className="grid gap-5 md:grid-cols-3">
-            <div className="md:col-span-3">
-              <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Step 4</p>
-              <h2 id="start-title" className="mt-3 text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] md:text-[40px]">Get started without building a pipeline.</h2>
-            </div>
-            {["Open the public CSV", "Join on date + chain", "Keep confidence visible"].map((item, index) => (
-              <div key={item} className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-6 transition hover:-translate-y-0.5 hover:border-white/20">
-                <p className="font-mono text-[12px] uppercase tracking-[0.08em] text-zinc-500">0{index + 1}</p>
-                <h3 className="mt-4 text-[24px] font-semibold tracking-[-0.03em]">{item}</h3>
-              </div>
-            ))}
-          </div>
-          <Link href="/getting-started" className="ua-home-focus mt-8 inline-flex rounded-full border border-white/70 bg-white px-6 py-3 font-mono text-[12px] font-semibold uppercase tracking-[0.12em] text-black transition hover:-translate-y-0.5 hover:bg-zinc-200">
-            Open getting started →
-          </Link>
-        </div>
-      </section>
+      <div className="ua3-transition" aria-hidden="true" />
 
-      <section id="pricing" className="bg-[linear-gradient(to_bottom,#0A0D11_0%,#08090A_100%)] py-24" aria-labelledby="pricing-title">
-        <div className="mx-auto w-[min(1440px,calc(100%-48px))]">
-          <div className="mb-8">
-            <p className="font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-sky-200/75">Step 5</p>
-            <h2 id="pricing-title" className="mt-3 text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] md:text-[40px]">Pricing.</h2>
-          </div>
-          <div className="grid items-stretch gap-5 md:grid-cols-3">
+      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title">
+        <div className="ua3-wrap">
+          <p className="ua3-label ua3-step-label">Step 5</p>
+          <h2 id="pricing-title" className="ua3-step-title">Pricing.</h2>
+          <div className="ua3-plan-grid">
             {plans.map((plan) => (
-              <div key={plan.id} className={`rounded-[1.75rem] border p-6 transition hover:-translate-y-0.5 ${plan.recommended ? "scale-[1.03] border-cyan-200/55 bg-cyan-300/10 shadow-[0_22px_90px_rgba(34,211,238,.16)]" : "border-white/10 bg-white/[0.025]"}`}>
-                <div className="flex min-h-8 items-center justify-between gap-4">
-                  <h3 className="text-[24px] font-semibold tracking-[-0.03em]">{plan.name}</h3>
-                  {plan.recommended ? <span className="rounded-full border border-cyan-100/40 bg-cyan-300/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-cyan-100">Recommended start</span> : null}
+              <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}>
+                <div className="ua3-plan-head">
+                  <h3>{plan.name}</h3>
+                  {plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}
                 </div>
-                <p className="mt-5 font-mono text-[40px] font-bold tracking-[-0.04em]">{plan.price}</p>
-                <p className="mt-4 min-h-14 text-[16px] leading-7 text-zinc-400">{plan.summary}</p>
-                <div className="mt-6">
-                  {plan.id === "free" ? (
-                    <Link href="/analyst-kit" className="ua-home-focus inline-flex w-full items-center justify-center rounded-full border border-white/16 bg-white/[0.06] px-5 py-3 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:-translate-y-0.5 hover:bg-white/[0.10]">
-                      {plan.cta}
-                    </Link>
-                  ) : (
-                    <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>
-                  )}
-                </div>
-              </div>
+                <p className="ua3-plan-price">{plan.price}</p>
+                <p className="ua3-body-small">{plan.summary}</p>
+                {plan.id === "free" ? (
+                  <Link href="/analyst-kit" className="ua3-button ua3-button-quiet ua3-button-full">
+                    {plan.cta}
+                  </Link>
+                ) : (
+                  <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>
+                )}
+              </article>
             ))}
           </div>
-          <p className="mt-7 max-w-3xl text-sm leading-6 text-zinc-500">Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p>
+          <p className="ua3-card-note ua3-pricing-note">Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p>
         </div>
       </section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
+      {modalOpen ? (
+        <div className="ua3-modal-backdrop" role="dialog" aria-modal="true" aria-label="Complete JSON preview" onClick={() => setModalOpen(false)}>
+          <div className="ua3-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="ua3-modal-head">
+              <div>
+                <p className="ua3-label">Complete JSON</p>
+                <h2>{selectedArtifact} latest.json</h2>
+              </div>
+              <div className="ua3-modal-actions">
+                <button type="button" className="ua3-button ua3-button-quiet" onClick={copyModalJson}>
+                  {copied ? "Copied" : "Copy to clipboard"}
+                </button>
+                <button type="button" className="ua3-button ua3-button-primary" onClick={() => setModalOpen(false)}>
+                  Close
+                </button>
+              </div>
+            </div>
+            <JsonPreview selectedArtifact={selectedArtifact} selectedExample={selectedExample} chain={selectedChain} complete />
+          </div>
+        </div>
+      ) : null}
+
+      <style>{ua3Styles}</style>
     </main>
   );
 }
+
+const ua3Styles = `
+.ua3 {
+  --radius-card: 12px;
+  --radius-badge: 6px;
+  --radius-button: 999px;
+  min-height: 100vh;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+.ua3-wrap {
+  width: min(1440px, calc(100% - 48px));
+  margin: 0 auto;
+}
+.ua3-section {
+  padding: 96px 0;
+}
+.ua3-hero {
+  min-height: calc(100vh - 72px);
+  display: grid;
+  align-items: center;
+  background: radial-gradient(circle at 78% 42%, var(--accent-depth-glow), transparent 44%), var(--bg-base);
+}
+.ua3-start {
+  background: linear-gradient(rgba(16, 224, 160, 0.03), rgba(16, 224, 160, 0.03)), var(--bg-base);
+}
+.ua3-status {
+  background: var(--bg-base);
+}
+.ua3-files {
+  background: linear-gradient(rgba(76, 110, 245, 0.04), rgba(76, 110, 245, 0.04)), var(--bg-base);
+}
+.ua3-pricing {
+  background: linear-gradient(rgba(245, 247, 248, 0.02), rgba(245, 247, 248, 0.02)), var(--bg-base);
+}
+.ua3-transition {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(to bottom, transparent 0%, var(--accent-depth-line) 50%, transparent 100%);
+  opacity: 0.4;
+}
+.ua3-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.58fr) minmax(320px, 0.42fr);
+  align-items: center;
+  gap: 64px;
+}
+.ua3-hero-glow {
+  height: 420px;
+  background: radial-gradient(circle at center, var(--accent-depth-glow), transparent 60%);
+}
+.ua3-category {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-badge);
+  padding: 4px 10px;
+  border: 1px solid rgba(16, 224, 160, 0.3);
+  background: rgba(16, 224, 160, 0.12);
+  color: var(--accent-action);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+.ua3-display {
+  max-width: 860px;
+  margin: 24px 0 0;
+  color: var(--text-primary);
+  font-size: 52px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+}
+.ua3-step-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+.ua3 h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+.ua3-body {
+  max-width: 720px;
+  margin: 24px 0 0;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.ua3-body-small {
+  margin: 16px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.ua3-label {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ua3-step-label {
+  margin-bottom: 12px;
+  color: var(--accent-action);
+}
+.ua3-hero-copy {
+  max-width: 640px;
+}
+.ua3-compliance-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+.ua3-compliance-pill {
+  border-radius: 20px;
+  padding: 6px 14px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ua3-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border-radius: var(--radius-button);
+  padding: 12px 18px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: transform .2s ease, background-color .2s ease, border-color .2s ease;
+  cursor: pointer;
+}
+.ua3-button:hover {
+  transform: translateY(-1px);
+}
+.ua3-button-primary {
+  margin-top: 32px;
+  border: 1px solid var(--accent-action);
+  background: var(--accent-action);
+  color: var(--accent-action-text);
+}
+.ua3-button-primary:hover {
+  background: var(--accent-action-hover);
+  border-color: var(--accent-action-hover);
+}
+.ua3-button-quiet {
+  margin-top: 20px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-2);
+  color: var(--text-primary);
+}
+.ua3-button-full {
+  width: 100%;
+}
+.ua3-card {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-1);
+}
+.ua3-start-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+.ua3-step-card {
+  padding: 28px 24px;
+}
+.ua3-step-number {
+  margin: 0 0 12px;
+  color: var(--accent-action);
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ua3-step-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ua3-step-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+.ua3-section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 32px;
+}
+.ua3-help-copy {
+  max-width: 420px;
+  margin: 0;
+}
+.ua3-chain-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+.ua3-chain-card {
+  min-height: 160px;
+  padding: 20px;
+  text-align: left;
+  border-left: 2px solid var(--status-color);
+  cursor: pointer;
+}
+.ua3-chain-card-active {
+  background: var(--bg-elevated-2);
+  border-color: var(--border-emphasis);
+  border-left-color: var(--status-color);
+}
+.ua3-chain-top,
+.ua3-chain-bottom,
+.ua3-detail-head,
+.ua3-metric-head,
+.ua3-plan-head,
+.ua3-modal-head,
+.ua3-modal-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ua3-chain-bottom {
+  align-items: flex-end;
+  margin-top: 28px;
+}
+.ua3-data-medium {
+  margin: 18px 0 0;
+  color: var(--text-primary);
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ua3-data-small {
+  margin: 18px 0 0;
+  color: var(--text-primary);
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+}
+.ua3-sparkline {
+  width: 120px;
+  height: 34px;
+}
+.ua3-status-badge,
+.ua3-plan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--status-color);
+  padding: 4px 8px;
+  color: var(--status-color);
+  background: color-mix(in srgb, var(--status-color) 12%, transparent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ua3-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-button);
+  background: currentColor;
+}
+.ua3-detail-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 24px;
+  margin-top: 24px;
+  padding: 24px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-1);
+}
+.ua3-detail-summary,
+.ua3-metric-card,
+.ua3-mini-card {
+  padding: 24px;
+}
+.ua3-one-liner {
+  margin-top: 24px;
+}
+.ua3-confidence-block {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  margin-top: 28px;
+}
+.ua3-gauge {
+  width: 140px;
+  height: 140px;
+  border-radius: var(--radius-button);
+  padding: 10px;
+  background: conic-gradient(var(--accent-action) var(--pct), rgba(255,255,255,0.08) 0);
+  box-shadow: 0 0 32px rgba(16, 224, 160, 0.16);
+}
+.ua3-gauge-inner {
+  display: grid;
+  place-items: center;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-button);
+  background: var(--bg-elevated-1);
+}
+.ua3-gauge-value {
+  color: var(--text-primary);
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ua3-gauge-label {
+  color: var(--text-tertiary);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ua3-confidence-text p:last-child {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ua3-status-metrics {
+  display: grid;
+  gap: 16px;
+}
+.ua3-secondary-grid,
+.ua3-tertiary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.ua3-metric-card {
+  background: var(--bg-elevated-2);
+}
+.ua3-mini-card {
+  background: var(--bg-elevated-1);
+}
+.ua3-progress {
+  height: 8px;
+  margin-top: 18px;
+  overflow: hidden;
+  border-radius: var(--radius-button);
+  background: rgba(255,255,255,0.08);
+}
+.ua3-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-button);
+  background: var(--accent-action);
+}
+.ua3-files-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.42fr) minmax(0, 0.58fr);
+  gap: 56px;
+  align-items: start;
+}
+.ua3-artifact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.ua3-artifact-card {
+  padding: 24px;
+  text-align: left;
+  cursor: pointer;
+}
+.ua3-artifact-card-active {
+  background: var(--bg-elevated-2);
+  border-color: var(--border-emphasis);
+}
+.ua3-artifact-icon {
+  display: inline-flex;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+  font-size: 20px;
+}
+.ua3-card-note {
+  margin: 14px 0 0;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ua3-preview-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.34fr) minmax(0, 0.66fr);
+  gap: 24px;
+  margin-top: 32px;
+  padding: 24px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-1);
+}
+.ua3-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.ua3-toggle {
+  border-radius: var(--radius-button);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-2);
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ua3-toggle-active {
+  border-color: var(--accent-action);
+  color: var(--accent-action-text);
+  background: var(--accent-action);
+}
+.ua3-json {
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+  padding: 20px;
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ua3-json-complete {
+  max-height: 62vh;
+}
+.ua3-json-open {
+  margin-top: 16px;
+}
+.ua3-json .token.property { color: #7DD3FC; }
+.ua3-json .token.string { color: #86EFAC; }
+.ua3-json .token.number,
+.ua3-json .token.boolean,
+.ua3-json .token.null { color: #FCD34D; }
+.ua3-json .token.punctuation,
+.ua3-json .token.operator { color: #6B7280; }
+.ua3-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+.ua3-plan-card {
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px;
+  opacity: 0.92;
+}
+.ua3-plan-card-recommended {
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--accent-action);
+  opacity: 1;
+  transform: scale(1.03);
+  box-shadow: 0 8px 32px rgba(16, 224, 160, 0.15);
+}
+.ua3-plan-badge {
+  border-color: var(--accent-action);
+  background: rgba(16, 224, 160, 0.12);
+  color: var(--accent-action);
+}
+.ua3-plan-price {
+  margin: 28px 0 0;
+  color: var(--text-primary);
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ua3-pricing-note {
+  max-width: 720px;
+  margin-top: 24px;
+}
+.ua3-form {
+  margin: 0;
+}
+.ua3-info {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.ua3-info-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-button);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated-2);
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+.ua3-info-popover {
+  position: absolute;
+  left: 0;
+  top: 28px;
+  z-index: 20;
+  width: 320px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-emphasis);
+  background: var(--bg-elevated-2);
+  padding: 16px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.8);
+}
+.ua3-info-title {
+  display: block;
+  color: var(--accent-action);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ua3-info-body {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ua3-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8,9,10,0.82);
+}
+.ua3-modal {
+  width: min(800px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-emphasis);
+  background: var(--bg-elevated-2);
+  padding: 24px;
+}
+.ua3-modal-head {
+  margin-bottom: 18px;
+}
+.ua3-modal-actions {
+  align-items: center;
+}
+.ua3-modal .ua3-button-primary,
+.ua3-modal .ua3-button-quiet {
+  margin-top: 0;
+}
+.ua-home-focus:focus-visible,
+.ua3 button:focus-visible,
+.ua3 a:focus-visible {
+  outline: 2px solid var(--accent-action);
+  outline-offset: 3px;
+}
+@media (max-width: 900px) {
+  .ua3-wrap { width: min(100% - 32px, 720px); }
+  .ua3-section { padding: 72px 0; }
+  .ua3-hero-grid,
+  .ua3-files-grid,
+  .ua3-preview-panel,
+  .ua3-detail-panel { grid-template-columns: 1fr; }
+  .ua3-hero { min-height: auto; }
+  .ua3-hero-glow { display: none; }
+  .ua3-start-grid,
+  .ua3-chain-grid,
+  .ua3-plan-grid { grid-template-columns: 1fr; }
+  .ua3-secondary-grid,
+  .ua3-tertiary-grid,
+  .ua3-artifact-grid { grid-template-columns: 1fr; }
+  .ua3-section-head { align-items: start; flex-direction: column; }
+  .ua3-confidence-block { grid-template-columns: 1fr; }
+  .ua3-info-popover { left: auto; right: 0; width: min(320px, calc(100vw - 48px)); }
+  .ua3-modal-head,
+  .ua3-modal-actions { flex-direction: column; align-items: stretch; }
+}
+@media (max-width: 767px) {
+  .ua3-display { font-size: 34px; line-height: 1.1; }
+  .ua3-step-title { font-size: 26px; line-height: 1.2; }
+  .ua3 h3 { font-size: 19px; }
+  .ua3-body { font-size: 15px; }
+  .ua3-body-small { font-size: 13px; }
+  .ua3-gauge-value,
+  .ua3-plan-price,
+  .ua3-step-number { font-size: 32px; }
+  .ua3-data-medium { font-size: 24px; }
+  .ua3-data-small { font-size: 16px; }
+}
+`;
