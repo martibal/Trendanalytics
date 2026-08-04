@@ -64,8 +64,6 @@ type ArtifactCard = {
   accent: "emerald" | "cyan" | "amber" | "violet";
 };
 
-const artifactOrder: Artifact[] = ["Meta", "Gold", "Derived", "Briefs"];
-
 const artifactCards: ArtifactCard[] = [
   {
     artifact: "Meta",
@@ -375,13 +373,31 @@ function MetricBar({ id, label, value, descriptor, color, activeInfo, setActiveI
   );
 }
 
-function ChainSelector({ chain, active, onClick }: { chain: HomeChainSnapshot; active: boolean; onClick: () => void }) {
+function HeroChainSelector({ chain, active, onClick }: { chain: HomeChainSnapshot; active: boolean; onClick: () => void }) {
   const t = tone(chain.regime);
+
   return (
-    <button type="button" onClick={onClick} className="ua-home-focus ua-chain-selector relative overflow-hidden rounded-2xl border p-4 text-left" style={{ borderColor: active ? `${t.color}88` : "rgba(255,255,255,.10)", background: active ? `linear-gradient(135deg, ${t.soft}, rgba(255,255,255,.035))` : "rgba(255,255,255,.025)", boxShadow: active ? `0 0 42px ${t.glow}` : "none" }}>
-      <div className="flex items-center justify-between gap-3"><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">{chain.ticker}</p><span className="h-2 w-2 rounded-full" style={{ background: t.color, boxShadow: `0 0 16px ${t.color}` }} aria-hidden="true" /></div>
-      <p className="mt-2 text-xl font-semibold tracking-tight text-white">{chain.name}</p>
-      <div className="mt-3 flex items-center justify-between gap-3"><p className="font-mono text-xs text-zinc-500">{chain.confidence}</p><p className="font-mono text-[10px] uppercase tracking-[0.14em]" style={{ color: t.color }}>{chain.regime}</p></div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="ua-home-focus ua-hero-chain-card rounded-2xl border p-4 text-left transition hover:-translate-y-0.5"
+      style={{
+        borderColor: active ? `${t.color}88` : "rgba(255,255,255,.10)",
+        background: active ? `linear-gradient(135deg, ${t.soft}, rgba(255,255,255,.035))` : "rgba(255,255,255,.025)",
+        boxShadow: active ? `0 0 30px ${t.glow}` : "inset 0 1px 0 rgba(255,255,255,.04)",
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">{chain.ticker}</p>
+          <p className="mt-1 text-lg font-semibold tracking-tight text-white">{chain.name}</p>
+        </div>
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: t.color, boxShadow: `0 0 16px ${t.color}` }} aria-hidden="true" />
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="font-mono text-xs text-zinc-500">{chain.confidence}</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em]" style={{ color: t.color }}>{chain.regime}</p>
+      </div>
     </button>
   );
 }
@@ -405,7 +421,7 @@ function FirstReadCard({ chain, activeInfo, setActiveInfo }: { chain: HomeChainS
   const guidance = shouldGate ? "Use this row as context, but keep confidence visible before drawing conclusions." : "This row is a cleaner candidate for a first join test against your own metric.";
 
   return (
-    <div className="ua-home-card relative mt-6 rounded-3xl p-4">
+    <div className="ua-home-card relative mt-4 rounded-3xl p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2"><button type="button" onClick={() => setActiveInfo(activeInfo === "firstRead" ? null : "firstRead")} className="ua-home-focus font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-cyan-200/60">Recommended first read</button><InfoPopover id="firstRead" activeInfo={activeInfo} setActiveInfo={setActiveInfo} compact /></div>
@@ -413,10 +429,10 @@ function FirstReadCard({ chain, activeInfo, setActiveInfo }: { chain: HomeChainS
         </div>
         <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-300">{chain.lag}</span>
       </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-3">
-        <Link href="/analyst-kit" className="ua-home-focus rounded-2xl border border-cyan-200/25 bg-cyan-300/10 px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-cyan-100 transition hover:border-cyan-100/60 hover:bg-cyan-300/15">Join CSV</Link>
-        <Link href="/validation" className="ua-home-focus rounded-2xl border border-emerald-200/25 bg-emerald-300/10 px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-100 transition hover:border-emerald-100/60 hover:bg-emerald-300/15">Check confidence</Link>
-        <Link href={`/chains/${chain.id}`} className="ua-home-focus rounded-2xl border border-white/10 bg-black/25 px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-300 transition hover:border-white/25 hover:text-white">Open chain</Link>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href="/analyst-kit" className="ua-home-focus rounded-full border border-cyan-200/25 bg-cyan-300/10 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:border-cyan-100/60 hover:bg-cyan-300/15">Join CSV</Link>
+        <Link href="/validation" className="ua-home-focus rounded-full border border-emerald-200/25 bg-emerald-300/10 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-emerald-100 transition hover:border-emerald-100/60 hover:bg-emerald-300/15">Check confidence</Link>
+        <Link href={`/chains/${chain.id}`} className="ua-home-focus rounded-full border border-white/10 bg-black/25 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-300 transition hover:border-white/25 hover:text-white">Open chain</Link>
       </div>
     </div>
   );
@@ -461,7 +477,7 @@ function JsonModal({ artifact, path, payload, copied, onClose, onCopy }: { artif
   );
 }
 
-export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) {
+export default function InteractiveHomeDashboard({ snapshots }: Props) {
   const [activeId, setActiveId] = useState(snapshots[0]?.id ?? "bitcoin");
   const [artifact, setArtifact] = useState<Artifact>("Meta");
   const [copied, setCopied] = useState(false);
@@ -498,24 +514,37 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun }: Props) 
           <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
             <Link href="/analyst-kit" className="ua-home-focus inline-flex items-center justify-center rounded-full border border-cyan-300/40 bg-cyan-300/15 px-6 py-4 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white shadow-[0_0_34px_rgba(56,189,248,.24)] transition hover:-translate-y-0.5 hover:border-cyan-200/70 hover:bg-cyan-300/20">Download Free Sample CSV</Link>
           </div>
+          <p className="mt-6 text-sm leading-6 text-zinc-300">Click on a chain for more information.</p>
+          <div className="ua-hero-chain-list mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {snapshots.map((chain) => (
+              <HeroChainSelector
+                key={chain.id}
+                chain={chain}
+                active={chain.id === active.id}
+                onClick={() => {
+                  setActiveId(chain.id);
+                  setActiveInfo(null);
+                  setJsonOpen(false);
+                }}
+              />
+            ))}
+          </div>
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[11px] uppercase tracking-[0.13em] text-zinc-400">
             <Link href="/validation" className="ua-home-focus underline-offset-4 hover:text-white hover:underline">Inspect diagnostics →</Link>
             <Link href="/api-docs" className="ua-home-focus underline-offset-4 hover:text-white hover:underline">API Docs →</Link>
             <a href="#pricing" className="ua-home-focus underline-offset-4 hover:text-white hover:underline">View pricing ↓</a>
           </div>
-          <p className="mt-6 text-sm leading-6 text-zinc-500">Not another dashboard. One versioned feature you join to data you already have.</p>
         </div>
 
         <div className="relative z-10">
           <p className="mb-4 text-sm leading-7 text-zinc-400">These three scores explain the regime label — Demand, Friction, Capacity. Hover or tap any metric for a plain-language definition.</p>
-          <div className="grid gap-4 rounded-[2.25rem] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,.075),rgba(255,255,255,.025))] p-4 shadow-[0_40px_120px_rgba(0,0,0,.45)] backdrop-blur-2xl lg:grid-cols-[0.82fr_1.18fr]">
-            <div className="ua-chain-list grid gap-3 self-start">{snapshots.map((chain) => (<ChainSelector key={chain.id} chain={chain} active={chain.id === active.id} onClick={() => { setActiveId(chain.id); setActiveInfo(null); setJsonOpen(false); }} />))}</div>
+          <div className="grid gap-4 rounded-[2.25rem] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,.075),rgba(255,255,255,.025))] p-4 shadow-[0_40px_120px_rgba(0,0,0,.45)] backdrop-blur-2xl">
             <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-black/30 p-5" style={{ boxShadow: `inset 0 1px 0 rgba(255,255,255,.06), 0 0 70px ${activeTone.glow}` }}>
               <div className="absolute inset-x-0 top-0 h-32 opacity-70" style={{ background: `radial-gradient(circle at 50% 0%, ${activeTone.soft}, transparent 70%)` }} />
               <div className="relative flex items-start justify-between gap-5"><div><p className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">{active.ticker} · {active.asOf} · {active.lag}</p><h2 className="mt-2 text-4xl font-semibold tracking-[-0.04em] text-white">{active.name}</h2></div><RegimeBadge label={active.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div>
               <div className="relative mt-7 grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]"><Gauge value={active.confidenceValue} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><div className="grid gap-3"><MetricBar id="demand" label="Demand" value={active.demand} descriptor={active.demandLabel} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><MetricBar id="friction" label="Friction" value={active.friction} descriptor={active.frictionLabel} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><MetricBar id="capacity" label="Capacity" value={active.capacity} descriptor={active.capacityLabel} color={activeTone.color} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div></div>
               <FirstReadCard chain={active} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-              <div className="relative mt-5 grid gap-3 sm:grid-cols-3"><QualityCard id="dataQuality" label="Data quality" value={percent(active.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><QualityCard id="labelConfidence" label="Label confidence" value={percent(active.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><QualityCard id="dataLag" label="Data lag" value={active.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} suffix="" /></div>
+              <div className="relative mt-4 grid gap-3 sm:grid-cols-3"><QualityCard id="dataQuality" label="Data quality" value={percent(active.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><QualityCard id="labelConfidence" label="Label confidence" value={percent(active.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><QualityCard id="dataLag" label="Data lag" value={active.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} suffix="" /></div>
             </section>
           </div>
         </div>
