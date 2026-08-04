@@ -37,6 +37,8 @@ const CHAINS = [
   { id: "base", ticker: "BASE", name: "Base", lag: "T+7" },
 ] as const;
 
+const DATASET_START_DATE = "2024-12-01";
+
 const BITCOIN_META_HISTORY_PATHS = [
   "data/published/v1/meta/bitcoin/history.json",
   "data/published/v1/meta/bitcoin/all.json",
@@ -138,19 +140,21 @@ function formatDayNumber(value: number): string {
   return new Date(value * ONE_DAY_MS).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
-function consecutiveDailyWindow(rows: MetaLatest[]): { count: number | null; firstPublishedLabel: string | null } {
-  const days = Array.from(new Set(rows.map((row) => utcDayNumber(rawDate(row))).filter((value): value is number => typeof value === "number"))).sort((a, b) => a - b);
-  if (days.length === 0) return { count: null, firstPublishedLabel: null };
+function datasetDailyWindow(rows: MetaLatest[], latest: MetaLatest | null): { count: number | null; firstPublishedLabel: string | null } {
+  const observedDays = Array.from(new Set(rows.map((row) => utcDayNumber(rawDate(row))).filter((value): value is number => typeof value === "number"))).sort((a, b) => a - b);
+  const latestDay = utcDayNumber(latest ? rawDate(latest) : "") ?? observedDays.at(-1) ?? null;
+  const canonicalStartDay = utcDayNumber(DATASET_START_DATE);
 
-  let startIndex = days.length - 1;
-  for (let index = days.length - 1; index > 0; index -= 1) {
-    if (days[index] - days[index - 1] !== 1) break;
-    startIndex = index - 1;
+  if (latestDay == null || canonicalStartDay == null || latestDay < canonicalStartDay) {
+    return { count: null, firstPublishedLabel: null };
   }
 
+  const earliestObservedDay = observedDays[0] ?? null;
+  const firstDay = earliestObservedDay != null && earliestObservedDay < canonicalStartDay ? earliestObservedDay : canonicalStartDay;
+
   return {
-    count: days.length - startIndex,
-    firstPublishedLabel: formatDayNumber(days[startIndex]),
+    count: latestDay - firstDay + 1,
+    firstPublishedLabel: formatDayNumber(firstDay),
   };
 }
 
@@ -176,7 +180,7 @@ async function getDatasetGlance(): Promise<HeroPanelSnapshot> {
     getBitcoinMetaHistory(),
     readJson<MetaLatest>("data/published/v1/meta/bitcoin/latest.json"),
   ]);
-  const window = consecutiveDailyWindow(historyRows);
+  const window = datasetDailyWindow(historyRows, latest);
   const latestFromHistory = [...historyRows].sort((a, b) => rawDate(a).localeCompare(rawDate(b))).at(-1);
 
   return {
