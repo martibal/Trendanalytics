@@ -7,10 +7,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { CHAIN_LIST } from "@/config/chains";
 
+const WIKI_URL = "https://github.com/martibal/Trendanalytics/wiki";
+
 const DESKTOP_ITEMS = [
   { href: "/", label: "Overview" },
   { href: "/api-docs", label: "API" },
   { href: "/methodology", label: "Docs" },
+  { href: WIKI_URL, label: "Wiki", external: true },
   { href: "/plans", label: "Plans" },
 ] as const;
 
@@ -31,8 +34,27 @@ const CLERK_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 const primaryCtaClass = "inline-flex items-center justify-center rounded-full border border-white/70 bg-white px-4 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:-translate-y-0.5 hover:bg-zinc-200";
 const secondaryAuthClass = "inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-300 transition hover:border-white/24 hover:text-white";
 
+type NavItem = (typeof DESKTOP_ITEMS)[number];
+
 function navLinkClass(active: boolean) {
   return ["ua-site-link", active ? "active" : ""].filter(Boolean).join(" ");
+}
+
+function navItemActive(item: NavItem, pathname: string | null) {
+  if ("external" in item && item.external) return false;
+  return item.href === "/" ? pathname === "/" : pathname === item.href || pathname?.startsWith(`${item.href}/`);
+}
+
+function NavItemLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string | null; onNavigate: () => void }) {
+  const active = navItemActive(item, pathname);
+  if ("external" in item && item.external) {
+    return (
+      <a href={item.href} target="_blank" rel="noreferrer" onClick={onNavigate} className={navLinkClass(false)}>
+        {item.label}
+      </a>
+    );
+  }
+  return <Link href={item.href} onClick={onNavigate} className={navLinkClass(Boolean(active))}>{item.label}</Link>;
 }
 
 function GetStartedLink({ onNavigate, mobile = false }: { onNavigate?: () => void; mobile?: boolean }) {
@@ -112,10 +134,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
         </Link>
 
         <nav aria-label="Primary" className="ua-site-links">
-          {DESKTOP_ITEMS.map((item) => {
-            const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname?.startsWith(`${item.href}/`);
-            return <Link key={item.href} href={item.href} onClick={closeMenus} className={navLinkClass(Boolean(active))}>{item.label}</Link>;
-          })}
+          {DESKTOP_ITEMS.map((item) => <NavItemLink key={item.href} item={item} pathname={pathname} onNavigate={closeMenus} />)}
           <div ref={chainsRef} className="relative">
             <button type="button" aria-haspopup="menu" aria-expanded={chainsOpen} onClick={() => setChainsOpen((prev) => !prev)} className={navLinkClass(Boolean(isChainsActive))}>
               Chains
@@ -144,7 +163,7 @@ function SiteNavbarInner({ pathname }: { pathname: string | null }) {
       </div>
 
       <div className={`ua-mobile-menu ${mobileOpen ? "is-open" : ""}`}>
-        {DESKTOP_ITEMS.map((item) => <Link key={item.href} href={item.href} onClick={closeMenus} className="ua-site-link">{item.label}</Link>)}
+        {DESKTOP_ITEMS.map((item) => <NavItemLink key={item.href} item={item} pathname={pathname} onNavigate={closeMenus} />)}
         <Link href="/chains" onClick={closeMenus} className="ua-site-link">Chains</Link>
         {MOBILE_SECONDARY_ITEMS.map((item) => <Link key={item.href} href={item.href} onClick={closeMenus} className="ua-site-link">{item.label}</Link>)}
         <div className="flex flex-wrap gap-3 pt-2">
