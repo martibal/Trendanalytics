@@ -8,6 +8,7 @@ export default function SiteFooter() {
 
         <nav style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center" }}>
           <Link href="/about" className="ua-vf-text-link" style={{ fontSize: "11px" }}>About</Link>
+          <Link href="/legal" className="ua-vf-text-link" style={{ fontSize: "11px" }}>Legal</Link>
           <Link href="/terms" className="ua-vf-text-link" style={{ fontSize: "11px" }}>Terms</Link>
           <Link href="/privacy" className="ua-vf-text-link" style={{ fontSize: "11px" }}>Privacy</Link>
         </nav>
