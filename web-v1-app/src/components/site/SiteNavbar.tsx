@@ -11,6 +11,7 @@ const DESKTOP_ITEMS = [
   { href: "/", label: "Overview" },
   { href: "/api-docs", label: "API" },
   { href: "/methodology", label: "Docs" },
+  { href: "/wiki", label: "Wiki" },
   { href: "/plans", label: "Plans" },
 ] as const;
 
