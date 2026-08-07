@@ -38,6 +38,7 @@ CANON_COLS = [
     "value_transferred_native",
     "median_tx_value_native",
     "median_tx_fee_native",
+    "median_tx_fee_rate_sat_vbyte",
     "failed_tx_rate",
     "gas_utilization_pct",
     "block_weight_utilization_pct",
@@ -295,6 +296,21 @@ def _apply_guardrails(df: pl.DataFrame, chain: str) -> Tuple[pl.DataFrame, Dict[
             df = df.with_columns(pl.lit(None).alias("block_weight_utilization_pct"))
             fixes["applied"].append("block_weight_utilization_pct_null_for_non_btc")
 
+    # median_tx_fee_rate_sat_vbyte: Bitcoin-only, non-negative sat/vB.
+    if "median_tx_fee_rate_sat_vbyte" in df.columns:
+        if prof == "btc":
+            df = df.with_columns(
+                pl.when(pl.col("median_tx_fee_rate_sat_vbyte").is_null())
+                .then(None)
+                .when(pl.col("median_tx_fee_rate_sat_vbyte") >= 0.0)
+                .then(pl.col("median_tx_fee_rate_sat_vbyte"))
+                .otherwise(None)
+                .alias("median_tx_fee_rate_sat_vbyte")
+            )
+        else:
+            df = df.with_columns(pl.lit(None).alias("median_tx_fee_rate_sat_vbyte"))
+            fixes["applied"].append("median_tx_fee_rate_sat_vbyte_null_for_non_btc")
+
     # failed_tx_rate
     if "failed_tx_rate" in df.columns:
         df = df.with_columns(
@@ -327,6 +343,15 @@ def _quality_summary(df: pl.DataFrame, chain: str) -> Dict[str, object]:
             null_rates[c] = 1.0
 
     out_of_range: Dict[str, int] = {}
+
+    # median_tx_fee_rate_sat_vbyte: BTC-only non-negative sat/vB.
+    if "median_tx_fee_rate_sat_vbyte" in df.columns:
+        if prof == "btc":
+            out_of_range["median_tx_fee_rate_sat_vbyte"] = int(
+                df.select(((pl.col("median_tx_fee_rate_sat_vbyte").is_not_null()) & (pl.col("median_tx_fee_rate_sat_vbyte") < 0.0)).sum()).item()
+            )
+        else:
+            out_of_range["median_tx_fee_rate_sat_vbyte"] = 0
 
     # block_weight_utilization_pct: BTC-only ratio in [0,1]
     if "block_weight_utilization_pct" in df.columns:

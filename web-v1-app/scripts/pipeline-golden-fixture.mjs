@@ -11,7 +11,7 @@ const CHAIN = "bitcoin";
 const DAYS = ["2026-01-01", "2026-01-02", "2026-01-03"];
 const FIXED_GENERATED_AT_UTC = "2026-01-04T00:00:00Z";
 const FIXED_UTC_TODAY = "2026-01-04";
-const EXPECTED_GOLDEN_FIXTURE_DIGEST = "4af137e2080ea00d30dff292584124aa78e14b21c99739bac97ff9952c5e5df7";
+const EXPECTED_GOLDEN_FIXTURE_DIGEST = "6b57441ace6047c7778a15ce791f20f8d30a26a78d639c6e0e520e07243e30e3";
 
 const EXPECTED_GOLD_DAYS = {
   "2026-01-01": {
@@ -23,6 +23,7 @@ const EXPECTED_GOLD_DAYS = {
     failed_tx_rate: 0.5,
     gas_utilization_pct: null,
     median_tx_fee_native: 0.25,
+    median_tx_fee_rate_sat_vbyte: 250000,
     median_tx_value_native: 2,
     tx_count_daily: 2,
     unique_active_addresses: 4,
@@ -37,6 +38,7 @@ const EXPECTED_GOLD_DAYS = {
     failed_tx_rate: 0,
     gas_utilization_pct: null,
     median_tx_fee_native: 0.5,
+    median_tx_fee_rate_sat_vbyte: 500000,
     median_tx_value_native: 3,
     tx_count_daily: 2,
     unique_active_addresses: 4,
@@ -51,6 +53,7 @@ const EXPECTED_GOLD_DAYS = {
     failed_tx_rate: 0.5,
     gas_utilization_pct: null,
     median_tx_fee_native: 0.75,
+    median_tx_fee_rate_sat_vbyte: 750000,
     median_tx_value_native: 4,
     tx_count_daily: 2,
     unique_active_addresses: 4,
@@ -80,6 +83,7 @@ const EXPECTED_STATUS = {
       failed_tx_rate: 0,
       gas_utilization_pct: 1,
       median_tx_fee_native: 0,
+      median_tx_fee_rate_sat_vbyte: 0,
       median_tx_value_native: 0,
       tx_count_daily: 0,
       unique_active_addresses: 0,
@@ -90,6 +94,7 @@ const EXPECTED_STATUS = {
       block_weight_utilization_pct: 0,
       failed_tx_rate: 0,
       gas_utilization_pct: 0,
+      median_tx_fee_rate_sat_vbyte: 0,
     },
   },
   fixes: {
@@ -119,6 +124,8 @@ const EXPECTED_DERIVED_METRICS = {
     failed_tx_rate__ma30: 0.5,
     median_tx_fee_native__ma7: 0.25,
     median_tx_fee_native__ma30: 0.25,
+    median_tx_fee_rate_sat_vbyte__ma7: 250000,
+    median_tx_fee_rate_sat_vbyte__ma30: 250000,
     median_tx_value_native__ma7: 2,
     median_tx_value_native__ma30: 2,
     tx_count_daily__ma7: 2,
@@ -139,6 +146,8 @@ const EXPECTED_DERIVED_METRICS = {
     failed_tx_rate__ma30: 0.25,
     median_tx_fee_native__ma7: 0.375,
     median_tx_fee_native__ma30: 0.375,
+    median_tx_fee_rate_sat_vbyte__ma7: 375000,
+    median_tx_fee_rate_sat_vbyte__ma30: 375000,
     median_tx_value_native__ma7: 2.5,
     median_tx_value_native__ma30: 2.5,
     tx_count_daily__ma7: 2,
@@ -159,6 +168,8 @@ const EXPECTED_DERIVED_METRICS = {
     failed_tx_rate__ma30: 1 / 3,
     median_tx_fee_native__ma7: 0.5,
     median_tx_fee_native__ma30: 0.5,
+    median_tx_fee_rate_sat_vbyte__ma7: 500000,
+    median_tx_fee_rate_sat_vbyte__ma30: 500000,
     median_tx_value_native__ma7: 3,
     median_tx_value_native__ma30: 3,
     tx_count_daily__ma7: 2,
@@ -333,6 +344,8 @@ fixtures = {
         "addresses": [("a1", "b1"), ("c1", "d1")],
         "timestamps": [1704067200, 1704067800],
         "weights": [2000000.0, 4000000.0],
+        "virtual_sizes": [100.0, 200.0],
+        "is_coinbase": [False, True],
     },
     "2026-01-02": {
         "values": [2.0, 4.0],
@@ -341,6 +354,8 @@ fixtures = {
         "addresses": [("a2", "b2"), ("c2", "d2")],
         "timestamps": [1704153600, 1704154200],
         "weights": [1000000.0, 2000000.0],
+        "virtual_sizes": [100.0, 200.0],
+        "is_coinbase": [False, True],
     },
     "2026-01-03": {
         "values": [3.0, 5.0],
@@ -349,6 +364,8 @@ fixtures = {
         "addresses": [("a3", "b3"), ("c3", "d3")],
         "timestamps": [1704240000, 1704240600],
         "weights": [4000000.0, 4000000.0],
+        "virtual_sizes": [100.0, 200.0],
+        "is_coinbase": [False, True],
     },
 }
 
@@ -364,6 +381,8 @@ for day, spec in fixtures.items():
         "receipt_status": spec["statuses"],
         "from_address": [pair[0] for pair in spec["addresses"]],
         "to_address": [pair[1] for pair in spec["addresses"]],
+        "virtual_size": spec["virtual_sizes"],
+        "is_coinbase": spec["is_coinbase"],
     })
     tx.write_parquet(tx_dir / "part-000.parquet")
 
