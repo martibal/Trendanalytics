@@ -274,14 +274,39 @@ try {
       Write-Log 'STEP -1: Download/sync RAW from AWS (JSON-aware minimal catch-up)'
 
       $rawLookbackDays = Get-EnvIntOrDefault -Name 'CSS_RAW_LOOKBACK_DAYS' -DefaultValue 60
-      $startRaw = (Get-Date).ToUniversalTime().AddDays(-1 * $rawLookbackDays)
-      $startRawIso = Format-IsoDate $startRaw
+      if ($Mode -eq 'rebuild') {
+        $startRawIso = Get-EnvOrDefault -Name 'CSS_REBUILD_START_DATE' -DefaultValue '2024-12-01'
+        $null = Parse-IsoDate $startRawIso
+      }
+      else {
+        $startRaw = (Get-Date).ToUniversalTime().AddDays(-1 * $rawLookbackDays)
+        $startRawIso = Format-IsoDate $startRaw
+      }
       $downloadReportPath = Join-Path $MAIN_ROOT 'reports\download_up_to_date_minimal.json'
 
-      Write-Log ("  raw sync start: " + $startRawIso + " (lookback " + $rawLookbackDays + "d)")
+      if ($Mode -eq 'rebuild') {
+        Write-Log ("  raw rebuild start: " + $startRawIso + " (includes already-published days)")
+      }
+      else {
+        Write-Log ("  raw sync start: " + $startRawIso + " (lookback " + $rawLookbackDays + "d)")
+      }
       Write-Log ("  published state root: " + $PUBLISHED_ROOT)
 
-      & $PY -u $PY_DOWNLOAD_RAW --root $MAIN_ROOT --raw-root $RAW_ROOT --published-root $PUBLISHED_ROOT --start $startRawIso --chains $chainsCsv --lag-l1-days 1 --lag-l2-days 7
+      $downloadArgs = @(
+        '-u', $PY_DOWNLOAD_RAW,
+        '--root', $MAIN_ROOT,
+        '--raw-root', $RAW_ROOT,
+        '--published-root', $PUBLISHED_ROOT,
+        '--start', $startRawIso,
+        '--chains', $chainsCsv,
+        '--lag-l1-days', '1',
+        '--lag-l2-days', '7'
+      )
+      if ($Mode -eq 'rebuild') {
+        $downloadArgs += '--include-published'
+      }
+
+      & $PY @downloadArgs
       if ($LASTEXITCODE -ne 0) {
         throw "download_up_to_date_minimal.py failed rc=$LASTEXITCODE"
       }
