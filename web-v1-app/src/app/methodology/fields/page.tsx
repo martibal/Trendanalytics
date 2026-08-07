@@ -61,6 +61,19 @@ const GOLD_FIELDS: FieldEntry[] = [
     ),
   },
   {
+    field: "median_tx_gas_used",
+    meaning: "Typical execution gas consumed by an Ethereum transaction that day.",
+    notes: (
+      <>
+        Ethereum-only observational execution-intensity field calculated as the daily median of
+        <FieldCode>receipt_gas_used</FieldCode>, with transaction-level <FieldCode>gas_used</FieldCode>
+        used only as a fallback when receipt gas is unavailable. Values are raw gas units, are null
+        for non-Ethereum chains, and do not yet drive the public regime label, scorecard, or confidence
+        calculation while historical behaviour is being validated.
+      </>
+    ),
+  },
+  {
     field: "failed_tx_rate",
     meaning: "Share of transactions that did not succeed.",
     notes: (
