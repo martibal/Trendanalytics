@@ -425,6 +425,8 @@ pl.DataFrame({
     "base_fee_per_gas": [10., 20., 30., 40., 50., 60., 70., 80., 90., 100.],
 }).write_parquet(out / "part-000.parquet")
 pl.DataFrame({
+    "value": [1_000_000_000_000_000_000., 2_000_000_000_000_000_000., 0., 500_000_000_000_000_000.],
+    "receipt_effective_gas_price": [1_000_000_000., 2_000_000_000., 3_000_000_000., 4_000_000_000.],
     "receipt_gas_used": [21000., 30000., 45000., 55000.],
     "input": ["0x", "", "0x1234", "0xabcdef"],
     "receipt_contract_address": [None, "", "0xabc123", None],
@@ -448,7 +450,7 @@ from pathlib import Path
 import polars as pl
 p = Path(sys.argv[1]) / "ethereum" / "2026-01-01.parquet"
 df = pl.read_parquet(p)
-print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0], "tx_gas": df["median_tx_gas_used"][0], "calldata_share": df["nonempty_calldata_share"][0], "contract_creation_share": df["contract_creation_tx_share"][0], "type2_share": df["eip1559_type2_tx_share"][0]}))
+print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0], "tx_gas": df["median_tx_gas_used"][0], "calldata_share": df["nonempty_calldata_share"][0], "contract_creation_share": df["contract_creation_tx_share"][0], "type2_share": df["eip1559_type2_tx_share"][0], "value_sum": df["value_transferred_native"][0], "value_median": df["median_tx_value_native"][0], "fee_median": df["median_tx_fee_native"][0]}))
 `;
   const result = runCommand(PYTHON, ["-c", checkCode, featuresRoot]);
   const parsed = JSON.parse(result.stdout.trim());
@@ -458,6 +460,9 @@ print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["med
   assertClose(parsed.calldata_share, 0.5, "ethereum.nonempty_calldata_share");
   assertClose(parsed.contract_creation_share, 0.25, "ethereum.contract_creation_tx_share");
   assertClose(parsed.type2_share, 0.5, "ethereum.eip1559_type2_tx_share");
+  assertClose(parsed.value_sum, 3.5, "ethereum.value_transferred_native_eth");
+  assertClose(parsed.value_median, 0.75, "ethereum.median_tx_value_native_eth");
+  assertClose(parsed.fee_median, 0.0000975, "ethereum.median_tx_fee_native_eth");
 }
 
 function runFixtureOnce(parent, runName) {

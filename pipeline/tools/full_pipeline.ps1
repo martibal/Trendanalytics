@@ -91,7 +91,7 @@ function Get-RawDaysForChain([string]$rawRoot, [string]$chain) {
   return $days
 }
 
-function Get-MissingFeatureDays([string]$featuresRoot, [string]$chain, [string[]]$rawDays, [DateTime]$startDate) {
+function Get-MissingFeatureDays([string]$featuresRoot, [string]$chain, [string[]]$rawDays, [DateTime]$startDate, [bool]$RecomputeExisting = $false) {
   Ensure-Dir (Join-Path $featuresRoot $chain)
 
   $existing = @{}
@@ -113,7 +113,7 @@ function Get-MissingFeatureDays([string]$featuresRoot, [string]$chain, [string[]
     $dt = Parse-IsoDate([string]$d)
     if ($dt -lt $startDate) { continue }
 
-    if (-not $existing.ContainsKey([string]$d)) {
+    if ($RecomputeExisting -or -not $existing.ContainsKey([string]$d)) {
       [void]$missing.Add([string]$d)
     }
   }
@@ -333,7 +333,17 @@ try {
     }
 
     $startDate = $latestRaw.AddDays(-30)
-    if ($Mode -eq 'rebuild') { $startDate = $latestRaw.AddDays(-365) }
+    if ($Mode -eq 'rebuild') {
+      $rebuildRawDays = @(
+        foreach ($c in $chains) {
+          Get-RawDaysForChain $RAW_ROOT $c
+        }
+      )
+      if ($rebuildRawDays.Length -gt 0) {
+        $earliestRebuildDay = @($rebuildRawDays | Sort-Object -Unique)[0]
+        $startDate = Parse-IsoDate $earliestRebuildDay
+      }
+    }
 
     Write-Log ("Start date: " + (Format-IsoDate $startDate))
 
@@ -349,16 +359,21 @@ try {
         continue
       }
 
-      $missing = @(Get-MissingFeatureDays $FEATURES_ROOT $c $rawDays $startDate)
+      $featureDays = @(Get-MissingFeatureDays $FEATURES_ROOT $c $rawDays $startDate -RecomputeExisting ($Mode -eq 'rebuild'))
 
-      if ($missing.Length -eq 0) {
+      if ($featureDays.Length -eq 0) {
         Write-Log "chain=$c feature parquet up-to-date (no missing days)"
         continue
       }
 
-      Write-Log ("chain=$c missing feature days: " + $missing.Length)
+      if ($Mode -eq 'rebuild') {
+        Write-Log ("chain=$c recompute feature days: " + $featureDays.Length)
+      }
+      else {
+        Write-Log ("chain=$c missing feature days: " + $featureDays.Length)
+      }
 
-      foreach ($d in $missing) {
+      foreach ($d in $featureDays) {
         Write-Log ("  build features: " + $c + " " + $d)
 
         & $PY -u $PY_DAILY_AGG --chain $c --date $d --raw_root $RAW_ROOT --out_root $FEATURES_ROOT

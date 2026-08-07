@@ -34,17 +34,17 @@ const GOLD_FIELDS: FieldEntry[] = [
     field: "value_transferred_native",
     meaning: "Sum of transaction value moved that day, in the chain's native denomination.",
     notes:
-      "Optional across all chain profiles: visible when available, never a confidence penalty when absent, and not currently used in the public Demand/Friction/Capacity scorecard.",
+      "Optional across all chain profiles: visible when available, never a confidence penalty when absent, and not currently used in the public Demand/Friction/Capacity scorecard. For AWS Ethereum data, transactions.value is sourced in wei and normalized by 1e18 so this field is published in ETH.",
   },
   {
     field: "median_tx_value_native",
     meaning: "Typical same-day transaction value in native denomination.",
-    notes: "Optional for all current chain profiles; visible when available, but not a confidence penalty when absent. Used only where value-normalized fee burden is methodologically valid.",
+    notes: "Optional for all current chain profiles; visible when available, but not a confidence penalty when absent. Used only where value-normalized fee burden is methodologically valid. For AWS Ethereum data, transactions.value is normalized from wei to ETH before the daily median is calculated.",
   },
   {
     field: "median_tx_fee_native",
     meaning: "Typical same-day transaction fee in native denomination.",
-    notes: "Published as a median, not an arithmetic average. Drives the Friction axis for every current chain profile.",
+    notes: "Published as a median, not an arithmetic average. Drives the Friction axis for every current chain profile. For Ethereum gas-derived fees, gas price × gas used is a wei amount and is normalized by 1e18 before publication as ETH.",
   },
   {
     field: "median_tx_fee_rate_sat_vbyte",
