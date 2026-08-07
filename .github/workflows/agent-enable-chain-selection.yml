@@ -1,0 +1,42 @@
+name: Agent enable chain selection
+
+on:
+  push:
+    branches:
+      - agent/ethereum-history-rebuild
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: "!contains(github.event.head_commit.message, '[chain-select-sync]')"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ethereum-history-rebuild
+          fetch-depth: 0
+
+      - name: Apply chain-selection change
+        shell: pwsh
+        run: python .agent/enable_chain_selection.py
+
+      - name: Verify targeted contract
+        shell: pwsh
+        run: |
+          $text = Get-Content pipeline/tools/full_pipeline.ps1 -Raw
+          if ($text -notmatch "CSS_CHAINS") { throw "CSS_CHAINS support missing" }
+          if ($text -notmatch "Unsupported chain in CSS_CHAINS") { throw "chain allowlist guard missing" }
+          if ($text -notmatch "\$chainsCsv = \(\$chains -join ','\)") { throw "chainsCsv is not derived from selected chains" }
+          Write-Host "Targeted chain-selection contract passed."
+
+      - name: Commit product change
+        shell: pwsh
+        run: |
+          Remove-Item .agent/enable_chain_selection.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pipeline/tools/full_pipeline.ps1 .agent/enable_chain_selection.py
+          git commit -m "Allow pipeline chain selection via CSS_CHAINS [chain-select-sync]"
+          git push origin HEAD:agent/ethereum-history-rebuild
