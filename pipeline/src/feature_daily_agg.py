@@ -44,8 +44,11 @@ def _raw_day_paths(raw_root: Path, chain: str, day_str: str) -> Tuple[Path, Path
     """
     chain_dir = raw_root / chain
 
+    # Preferred (Hive-style) layout
     tx_dir_hive = chain_dir / "transactions" / f"date={day_str}"
     blk_dir_hive = chain_dir / "blocks" / f"date={day_str}"
+
+    # Plain layout
     tx_dir_plain = chain_dir / "transactions" / day_str
     blk_dir_plain = chain_dir / "blocks" / day_str
 
@@ -55,7 +58,12 @@ def _raw_day_paths(raw_root: Path, chain: str, day_str: str) -> Tuple[Path, Path
 
 
 def _scan_dir(dir_path: Path) -> Optional[pl.LazyFrame]:
-    """Robust parquet scanning across minor per-file schema variations."""
+    """
+    Robust parquet scanning:
+      - Some days/tables have parquet files with slightly different schemas.
+      - Using scan_parquet(list_of_files) can raise SchemaError.
+      - We instead scan per-file and concat using diagonal_relaxed (union schema).
+    """
     if not dir_path.exists():
         return None
 
@@ -78,7 +86,9 @@ def _scan_dir(dir_path: Path) -> Optional[pl.LazyFrame]:
 
 def _load_daily_inputs(raw_root: Path, chain: str, day_str: str) -> Tuple[Optional[pl.LazyFrame], Optional[pl.LazyFrame]]:
     tx_dir, blk_dir = _raw_day_paths(raw_root, chain, day_str)
-    return _scan_dir(tx_dir), _scan_dir(blk_dir)
+    tx = _scan_dir(tx_dir)
+    blocks = _scan_dir(blk_dir)
+    return tx, blocks
 
 
 def _has_non_empty_parquet(day_dir: Path) -> Tuple[bool, str]:
@@ -127,6 +137,8 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
         return None
 
     base = pl.LazyFrame({"date": [day_str], "chain": [chain]})
+
+    # Transactions-derived features
     tx_ci = _ci_map_columns(tx) if tx is not None else {}
 
     tx_count = pl.LazyFrame({"tx_count_daily": [None]})
@@ -140,6 +152,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
     if tx is not None:
         tx_count = tx.select(pl.len().cast(pl.UInt32).alias("tx_count_daily"))
 
+        # value (native) candidates
         value_col = None
         for cand in ["value", "value_native", "value_transferred", "amount", "native_value", "tx_value"]:
             if _ci_has(tx_ci, cand):
@@ -151,7 +164,9 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
             value_sum = tx.select(value_expr.sum().alias("value_transferred_native"))
             value_med = tx.select(value_expr.median().alias("median_tx_value_native"))
 
+        # fee candidates
         fee_expr: Optional[pl.Expr] = None
+
         for cand in ["fee", "tx_fee", "transaction_fee", "gas_fee", "transaction_fee_native", "transaction_fee"]:
             if _ci_has(tx_ci, cand):
                 fee_expr = _ci_safe_f64(tx_ci, cand).median().alias("median_tx_fee_native")
@@ -179,9 +194,9 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
         if fee_expr is not None:
             median_fee = tx.select(fee_expr)
 
-        # Bitcoin fee rate: AWS/bitcoin-etl fee is denominated in BTC and
-        # virtual_size is measured in virtual bytes. Convert BTC to satoshis
-        # before dividing, then publish the daily median sat/vB.
+        # Bitcoin fee rate: fee is expressed in BTC in the AWS/bitcoin-etl
+        # transaction schema, while virtual_size is measured in virtual bytes.
+        # Convert BTC -> satoshis before dividing, and publish the daily median.
         if str(chain).lower() in {"bitcoin", "btc"} and _ci_has(tx_ci, "fee") and _ci_has(tx_ci, "virtual_size"):
             fee_btc = _ci_safe_f64(tx_ci, "fee")
             virtual_size = _ci_safe_f64(tx_ci, "virtual_size")
@@ -189,14 +204,16 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
                 fee_btc.is_not_null() & virtual_size.is_not_null() & (virtual_size > 0)
             ).then((fee_btc * pl.lit(100_000_000.0)) / virtual_size).otherwise(None)
             if _ci_has(tx_ci, "is_coinbase"):
-                fee_rate = pl.when(~_ci_col(tx_ci, "is_coinbase").cast(pl.Boolean, strict=False)).then(fee_rate).otherwise(None)
+                fee_rate = pl.when(_ci_col(tx_ci, "is_coinbase") == False).then(fee_rate).otherwise(None)  # noqa: E712
             median_fee_rate = tx.select(fee_rate.median().alias("median_tx_fee_rate_sat_vbyte"))
 
+        # failed_tx_rate
         if _ci_has(tx_ci, "receipt_status"):
             failed_tx_rate = tx.select((_ci_safe_f64(tx_ci, "receipt_status") != 1.0).mean().alias("failed_tx_rate"))
         elif _ci_has(tx_ci, "status"):
             failed_tx_rate = tx.select((_ci_safe_f64(tx_ci, "status") != 1.0).mean().alias("failed_tx_rate"))
 
+        # unique_active_addresses
         from_candidates = ["from_address", "from", "sender"]
         to_candidates = ["to_address", "to", "recipient"]
         from_col = next((c for c in from_candidates if _ci_has(tx_ci, c)), None)
@@ -217,7 +234,9 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
                 .alias("unique_active_addresses")
             )
 
+    # Blocks-derived features
     blk_ci = _ci_map_columns(blocks) if blocks is not None else {}
+
     block_count = pl.LazyFrame({"block_count_daily": [None]})
     gas_util = pl.LazyFrame({"gas_utilization_pct": [None]})
     block_weight_util = pl.LazyFrame({"block_weight_utilization_pct": [None]})
@@ -233,6 +252,9 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
                 pl.when(gas_limit_sum > 0).then(gas_used_sum / gas_limit_sum).otherwise(None).alias("gas_utilization_pct")
             )
 
+        # Bitcoin blockspace utilization: average block weight divided by the
+        # consensus maximum of 4,000,000 weight units. This is intentionally
+        # computed only for the BTC profile; non-BTC chains remain null.
         if str(chain).lower() in {"bitcoin", "btc"}:
             weight_col = next((c for c in ["weight", "block_weight"] if _ci_has(blk_ci, c)), None)
             if weight_col is not None:
@@ -268,8 +290,10 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
                 .unique()
                 .sort("ts")
             )
+
             max_ts = pl.col("ts").max()
             divisor = _ts_divisor_from_max(max_ts)
+
             avg_block_time = ts.select((pl.col("ts").diff().median() / divisor).alias("avg_block_time_sec"))
 
     out = (
@@ -384,7 +408,7 @@ def main() -> int:
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--chain", required=True)
-    ap.add_argument("--date", required=True)
+    ap.add_argument("--date", required=True)  # YYYY-MM-DD
     ap.add_argument("--raw_root", required=True)
     ap.add_argument("--out_root", required=True)
     args = ap.parse_args()
@@ -396,6 +420,7 @@ def main() -> int:
         raise SystemExit(f"Refusing to write to legacy features root: {out_dir.parent}. Use features_agg.")
 
     out_dir.mkdir(parents=True, exist_ok=True)
+
     df = compute_daily_features(args.chain, args.date, raw_root)
     if df is None:
         LOG.warning("[FEATURE] %s %s: no output", args.chain, args.date)
