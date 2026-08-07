@@ -264,6 +264,7 @@ def main() -> None:
     ap.add_argument("--root", required=True, help="Repo root (for reports/)")
     ap.add_argument("--raw-root", required=True, help="Local raw root")
     ap.add_argument("--published-root", default="", help="Published JSON root used as state reference (recommended: data/published/v1)")
+    ap.add_argument("--include-published", action="store_true", help="Allow already-published days to be downloaded again (intended for explicit historical rebuilds only)")
     ap.add_argument("--start", required=True, help="ISO date YYYY-MM-DD (inclusive)")
     ap.add_argument("--chains", default="bitcoin,ethereum,arbitrum,base", help="Comma-separated chains")
     ap.add_argument("--lag-l1-days", type=int, default=1, help="Safety lag for L1 (BTC/ETH)")
@@ -290,6 +291,7 @@ def main() -> None:
         "started_at": dt.datetime.now().isoformat(timespec="seconds"),
         "start": args.start,
         "published_root": published_root,
+        "include_published": bool(args.include_published),
         "dry_run": bool(args.dry_run),
         "lags": {"l1_days": int(args.lag_l1_days), "l2_days": int(args.lag_l2_days)},
         "aws_policy": {
@@ -307,7 +309,8 @@ def main() -> None:
         "notes": [
             "Supports both S3 layouts: .../date=YYYY-MM-DD/ and .../YYYY-MM-DD/",
             "Downloads are limited to [start, cutoff_by_chain] per chain (safety lag).",
-            "If --published-root is provided, already-published day-json files are treated as state and are not re-downloaded.",
+            "If --published-root is provided, already-published day-json files are treated as state and are not re-downloaded unless --include-published is explicitly set.",
+            "--include-published is reserved for explicit historical rebuilds that must regenerate previously published calculations from raw source data.",
             "Source listing and download failures are fail-closed and return a non-zero exit code.",
             "AWS CLI calls use a bounded timeout, bounded retry count, and exponential backoff.",
         ],
@@ -366,7 +369,7 @@ def main() -> None:
             skipped_published: List[str] = []
 
             for day in avail_dates:
-                if day in published_days:
+                if (not args.include_published) and day in published_days:
                     skipped_published.append(day)
                     continue
 
