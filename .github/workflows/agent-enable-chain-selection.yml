@@ -26,9 +26,9 @@ jobs:
         shell: pwsh
         run: |
           $text = Get-Content pipeline/tools/full_pipeline.ps1 -Raw
-          if ($text -notmatch "CSS_CHAINS") { throw "CSS_CHAINS support missing" }
-          if ($text -notmatch "Unsupported chain in CSS_CHAINS") { throw "chain allowlist guard missing" }
-          if ($text -notmatch "\$chainsCsv = \(\$chains -join ','\)") { throw "chainsCsv is not derived from selected chains" }
+          if (-not $text.Contains("CSS_CHAINS")) { throw "CSS_CHAINS support missing" }
+          if (-not $text.Contains("Unsupported chain in CSS_CHAINS")) { throw "chain allowlist guard missing" }
+          if (-not $text.Contains('$chainsCsv = ($chains -join '','')')) { throw "chainsCsv is not derived from selected chains" }
           Write-Host "Targeted chain-selection contract passed."
 
       - name: Commit product change
