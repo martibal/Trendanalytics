@@ -279,7 +279,9 @@ try {
   }
 
   $chainsCsv = ($chains -join ',')
-  Write-Log ("Chains: " + $chainsCsv)
+  $publishChainsCsv = ($allowedChains -join ',')
+  Write-Log ("Recompute chains: " + $chainsCsv)
+  Write-Log ("Global publish chains: " + $publishChainsCsv)
   $windowsCsv = '7,30,90,180,365'
 
   Push-Location $MAIN_ROOT
@@ -505,7 +507,7 @@ try {
       [Environment]::SetEnvironmentVariable('GOLD_WEEKLY_DIR', $GOLD_WEEKLY_ROOT, [EnvironmentVariableTarget]::Process)
       [Environment]::SetEnvironmentVariable('META_DIR', $META_JSON_ROOT, [EnvironmentVariableTarget]::Process)
 
-      & $PY -u $PY_EXPORT_META --root $MAIN_ROOT --out-root $META_JSON_ROOT --start $startIso --mode $modeIncRebuild --windows $windowsCsv
+      & $PY -u $PY_EXPORT_META --root $MAIN_ROOT --out-root $META_JSON_ROOT --start $startIso --mode $modeIncRebuild --windows $windowsCsv --chains $activeChainsCsv
       if ($LASTEXITCODE -ne 0) {
         throw "export_meta_json_history.py failed rc=$LASTEXITCODE"
       }
@@ -518,14 +520,14 @@ try {
 
     Write-Log 'STEP 7: Publish artifacts -> data/published/v1'
 
-    & $PY -u $PY_PUBLISH --root $MAIN_ROOT --calculated-root $CALC_ROOT --published-root $PUBLISHED_ROOT --chains $chainsCsv --genres 'gold,meta,derived' --windows $windowsCsv
+    & $PY -u $PY_PUBLISH --root $MAIN_ROOT --calculated-root $CALC_ROOT --published-root $PUBLISHED_ROOT --chains $publishChainsCsv --genres 'gold,meta,derived' --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) {
       throw "publish_artifacts.py failed rc=$LASTEXITCODE"
     }
 
     Write-Log 'STEP 8: Validate published dataset contract'
 
-    & $PY -u $PY_VALIDATE_PUBLISHED --published-root $PUBLISHED_ROOT --chains $chainsCsv --genres 'gold,meta,derived' --windows $windowsCsv
+    & $PY -u $PY_VALIDATE_PUBLISHED --published-root $PUBLISHED_ROOT --chains $publishChainsCsv --genres 'gold,meta,derived' --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) {
       throw "validate_published_dataset.py failed rc=$LASTEXITCODE"
     }
