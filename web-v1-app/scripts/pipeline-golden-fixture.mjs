@@ -11,7 +11,7 @@ const CHAIN = "bitcoin";
 const DAYS = ["2026-01-01", "2026-01-02", "2026-01-03"];
 const FIXED_GENERATED_AT_UTC = "2026-01-04T00:00:00Z";
 const FIXED_UTC_TODAY = "2026-01-04";
-const EXPECTED_GOLDEN_FIXTURE_DIGEST = "ebcb14e22de8fce1bb6f04e34e9a977732532cb51cfee0cd1658b50f11117662";
+const EXPECTED_GOLDEN_FIXTURE_DIGEST = "b5ff196b9e84c6e6c71d9d39f19d4d5680f62da2fed259679afe50e0e1880547";
 
 const EXPECTED_GOLD_DAYS = {
   "2026-01-01": {
@@ -428,6 +428,7 @@ pl.DataFrame({
     "receipt_gas_used": [21000., 30000., 45000., 55000.],
     "input": ["0x", "", "0x1234", "0xabcdef"],
     "receipt_contract_address": [None, "", "0xabc123", None],
+    "transaction_type": [0, 2, 2, 1],
 }).write_parquet(tx_out / "part-000.parquet")
 `;
   runCommand(PYTHON, ["-c", createCode, blockDir, txDir]);
@@ -447,7 +448,7 @@ from pathlib import Path
 import polars as pl
 p = Path(sys.argv[1]) / "ethereum" / "2026-01-01.parquet"
 df = pl.read_parquet(p)
-print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0], "tx_gas": df["median_tx_gas_used"][0], "calldata_share": df["nonempty_calldata_share"][0], "contract_creation_share": df["contract_creation_tx_share"][0]}))
+print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0], "tx_gas": df["median_tx_gas_used"][0], "calldata_share": df["nonempty_calldata_share"][0], "contract_creation_share": df["contract_creation_tx_share"][0], "type2_share": df["eip1559_type2_tx_share"][0]}))
 `;
   const result = runCommand(PYTHON, ["-c", checkCode, featuresRoot]);
   const parsed = JSON.parse(result.stdout.trim());
@@ -456,6 +457,7 @@ print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["med
   assertClose(parsed.tx_gas, 37500, "ethereum.median_tx_gas_used");
   assertClose(parsed.calldata_share, 0.5, "ethereum.nonempty_calldata_share");
   assertClose(parsed.contract_creation_share, 0.25, "ethereum.contract_creation_tx_share");
+  assertClose(parsed.type2_share, 0.5, "ethereum.eip1559_type2_tx_share");
 }
 
 function runFixtureOnce(parent, runName) {

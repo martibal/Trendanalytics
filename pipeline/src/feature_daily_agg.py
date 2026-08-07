@@ -22,6 +22,7 @@ CANON_COLS = [
     "median_tx_gas_used",
     "nonempty_calldata_share",
     "contract_creation_tx_share",
+    "eip1559_type2_tx_share",
     "failed_tx_rate",
     "gas_utilization_pct",
     "median_block_base_fee_per_gas",
@@ -154,6 +155,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
     median_tx_gas_used = pl.LazyFrame({"median_tx_gas_used": [None]})
     nonempty_calldata_share = pl.LazyFrame({"nonempty_calldata_share": [None]})
     contract_creation_tx_share = pl.LazyFrame({"contract_creation_tx_share": [None]})
+    eip1559_type2_tx_share = pl.LazyFrame({"eip1559_type2_tx_share": [None]})
     failed_tx_rate = pl.LazyFrame({"failed_tx_rate": [None]})
     unique_addrs = pl.LazyFrame({"unique_active_addresses": [None]})
 
@@ -238,6 +240,17 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
             contract_address = _ci_col(tx_ci, "receipt_contract_address").cast(pl.Utf8, strict=False).str.strip_chars()
             created_contract = (contract_address.is_not_null() & (contract_address != "") & (contract_address != "0x")).fill_null(False)
             contract_creation_tx_share = tx.select(created_contract.mean().alias("contract_creation_tx_share"))
+
+        # Ethereum transaction-type composition: share of EIP-1559 dynamic-fee type-2 transactions.
+        # Prefer transaction_type; accept type as a compatibility fallback. Numeric 2 and hex 0x2/0x02 are equivalent.
+        if str(chain).lower() in {"ethereum", "eth"}:
+            tx_type_col = next((c for c in ["transaction_type", "type"] if _ci_has(tx_ci, c)), None)
+            if tx_type_col is not None:
+                tx_type_raw = _ci_col(tx_ci, tx_type_col)
+                tx_type_num = tx_type_raw.cast(pl.Float64, strict=False)
+                tx_type_text = tx_type_raw.cast(pl.Utf8, strict=False).str.strip_chars().str.to_lowercase()
+                is_type2 = ((tx_type_num == 2.0) | tx_type_text.is_in(["2", "2.0", "0x2", "0x02"])).fill_null(False)
+                eip1559_type2_tx_share = tx.select(is_type2.mean().alias("eip1559_type2_tx_share"))
 
         # failed_tx_rate
         if _ci_has(tx_ci, "receipt_status"):
@@ -358,6 +371,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
         .join(median_tx_gas_used, how="cross")
         .join(nonempty_calldata_share, how="cross")
         .join(contract_creation_tx_share, how="cross")
+        .join(eip1559_type2_tx_share, how="cross")
         .join(failed_tx_rate, how="cross")
         .join(gas_util, how="cross")
         .join(median_base_fee, how="cross")
