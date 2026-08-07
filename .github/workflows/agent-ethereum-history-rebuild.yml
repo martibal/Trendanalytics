@@ -51,10 +51,61 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r .\pipeline\requirements.txt
 
-      - name: Run Ethereum-only historical rebuild
+      - name: Stream Ethereum raw history into daily features
         shell: pwsh
         run: |
-          powershell -ExecutionPolicy Bypass -File .\pipeline\tools\full_pipeline.ps1 -Mode rebuild
+          $ErrorActionPreference = 'Stop'
+          $start = [datetime]'2024-12-01'
+          $end = (Get-Date).ToUniversalTime().Date.AddDays(-1)
+          $rawRoot = Join-Path $env:GITHUB_WORKSPACE 'data\raw'
+          $featuresRoot = Join-Path $env:GITHUB_WORKSPACE 'pipeline\_work\prod\features_agg'
+          New-Item -ItemType Directory -Force -Path $featuresRoot | Out-Null
+
+          function Sync-DayTable([string]$table, [string]$day, [string]$dst) {
+            New-Item -ItemType Directory -Force -Path $dst | Out-Null
+            $src = "s3://aws-public-blockchain/v1.0/eth/$table/date=$day/"
+            $ok = $false
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              Write-Host "[STREAM] $day $table attempt=$attempt"
+              aws s3 sync $src $dst --no-sign-request --only-show-errors
+              $parquet = @(Get-ChildItem -LiteralPath $dst -Recurse -File -Filter '*.parquet' -ErrorAction SilentlyContinue)
+              if ($LASTEXITCODE -eq 0 -and $parquet.Count -gt 0) {
+                $ok = $true
+                break
+              }
+              if ($attempt -lt 3) { Start-Sleep -Seconds (2 * $attempt) }
+            }
+            if (-not $ok) { throw "Failed to stream $table for $day from $src" }
+          }
+
+          for ($d = $start; $d -le $end; $d = $d.AddDays(1)) {
+            $day = $d.ToString('yyyy-MM-dd')
+            $blockDst = Join-Path $rawRoot "ethereum\blocks\$day"
+            $txDst = Join-Path $rawRoot "ethereum\transactions\$day"
+
+            Sync-DayTable 'blocks' $day $blockDst
+            Sync-DayTable 'transactions' $day $txDst
+
+            Write-Host "[FEATURE] ethereum $day"
+            python .\pipeline\src\feature_daily_agg.py --chain ethereum --date $day --raw_root $rawRoot --out_root $featuresRoot
+            if ($LASTEXITCODE -ne 0) { throw "feature_daily_agg.py failed for $day" }
+
+            # Keep only the first raw day so full_pipeline can resolve the rebuild start date.
+            # Every other raw day is deleted immediately to keep runner disk usage bounded.
+            if ($day -ne '2024-12-01') {
+              Remove-Item -LiteralPath $blockDst -Recurse -Force -ErrorAction SilentlyContinue
+              Remove-Item -LiteralPath $txDst -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          $featureCount = @(Get-ChildItem -LiteralPath (Join-Path $featuresRoot 'ethereum') -File -Filter '*.parquet').Count
+          Write-Host "Streaming feature build complete: $featureCount day files"
+          if ($featureCount -lt 500) { throw "Expected at least 500 Ethereum feature days; found $featureCount" }
+
+      - name: Rebuild Gold Derived META and published artifacts from streamed features
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\pipeline\tools\full_pipeline.ps1 -Mode rebuild -SkipRawDownload
 
       - name: Validate Ethereum native-unit history
         shell: pwsh
@@ -91,12 +142,9 @@ jobs:
                           if abs(float(value)) >= 1e15:
                               raise SystemExit(f"Wei-scale value remains: {root}/{path.name} {field}={value}")
 
-              if numeric["value_transferred_native"] == 0:
-                  raise SystemExit(f"No numeric value_transferred_native values found in {root}")
-              if numeric["median_tx_value_native"] == 0:
-                  raise SystemExit(f"No numeric median_tx_value_native values found in {root}")
-              if numeric["median_tx_fee_native"] == 0:
-                  raise SystemExit(f"No numeric median_tx_fee_native values found in {root}")
+              for field in fields:
+                  if numeric[field] == 0:
+                      raise SystemExit(f"No numeric {field} values found in {root}")
 
               print(root, "days=", len(files), "numeric=", numeric, "max=", maxima)
           '@ | python -
