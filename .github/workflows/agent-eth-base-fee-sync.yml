@@ -41,16 +41,25 @@ jobs:
           from pathlib import Path
           p = Path('.agent/eth_base_fee_sync.py')
           text = p.read_text(encoding='utf-8')
+
           bad = 'f = fixture.read_text(encoding="utf-8")nf = re.sub'
           good = 'f = fixture.read_text(encoding="utf-8")\nf = re.sub'
           if text.count(bad) != 1:
               raise SystemExit('helper line-break repair marker mismatch')
           text = text.replace(bad, good, 1)
+
           old_guard = '    if count != 1:\n        raise SystemExit(f"{path}: expected one match, got {count}: {old[:100]!r}")'
           new_guard = '    if count < 1:\n        raise SystemExit(f"{path}: expected at least one match, got {count}: {old[:100]!r}")'
           if text.count(old_guard) != 1:
               raise SystemExit('helper matcher guard repair marker mismatch')
           text = text.replace(old_guard, new_guard, 1)
+
+          old_fixture = '''# Bitcoin golden fixture now also carries the new canonical null field and fix marker.\nreplace_once(FIXTURE,\n    '      block_gas_utilization_p90: 0,\\n      median_tx_fee_rate_sat_vbyte: 0,',\n    '      block_gas_utilization_p90: 0,\\n      median_block_base_fee_per_gas: 0,\\n      median_tx_fee_rate_sat_vbyte: 0,')\nreplace_once(FIXTURE,\n    '        "block_gas_utilization_p90_null_for_non_eth",\\n        "median_tx_fee_rate_sat_vbyte_null_for_non_btc",',\n    '        "block_gas_utilization_p90_null_for_non_eth",\\n        "median_block_base_fee_per_gas_null_for_non_eth",\\n        "median_tx_fee_rate_sat_vbyte_null_for_non_btc",')'''
+          new_fixture = '''# Bitcoin golden fixture keeps subset metric assertions; only the exact fixes array changes.\nreplace_once(FIXTURE,\n    '    applied: ["gas_utilization_pct_null_for_btc", "block_gas_utilization_p90_null_for_non_eth"],',\n    '    applied: ["gas_utilization_pct_null_for_btc", "median_block_base_fee_per_gas_null_for_non_eth", "block_gas_utilization_p90_null_for_non_eth"],')'''
+          if text.count(old_fixture) != 1:
+              raise SystemExit('helper fixture-repair marker mismatch')
+          text = text.replace(old_fixture, new_fixture, 1)
+
           p.write_text(text, encoding='utf-8')
 
       - name: Apply synchronized product change
