@@ -259,8 +259,27 @@ try {
   $modeIncRebuild = 'incremental'
   if ($Mode -eq 'rebuild') { $modeIncRebuild = 'rebuild' }
 
-  $chains = @('bitcoin','ethereum','arbitrum','base')
-  $chainsCsv = 'bitcoin,ethereum,arbitrum,base'
+  $allowedChains = @('bitcoin','ethereum','arbitrum','base')
+  $chainsRaw = Get-EnvOrDefault -Name 'CSS_CHAINS' -DefaultValue ($allowedChains -join ',')
+  $chains = @(
+    $chainsRaw.Split(',') |
+      ForEach-Object { $_.Trim().ToLowerInvariant() } |
+      Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+      Select-Object -Unique
+  )
+
+  if ($chains.Length -eq 0) {
+    throw 'CSS_CHAINS resolved to an empty chain set.'
+  }
+
+  foreach ($c in $chains) {
+    if ($allowedChains -notcontains $c) {
+      throw "Unsupported chain in CSS_CHAINS: $c. Allowed: $($allowedChains -join ',')"
+    }
+  }
+
+  $chainsCsv = ($chains -join ',')
+  Write-Log ("Chains: " + $chainsCsv)
   $windowsCsv = '7,30,90,180,365'
 
   Push-Location $MAIN_ROOT
