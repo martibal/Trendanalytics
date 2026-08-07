@@ -20,6 +20,7 @@ CANON_COLS = [
     "median_tx_fee_native",
     "median_tx_fee_rate_sat_vbyte",
     "median_tx_gas_used",
+    "nonempty_calldata_share",
     "failed_tx_rate",
     "gas_utilization_pct",
     "median_block_base_fee_per_gas",
@@ -150,6 +151,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
     median_fee = pl.LazyFrame({"median_tx_fee_native": [None]})
     median_fee_rate = pl.LazyFrame({"median_tx_fee_rate_sat_vbyte": [None]})
     median_tx_gas_used = pl.LazyFrame({"median_tx_gas_used": [None]})
+    nonempty_calldata_share = pl.LazyFrame({"nonempty_calldata_share": [None]})
     failed_tx_rate = pl.LazyFrame({"failed_tx_rate": [None]})
     unique_addrs = pl.LazyFrame({"unique_active_addresses": [None]})
 
@@ -220,6 +222,13 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
                 median_tx_gas_used = tx.select(
                     pl.when(tx_gas >= 0.0).then(tx_gas).otherwise(None).median().alias("median_tx_gas_used")
                 )
+
+        # Ethereum activity composition: share of transactions carrying non-empty calldata.
+        # Null, empty string, and the canonical empty hex payload "0x" count as no calldata.
+        if str(chain).lower() in {"ethereum", "eth"} and _ci_has(tx_ci, "input"):
+            calldata = _ci_col(tx_ci, "input").cast(pl.Utf8, strict=False).str.strip_chars().str.to_lowercase()
+            has_calldata = (calldata.is_not_null() & (calldata != "") & (calldata != "0x")).fill_null(False)
+            nonempty_calldata_share = tx.select(has_calldata.mean().alias("nonempty_calldata_share"))
 
         # failed_tx_rate
         if _ci_has(tx_ci, "receipt_status"):
@@ -338,6 +347,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
         .join(median_fee, how="cross")
         .join(median_fee_rate, how="cross")
         .join(median_tx_gas_used, how="cross")
+        .join(nonempty_calldata_share, how="cross")
         .join(failed_tx_rate, how="cross")
         .join(gas_util, how="cross")
         .join(median_base_fee, how="cross")
