@@ -1,0 +1,110 @@
+name: Agent Ethereum native history migration
+
+on:
+  push:
+    branches:
+      - agent/ethereum-native-history-migration-run
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: "!contains(github.event.head_commit.message, '[eth-native-history]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ethereum-native-history-migration-run
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip pandas numpy fastapi starlette
+
+      - name: Migrate Ethereum canonical native units
+        run: python .agent/migrate_ethereum_native_history.py
+
+      - name: Rebuild Ethereum derived history
+        run: |
+          python pipeline/tools/export_derived_json_history.py \
+            --root . \
+            --gold-json-root data/calculated/gold_json \
+            --meta-json-root data/calculated/meta \
+            --out-root data/calculated/derived \
+            --start 2024-12-01 \
+            --chains ethereum \
+            --mode rebuild \
+            --windows 7,30,90,180,365
+
+      - name: Publish complete four-chain dataset
+        run: |
+          python pipeline/tools/publish_artifacts.py \
+            --root . \
+            --calculated-root data/calculated \
+            --published-root data/published/v1 \
+            --chains bitcoin,ethereum,arbitrum,base \
+            --genres gold,meta,derived \
+            --windows 7,30,90,180,365
+
+      - name: Validate published contract
+        run: |
+          python pipeline/tools/validate_published_dataset.py \
+            --published-root data/published/v1 \
+            --chains bitcoin,ethereum,arbitrum,base \
+            --genres gold,meta,derived \
+            --windows 7,30,90,180,365
+
+      - name: Sync web public mirror
+        run: python pipeline/tools/sync_web_data.py --root .
+
+      - name: Verify migration invariants
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('.')
+          gold = json.loads((root / 'data/calculated/gold_json/ethereum/2025-01-15.json').read_text())
+          assert 1_000_000 < gold['value_transferred_native'] < 2_000_000
+          assert 0 <= gold['median_tx_fee_native'] < 0.01
+
+          derived = json.loads((root / 'data/calculated/derived/ethereum/2025-01-15.json').read_text())
+          metrics = derived['derived']['metrics']
+          assert 0 <= metrics['median_tx_fee_native__ma7'] < 0.01
+          assert 1_000_000 < metrics['value_transferred_native__ma7'] < 2_000_000
+
+          meta = json.loads((root / 'data/calculated/meta/ethereum/2025-05-13.json').read_text())
+          fee_current = meta['regime']['signals']['median_tx_fee_native']['current']
+          assert 0 <= fee_current < 0.01
+          assert meta['regime']['label'] in {'STABLE','HEATING','CONGESTED','CHEAP','UNKNOWN/DEGRADED'}
+          assert len(meta['regime']['determinism_hash']) == 12
+
+          dataset = json.loads((root / 'data/published/v1/dataset.json').read_text())
+          assert set(dataset['supported_chains']) == {'bitcoin','ethereum','arbitrum','base'}
+          print('Semantic migration invariants passed.')
+          PY
+
+          changed="$(git diff --name-only HEAD)"
+          echo "$changed"
+          if echo "$changed" | grep -E '^(data/calculated/(gold_json|derived|meta)|data/published/v1/(gold|derived|meta)|web-v1-app/public/data/published/v1/(gold|derived|meta))/(bitcoin|arbitrum|base)/[0-9]{4}-[0-9]{2}-[0-9]{2}\.json$'; then
+            echo 'ERROR: non-Ethereum historical day file changed'
+            exit 1
+          fi
+
+      - name: Commit migrated data
+        shell: bash
+        run: |
+          rm .agent/migrate_ethereum_native_history.py
+          rm .github/workflows/agent-ethereum-native-history-migration.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/calculated/gold_json/ethereum data/calculated/derived/ethereum data/calculated/meta/ethereum data/published/v1 web-v1-app/public/data/published/v1 .agent/migrate_ethereum_native_history.py .github/workflows/agent-ethereum-native-history-migration.yml
+          git commit -m "Migrate Ethereum native history from wei to ETH [eth-native-history]"
+          git push origin HEAD:agent/ethereum-native-history-migration-run
