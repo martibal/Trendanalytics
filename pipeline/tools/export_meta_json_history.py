@@ -63,6 +63,7 @@ def main() -> None:
         help="incremental=preserve existing day files; rebuild=overwrite history",
     )
     ap.add_argument("--windows", default="7,30,90,180,365", help="Comma-separated window sizes to materialize as lastXd.json")
+    ap.add_argument("--chains", default="", help="Optional comma-separated chain subset; defaults to api.main.SUPPORTED_CHAINS")
     args = ap.parse_args()
 
     mode = str(args.mode)
@@ -93,7 +94,13 @@ def main() -> None:
 
     out_root.mkdir(parents=True, exist_ok=True)
 
-    for chain in SUPPORTED_CHAINS:
+    requested_chains = [x.strip().lower() for x in str(args.chains or "").split(",") if x.strip()]
+    chains = requested_chains or list(SUPPORTED_CHAINS)
+    unsupported = [chain for chain in chains if chain not in SUPPORTED_CHAINS]
+    if unsupported:
+        raise SystemExit(f"Unsupported chain(s) in --chains: {','.join(unsupported)}")
+
+    for chain in chains:
         gs = _load_gold_status(chain)
         df = _load_gold_df(chain, "daily")
         if df is None or df.empty:
