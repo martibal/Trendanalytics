@@ -11,7 +11,7 @@ const CHAIN = "bitcoin";
 const DAYS = ["2026-01-01", "2026-01-02", "2026-01-03"];
 const FIXED_GENERATED_AT_UTC = "2026-01-04T00:00:00Z";
 const FIXED_UTC_TODAY = "2026-01-04";
-const EXPECTED_GOLDEN_FIXTURE_DIGEST = "6b57441ace6047c7778a15ce791f20f8d30a26a78d639c6e0e520e07243e30e3";
+const EXPECTED_GOLDEN_FIXTURE_DIGEST = "4b5dc2e8e8f72319b71317a647e90d4616645558e20c4c9ada2feaaa5e50b5cc";
 
 const EXPECTED_GOLD_DAYS = {
   "2026-01-01": {
@@ -77,6 +77,7 @@ const EXPECTED_STATUS = {
     null_rates: {
       avg_block_time_sec: 0,
       block_count_daily: 0,
+      block_gas_utilization_p90: 1,
       block_weight_utilization_pct: 0,
       chain: 0,
       date: 0,
@@ -91,6 +92,7 @@ const EXPECTED_STATUS = {
     },
     out_of_range_counts: {
       avg_block_time_sec: 0,
+      block_gas_utilization_p90: 0,
       block_weight_utilization_pct: 0,
       failed_tx_rate: 0,
       gas_utilization_pct: 0,
@@ -98,7 +100,7 @@ const EXPECTED_STATUS = {
     },
   },
   fixes: {
-    applied: ["gas_utilization_pct_null_for_btc"],
+    applied: ["gas_utilization_pct_null_for_btc", "block_gas_utilization_p90_null_for_non_eth"],
     notes: [],
   },
   raw_context: {
@@ -398,6 +400,49 @@ for day, spec in fixtures.items():
   runCommand(PYTHON, ["-c", code, rawRoot]);
 }
 
+function validateEthereumBlockGasP90(parent) {
+  const runRoot = path.join(parent, "ethereum-gas-p90");
+  const rawRoot = path.join(runRoot, "raw");
+  const featuresRoot = path.join(runRoot, "features_agg");
+  const day = "2026-01-01";
+  const blockDir = path.join(rawRoot, "ethereum", "blocks", `date=${day}`);
+  fs.mkdirSync(blockDir, { recursive: true });
+
+  const createCode = String.raw`
+import sys
+from pathlib import Path
+import polars as pl
+out = Path(sys.argv[1])
+pl.DataFrame({
+    "timestamp": [1704067200 + 12 * i for i in range(10)],
+    "gas_used": [10., 20., 30., 40., 50., 60., 70., 80., 90., 100.],
+    "gas_limit": [100.] * 10,
+}).write_parquet(out / "part-000.parquet")
+`;
+  runCommand(PYTHON, ["-c", createCode, blockDir]);
+
+  runCommand(PYTHON, [
+    path.join(REPO_ROOT, "pipeline", "src", "feature_daily_agg.py"),
+    "--chain", "ethereum",
+    "--date", day,
+    "--raw_root", rawRoot,
+    "--out_root", featuresRoot,
+  ]);
+
+  const checkCode = String.raw`
+import json
+import sys
+from pathlib import Path
+import polars as pl
+p = Path(sys.argv[1]) / "ethereum" / "2026-01-01.parquet"
+df = pl.read_parquet(p)
+print(json.dumps({"value": df["block_gas_utilization_p90"][0]}))
+`;
+  const result = runCommand(PYTHON, ["-c", checkCode, featuresRoot]);
+  const parsed = JSON.parse(result.stdout.trim());
+  assertClose(parsed.value, 0.9, "ethereum.block_gas_utilization_p90");
+}
+
 function runFixtureOnce(parent, runName) {
   const runRoot = path.join(parent, runName);
   const rawRoot = path.join(runRoot, "raw");
@@ -543,6 +588,8 @@ function writeReport(reportPath, runA, runB) {
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "urd-pipeline-golden-fixture-"));
 
 try {
+  validateEthereumBlockGasP90(tmpRoot);
+
   const runA = runFixtureOnce(tmpRoot, "run-a");
   const runB = runFixtureOnce(tmpRoot, "run-b");
 

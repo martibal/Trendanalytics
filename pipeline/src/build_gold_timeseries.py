@@ -41,6 +41,7 @@ CANON_COLS = [
     "median_tx_fee_rate_sat_vbyte",
     "failed_tx_rate",
     "gas_utilization_pct",
+    "block_gas_utilization_p90",
     "block_weight_utilization_pct",
     "unique_active_addresses",
     "avg_block_time_sec",
@@ -296,6 +297,21 @@ def _apply_guardrails(df: pl.DataFrame, chain: str) -> Tuple[pl.DataFrame, Dict[
             df = df.with_columns(pl.lit(None).alias("block_weight_utilization_pct"))
             fixes["applied"].append("block_weight_utilization_pct_null_for_non_btc")
 
+    # block_gas_utilization_p90: Ethereum-only ratio in [0,1].
+    if "block_gas_utilization_p90" in df.columns:
+        if prof == "eth":
+            df = df.with_columns(
+                pl.when(pl.col("block_gas_utilization_p90").is_null())
+                .then(None)
+                .when((pl.col("block_gas_utilization_p90") >= 0.0) & (pl.col("block_gas_utilization_p90") <= 1.0))
+                .then(pl.col("block_gas_utilization_p90"))
+                .otherwise(None)
+                .alias("block_gas_utilization_p90")
+            )
+        else:
+            df = df.with_columns(pl.lit(None).alias("block_gas_utilization_p90"))
+            fixes["applied"].append("block_gas_utilization_p90_null_for_non_eth")
+
     # median_tx_fee_rate_sat_vbyte: Bitcoin-only, non-negative sat/vB.
     if "median_tx_fee_rate_sat_vbyte" in df.columns:
         if prof == "btc":
@@ -343,6 +359,15 @@ def _quality_summary(df: pl.DataFrame, chain: str) -> Dict[str, object]:
             null_rates[c] = 1.0
 
     out_of_range: Dict[str, int] = {}
+
+    # block_gas_utilization_p90: Ethereum-only ratio in [0,1].
+    if "block_gas_utilization_p90" in df.columns:
+        if prof == "eth":
+            out_of_range["block_gas_utilization_p90"] = int(
+                df.select(((pl.col("block_gas_utilization_p90").is_not_null()) & ((pl.col("block_gas_utilization_p90") < 0.0) | (pl.col("block_gas_utilization_p90") > 1.0))).sum()).item()
+            )
+        else:
+            out_of_range["block_gas_utilization_p90"] = 0
 
     # median_tx_fee_rate_sat_vbyte: BTC-only non-negative sat/vB.
     if "median_tx_fee_rate_sat_vbyte" in df.columns:

@@ -85,6 +85,19 @@ const GOLD_FIELDS: FieldEntry[] = [
     ),
   },
   {
+    field: "block_gas_utilization_p90",
+    meaning: "90th-percentile Ethereum block gas utilization for the day.",
+    notes: (
+      <>
+        Ethereum-only observational blockspace-stress field. It is calculated from each valid
+        block&apos;s <FieldCode>gas_used / gas_limit</FieldCode> ratio and reports the daily 90th
+        percentile on a 0–1 scale. This complements the daily aggregate gas-utilization field by
+        retaining upper-tail load information. It does not yet drive the public regime label,
+        scorecard, or confidence calculation while historical behaviour is being validated.
+      </>
+    ),
+  },
+  {
     field: "block_weight_utilization_pct",
     meaning: "Average share of Bitcoin's maximum block weight used across blocks produced that day.",
     notes: (
