@@ -21,6 +21,7 @@ CANON_COLS = [
     "median_tx_fee_rate_sat_vbyte",
     "failed_tx_rate",
     "gas_utilization_pct",
+    "median_block_base_fee_per_gas",
     "block_gas_utilization_p90",
     "block_weight_utilization_pct",
     "unique_active_addresses",
@@ -240,12 +241,19 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
 
     block_count = pl.LazyFrame({"block_count_daily": [None]})
     gas_util = pl.LazyFrame({"gas_utilization_pct": [None]})
+    median_base_fee = pl.LazyFrame({"median_block_base_fee_per_gas": [None]})
     block_gas_p90 = pl.LazyFrame({"block_gas_utilization_p90": [None]})
     block_weight_util = pl.LazyFrame({"block_weight_utilization_pct": [None]})
     avg_block_time = pl.LazyFrame({"avg_block_time_sec": [None]})
 
     if blocks is not None:
         block_count = blocks.select(pl.len().cast(pl.UInt32).alias("block_count_daily"))
+
+        if str(chain).lower() in {"ethereum", "eth"} and _ci_has(blk_ci, "base_fee_per_gas"):
+            base_fee = _ci_safe_f64(blk_ci, "base_fee_per_gas")
+            median_base_fee = blocks.select(
+                pl.when(base_fee >= 0.0).then(base_fee).otherwise(None).median().alias("median_block_base_fee_per_gas")
+            )
 
         if _ci_has(blk_ci, "gas_used") and _ci_has(blk_ci, "gas_limit"):
             gas_used_sum = _ci_safe_f64(blk_ci, "gas_used").sum()
@@ -319,6 +327,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
         .join(median_fee_rate, how="cross")
         .join(failed_tx_rate, how="cross")
         .join(gas_util, how="cross")
+        .join(median_base_fee, how="cross")
         .join(block_gas_p90, how="cross")
         .join(block_weight_util, how="cross")
         .join(unique_addrs, how="cross")
@@ -374,6 +383,19 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
                 .otherwise(None)
                 .alias("gas_utilization_pct")
             )
+
+    if "median_block_base_fee_per_gas" in out.columns:
+        if prof == "eth":
+            out = out.with_columns(
+                pl.when(pl.col("median_block_base_fee_per_gas").is_null())
+                .then(None)
+                .when(pl.col("median_block_base_fee_per_gas") >= 0.0)
+                .then(pl.col("median_block_base_fee_per_gas"))
+                .otherwise(None)
+                .alias("median_block_base_fee_per_gas")
+            )
+        else:
+            out = out.with_columns(pl.lit(None).alias("median_block_base_fee_per_gas"))
 
     if "block_gas_utilization_p90" in out.columns:
         if prof == "eth":

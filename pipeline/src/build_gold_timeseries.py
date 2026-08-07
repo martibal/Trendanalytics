@@ -41,6 +41,7 @@ CANON_COLS = [
     "median_tx_fee_rate_sat_vbyte",
     "failed_tx_rate",
     "gas_utilization_pct",
+    "median_block_base_fee_per_gas",
     "block_gas_utilization_p90",
     "block_weight_utilization_pct",
     "unique_active_addresses",
@@ -297,6 +298,21 @@ def _apply_guardrails(df: pl.DataFrame, chain: str) -> Tuple[pl.DataFrame, Dict[
             df = df.with_columns(pl.lit(None).alias("block_weight_utilization_pct"))
             fixes["applied"].append("block_weight_utilization_pct_null_for_non_btc")
 
+    # median_block_base_fee_per_gas: Ethereum-only, non-negative raw chain unit.
+    if "median_block_base_fee_per_gas" in df.columns:
+        if prof == "eth":
+            df = df.with_columns(
+                pl.when(pl.col("median_block_base_fee_per_gas").is_null())
+                .then(None)
+                .when(pl.col("median_block_base_fee_per_gas") >= 0.0)
+                .then(pl.col("median_block_base_fee_per_gas"))
+                .otherwise(None)
+                .alias("median_block_base_fee_per_gas")
+            )
+        else:
+            df = df.with_columns(pl.lit(None).alias("median_block_base_fee_per_gas"))
+            fixes["applied"].append("median_block_base_fee_per_gas_null_for_non_eth")
+
     # block_gas_utilization_p90: Ethereum-only ratio in [0,1].
     if "block_gas_utilization_p90" in df.columns:
         if prof == "eth":
@@ -359,6 +375,15 @@ def _quality_summary(df: pl.DataFrame, chain: str) -> Dict[str, object]:
             null_rates[c] = 1.0
 
     out_of_range: Dict[str, int] = {}
+
+    # median_block_base_fee_per_gas: Ethereum-only non-negative raw chain unit.
+    if "median_block_base_fee_per_gas" in df.columns:
+        if prof == "eth":
+            out_of_range["median_block_base_fee_per_gas"] = int(
+                df.select(((pl.col("median_block_base_fee_per_gas").is_not_null()) & (pl.col("median_block_base_fee_per_gas") < 0.0)).sum()).item()
+            )
+        else:
+            out_of_range["median_block_base_fee_per_gas"] = 0
 
     # block_gas_utilization_p90: Ethereum-only ratio in [0,1].
     if "block_gas_utilization_p90" in df.columns:
