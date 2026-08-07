@@ -1,0 +1,32 @@
+name: Agent Ethereum Source Probe
+
+on:
+  push:
+    branches:
+      - agent/ethereum-history-rebuild-run
+    paths:
+      - .github/workflows/agent-ethereum-source-probe.yml
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify AWS CLI
+        shell: pwsh
+        run: aws --version
+      - name: Probe failing Ethereum transaction day
+        shell: pwsh
+        run: |
+          $day = '2026-04-18'
+          Write-Host '=== table root around date ==='
+          aws s3 ls s3://aws-public-blockchain/v1.0/eth/transactions/ --no-sign-request | Select-String $day
+          Write-Host '=== date= prefix ==='
+          aws s3 ls "s3://aws-public-blockchain/v1.0/eth/transactions/date=$day/" --recursive --no-sign-request
+          Write-Host '=== plain prefix ==='
+          aws s3 ls "s3://aws-public-blockchain/v1.0/eth/transactions/$day/" --recursive --no-sign-request
+          Write-Host '=== candidate year/month/day prefix ==='
+          aws s3 ls "s3://aws-public-blockchain/v1.0/eth/transactions/2026/04/18/" --recursive --no-sign-request
+          Write-Host '=== candidate dt= prefix ==='
+          aws s3 ls "s3://aws-public-blockchain/v1.0/eth/transactions/dt=$day/" --recursive --no-sign-request
