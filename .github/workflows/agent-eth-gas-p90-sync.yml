@@ -1,0 +1,224 @@
+name: Agent Ethereum gas p90 sync
+
+on:
+  push:
+    branches:
+      - agent/ethereum-block-gas-p90
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: "!contains(github.event.head_commit.message, '[eth-gas-p90-sync]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ethereum-block-gas-p90
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web-v1-app/package-lock.json
+
+      - name: Install Python dependencies
+        run: pip install -r pipeline/requirements.txt
+
+      - name: Install web dependencies
+        working-directory: web-v1-app
+        run: npm ci
+
+      - name: Patch Ethereum block gas p90 end-to-end
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          import subprocess
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count < 1:
+                  raise SystemExit(f'{path}: missing patch anchor: {old[:100]!r}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          feature = 'pipeline/src/feature_daily_agg.py'
+          replace_once(
+              feature,
+              '    "gas_utilization_pct",\n    "block_weight_utilization_pct",',
+              '    "gas_utilization_pct",\n    "block_gas_utilization_p90",\n    "block_weight_utilization_pct",',
+          )
+          replace_once(
+              feature,
+              '    gas_util = pl.LazyFrame({"gas_utilization_pct": [None]})\n    block_weight_util = pl.LazyFrame({"block_weight_utilization_pct": [None]})',
+              '    gas_util = pl.LazyFrame({"gas_utilization_pct": [None]})\n    block_gas_p90 = pl.LazyFrame({"block_gas_utilization_p90": [None]})\n    block_weight_util = pl.LazyFrame({"block_weight_utilization_pct": [None]})',
+          )
+          replace_once(
+              feature,
+              '''            gas_util = blocks.select(\n                pl.when(gas_limit_sum > 0).then(gas_used_sum / gas_limit_sum).otherwise(None).alias("gas_utilization_pct")\n            )\n''',
+              '''            gas_util = blocks.select(\n                pl.when(gas_limit_sum > 0).then(gas_used_sum / gas_limit_sum).otherwise(None).alias("gas_utilization_pct")\n            )\n\n            # Ethereum-only blockspace stress observation. Unlike the daily aggregate\n            # above, this retains information about the upper tail of per-block load.\n            if str(chain).lower() in {"ethereum", "eth"}:\n                per_block_util = pl.when(\n                    _ci_safe_f64(blk_ci, "gas_limit") > 0\n                ).then(\n                    _ci_safe_f64(blk_ci, "gas_used") / _ci_safe_f64(blk_ci, "gas_limit")\n                ).otherwise(None)\n                block_gas_p90 = blocks.select(\n                    per_block_util.drop_nulls().quantile(0.90, interpolation="nearest").alias("block_gas_utilization_p90")\n                )\n''',
+          )
+          replace_once(
+              feature,
+              '        .join(gas_util, how="cross")\n        .join(block_weight_util, how="cross")',
+              '        .join(gas_util, how="cross")\n        .join(block_gas_p90, how="cross")\n        .join(block_weight_util, how="cross")',
+          )
+          replace_once(
+              feature,
+              '    if "median_tx_fee_rate_sat_vbyte" in out.columns:',
+              '''    if "block_gas_utilization_p90" in out.columns:\n        if prof == "eth":\n            out = out.with_columns(\n                pl.when(pl.col("block_gas_utilization_p90").is_null())\n                .then(None)\n                .when((pl.col("block_gas_utilization_p90") >= 0) & (pl.col("block_gas_utilization_p90") <= 1.0))\n                .then(pl.col("block_gas_utilization_p90"))\n                .otherwise(None)\n                .alias("block_gas_utilization_p90")\n            )\n        else:\n            out = out.with_columns(pl.lit(None).alias("block_gas_utilization_p90"))\n\n    if "median_tx_fee_rate_sat_vbyte" in out.columns:''',
+          )
+
+          gold = 'pipeline/src/build_gold_timeseries.py'
+          replace_once(
+              gold,
+              '    "gas_utilization_pct",\n    "block_weight_utilization_pct",',
+              '    "gas_utilization_pct",\n    "block_gas_utilization_p90",\n    "block_weight_utilization_pct",',
+          )
+          replace_once(
+              gold,
+              '    # median_tx_fee_rate_sat_vbyte: Bitcoin-only, non-negative sat/vB.\n',
+              '''    # block_gas_utilization_p90: Ethereum-only ratio in [0,1].\n    if "block_gas_utilization_p90" in df.columns:\n        if prof == "eth":\n            df = df.with_columns(\n                pl.when(pl.col("block_gas_utilization_p90").is_null())\n                .then(None)\n                .when((pl.col("block_gas_utilization_p90") >= 0.0) & (pl.col("block_gas_utilization_p90") <= 1.0))\n                .then(pl.col("block_gas_utilization_p90"))\n                .otherwise(None)\n                .alias("block_gas_utilization_p90")\n            )\n        else:\n            df = df.with_columns(pl.lit(None).alias("block_gas_utilization_p90"))\n            fixes["applied"].append("block_gas_utilization_p90_null_for_non_eth")\n\n    # median_tx_fee_rate_sat_vbyte: Bitcoin-only, non-negative sat/vB.\n''',
+          )
+          replace_once(
+              gold,
+              '    # median_tx_fee_rate_sat_vbyte: BTC-only non-negative sat/vB.\n',
+              '''    # block_gas_utilization_p90: Ethereum-only ratio in [0,1].\n    if "block_gas_utilization_p90" in df.columns:\n        if prof == "eth":\n            out_of_range["block_gas_utilization_p90"] = int(\n                df.select(((pl.col("block_gas_utilization_p90").is_not_null()) & ((pl.col("block_gas_utilization_p90") < 0.0) | (pl.col("block_gas_utilization_p90") > 1.0))).sum()).item()\n            )\n        else:\n            out_of_range["block_gas_utilization_p90"] = 0\n\n    # median_tx_fee_rate_sat_vbyte: BTC-only non-negative sat/vB.\n''',
+          )
+
+          fields = 'web-v1-app/src/app/methodology/fields/page.tsx'
+          replace_once(
+              fields,
+              '  {\n    field: "block_weight_utilization_pct",',
+              '''  {\n    field: "block_gas_utilization_p90",\n    meaning: "90th-percentile Ethereum block gas utilization for the day.",\n    notes: (\n      <>\n        Ethereum-only observational blockspace-stress field. It is calculated from each valid\n        block&apos;s <FieldCode>gas_used / gas_limit</FieldCode> ratio and reports the daily 90th\n        percentile on a 0–1 scale. This complements the daily aggregate gas-utilization field by\n        retaining upper-tail load information. It does not yet drive the public regime label,\n        scorecard, or confidence calculation while historical behaviour is being validated.\n      </>\n    ),\n  },\n  {\n    field: "block_weight_utilization_pct",''',
+          )
+
+          fixture = 'web-v1-app/scripts/pipeline-golden-fixture.mjs'
+          p = Path(fixture)
+          text = p.read_text(encoding='utf-8')
+
+          # Bitcoin golden output must expose the ETH-only field as null.
+          old = '      block_weight_utilization_pct: 0,\n      chain: 0,'
+          new = '      block_gas_utilization_p90: 1,\n      block_weight_utilization_pct: 0,\n      chain: 0,'
+          if text.count(old) != 1:
+              raise SystemExit('golden null-rate anchor mismatch')
+          text = text.replace(old, new, 1)
+
+          old = '      avg_block_time_sec: 0,\n      block_weight_utilization_pct: 0,'
+          new = '      avg_block_time_sec: 0,\n      block_gas_utilization_p90: 0,\n      block_weight_utilization_pct: 0,'
+          if text.count(old) != 1:
+              raise SystemExit('golden range anchor mismatch')
+          text = text.replace(old, new, 1)
+
+          # Permanent direct ETH regression check inside the existing pipeline golden gate.
+          anchor = 'function runFixtureOnce(parent, runName) {'
+          eth_fn = r'''function validateEthereumBlockGasP90(parent) {
+  const runRoot = path.join(parent, "ethereum-gas-p90");
+  const rawRoot = path.join(runRoot, "raw");
+  const featuresRoot = path.join(runRoot, "features_agg");
+  const day = "2026-01-01";
+  const blockDir = path.join(rawRoot, "ethereum", "blocks", `date=${day}`);
+  fs.mkdirSync(blockDir, { recursive: true });
+
+  const createCode = String.raw`
+import sys
+from pathlib import Path
+import polars as pl
+out = Path(sys.argv[1])
+pl.DataFrame({
+    "timestamp": [1704067200 + 12 * i for i in range(10)],
+    "gas_used": [10., 20., 30., 40., 50., 60., 70., 80., 90., 100.],
+    "gas_limit": [100.] * 10,
+}).write_parquet(out / "part-000.parquet")
+`;
+  runCommand(PYTHON, ["-c", createCode, blockDir]);
+
+  runCommand(PYTHON, [
+    path.join(REPO_ROOT, "pipeline", "src", "feature_daily_agg.py"),
+    "--chain", "ethereum",
+    "--date", day,
+    "--raw_root", rawRoot,
+    "--out_root", featuresRoot,
+  ]);
+
+  const checkCode = String.raw`
+import json
+import sys
+from pathlib import Path
+import polars as pl
+p = Path(sys.argv[1]) / "ethereum" / "2026-01-01.parquet"
+df = pl.read_parquet(p)
+print(json.dumps({"value": df["block_gas_utilization_p90"][0]}))
+`;
+  const result = runCommand(PYTHON, ["-c", checkCode, featuresRoot]);
+  const parsed = JSON.parse(result.stdout.trim());
+  assertClose(parsed.value, 0.9, "ethereum.block_gas_utilization_p90");
+}
+
+'''
+          if text.count(anchor) != 1:
+              raise SystemExit('golden ETH function anchor mismatch')
+          text = text.replace(anchor, eth_fn + anchor, 1)
+
+          try_anchor = '  const runA = runFixtureOnce(tmpRoot, "run-a");'
+          if text.count(try_anchor) != 1:
+              raise SystemExit('golden try anchor mismatch')
+          text = text.replace(try_anchor, '  validateEthereumBlockGasP90(tmpRoot);\n\n' + try_anchor, 1)
+
+          # Resolve new deterministic digest after explicit assertions pass.
+          text = re.sub(
+              r'const EXPECTED_GOLDEN_FIXTURE_DIGEST = "[0-9a-f]{64}";',
+              'const EXPECTED_GOLDEN_FIXTURE_DIGEST = "0000000000000000000000000000000000000000000000000000000000000000";',
+              text,
+              count=1,
+          )
+          p.write_text(text, encoding='utf-8')
+
+          manifest = Path('pipeline/methodology-version.json')
+          m = manifest.read_text(encoding='utf-8')
+          if '"methodology_version": "1.3"' not in m:
+              raise SystemExit('Expected methodology version 1.3 before ETH gas p90 change')
+          m = m.replace('"methodology_version": "1.3"', '"methodology_version": "1.4"', 1)
+          m = re.sub(
+              r'"golden_fixture_digest": "[0-9a-f]{64}"',
+              '"golden_fixture_digest": "0000000000000000000000000000000000000000000000000000000000000000"',
+              m,
+              count=1,
+          )
+          manifest.write_text(m, encoding='utf-8')
+
+          proc = subprocess.run(
+              ['npm', 'run', 'check:pipeline-golden-fixture'],
+              cwd='web-v1-app', text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+          )
+          print(proc.stdout)
+          match = re.search(r'Golden fixture digest ([0-9a-f]{64}) does not match', proc.stdout)
+          if not match:
+              raise SystemExit('Could not resolve new digest; an explicit regression assertion may have failed')
+          digest = match.group(1)
+          print(f'Resolved golden fixture digest: {digest}')
+          p.write_text(p.read_text(encoding='utf-8').replace('0' * 64, digest, 1), encoding='utf-8')
+          manifest.write_text(manifest.read_text(encoding='utf-8').replace('0' * 64, digest, 1), encoding='utf-8')
+
+      - name: Verify targeted gates
+        run: |
+          python -m py_compile pipeline/src/feature_daily_agg.py pipeline/src/build_gold_timeseries.py
+          cd web-v1-app
+          npm run check:pipeline-golden-fixture
+          npm run check:field-dictionary-sync
+
+      - name: Commit product changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pipeline/src/feature_daily_agg.py pipeline/src/build_gold_timeseries.py pipeline/methodology-version.json web-v1-app/scripts/pipeline-golden-fixture.mjs web-v1-app/src/app/methodology/fields/page.tsx
+          git commit -m "Add Ethereum block gas utilization p90 [eth-gas-p90-sync]"
+          git push origin HEAD:agent/ethereum-block-gas-p90
