@@ -171,6 +171,12 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
 
         if value_col is not None:
             value_expr = _ci_safe_f64(tx_ci, value_col)
+            # AWS Public Blockchain Data documents Ethereum transactions.value in wei.
+            # Canonical *_native fields are expressed in the chain's native denomination,
+            # so normalize the AWS `value` field to ETH before aggregating. Explicit
+            # native-denomination aliases remain untouched for schema compatibility.
+            if str(chain).lower() in {"ethereum", "eth"} and value_col == "value":
+                value_expr = value_expr / pl.lit(1_000_000_000_000_000_000.0)
             value_sum = tx.select(value_expr.sum().alias("value_transferred_native"))
             value_med = tx.select(value_expr.median().alias("median_tx_value_native"))
 
@@ -183,23 +189,22 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
                 break
 
         if fee_expr is None and (_ci_has(tx_ci, "receipt_effective_gas_price") and _ci_has(tx_ci, "receipt_gas_used")):
-            fee_expr = (
-                (_ci_safe_f64(tx_ci, "receipt_effective_gas_price") * _ci_safe_f64(tx_ci, "receipt_gas_used"))
-                .median()
-                .alias("median_tx_fee_native")
-            )
+            fee_value = _ci_safe_f64(tx_ci, "receipt_effective_gas_price") * _ci_safe_f64(tx_ci, "receipt_gas_used")
+            if str(chain).lower() in {"ethereum", "eth"}:
+                fee_value = fee_value / pl.lit(1_000_000_000_000_000_000.0)
+            fee_expr = fee_value.median().alias("median_tx_fee_native")
 
         if fee_expr is None and (_ci_has(tx_ci, "effective_gas_price") and _ci_has(tx_ci, "gas_used")):
-            fee_expr = (
-                (_ci_safe_f64(tx_ci, "effective_gas_price") * _ci_safe_f64(tx_ci, "gas_used"))
-                .median()
-                .alias("median_tx_fee_native")
-            )
+            fee_value = _ci_safe_f64(tx_ci, "effective_gas_price") * _ci_safe_f64(tx_ci, "gas_used")
+            if str(chain).lower() in {"ethereum", "eth"}:
+                fee_value = fee_value / pl.lit(1_000_000_000_000_000_000.0)
+            fee_expr = fee_value.median().alias("median_tx_fee_native")
 
         if fee_expr is None and (_ci_has(tx_ci, "gas_price") and _ci_has(tx_ci, "gas_used")):
-            fee_expr = ((_ci_safe_f64(tx_ci, "gas_price") * _ci_safe_f64(tx_ci, "gas_used")).median()).alias(
-                "median_tx_fee_native"
-            )
+            fee_value = _ci_safe_f64(tx_ci, "gas_price") * _ci_safe_f64(tx_ci, "gas_used")
+            if str(chain).lower() in {"ethereum", "eth"}:
+                fee_value = fee_value / pl.lit(1_000_000_000_000_000_000.0)
+            fee_expr = fee_value.median().alias("median_tx_fee_native")
 
         if fee_expr is not None:
             median_fee = tx.select(fee_expr)
