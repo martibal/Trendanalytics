@@ -100,6 +100,7 @@ def build_weekly_for_chain(chain: str, gold_root: Path, gold_weekly_root: Path) 
     tx = pl.col("tx_count_daily").cast(pl.Float64)
     med_fee = pl.col("median_tx_fee_native").cast(pl.Float64)
     gas_util = pl.col("gas_utilization_pct").cast(pl.Float64)
+    btc_weight_util = pl.col("block_weight_utilization_pct").cast(pl.Float64)
     blk_time = pl.col("avg_block_time_sec").cast(pl.Float64)
 
     fees_proxy_daily = (med_fee * tx).alias("_fee_proxy")
@@ -119,14 +120,18 @@ def build_weekly_for_chain(chain: str, gold_root: Path, gold_weekly_root: Path) 
         tx.sum().alias("activity_7d_sum"),
         pl.col("_fee_proxy").sum().alias("fees_7d_sum_proxy"),
         gas_util.mean().alias("_gas_mean"),
+        btc_weight_util.mean().alias("_btc_weight_mean"),
         blk_time.mean().alias("_blk_mean"),
     ).sort("_week_start")
 
-    # capacity: prefer gas utilization if it has data, else block time stability proxy (inverse)
-    # Represent as a "higher is tighter" proxy in [0,1] when gas exists, else -block_time (lower block time => higher capacity, so negate)
+    # capacity: use the chain-native direct utilization measure when available.
+    # Ethereum/EVM -> gas utilization; Bitcoin -> block-weight utilization.
+    # Fall back to the legacy inverse block-time proxy only when no direct utilization exists.
     grp = grp.with_columns(
         pl.when(pl.col("_gas_mean").is_not_null())
           .then(pl.col("_gas_mean"))
+          .when(pl.col("_btc_weight_mean").is_not_null())
+          .then(pl.col("_btc_weight_mean"))
           .otherwise(pl.col("_blk_mean") * -1.0)
           .alias("capacity_7d_mean")
     )

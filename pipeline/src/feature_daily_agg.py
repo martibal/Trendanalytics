@@ -20,6 +20,7 @@ CANON_COLS = [
     "median_tx_fee_native",
     "failed_tx_rate",
     "gas_utilization_pct",
+    "block_weight_utilization_pct",
     "unique_active_addresses",
     "avg_block_time_sec",
 ]
@@ -223,6 +224,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
 
     block_count = pl.LazyFrame({"block_count_daily": [None]})
     gas_util = pl.LazyFrame({"gas_utilization_pct": [None]})
+    block_weight_util = pl.LazyFrame({"block_weight_utilization_pct": [None]})
     avg_block_time = pl.LazyFrame({"avg_block_time_sec": [None]})
 
     if blocks is not None:
@@ -234,6 +236,20 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
             gas_util = blocks.select(
                 pl.when(gas_limit_sum > 0).then(gas_used_sum / gas_limit_sum).otherwise(None).alias("gas_utilization_pct")
             )
+
+        # Bitcoin blockspace utilization: average block weight divided by the
+        # consensus maximum of 4,000,000 weight units. This is intentionally
+        # computed only for the BTC profile; non-BTC chains remain null.
+        if str(chain).lower() in {"bitcoin", "btc"}:
+            weight_col = next((c for c in ["weight", "block_weight"] if _ci_has(blk_ci, c)), None)
+            if weight_col is not None:
+                weight = _ci_safe_f64(blk_ci, weight_col)
+                block_weight_util = blocks.select(
+                    pl.when(weight.is_not_null().sum() > 0)
+                    .then(weight.mean() / pl.lit(4_000_000.0))
+                    .otherwise(None)
+                    .alias("block_weight_utilization_pct")
+                )
 
         def _ts_divisor_from_max(max_ts_expr: pl.Expr) -> pl.Expr:
             return (
@@ -273,6 +289,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
         .join(median_fee, how="cross")
         .join(failed_tx_rate, how="cross")
         .join(gas_util, how="cross")
+        .join(block_weight_util, how="cross")
         .join(unique_addrs, how="cross")
         .join(avg_block_time, how="cross")
         .collect()
@@ -326,6 +343,19 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
                 .otherwise(None)
                 .alias("gas_utilization_pct")
             )
+
+    if "block_weight_utilization_pct" in out.columns:
+        if prof == "btc":
+            out = out.with_columns(
+                pl.when(pl.col("block_weight_utilization_pct").is_null())
+                .then(None)
+                .when((pl.col("block_weight_utilization_pct") >= 0) & (pl.col("block_weight_utilization_pct") <= 1.0))
+                .then(pl.col("block_weight_utilization_pct"))
+                .otherwise(None)
+                .alias("block_weight_utilization_pct")
+            )
+        else:
+            out = out.with_columns(pl.lit(None).alias("block_weight_utilization_pct"))
 
     if "failed_tx_rate" in out.columns:
         out = out.with_columns(

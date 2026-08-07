@@ -71,6 +71,19 @@ const GOLD_FIELDS: FieldEntry[] = [
     ),
   },
   {
+    field: "block_weight_utilization_pct",
+    meaning: "Average share of Bitcoin's maximum block weight used across blocks produced that day.",
+    notes: (
+      <>
+        Bitcoin-only observational capacity field calculated from block weight divided by the
+        4,000,000 weight-unit consensus maximum. Published on a 0–1 scale and null for non-Bitcoin
+        chains. It is included in Gold and weekly capacity summaries, but does not yet drive the
+        public regime label, scorecard, or confidence calculation while historical behaviour is
+        being validated.
+      </>
+    ),
+  },
+  {
     field: "unique_active_addresses",
     meaning: "Count of distinct addresses that sent or received a transaction that day.",
     notes: (

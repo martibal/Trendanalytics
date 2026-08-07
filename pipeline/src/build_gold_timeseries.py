@@ -40,6 +40,7 @@ CANON_COLS = [
     "median_tx_fee_native",
     "failed_tx_rate",
     "gas_utilization_pct",
+    "block_weight_utilization_pct",
     "unique_active_addresses",
     "avg_block_time_sec",
 ]
@@ -279,6 +280,21 @@ def _apply_guardrails(df: pl.DataFrame, chain: str) -> Tuple[pl.DataFrame, Dict[
                 .alias("gas_utilization_pct")
             )
 
+    # block_weight_utilization_pct
+    if "block_weight_utilization_pct" in df.columns:
+        if prof == "btc":
+            df = df.with_columns(
+                pl.when(pl.col("block_weight_utilization_pct").is_null())
+                .then(None)
+                .when((pl.col("block_weight_utilization_pct") >= 0.0) & (pl.col("block_weight_utilization_pct") <= 1.0))
+                .then(pl.col("block_weight_utilization_pct"))
+                .otherwise(None)
+                .alias("block_weight_utilization_pct")
+            )
+        else:
+            df = df.with_columns(pl.lit(None).alias("block_weight_utilization_pct"))
+            fixes["applied"].append("block_weight_utilization_pct_null_for_non_btc")
+
     # failed_tx_rate
     if "failed_tx_rate" in df.columns:
         df = df.with_columns(
@@ -311,6 +327,15 @@ def _quality_summary(df: pl.DataFrame, chain: str) -> Dict[str, object]:
             null_rates[c] = 1.0
 
     out_of_range: Dict[str, int] = {}
+
+    # block_weight_utilization_pct: BTC-only ratio in [0,1]
+    if "block_weight_utilization_pct" in df.columns:
+        if prof == "btc":
+            out_of_range["block_weight_utilization_pct"] = int(
+                df.select(((pl.col("block_weight_utilization_pct").is_not_null()) & ((pl.col("block_weight_utilization_pct") < 0.0) | (pl.col("block_weight_utilization_pct") > 1.0))).sum()).item()
+            )
+        else:
+            out_of_range["block_weight_utilization_pct"] = 0
 
     # avg_block_time_sec: count non-null values that violate profile bounds
     if "avg_block_time_sec" in df.columns:
