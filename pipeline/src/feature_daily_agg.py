@@ -21,6 +21,7 @@ CANON_COLS = [
     "median_tx_fee_rate_sat_vbyte",
     "median_tx_gas_used",
     "nonempty_calldata_share",
+    "contract_creation_tx_share",
     "failed_tx_rate",
     "gas_utilization_pct",
     "median_block_base_fee_per_gas",
@@ -152,6 +153,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
     median_fee_rate = pl.LazyFrame({"median_tx_fee_rate_sat_vbyte": [None]})
     median_tx_gas_used = pl.LazyFrame({"median_tx_gas_used": [None]})
     nonempty_calldata_share = pl.LazyFrame({"nonempty_calldata_share": [None]})
+    contract_creation_tx_share = pl.LazyFrame({"contract_creation_tx_share": [None]})
     failed_tx_rate = pl.LazyFrame({"failed_tx_rate": [None]})
     unique_addrs = pl.LazyFrame({"unique_active_addresses": [None]})
 
@@ -229,6 +231,13 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
             calldata = _ci_col(tx_ci, "input").cast(pl.Utf8, strict=False).str.strip_chars().str.to_lowercase()
             has_calldata = (calldata.is_not_null() & (calldata != "") & (calldata != "0x")).fill_null(False)
             nonempty_calldata_share = tx.select(has_calldata.mean().alias("nonempty_calldata_share"))
+
+        # Ethereum contract-creation activity: share of transactions whose receipt reports
+        # a created contract address. This is descriptive execution activity only.
+        if str(chain).lower() in {"ethereum", "eth"} and _ci_has(tx_ci, "receipt_contract_address"):
+            contract_address = _ci_col(tx_ci, "receipt_contract_address").cast(pl.Utf8, strict=False).str.strip_chars()
+            created_contract = (contract_address.is_not_null() & (contract_address != "") & (contract_address != "0x")).fill_null(False)
+            contract_creation_tx_share = tx.select(created_contract.mean().alias("contract_creation_tx_share"))
 
         # failed_tx_rate
         if _ci_has(tx_ci, "receipt_status"):
@@ -348,6 +357,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
         .join(median_fee_rate, how="cross")
         .join(median_tx_gas_used, how="cross")
         .join(nonempty_calldata_share, how="cross")
+        .join(contract_creation_tx_share, how="cross")
         .join(failed_tx_rate, how="cross")
         .join(gas_util, how="cross")
         .join(median_base_fee, how="cross")

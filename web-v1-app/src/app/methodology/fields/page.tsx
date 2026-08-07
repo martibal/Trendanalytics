@@ -88,6 +88,19 @@ const GOLD_FIELDS: FieldEntry[] = [
     ),
   },
   {
+    field: "contract_creation_tx_share",
+    meaning: "Share of Ethereum transactions that create a contract that day.",
+    notes: (
+      <>
+        Ethereum-only observational activity-composition field calculated as the share of transactions
+        with a non-empty <FieldCode>receipt_contract_address</FieldCode>. It describes contract-deployment
+        activity without identifying protocols, tokens, financial intent, or trading behaviour. Values are
+        published on a 0–1 scale, are null for non-Ethereum chains, and do not yet drive the public regime
+        label, scorecard, or confidence calculation while historical behaviour is being validated.
+      </>
+    ),
+  },
+  {
     field: "failed_tx_rate",
     meaning: "Share of transactions that did not succeed.",
     notes: (
