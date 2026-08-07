@@ -11,12 +11,13 @@ const CHAIN = "bitcoin";
 const DAYS = ["2026-01-01", "2026-01-02", "2026-01-03"];
 const FIXED_GENERATED_AT_UTC = "2026-01-04T00:00:00Z";
 const FIXED_UTC_TODAY = "2026-01-04";
-const EXPECTED_GOLDEN_FIXTURE_DIGEST = "6ac586ab7a21fc4a664130d39e7bd9bf75cdda52698eac3e8005cebe6ee9d55f";
+const EXPECTED_GOLDEN_FIXTURE_DIGEST = "43e85ade463372a75de6c52e486dd21474f13fed1c08bd1a63a293d7ef2b11fd";
 
 const EXPECTED_GOLD_DAYS = {
   "2026-01-01": {
     avg_block_time_sec: 600,
     block_count_daily: 2,
+    block_weight_utilization_pct: 0.75,
     chain: "bitcoin",
     date: "2026-01-01",
     failed_tx_rate: 0.5,
@@ -30,6 +31,7 @@ const EXPECTED_GOLD_DAYS = {
   "2026-01-02": {
     avg_block_time_sec: 600,
     block_count_daily: 2,
+    block_weight_utilization_pct: 0.375,
     chain: "bitcoin",
     date: "2026-01-02",
     failed_tx_rate: 0,
@@ -43,6 +45,7 @@ const EXPECTED_GOLD_DAYS = {
   "2026-01-03": {
     avg_block_time_sec: 600,
     block_count_daily: 2,
+    block_weight_utilization_pct: 1,
     chain: "bitcoin",
     date: "2026-01-03",
     failed_tx_rate: 0.5,
@@ -71,6 +74,7 @@ const EXPECTED_STATUS = {
     null_rates: {
       avg_block_time_sec: 0,
       block_count_daily: 0,
+      block_weight_utilization_pct: 0,
       chain: 0,
       date: 0,
       failed_tx_rate: 0,
@@ -83,6 +87,7 @@ const EXPECTED_STATUS = {
     },
     out_of_range_counts: {
       avg_block_time_sec: 0,
+      block_weight_utilization_pct: 0,
       failed_tx_rate: 0,
       gas_utilization_pct: 0,
     },
@@ -108,6 +113,8 @@ const EXPECTED_DERIVED_METRICS = {
     avg_block_time_sec__ma30: 600,
     block_count_daily__ma7: 2,
     block_count_daily__ma30: 2,
+    block_weight_utilization_pct__ma7: 0.75,
+    block_weight_utilization_pct__ma30: 0.75,
     failed_tx_rate__ma7: 0.5,
     failed_tx_rate__ma30: 0.5,
     median_tx_fee_native__ma7: 0.25,
@@ -126,6 +133,8 @@ const EXPECTED_DERIVED_METRICS = {
     avg_block_time_sec__ma30: 600,
     block_count_daily__ma7: 2,
     block_count_daily__ma30: 2,
+    block_weight_utilization_pct__ma7: 0.5625,
+    block_weight_utilization_pct__ma30: 0.5625,
     failed_tx_rate__ma7: 0.25,
     failed_tx_rate__ma30: 0.25,
     median_tx_fee_native__ma7: 0.375,
@@ -144,6 +153,8 @@ const EXPECTED_DERIVED_METRICS = {
     avg_block_time_sec__ma30: 600,
     block_count_daily__ma7: 2,
     block_count_daily__ma30: 2,
+    block_weight_utilization_pct__ma7: 0.7083333333333334,
+    block_weight_utilization_pct__ma30: 0.7083333333333334,
     failed_tx_rate__ma7: 1 / 3,
     failed_tx_rate__ma30: 1 / 3,
     median_tx_fee_native__ma7: 0.5,
@@ -321,6 +332,7 @@ fixtures = {
         "statuses": [1, 0],
         "addresses": [("a1", "b1"), ("c1", "d1")],
         "timestamps": [1704067200, 1704067800],
+        "weights": [2000000.0, 4000000.0],
     },
     "2026-01-02": {
         "values": [2.0, 4.0],
@@ -328,6 +340,7 @@ fixtures = {
         "statuses": [1, 1],
         "addresses": [("a2", "b2"), ("c2", "d2")],
         "timestamps": [1704153600, 1704154200],
+        "weights": [1000000.0, 2000000.0],
     },
     "2026-01-03": {
         "values": [3.0, 5.0],
@@ -335,6 +348,7 @@ fixtures = {
         "statuses": [1, 0],
         "addresses": [("a3", "b3"), ("c3", "d3")],
         "timestamps": [1704240000, 1704240600],
+        "weights": [4000000.0, 4000000.0],
     },
 }
 
@@ -357,6 +371,7 @@ for day, spec in fixtures.items():
         "timestamp": spec["timestamps"],
         "gas_used": [100.0, 100.0],
         "gas_limit": [200.0, 200.0],
+        "weight": spec["weights"],
     })
     blocks.write_parquet(block_dir / "part-000.parquet")
 `;
@@ -516,13 +531,14 @@ try {
     throw new Error(`Golden fixture digest mismatch: ${runA.digest} != ${runB.digest}`);
   }
 
+  validateExpectedOutputs(runA.output);
+  validateExpectedOutputs(runB.output);
+
   if (runA.digest !== EXPECTED_GOLDEN_FIXTURE_DIGEST) {
     throw new Error(
       `Golden fixture digest ${runA.digest} does not match committed expected digest ${EXPECTED_GOLDEN_FIXTURE_DIGEST}`,
     );
   }
-  validateExpectedOutputs(runA.output);
-  validateExpectedOutputs(runB.output);
 
   const reportPath = path.join(WEB_ROOT, ".audit", "pipeline-golden-fixture", "pipeline-golden-fixture.md");
   writeReport(reportPath, runA, runB);
@@ -537,4 +553,3 @@ try {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
 }
-
