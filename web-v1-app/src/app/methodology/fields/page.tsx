@@ -85,6 +85,19 @@ const GOLD_FIELDS: FieldEntry[] = [
     ),
   },
   {
+    field: "median_block_base_fee_per_gas",
+    meaning: "Typical Ethereum protocol base fee per unit of gas across blocks produced that day.",
+    notes: (
+      <>
+        Ethereum-only observational transaction-cost field calculated as the daily median of block
+        <FieldCode>base_fee_per_gas</FieldCode>. It describes the protocol-set base price for gas
+        before transaction-specific priority fees. Values are published in the raw chain unit from
+        the source schema, are null for non-Ethereum chains, and do not yet drive the public regime
+        label, scorecard, or confidence calculation while historical behaviour is being validated.
+      </>
+    ),
+  },
+  {
     field: "block_gas_utilization_p90",
     meaning: "90th-percentile Ethereum block gas utilization for the day.",
     notes: (

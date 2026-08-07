@@ -11,7 +11,7 @@ const CHAIN = "bitcoin";
 const DAYS = ["2026-01-01", "2026-01-02", "2026-01-03"];
 const FIXED_GENERATED_AT_UTC = "2026-01-04T00:00:00Z";
 const FIXED_UTC_TODAY = "2026-01-04";
-const EXPECTED_GOLDEN_FIXTURE_DIGEST = "4b5dc2e8e8f72319b71317a647e90d4616645558e20c4c9ada2feaaa5e50b5cc";
+const EXPECTED_GOLDEN_FIXTURE_DIGEST = "063acd35d96df5dbca018cc25a16f4735bd33c957e1a68fcb459719af36fddfe";
 
 const EXPECTED_GOLD_DAYS = {
   "2026-01-01": {
@@ -100,7 +100,7 @@ const EXPECTED_STATUS = {
     },
   },
   fixes: {
-    applied: ["gas_utilization_pct_null_for_btc", "block_gas_utilization_p90_null_for_non_eth"],
+    applied: ["gas_utilization_pct_null_for_btc", "median_block_base_fee_per_gas_null_for_non_eth", "block_gas_utilization_p90_null_for_non_eth"],
     notes: [],
   },
   raw_context: {
@@ -417,6 +417,7 @@ pl.DataFrame({
     "timestamp": [1704067200 + 12 * i for i in range(10)],
     "gas_used": [10., 20., 30., 40., 50., 60., 70., 80., 90., 100.],
     "gas_limit": [100.] * 10,
+    "base_fee_per_gas": [10., 20., 30., 40., 50., 60., 70., 80., 90., 100.],
 }).write_parquet(out / "part-000.parquet")
 `;
   runCommand(PYTHON, ["-c", createCode, blockDir]);
@@ -436,11 +437,12 @@ from pathlib import Path
 import polars as pl
 p = Path(sys.argv[1]) / "ethereum" / "2026-01-01.parquet"
 df = pl.read_parquet(p)
-print(json.dumps({"value": df["block_gas_utilization_p90"][0]}))
+print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0]}))
 `;
   const result = runCommand(PYTHON, ["-c", checkCode, featuresRoot]);
   const parsed = JSON.parse(result.stdout.trim());
-  assertClose(parsed.value, 0.9, "ethereum.block_gas_utilization_p90");
+  assertClose(parsed.p90, 0.9, "ethereum.block_gas_utilization_p90");
+  assertClose(parsed.base_fee, 55, "ethereum.median_block_base_fee_per_gas");
 }
 
 function runFixtureOnce(parent, runName) {
