@@ -45,8 +45,8 @@ replace_once(fields,
 
 golden = ROOT / "web-v1-app/scripts/pipeline-golden-fixture.mjs"
 replace_once(golden,
-'''    "receipt_contract_address": [null, "0xcontract1", null, null],\n''',
-'''    "receipt_contract_address": [null, "0xcontract1", null, null],\n    "transaction_type": [0, 2, "0x2", 1],\n''')
+'''    "receipt_contract_address": [None, "", "0xabc123", None],\n''',
+'''    "receipt_contract_address": [None, "", "0xabc123", None],\n    "transaction_type": [0, 2, 2, 1],\n''')
 replace_once(golden,
 '''print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0], "tx_gas": df["median_tx_gas_used"][0], "calldata_share": df["nonempty_calldata_share"][0], "contract_creation_share": df["contract_creation_tx_share"][0]}))''',
 '''print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0], "tx_gas": df["median_tx_gas_used"][0], "calldata_share": df["nonempty_calldata_share"][0], "contract_creation_share": df["contract_creation_tx_share"][0], "type2_share": df["eip1559_type2_tx_share"][0]}))''')
@@ -61,7 +61,6 @@ if data.get("methodology_version") != "1.8":
 data["methodology_version"] = "1.9"
 manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
-# Run once to obtain the new deterministic digest, then synchronize both committed expectations.
 proc = subprocess.run(["npm", "run", "check:pipeline-golden-fixture"], cwd=ROOT / "web-v1-app", text=True, capture_output=True)
 combined = proc.stdout + "\n" + proc.stderr
 m = re.search(r"Golden fixture digest ([0-9a-f]{64}) does not match committed expected digest", combined)
