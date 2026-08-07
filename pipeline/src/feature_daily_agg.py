@@ -18,6 +18,7 @@ CANON_COLS = [
     "value_transferred_native",
     "median_tx_value_native",
     "median_tx_fee_native",
+    "median_tx_fee_rate_sat_vbyte",
     "failed_tx_rate",
     "gas_utilization_pct",
     "block_weight_utilization_pct",
@@ -144,6 +145,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
     value_sum = pl.LazyFrame({"value_transferred_native": [None]})
     value_med = pl.LazyFrame({"median_tx_value_native": [None]})
     median_fee = pl.LazyFrame({"median_tx_fee_native": [None]})
+    median_fee_rate = pl.LazyFrame({"median_tx_fee_rate_sat_vbyte": [None]})
     failed_tx_rate = pl.LazyFrame({"failed_tx_rate": [None]})
     unique_addrs = pl.LazyFrame({"unique_active_addresses": [None]})
 
@@ -191,6 +193,19 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
 
         if fee_expr is not None:
             median_fee = tx.select(fee_expr)
+
+        # Bitcoin fee rate: fee is expressed in BTC in the AWS/bitcoin-etl
+        # transaction schema, while virtual_size is measured in virtual bytes.
+        # Convert BTC -> satoshis before dividing, and publish the daily median.
+        if str(chain).lower() in {"bitcoin", "btc"} and _ci_has(tx_ci, "fee") and _ci_has(tx_ci, "virtual_size"):
+            fee_btc = _ci_safe_f64(tx_ci, "fee")
+            virtual_size = _ci_safe_f64(tx_ci, "virtual_size")
+            fee_rate = pl.when(
+                fee_btc.is_not_null() & virtual_size.is_not_null() & (virtual_size > 0)
+            ).then((fee_btc * pl.lit(100_000_000.0)) / virtual_size).otherwise(None)
+            if _ci_has(tx_ci, "is_coinbase"):
+                fee_rate = pl.when(_ci_col(tx_ci, "is_coinbase") == False).then(fee_rate).otherwise(None)  # noqa: E712
+            median_fee_rate = tx.select(fee_rate.median().alias("median_tx_fee_rate_sat_vbyte"))
 
         # failed_tx_rate
         if _ci_has(tx_ci, "receipt_status"):
@@ -287,6 +302,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
         .join(value_sum, how="cross")
         .join(value_med, how="cross")
         .join(median_fee, how="cross")
+        .join(median_fee_rate, how="cross")
         .join(failed_tx_rate, how="cross")
         .join(gas_util, how="cross")
         .join(block_weight_util, how="cross")
@@ -343,6 +359,19 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
                 .otherwise(None)
                 .alias("gas_utilization_pct")
             )
+
+    if "median_tx_fee_rate_sat_vbyte" in out.columns:
+        if prof == "btc":
+            out = out.with_columns(
+                pl.when(pl.col("median_tx_fee_rate_sat_vbyte").is_null())
+                .then(None)
+                .when(pl.col("median_tx_fee_rate_sat_vbyte") >= 0)
+                .then(pl.col("median_tx_fee_rate_sat_vbyte"))
+                .otherwise(None)
+                .alias("median_tx_fee_rate_sat_vbyte")
+            )
+        else:
+            out = out.with_columns(pl.lit(None).alias("median_tx_fee_rate_sat_vbyte"))
 
     if "block_weight_utilization_pct" in out.columns:
         if prof == "btc":

@@ -47,6 +47,20 @@ const GOLD_FIELDS: FieldEntry[] = [
     notes: "Published as a median, not an arithmetic average. Drives the Friction axis for every current chain profile.",
   },
   {
+    field: "median_tx_fee_rate_sat_vbyte",
+    meaning: "Typical Bitcoin transaction fee rate in satoshis per virtual byte.",
+    notes: (
+      <>
+        Bitcoin-only observational friction field calculated as the daily median of{" "}
+        <FieldCode>(fee_BTC × 100,000,000) / virtual_size</FieldCode> for valid transactions.
+        Coinbase transactions are excluded when the source flag is available, and non-positive
+        virtual sizes are ignored. The field is null for non-Bitcoin chains and does not yet drive
+        the public regime label, scorecard, or confidence calculation while historical behaviour is
+        being validated.
+      </>
+    ),
+  },
+  {
     field: "failed_tx_rate",
     meaning: "Share of transactions that did not succeed.",
     notes: (
