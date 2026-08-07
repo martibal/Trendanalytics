@@ -41,6 +41,7 @@ CANON_COLS = [
     "median_tx_fee_rate_sat_vbyte",
     "median_tx_gas_used",
     "nonempty_calldata_share",
+    "contract_creation_tx_share",
     "failed_tx_rate",
     "gas_utilization_pct",
     "median_block_base_fee_per_gas",
@@ -314,6 +315,20 @@ def _apply_guardrails(df: pl.DataFrame, chain: str) -> Tuple[pl.DataFrame, Dict[
         else:
             df = df.with_columns(pl.lit(None).alias("nonempty_calldata_share"))
 
+    # contract_creation_tx_share: Ethereum-only ratio in [0,1].
+    if "contract_creation_tx_share" in df.columns:
+        if prof == "eth":
+            df = df.with_columns(
+                pl.when(pl.col("contract_creation_tx_share").is_null())
+                .then(None)
+                .when((pl.col("contract_creation_tx_share") >= 0.0) & (pl.col("contract_creation_tx_share") <= 1.0))
+                .then(pl.col("contract_creation_tx_share"))
+                .otherwise(None)
+                .alias("contract_creation_tx_share")
+            )
+        else:
+            df = df.with_columns(pl.lit(None).alias("contract_creation_tx_share"))
+
     # median_tx_gas_used: Ethereum-only, non-negative gas units.
     if "median_tx_gas_used" in df.columns:
         if prof == "eth":
@@ -415,6 +430,15 @@ def _quality_summary(df: pl.DataFrame, chain: str) -> Dict[str, object]:
             )
         else:
             out_of_range["nonempty_calldata_share"] = 0
+
+    # contract_creation_tx_share: Ethereum-only ratio in [0,1].
+    if "contract_creation_tx_share" in df.columns:
+        if prof == "eth":
+            out_of_range["contract_creation_tx_share"] = int(
+                df.select(((pl.col("contract_creation_tx_share").is_not_null()) & ((pl.col("contract_creation_tx_share") < 0.0) | (pl.col("contract_creation_tx_share") > 1.0))).sum()).item()
+            )
+        else:
+            out_of_range["contract_creation_tx_share"] = 0
 
     # median_tx_gas_used: Ethereum-only non-negative gas units.
     if "median_tx_gas_used" in df.columns:
