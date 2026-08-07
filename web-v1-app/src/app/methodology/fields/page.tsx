@@ -47,20 +47,6 @@ const GOLD_FIELDS: FieldEntry[] = [
     notes: "Published as a median, not an arithmetic average. Drives the Friction axis for every current chain profile.",
   },
   {
-    field: "median_tx_fee_rate_sat_vbyte",
-    meaning: "Typical Bitcoin transaction fee rate in satoshis per virtual byte.",
-    notes: (
-      <>
-        Bitcoin-only observational friction field calculated as the daily median of{" "}
-        <FieldCode>(fee_BTC × 100,000,000) / virtual_size</FieldCode> for valid transactions.
-        Coinbase transactions are excluded when the source flag is available, and non-positive
-        virtual sizes are ignored. The field is null for non-Bitcoin chains and does not yet drive
-        the public regime label, scorecard, or confidence calculation while historical behaviour is
-        being validated.
-      </>
-    ),
-  },
-  {
     field: "failed_tx_rate",
     meaning: "Share of transactions that did not succeed.",
     notes: (
@@ -421,80 +407,236 @@ function AxisMappingTable() {
   );
 }
 
-export default function FieldsMethodologyPage() {
+export default function MethodologyFieldsPage() {
   return (
     <MethodologyPageShell>
       <MethodologyHeader
-        eyebrow="Methodology"
         title="Field Dictionary"
-        intro="A compact reference for the published Gold, Meta, Briefs, and scorecard fields that matter for interpretation, reproducibility, and integration."
+        description="This page defines the public meaning of the main published fields and the interpretation warnings that matter most for technical users."
       />
 
-      <MethodologyNav />
-
       <MethodologyContent>
-        <Section title="Gold fields">
-          <ShortFullContent
-            short={
-              <>
+        <MethodologyNav />
+
+        <ShortFullContent
+          pageKey="methodology-fields"
+          summary={
+            <>
+              Use this page to look up what a published field means, how to interpret it, and whether
+              it is directly reproducible or only independently checkable.
+            </>
+          }
+          bullets={[
+            <>
+              Field Dictionary is for meaning and interpretation. Use Schema Reference when you need
+              structural contract detail for parsing.
+            </>,
+            <>
+              Confidence v2 fields explain why data quality can be high while label confidence remains
+              modest, and why non-applicable fields are not counted as missing evidence.
+            </>,
+            <>
+              Basic meaning comes first. Advanced and traceability detail remain available in the full
+              version.
+            </>,
+          ]}
+          whyItMatters={
+            <>
+              Users should be able to resolve field meaning quickly without scanning the entire
+              methodology section every time.
+            </>
+          }
+          fullContent={
+            <div className="grid gap-6">
+              <Section title="How to use this page">
+                <div className="space-y-3">
+                  <p>
+                    Use this page when you already know the field name and need the public meaning,
+                    unit semantics, verification class, and interpretation boundaries. For deeper
+                    system-level logic, use the Public Methodology Reference page.
+                  </p>
+                  <p>
+                    Long field paths are shown in wrapping code blocks and cards rather than compact
+                    tables, so the page remains readable on laptop and mobile widths.
+                  </p>
+                </div>
+              </Section>
+
+              <NotePanel title="Where Gold fields come from">
                 <p>
-                  Gold is the canonical daily observation layer. These fields describe the chain day before regime classification and confidence logic are applied.
+                  Every Gold field is derived from two raw tables per chain — <FieldCode>blocks</FieldCode>{" "}
+                  and <FieldCode>transactions</FieldCode> — sourced from the AWS Public Blockchain Dataset.
+                  Column names vary slightly across chains and over time; the pipeline resolves a
+                  prioritized list of known candidate names per concept (case-insensitive) before falling
+                  back to null rather than guessing.
                 </p>
+              </NotePanel>
+
+              <Section title="Key Gold fields">
                 <FieldGrid entries={GOLD_FIELDS} />
-              </>
-            }
-            full={
-              <div className="space-y-5">
-                <Callout title="Interpretation rule">
-                  Gold fields are descriptive observations. A field appearing in Gold does not automatically mean it is an active regime driver for every chain profile.
+              </Section>
+
+              <Section title="Which field drives which axis, per chain">
+                <p>
+                  The same nine Gold metric fields are not used identically across chains. Each chain profile
+                  (BTC, ETH L1, L2) has its own Demand / Friction / Capacity component list, weights, and
+                  transform. This table mirrors <FieldCode>PROFILE_COMPONENTS</FieldCode> in the scoring
+                  engine directly, so documentation drift is caught by the field-dictionary sync gate.
+                </p>
+                <AxisMappingTable />
+              </Section>
+
+              <Section title="Key Meta fields">
+                <FieldGrid entries={META_FIELDS} />
+              </Section>
+
+              <Section title="Key Briefs fields">
+                <FieldGrid entries={BRIEF_FIELDS} />
+              </Section>
+
+              <Section title="Field note: Confidence v2">
+                <NotePanel title="Composite confidence">
+                  <p>
+                    <FieldCode>confidence.confidence_score</FieldCode> is not a standalone judgement.
+                    It is the geometric mean of data quality and label confidence.
+                  </p>
+                  <FormulaBlock>{"sqrt(data_quality_score × label_confidence_score)"}</FormulaBlock>
+                  <p>
+                    A row can therefore have perfect data quality and still have moderate confidence if
+                    the label evidence is thin, adjacent, or mixed.
+                  </p>
+                </NotePanel>
+                <NotePanel title="Profile-aware data quality">
+                  <p>
+                    <FieldCode>confidence.components.data_quality.required_metrics</FieldCode> lists the
+                    metrics that actually count toward coverage for this chain profile.
+                  </p>
+                  <p>
+                    <FieldCode>structurally_not_applicable</FieldCode> fields are excluded from the
+                    denominator. <FieldCode>optional_not_penalized</FieldCode> fields remain visible but
+                    do not reduce confidence when absent.
+                  </p>
+                </NotePanel>
+                <WarningCallout title="Important interpretation warning">
+                  <p>
+                    A higher <FieldCode>data_quality_score</FieldCode> after Confidence v2 does not mean
+                    the model became more optimistic. It means the data-quality denominator now matches
+                    the evidence surface that is actually meaningful for that chain.
+                  </p>
+                </WarningCallout>
+              </Section>
+
+              <Section title="Field note: status explanations">
+                <p>
+                  <FieldCode>status.one_liner</FieldCode> is the public readable explanation of the
+                  current state. For borderline stable rows it can now explicitly state that the scorecard
+                  shows adjacent pressure while the regime-axis evidence did not cross the threshold for
+                  <FieldCode>HEATING</FieldCode>, <FieldCode>CHEAP</FieldCode>, or <FieldCode>CONGESTED</FieldCode>.
+                </p>
+                <Callout title="Why this matters">
+                  <p>
+                    The scorecard is a continuous descriptive surface. The regime label is a categorical
+                    thresholded state. They should be read together, but they are not identical. The status
+                    text is allowed to explain that distinction.
+                  </p>
                 </Callout>
-                <FieldGrid entries={GOLD_FIELDS} />
-              </div>
-            }
-          />
-        </Section>
+              </Section>
 
-        <Section title="Meta and confidence fields">
-          <FieldGrid entries={META_FIELDS} />
-        </Section>
+              <Section title="Field note: scorecard dimensions">
+                <p>
+                  <FieldCode>scorecard.dimensions.&lt;axis&gt;.score</FieldCode> is the published
+                  confidence-degraded display score for an axis.
+                </p>
+                <FieldGrid entries={SCORECARD_FIELDS} />
+                <FormulaBlock>{"50 + (raw - 50) × effective_confidence"}</FormulaBlock>
+                <Callout title="Interpretation boundary">
+                  <p>
+                    Customers can fully verify the published display score from published row inputs.
+                    That does not mean the entire raw-score construction is fully reconstructable from
+                    public documentation alone.
+                  </p>
+                </Callout>
+              </Section>
 
-        <Section title="Briefs fields">
-          <FieldGrid entries={BRIEF_FIELDS} />
-        </Section>
+              <Section title="Field note: regime drivers z robust">
+                <NotePanel title="Driver z-score">
+                  <p>
+                    <FieldCode>regime.drivers[].z_robust</FieldCode> is the driver-layer z-score
+                    published for a regime driver row. It is computed from 180-day raw daily values, not
+                    from the 7-day smoothed scorecard series.
+                  </p>
+                </NotePanel>
+                <WarningCallout title="Important comparison warning">
+                  <p>
+                    Do not expect <FieldCode>regime.drivers[].z_robust</FieldCode> to numerically match a
+                    scorecard dimension score or the internal z-family behind that score. The driver
+                    z-score and the scorecard normalization use different input series, different windows,
+                    and different purposes.
+                  </p>
+                </WarningCallout>
+              </Section>
 
-        <Section title="Scorecard fields">
-          <FieldGrid entries={SCORECARD_FIELDS} />
-        </Section>
+              <Section title="Field note: fee burden proxy">
+                <NotePanel title="Current value">
+                  <p>
+                    <FieldCode>scorecard.dimensions.friction.components.fee_burden_proxy.current</FieldCode>{" "}
+                    is not a native fee amount. It is the current value of an internal friction proxy.
+                  </p>
+                  <FormulaBlock>{"median_tx_fee_native / median_tx_value_native"}</FormulaBlock>
+                  <p>
+                    Its unit is a dimensionless ratio, not a native-denominated fee. It measures fee
+                    burden relative to transaction value, not fee size in isolation.
+                  </p>
+                </NotePanel>
+                <Callout title="Why this matters">
+                  <p>
+                    A friction score can be elevated even when absolute fees are not unusually high in
+                    native terms, because the friction component is based on fee burden relative to
+                    transferred value. Customers should read this field as a burden proxy rather than as
+                    a direct fee amount.
+                  </p>
+                </Callout>
+              </Section>
 
-        <Section title="Current axis mapping">
-          <p className="text-sm leading-7 text-[var(--ink2)]">
-            This table documents the active scorecard inputs by chain profile. Observational fields that are published but not yet promoted into scorecard or regime logic are intentionally omitted here.
-          </p>
-          <AxisMappingTable />
-        </Section>
+              <Section title="Field note: Bitcoin blocktime instability">
+                <NotePanel title="BTC capacity component">
+                  <p>
+                    For BTC capacity interpretation, the capacity axis does not score raw block time
+                    directionally and does not combine with gas utilization. For BTC,{" "}
+                    <FieldCode>blocktime_instability</FieldCode> is the only capacity component.
+                  </p>
+                  <FormulaBlock>{"|block_time - median30(block_time)| / median30(block_time)"}</FormulaBlock>
+                  <p>The field is then smoothed before scoring.</p>
+                </NotePanel>
+                <WarningCallout title="Directional consequence">
+                  <p>
+                    This means the BTC capacity score is not a direct measure of slow blocks only. It is a
+                    measure of unusual block-time behaviour around the recent norm in either direction.
+                    Customers should read BTC capacity as a stress-or-instability proxy, not as a
+                    directional slow-block indicator.
+                  </p>
+                </WarningCallout>
+              </Section>
 
-        <Section title="Derived scorecard display formula">
-          <FormulaBlock>{"score = 50 + (score_raw - 50) × effective_confidence"}</FormulaBlock>
-          <p className="text-sm leading-7 text-[var(--ink2)]">
-            The published score is confidence-degraded toward neutral 50. The raw score and effective confidence remain available for audit and interpretation.
-          </p>
-        </Section>
-
-        <Section title="Important boundaries">
-          <div className="grid gap-4 md:grid-cols-2">
-            <NotePanel title="Descriptive, not predictive">
-              <p>Fields describe observed network conditions. They are not forecasts, recommendations, or price signals.</p>
-            </NotePanel>
-            <NotePanel title="Chain semantics matter">
-              <p>
-                Structurally non-applicable fields are not treated as missing evidence. Bitcoin, Ethereum L1, and L2 profiles can therefore expose different valid evidence surfaces.
-              </p>
-            </NotePanel>
-          </div>
-          <WarningCallout title="Do not infer user identity">
-            Address counts, transaction counts, and related fields describe on-chain observations. They do not establish the number of unique people or entities using a chain.
-          </WarningCallout>
-        </Section>
+              <Section title="Field note: regime label stability">
+                <p>
+                  <FieldCode>regime.label</FieldCode> is a daily descriptive state, not a built-in
+                  multi-day stable segmentation layer.
+                </p>
+                <WarningCallout title="Downstream use warning">
+                  <p>
+                    Labels can change day to day in response to threshold crossings. This matters most for{" "}
+                    <FieldCode>CONGESTED</FieldCode> and <FieldCode>CHEAP</FieldCode>, which do not have a
+                    separate universal multi-day confirmation window. <FieldCode>HEATING</FieldCode> depends
+                    in part on a trend condition and therefore has a different stability profile. Customers
+                    who need multi-day regime stability should apply their own minimum-duration or smoothing
+                    rule.
+                  </p>
+                </WarningCallout>
+              </Section>
+            </div>
+          }
+        />
       </MethodologyContent>
     </MethodologyPageShell>
   );
