@@ -35,6 +35,18 @@ jobs:
         working-directory: web-v1-app
         run: npm ci
 
+      - name: Align sync-script fixture expectation
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('.agent/eth_gas_p90_sync.py')
+          text = p.read_text(encoding='utf-8')
+          anchor = 'fixture = "web-v1-app/scripts/pipeline-golden-fixture.mjs"\n'
+          addition = '''replace_once(\n    "web-v1-app/scripts/pipeline-golden-fixture.mjs",\n    '    applied: ["gas_utilization_pct_null_for_btc"],',\n    '    applied: ["gas_utilization_pct_null_for_btc", "block_gas_utilization_p90_null_for_non_eth"],',\n)\n\n'''
+          if anchor not in text:
+              raise SystemExit('Could not find fixture anchor in sync script')
+          p.write_text(text.replace(anchor, addition + anchor, 1), encoding='utf-8')
+
       - name: Apply synchronized product change
         run: python .agent/eth_gas_p90_sync.py
 
