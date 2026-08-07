@@ -39,6 +39,7 @@ CANON_COLS = [
     "median_tx_value_native",
     "median_tx_fee_native",
     "median_tx_fee_rate_sat_vbyte",
+    "median_tx_gas_used",
     "failed_tx_rate",
     "gas_utilization_pct",
     "median_block_base_fee_per_gas",
@@ -298,6 +299,21 @@ def _apply_guardrails(df: pl.DataFrame, chain: str) -> Tuple[pl.DataFrame, Dict[
             df = df.with_columns(pl.lit(None).alias("block_weight_utilization_pct"))
             fixes["applied"].append("block_weight_utilization_pct_null_for_non_btc")
 
+    # median_tx_gas_used: Ethereum-only, non-negative gas units.
+    if "median_tx_gas_used" in df.columns:
+        if prof == "eth":
+            df = df.with_columns(
+                pl.when(pl.col("median_tx_gas_used").is_null())
+                .then(None)
+                .when(pl.col("median_tx_gas_used") >= 0.0)
+                .then(pl.col("median_tx_gas_used"))
+                .otherwise(None)
+                .alias("median_tx_gas_used")
+            )
+        else:
+            df = df.with_columns(pl.lit(None).alias("median_tx_gas_used"))
+            fixes["applied"].append("median_tx_gas_used_null_for_non_eth")
+
     # median_block_base_fee_per_gas: Ethereum-only, non-negative raw chain unit.
     if "median_block_base_fee_per_gas" in df.columns:
         if prof == "eth":
@@ -375,6 +391,15 @@ def _quality_summary(df: pl.DataFrame, chain: str) -> Dict[str, object]:
             null_rates[c] = 1.0
 
     out_of_range: Dict[str, int] = {}
+
+    # median_tx_gas_used: Ethereum-only non-negative gas units.
+    if "median_tx_gas_used" in df.columns:
+        if prof == "eth":
+            out_of_range["median_tx_gas_used"] = int(
+                df.select(((pl.col("median_tx_gas_used").is_not_null()) & (pl.col("median_tx_gas_used") < 0.0)).sum()).item()
+            )
+        else:
+            out_of_range["median_tx_gas_used"] = 0
 
     # median_block_base_fee_per_gas: Ethereum-only non-negative raw chain unit.
     if "median_block_base_fee_per_gas" in df.columns:

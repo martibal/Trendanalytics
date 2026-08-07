@@ -11,7 +11,7 @@ const CHAIN = "bitcoin";
 const DAYS = ["2026-01-01", "2026-01-02", "2026-01-03"];
 const FIXED_GENERATED_AT_UTC = "2026-01-04T00:00:00Z";
 const FIXED_UTC_TODAY = "2026-01-04";
-const EXPECTED_GOLDEN_FIXTURE_DIGEST = "063acd35d96df5dbca018cc25a16f4735bd33c957e1a68fcb459719af36fddfe";
+const EXPECTED_GOLDEN_FIXTURE_DIGEST = "1a225eac0abdf4e0608892e7899a2be7b9f2a15a945d47d9a61f45151ce36819";
 
 const EXPECTED_GOLD_DAYS = {
   "2026-01-01": {
@@ -85,6 +85,7 @@ const EXPECTED_STATUS = {
       gas_utilization_pct: 1,
       median_tx_fee_native: 0,
       median_tx_fee_rate_sat_vbyte: 0,
+      median_tx_gas_used: 1,
       median_tx_value_native: 0,
       tx_count_daily: 0,
       unique_active_addresses: 0,
@@ -97,10 +98,11 @@ const EXPECTED_STATUS = {
       failed_tx_rate: 0,
       gas_utilization_pct: 0,
       median_tx_fee_rate_sat_vbyte: 0,
+      median_tx_gas_used: 0,
     },
   },
   fixes: {
-    applied: ["gas_utilization_pct_null_for_btc", "median_block_base_fee_per_gas_null_for_non_eth", "block_gas_utilization_p90_null_for_non_eth"],
+    applied: ["gas_utilization_pct_null_for_btc", "median_tx_gas_used_null_for_non_eth", "median_block_base_fee_per_gas_null_for_non_eth", "block_gas_utilization_p90_null_for_non_eth"],
     notes: [],
   },
   raw_context: {
@@ -406,21 +408,27 @@ function validateEthereumBlockGasP90(parent) {
   const featuresRoot = path.join(runRoot, "features_agg");
   const day = "2026-01-01";
   const blockDir = path.join(rawRoot, "ethereum", "blocks", `date=${day}`);
+  const txDir = path.join(rawRoot, "ethereum", "transactions", `date=${day}`);
   fs.mkdirSync(blockDir, { recursive: true });
+  fs.mkdirSync(txDir, { recursive: true });
 
   const createCode = String.raw`
 import sys
 from pathlib import Path
 import polars as pl
 out = Path(sys.argv[1])
+tx_out = Path(sys.argv[2])
 pl.DataFrame({
     "timestamp": [1704067200 + 12 * i for i in range(10)],
     "gas_used": [10., 20., 30., 40., 50., 60., 70., 80., 90., 100.],
     "gas_limit": [100.] * 10,
     "base_fee_per_gas": [10., 20., 30., 40., 50., 60., 70., 80., 90., 100.],
 }).write_parquet(out / "part-000.parquet")
+pl.DataFrame({
+    "receipt_gas_used": [21000., 30000., 45000., 55000.],
+}).write_parquet(tx_out / "part-000.parquet")
 `;
-  runCommand(PYTHON, ["-c", createCode, blockDir]);
+  runCommand(PYTHON, ["-c", createCode, blockDir, txDir]);
 
   runCommand(PYTHON, [
     path.join(REPO_ROOT, "pipeline", "src", "feature_daily_agg.py"),
@@ -437,12 +445,13 @@ from pathlib import Path
 import polars as pl
 p = Path(sys.argv[1]) / "ethereum" / "2026-01-01.parquet"
 df = pl.read_parquet(p)
-print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0]}))
+print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0], "tx_gas": df["median_tx_gas_used"][0]}))
 `;
   const result = runCommand(PYTHON, ["-c", checkCode, featuresRoot]);
   const parsed = JSON.parse(result.stdout.trim());
   assertClose(parsed.p90, 0.9, "ethereum.block_gas_utilization_p90");
   assertClose(parsed.base_fee, 55, "ethereum.median_block_base_fee_per_gas");
+  assertClose(parsed.tx_gas, 37500, "ethereum.median_tx_gas_used");
 }
 
 function runFixtureOnce(parent, runName) {

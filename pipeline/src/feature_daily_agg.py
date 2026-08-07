@@ -19,6 +19,7 @@ CANON_COLS = [
     "median_tx_value_native",
     "median_tx_fee_native",
     "median_tx_fee_rate_sat_vbyte",
+    "median_tx_gas_used",
     "failed_tx_rate",
     "gas_utilization_pct",
     "median_block_base_fee_per_gas",
@@ -148,6 +149,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
     value_med = pl.LazyFrame({"median_tx_value_native": [None]})
     median_fee = pl.LazyFrame({"median_tx_fee_native": [None]})
     median_fee_rate = pl.LazyFrame({"median_tx_fee_rate_sat_vbyte": [None]})
+    median_tx_gas_used = pl.LazyFrame({"median_tx_gas_used": [None]})
     failed_tx_rate = pl.LazyFrame({"failed_tx_rate": [None]})
     unique_addrs = pl.LazyFrame({"unique_active_addresses": [None]})
 
@@ -208,6 +210,16 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
             if _ci_has(tx_ci, "is_coinbase"):
                 fee_rate = pl.when(_ci_col(tx_ci, "is_coinbase") == False).then(fee_rate).otherwise(None)  # noqa: E712
             median_fee_rate = tx.select(fee_rate.median().alias("median_tx_fee_rate_sat_vbyte"))
+
+        # Ethereum execution intensity: median gas actually consumed by transactions.
+        # Prefer receipt_gas_used; fall back to transaction gas_used only when needed.
+        if str(chain).lower() in {"ethereum", "eth"}:
+            tx_gas_col = next((c for c in ["receipt_gas_used", "gas_used"] if _ci_has(tx_ci, c)), None)
+            if tx_gas_col is not None:
+                tx_gas = _ci_safe_f64(tx_ci, tx_gas_col)
+                median_tx_gas_used = tx.select(
+                    pl.when(tx_gas >= 0.0).then(tx_gas).otherwise(None).median().alias("median_tx_gas_used")
+                )
 
         # failed_tx_rate
         if _ci_has(tx_ci, "receipt_status"):
@@ -325,6 +337,7 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
         .join(value_med, how="cross")
         .join(median_fee, how="cross")
         .join(median_fee_rate, how="cross")
+        .join(median_tx_gas_used, how="cross")
         .join(failed_tx_rate, how="cross")
         .join(gas_util, how="cross")
         .join(median_base_fee, how="cross")
@@ -383,6 +396,19 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
                 .otherwise(None)
                 .alias("gas_utilization_pct")
             )
+
+    if "median_tx_gas_used" in out.columns:
+        if prof == "eth":
+            out = out.with_columns(
+                pl.when(pl.col("median_tx_gas_used").is_null())
+                .then(None)
+                .when(pl.col("median_tx_gas_used") >= 0.0)
+                .then(pl.col("median_tx_gas_used"))
+                .otherwise(None)
+                .alias("median_tx_gas_used")
+            )
+        else:
+            out = out.with_columns(pl.lit(None).alias("median_tx_gas_used"))
 
     if "median_block_base_fee_per_gas" in out.columns:
         if prof == "eth":
