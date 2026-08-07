@@ -11,7 +11,7 @@ const CHAIN = "bitcoin";
 const DAYS = ["2026-01-01", "2026-01-02", "2026-01-03"];
 const FIXED_GENERATED_AT_UTC = "2026-01-04T00:00:00Z";
 const FIXED_UTC_TODAY = "2026-01-04";
-const EXPECTED_GOLDEN_FIXTURE_DIGEST = "1a225eac0abdf4e0608892e7899a2be7b9f2a15a945d47d9a61f45151ce36819";
+const EXPECTED_GOLDEN_FIXTURE_DIGEST = "1ff93ff5b5ff56b960db0f34fd324ea6e58be0e2a35fde4f6771f678279fc3a3";
 
 const EXPECTED_GOLD_DAYS = {
   "2026-01-01": {
@@ -426,6 +426,7 @@ pl.DataFrame({
 }).write_parquet(out / "part-000.parquet")
 pl.DataFrame({
     "receipt_gas_used": [21000., 30000., 45000., 55000.],
+    "input": ["0x", "", "0x1234", "0xabcdef"],
 }).write_parquet(tx_out / "part-000.parquet")
 `;
   runCommand(PYTHON, ["-c", createCode, blockDir, txDir]);
@@ -445,13 +446,14 @@ from pathlib import Path
 import polars as pl
 p = Path(sys.argv[1]) / "ethereum" / "2026-01-01.parquet"
 df = pl.read_parquet(p)
-print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0], "tx_gas": df["median_tx_gas_used"][0]}))
+print(json.dumps({"p90": df["block_gas_utilization_p90"][0], "base_fee": df["median_block_base_fee_per_gas"][0], "tx_gas": df["median_tx_gas_used"][0], "calldata_share": df["nonempty_calldata_share"][0]}))
 `;
   const result = runCommand(PYTHON, ["-c", checkCode, featuresRoot]);
   const parsed = JSON.parse(result.stdout.trim());
   assertClose(parsed.p90, 0.9, "ethereum.block_gas_utilization_p90");
   assertClose(parsed.base_fee, 55, "ethereum.median_block_base_fee_per_gas");
   assertClose(parsed.tx_gas, 37500, "ethereum.median_tx_gas_used");
+  assertClose(parsed.calldata_share, 0.5, "ethereum.nonempty_calldata_share");
 }
 
 function runFixtureOnce(parent, runName) {

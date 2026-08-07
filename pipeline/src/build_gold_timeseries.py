@@ -40,6 +40,7 @@ CANON_COLS = [
     "median_tx_fee_native",
     "median_tx_fee_rate_sat_vbyte",
     "median_tx_gas_used",
+    "nonempty_calldata_share",
     "failed_tx_rate",
     "gas_utilization_pct",
     "median_block_base_fee_per_gas",
@@ -299,6 +300,20 @@ def _apply_guardrails(df: pl.DataFrame, chain: str) -> Tuple[pl.DataFrame, Dict[
             df = df.with_columns(pl.lit(None).alias("block_weight_utilization_pct"))
             fixes["applied"].append("block_weight_utilization_pct_null_for_non_btc")
 
+    # nonempty_calldata_share: Ethereum-only ratio in [0,1].
+    if "nonempty_calldata_share" in df.columns:
+        if prof == "eth":
+            df = df.with_columns(
+                pl.when(pl.col("nonempty_calldata_share").is_null())
+                .then(None)
+                .when((pl.col("nonempty_calldata_share") >= 0.0) & (pl.col("nonempty_calldata_share") <= 1.0))
+                .then(pl.col("nonempty_calldata_share"))
+                .otherwise(None)
+                .alias("nonempty_calldata_share")
+            )
+        else:
+            df = df.with_columns(pl.lit(None).alias("nonempty_calldata_share"))
+
     # median_tx_gas_used: Ethereum-only, non-negative gas units.
     if "median_tx_gas_used" in df.columns:
         if prof == "eth":
@@ -391,6 +406,15 @@ def _quality_summary(df: pl.DataFrame, chain: str) -> Dict[str, object]:
             null_rates[c] = 1.0
 
     out_of_range: Dict[str, int] = {}
+
+    # nonempty_calldata_share: Ethereum-only ratio in [0,1].
+    if "nonempty_calldata_share" in df.columns:
+        if prof == "eth":
+            out_of_range["nonempty_calldata_share"] = int(
+                df.select(((pl.col("nonempty_calldata_share").is_not_null()) & ((pl.col("nonempty_calldata_share") < 0.0) | (pl.col("nonempty_calldata_share") > 1.0))).sum()).item()
+            )
+        else:
+            out_of_range["nonempty_calldata_share"] = 0
 
     # median_tx_gas_used: Ethereum-only non-negative gas units.
     if "median_tx_gas_used" in df.columns:

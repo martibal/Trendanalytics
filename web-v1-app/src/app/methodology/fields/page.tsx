@@ -74,6 +74,20 @@ const GOLD_FIELDS: FieldEntry[] = [
     ),
   },
   {
+    field: "nonempty_calldata_share",
+    meaning: "Share of Ethereum transactions carrying non-empty calldata that day.",
+    notes: (
+      <>
+        Ethereum-only observational activity-composition field. A transaction counts as carrying
+        calldata when its <FieldCode>input</FieldCode> value is non-null and, after trimming, is
+        neither an empty string nor <FieldCode>0x</FieldCode>. The metric is published on a 0–1
+        scale, is null for non-Ethereum chains, and does not identify protocols, tokens, or user
+        intent. It does not yet drive the public regime label, scorecard, or confidence calculation
+        while historical behaviour is being validated.
+      </>
+    ),
+  },
+  {
     field: "failed_tx_rate",
     meaning: "Share of transactions that did not succeed.",
     notes: (
