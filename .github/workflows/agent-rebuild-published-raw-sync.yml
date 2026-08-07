@@ -1,0 +1,43 @@
+name: Agent rebuild published raw-history sync
+
+on:
+  push:
+    branches:
+      - agent/rebuild-published-raw-history
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: "!contains(github.event.head_commit.message, '[rebuild-raw-sync]')"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rebuild-published-raw-history
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply rebuild download-path change
+        shell: pwsh
+        run: python .agent/rebuild_published_raw_sync.py
+
+      - name: Verify targeted contract
+        shell: pwsh
+        run: |
+          python -m py_compile pipeline/tools/download_up_to_date_minimal.py
+          python -c "from pathlib import Path; t=Path('pipeline/tools/download_up_to_date_minimal.py').read_text(); assert '--include-published' in t; f=Path('pipeline/tools/full_pipeline.ps1').read_text(); assert 'CSS_REBUILD_START_DATE' in f and \"$downloadArgs += '--include-published'\" in f"
+
+      - name: Commit product changes
+        shell: pwsh
+        run: |
+          Remove-Item .agent/rebuild_published_raw_sync.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pipeline/tools/download_up_to_date_minimal.py pipeline/tools/full_pipeline.ps1 .agent/rebuild_published_raw_sync.py
+          git commit -m "Enable historical raw redownload for rebuild [rebuild-raw-sync]"
+          git push origin HEAD:agent/rebuild-published-raw-history
