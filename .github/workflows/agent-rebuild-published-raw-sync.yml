@@ -30,7 +30,16 @@ jobs:
         shell: pwsh
         run: |
           python -m py_compile pipeline/tools/download_up_to_date_minimal.py
-          python -c "from pathlib import Path; t=Path('pipeline/tools/download_up_to_date_minimal.py').read_text(); assert '--include-published' in t; f=Path('pipeline/tools/full_pipeline.ps1').read_text(); assert 'CSS_REBUILD_START_DATE' in f and \"$downloadArgs += '--include-published'\" in f"
+          @'
+          from pathlib import Path
+          downloader = Path('pipeline/tools/download_up_to_date_minimal.py').read_text(encoding='utf-8')
+          full = Path('pipeline/tools/full_pipeline.ps1').read_text(encoding='utf-8')
+          assert '--include-published' in downloader
+          assert 'CSS_REBUILD_START_DATE' in full
+          assert "$downloadArgs += '--include-published'" in full
+          assert "DefaultValue '2024-12-01'" in full
+          print('Targeted rebuild download contract passed.')
+          '@ | python -
 
       - name: Commit product changes
         shell: pwsh
