@@ -1,0 +1,148 @@
+name: Agent Ethereum Historical Rebuild
+
+on:
+  push:
+    branches:
+      - agent/ethereum-history-rebuild-run
+    paths:
+      - .github/workflows/agent-ethereum-history-rebuild.yml
+
+concurrency:
+  group: agent-ethereum-history-rebuild
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    env:
+      CSS_PYTHON: python
+      CSS_CHAINS: ethereum
+      CSS_REBUILD_START_DATE: "2024-12-01"
+      CSS_SYNC_WEB: "1"
+      CSS_CLEANUP_EPHEMERAL_RAW: "1"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+    steps:
+      - name: Checkout rebuild branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/ethereum-history-rebuild-run
+          fetch-depth: 0
+          persist-credentials: true
+          clean: true
+
+      - name: Configure git identity
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pipeline dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r .\pipeline\requirements.txt
+
+      - name: Run Ethereum-only historical rebuild
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\pipeline\tools\full_pipeline.ps1 -Mode rebuild
+
+      - name: Validate Ethereum native-unit history
+        shell: pwsh
+        run: |
+          @'
+          import json
+          from pathlib import Path
+
+          roots = [
+              Path("data/calculated/gold_json/ethereum"),
+              Path("data/published/v1/gold/ethereum"),
+              Path("web-v1-app/public/data/published/v1/gold/ethereum"),
+          ]
+          fields = (
+              "value_transferred_native",
+              "median_tx_value_native",
+              "median_tx_fee_native",
+          )
+
+          for root in roots:
+              files = sorted(p for p in root.glob("*.json") if p.stem[:4].isdigit())
+              if len(files) < 500:
+                  raise SystemExit(f"Expected >=500 Ethereum day files in {root}, found {len(files)}")
+
+              numeric = {field: 0 for field in fields}
+              maxima = {field: 0.0 for field in fields}
+              for path in files:
+                  obj = json.loads(path.read_text(encoding="utf-8"))
+                  for field in fields:
+                      value = obj.get(field)
+                      if isinstance(value, (int, float)):
+                          numeric[field] += 1
+                          maxima[field] = max(maxima[field], abs(float(value)))
+                          if abs(float(value)) >= 1e15:
+                              raise SystemExit(f"Wei-scale value remains: {root}/{path.name} {field}={value}")
+
+              if numeric["value_transferred_native"] == 0:
+                  raise SystemExit(f"No numeric value_transferred_native values found in {root}")
+              if numeric["median_tx_value_native"] == 0:
+                  raise SystemExit(f"No numeric median_tx_value_native values found in {root}")
+              if numeric["median_tx_fee_native"] == 0:
+                  raise SystemExit(f"No numeric median_tx_fee_native values found in {root}")
+
+              print(root, "days=", len(files), "numeric=", numeric, "max=", maxima)
+          '@ | python -
+
+      - name: Reject non-Ethereum historical data changes
+        shell: pwsh
+        run: |
+          $changed = @(git diff --name-only HEAD)
+          $forbidden = @(
+            $changed | Where-Object {
+              $_ -match '^(data/calculated/(gold_json|derived|meta)/(bitcoin|arbitrum|base)/)' -or
+              $_ -match '^(data/published/v1/(gold|derived|meta)/(bitcoin|arbitrum|base)/)' -or
+              $_ -match '^(web-v1-app/public/data/published/v1/(gold|derived|meta)/(bitcoin|arbitrum|base)/)'
+            }
+          )
+
+          if ($forbidden.Count -gt 0) {
+            Write-Host "Unexpected non-Ethereum history changes:"
+            $forbidden | ForEach-Object { Write-Host "  $_" }
+            throw "Ethereum-only rebuild modified non-Ethereum historical artifacts."
+          }
+
+          Write-Host "Non-Ethereum historical artifact invariant passed."
+
+      - name: Validate published dataset
+        shell: pwsh
+        run: |
+          python pipeline/tools/validate_published_dataset.py --published-root data/published/v1 --chains bitcoin,ethereum,arbitrum,base --genres gold,meta,derived --windows 7,30,90,180,365
+          python pipeline/tools/validate_meta_methodology_safety.py --root . --meta-root data/published/v1/meta
+
+      - name: Show migration summary
+        shell: pwsh
+        run: |
+          $changed = @(git diff --name-only HEAD)
+          Write-Host "Changed tracked files before commit: $($changed.Count)"
+          $changed | Group-Object { ($_ -split '/')[0..([Math]::Min(4,(($_ -split '/').Length-1)))] -join '/' } | Sort-Object Count -Descending | Select-Object -First 30 | Format-Table Count, Name -AutoSize
+
+      - name: Commit regenerated history to rebuild branch
+        shell: pwsh
+        run: |
+          git add -- data/calculated/gold_json/ethereum data/calculated/derived/ethereum data/calculated/meta/ethereum data/published/v1 web-v1-app/public/data/published/v1
+
+          $staged = git diff --cached --name-only
+          if ([string]::IsNullOrWhiteSpace(($staged | Out-String).Trim())) {
+            throw "Historical rebuild produced no committable data changes."
+          }
+
+          git commit -m "Rebuild Ethereum history with normalized native units"
+          git push origin HEAD:agent/ethereum-history-rebuild-run
