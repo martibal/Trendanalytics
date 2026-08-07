@@ -101,6 +101,20 @@ const GOLD_FIELDS: FieldEntry[] = [
     ),
   },
   {
+    field: "eip1559_type2_tx_share",
+    meaning: "Share of Ethereum transactions using EIP-1559 dynamic-fee transaction type 2 that day.",
+    notes: (
+      <>
+        Ethereum-only observational transaction-composition field derived from <FieldCode>transaction_type</FieldCode>,
+        with <FieldCode>type</FieldCode> as a schema-compatibility fallback. Numeric <FieldCode>2</FieldCode> and
+        equivalent hex encodings such as <FieldCode>0x2</FieldCode> count as type 2. Values are published on a
+        0–1 scale, are null for non-Ethereum chains, and describe transaction-envelope adoption only; they do not
+        identify protocols, tokens, financial intent, or trading behaviour. The field does not yet drive the public
+        regime label, scorecard, or confidence calculation while historical behaviour is being validated.
+      </>
+    ),
+  },
+  {
     field: "failed_tx_rate",
     meaning: "Share of transactions that did not succeed.",
     notes: (
