@@ -1,4 +1,4 @@
-name: Bitcoin schema probe
+name: Bitcoin nested IO correctness patch
 
 on:
   push:
@@ -6,42 +6,147 @@ on:
       - agent/bitcoin-nested-io-correctness
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  probe:
+  patch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install pyarrow
-        run: pip install 'pyarrow>=18,<19'
-      - name: Probe BTC transaction parquet schema
+      - name: Install pipeline dependencies
+        run: pip install -r pipeline/requirements.txt
+      - name: Apply focused patch
         shell: bash
         run: |
           set -euo pipefail
-          PREFIX='s3://aws-public-blockchain/v1.0/btc/transactions/date=2026-08-06/'
-          aws s3 ls "$PREFIX" --recursive --no-sign-request > /tmp/btc_ls.txt
-          cat /tmp/btc_ls.txt | head -20
-          LINE=$(awk '/\.parquet$/ {print $3 " " $4}' /tmp/btc_ls.txt | sort -n | head -1)
-          SIZE=$(echo "$LINE" | awk '{print $1}')
-          KEY=$(echo "$LINE" | cut -d' ' -f2-)
-          if [ -z "$KEY" ]; then echo 'No parquet file found'; exit 1; fi
-          echo "selected_size=$SIZE"
-          echo "selected_key=$KEY"
-          aws s3 cp "s3://aws-public-blockchain/$KEY" /tmp/btc.parquet --no-sign-request --only-show-errors
           python - <<'PY'
-          import pyarrow.parquet as pq
-          pf = pq.ParquetFile('/tmp/btc.parquet')
-          print('schema_arrow=')
-          print(pf.schema_arrow)
-          print('row_groups=', pf.num_row_groups)
-          cols = [c for c in ['inputs','outputs','input_value','output_value','fee','virtual_size','is_coinbase'] if c in pf.schema_arrow.names]
-          print('selected_columns=', cols)
-          table = pf.read_row_group(0, columns=cols).slice(0, 3)
-          print('sample=')
-          for row in table.to_pylist():
-              print(row)
+          import json
+          from pathlib import Path
+
+          feature = Path('pipeline/src/feature_daily_agg.py')
+          text = feature.read_text(encoding='utf-8')
+
+          old_value = '''        # value (native) candidates\n        value_col = None\n        for cand in ["value", "value_native", "value_transferred", "amount", "native_value", "tx_value"]:\n            if _ci_has(tx_ci, cand):\n                value_col = cand\n                break\n'''
+          new_value = '''        # value (native) candidates. Bitcoin's AWS transaction schema exposes\n        # total transaction outputs as output_value; prefer it over generic aliases\n        # because UTXO transactions do not have a single top-level transfer value.\n        value_col = None\n        value_candidates = [\n            "output_value",\n            "value",\n            "value_native",\n            "value_transferred",\n            "amount",\n            "native_value",\n            "tx_value",\n        ] if str(chain).lower() in {"bitcoin", "btc"} else [\n            "value",\n            "value_native",\n            "value_transferred",\n            "amount",\n            "native_value",\n            "tx_value",\n        ]\n        for cand in value_candidates:\n            if _ci_has(tx_ci, cand):\n                value_col = cand\n                break\n'''
+          if old_value not in text:
+              raise SystemExit('value candidate anchor not found')
+          text = text.replace(old_value, new_value, 1)
+
+          old_addr = '''        # unique_active_addresses\n        from_candidates = ["from_address", "from", "sender"]\n        to_candidates = ["to_address", "to", "recipient"]\n        from_col = next((c for c in from_candidates if _ci_has(tx_ci, c)), None)\n        to_col = next((c for c in to_candidates if _ci_has(tx_ci, c)), None)\n\n        addr_exprs = []\n        if from_col:\n            addr_exprs.append(_ci_col(tx_ci, from_col))\n        if to_col:\n            addr_exprs.append(_ci_col(tx_ci, to_col))\n        if addr_exprs:\n            unique_addrs = tx.select(\n                pl.concat_list(addr_exprs)\n                .list.explode()\n                .drop_nulls()\n                .n_unique()\n                .cast(pl.UInt32)\n                .alias("unique_active_addresses")\n            )\n'''
+          new_addr = '''        # unique_active_addresses\n        # Bitcoin is UTXO-based: AWS stores participant addresses inside\n        # inputs[].address and outputs[].address rather than top-level from/to fields.\n        # Count the union across both nested collections, excluding null/blank addresses.\n        if str(chain).lower() in {"bitcoin", "btc"} and (\n            _ci_has(tx_ci, "inputs") or _ci_has(tx_ci, "outputs")\n        ):\n            nested_addr_frames = []\n            for io_col in ["inputs", "outputs"]:\n                if _ci_has(tx_ci, io_col):\n                    nested_addr_frames.append(\n                        tx.select(\n                            _ci_col(tx_ci, io_col)\n                            .explode()\n                            .struct.field("address")\n                            .cast(pl.Utf8, strict=False)\n                            .str.strip_chars()\n                            .alias("address")\n                        )\n                    )\n            if nested_addr_frames:\n                unique_addrs = pl.concat(nested_addr_frames, how="vertical_relaxed").select(\n                    pl.col("address")\n                    .filter(pl.col("address").is_not_null() & (pl.col("address") != ""))\n                    .n_unique()\n                    .cast(pl.UInt32)\n                    .alias("unique_active_addresses")\n                )\n        else:\n            from_candidates = ["from_address", "from", "sender"]\n            to_candidates = ["to_address", "to", "recipient"]\n            from_col = next((c for c in from_candidates if _ci_has(tx_ci, c)), None)\n            to_col = next((c for c in to_candidates if _ci_has(tx_ci, c)), None)\n\n            addr_exprs = []\n            if from_col:\n                addr_exprs.append(_ci_col(tx_ci, from_col))\n            if to_col:\n                addr_exprs.append(_ci_col(tx_ci, to_col))\n            if addr_exprs:\n                unique_addrs = tx.select(\n                    pl.concat_list(addr_exprs)\n                    .list.explode()\n                    .drop_nulls()\n                    .n_unique()\n                    .cast(pl.UInt32)\n                    .alias("unique_active_addresses")\n                )\n'''
+          if old_addr not in text:
+              raise SystemExit('address anchor not found')
+          text = text.replace(old_addr, new_addr, 1)
+          feature.write_text(text, encoding='utf-8')
+
+          fixture = Path('web-v1-app/scripts/pipeline-golden-fixture.mjs')
+          js = fixture.read_text(encoding='utf-8')
+          anchor = 'function validateEthereumBlockGasP90(parent) {'
+          if anchor not in js:
+              raise SystemExit('fixture insertion anchor not found')
+          btc_test = r'''function validateBitcoinNestedInputsOutputs(parent) {
+  const runRoot = path.join(parent, "bitcoin-nested-io");
+  const rawRoot = path.join(runRoot, "raw");
+  const featuresRoot = path.join(runRoot, "features_agg");
+  const day = "2026-01-01";
+  const txDir = path.join(rawRoot, "bitcoin", "transactions", `date=${day}`);
+  const blockDir = path.join(rawRoot, "bitcoin", "blocks", `date=${day}`);
+  fs.mkdirSync(txDir, { recursive: true });
+  fs.mkdirSync(blockDir, { recursive: true });
+
+  const createCode = String.raw`
+import sys
+from pathlib import Path
+import polars as pl
+
+tx_out = Path(sys.argv[1])
+blk_out = Path(sys.argv[2])
+pl.DataFrame({
+    "output_value": [4.0, 6.0],
+    "input_value": [4.1, 6.2],
+    "fee": [0.1, 0.2],
+    "virtual_size": [100.0, 200.0],
+    "is_coinbase": [False, False],
+    "inputs": [
+        [{"address": "a"}, {"address": "b"}],
+        [{"address": "a"}, {"address": "e"}],
+    ],
+    "outputs": [
+        [{"address": "c"}, {"address": "d"}],
+        [{"address": "f"}, {"address": None}],
+    ],
+}).write_parquet(tx_out / "part-000.parquet")
+pl.DataFrame({
+    "timestamp": [1704067200, 1704067800],
+    "weight": [2000000.0, 2000000.0],
+}).write_parquet(blk_out / "part-000.parquet")
+`;
+  runCommand(PYTHON, ["-c", createCode, txDir, blockDir]);
+
+  runCommand(PYTHON, [
+    path.join(REPO_ROOT, "pipeline", "src", "feature_daily_agg.py"),
+    "--chain", "bitcoin",
+    "--date", day,
+    "--raw_root", rawRoot,
+    "--out_root", featuresRoot,
+  ]);
+
+  const checkCode = String.raw`
+import json
+import sys
+from pathlib import Path
+import polars as pl
+p = Path(sys.argv[1]) / "bitcoin" / "2026-01-01.parquet"
+df = pl.read_parquet(p)
+print(json.dumps({
+    "value_sum": df["value_transferred_native"][0],
+    "value_median": df["median_tx_value_native"][0],
+    "unique": df["unique_active_addresses"][0],
+}))
+`;
+  const result = runCommand(PYTHON, ["-c", checkCode, featuresRoot]);
+  const parsed = JSON.parse(result.stdout.trim());
+  assertClose(parsed.value_sum, 10, "bitcoin.value_transferred_native_from_output_value");
+  assertClose(parsed.value_median, 5, "bitcoin.median_tx_value_native_from_output_value");
+  assertClose(parsed.unique, 6, "bitcoin.unique_active_addresses_from_nested_io");
+}
+
+'''
+          js = js.replace(anchor, btc_test + anchor, 1)
+          call_anchor = '  validateEthereumBlockGasP90(tmpRoot);\n'
+          if call_anchor not in js:
+              raise SystemExit('fixture call anchor not found')
+          js = js.replace(call_anchor, '  validateBitcoinNestedInputsOutputs(tmpRoot);\n' + call_anchor, 1)
+          fixture.write_text(js, encoding='utf-8')
+
+          methodology = Path('pipeline/methodology-version.json')
+          obj = json.loads(methodology.read_text(encoding='utf-8'))
+          if obj.get('methodology_version') != '2.0':
+              raise SystemExit(f"Unexpected methodology version {obj.get('methodology_version')}")
+          obj['methodology_version'] = '2.1'
+          methodology.write_text(json.dumps(obj, indent=2) + '\n', encoding='utf-8')
           PY
+      - name: Run focused golden fixture
+        working-directory: web-v1-app
+        run: node scripts/pipeline-golden-fixture.mjs
+      - name: Validate Python syntax
+        run: python -m py_compile pipeline/src/feature_daily_agg.py
+      - name: Commit product changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pipeline/src/feature_daily_agg.py pipeline/methodology-version.json web-v1-app/scripts/pipeline-golden-fixture.mjs
+          git diff --cached --check
+          git status --short
+          git commit -m "Parse Bitcoin nested inputs and outputs correctly"
+          git push origin HEAD:agent/bitcoin-nested-io-correctness
