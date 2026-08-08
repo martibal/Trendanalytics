@@ -402,6 +402,73 @@ for day, spec in fixtures.items():
   runCommand(PYTHON, ["-c", code, rawRoot]);
 }
 
+function validateBitcoinNestedInputsOutputs(parent) {
+  const runRoot = path.join(parent, "bitcoin-nested-io");
+  const rawRoot = path.join(runRoot, "raw");
+  const featuresRoot = path.join(runRoot, "features_agg");
+  const day = "2026-01-01";
+  const txDir = path.join(rawRoot, "bitcoin", "transactions", `date=${day}`);
+  const blockDir = path.join(rawRoot, "bitcoin", "blocks", `date=${day}`);
+  fs.mkdirSync(txDir, { recursive: true });
+  fs.mkdirSync(blockDir, { recursive: true });
+
+  const createCode = String.raw`
+import sys
+from pathlib import Path
+import polars as pl
+
+tx_out = Path(sys.argv[1])
+blk_out = Path(sys.argv[2])
+pl.DataFrame({
+    "output_value": [4.0, 6.0],
+    "input_value": [4.1, 6.2],
+    "fee": [0.1, 0.2],
+    "virtual_size": [100.0, 200.0],
+    "is_coinbase": [False, False],
+    "inputs": [
+        [{"address": "a"}, {"address": "b"}],
+        [{"address": "a"}, {"address": "e"}],
+    ],
+    "outputs": [
+        [{"address": "c"}, {"address": "d"}],
+        [{"address": "f"}, {"address": None}],
+    ],
+}).write_parquet(tx_out / "part-000.parquet")
+pl.DataFrame({
+    "timestamp": [1704067200, 1704067800],
+    "weight": [2000000.0, 2000000.0],
+}).write_parquet(blk_out / "part-000.parquet")
+`;
+  runCommand(PYTHON, ["-c", createCode, txDir, blockDir]);
+
+  runCommand(PYTHON, [
+    path.join(REPO_ROOT, "pipeline", "src", "feature_daily_agg.py"),
+    "--chain", "bitcoin",
+    "--date", day,
+    "--raw_root", rawRoot,
+    "--out_root", featuresRoot,
+  ]);
+
+  const checkCode = String.raw`
+import json
+import sys
+from pathlib import Path
+import polars as pl
+p = Path(sys.argv[1]) / "bitcoin" / "2026-01-01.parquet"
+df = pl.read_parquet(p)
+print(json.dumps({
+    "value_sum": df["value_transferred_native"][0],
+    "value_median": df["median_tx_value_native"][0],
+    "unique": df["unique_active_addresses"][0],
+}))
+`;
+  const result = runCommand(PYTHON, ["-c", checkCode, featuresRoot]);
+  const parsed = JSON.parse(result.stdout.trim());
+  assertClose(parsed.value_sum, 10, "bitcoin.value_transferred_native_from_output_value");
+  assertClose(parsed.value_median, 5, "bitcoin.median_tx_value_native_from_output_value");
+  assertClose(parsed.unique, 6, "bitcoin.unique_active_addresses_from_nested_io");
+}
+
 function validateEthereumBlockGasP90(parent) {
   const runRoot = path.join(parent, "ethereum-gas-p90");
   const rawRoot = path.join(runRoot, "raw");
@@ -610,6 +677,7 @@ function writeReport(reportPath, runA, runB) {
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "urd-pipeline-golden-fixture-"));
 
 try {
+  validateBitcoinNestedInputsOutputs(tmpRoot);
   validateEthereumBlockGasP90(tmpRoot);
 
   const runA = runFixtureOnce(tmpRoot, "run-a");
