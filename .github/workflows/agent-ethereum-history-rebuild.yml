@@ -90,8 +90,6 @@ jobs:
             python .\pipeline\src\feature_daily_agg.py --chain ethereum --date $day --raw_root $rawRoot --out_root $featuresRoot
             if ($LASTEXITCODE -ne 0) { throw "feature_daily_agg.py failed for $day" }
 
-            # Keep only the first raw day so full_pipeline can resolve the rebuild start date.
-            # Every other raw day is deleted immediately to keep runner disk usage bounded.
             if ($day -ne '2024-12-01') {
               Remove-Item -LiteralPath $blockDst -Recurse -Force -ErrorAction SilentlyContinue
               Remove-Item -LiteralPath $txDst -Recurse -Force -ErrorAction SilentlyContinue
@@ -117,7 +115,7 @@ jobs:
           roots = [
               Path("data/calculated/gold_json/ethereum"),
               Path("data/published/v1/gold/ethereum"),
-              Path("web-v1-app/public/data/published/v1/gold/ethereum"),
+              Path("web-v1-app/.private-data/published/v1/gold/ethereum"),
           ]
           fields = (
               "value_transferred_native",
@@ -157,7 +155,7 @@ jobs:
             $changed | Where-Object {
               $_ -match '^(data/calculated/(gold_json|derived|meta)/(bitcoin|arbitrum|base)/)' -or
               $_ -match '^(data/published/v1/(gold|derived|meta)/(bitcoin|arbitrum|base)/)' -or
-              $_ -match '^(web-v1-app/public/data/published/v1/(gold|derived|meta)/(bitcoin|arbitrum|base)/)'
+              $_ -match '^(web-v1-app/\.private-data/published/v1/(gold|derived|meta)/(bitcoin|arbitrum|base)/)'
             }
           )
 
@@ -185,7 +183,7 @@ jobs:
       - name: Commit regenerated history to rebuild branch
         shell: pwsh
         run: |
-          git add -- data/calculated/gold_json/ethereum data/calculated/derived/ethereum data/calculated/meta/ethereum data/published/v1 web-v1-app/public/data/published/v1
+          git add -- data/calculated/gold_json/ethereum data/calculated/derived/ethereum data/calculated/meta/ethereum data/published/v1 web-v1-app/.private-data/published/v1
 
           $staged = git diff --cached --name-only
           if ([string]::IsNullOrWhiteSpace(($staged | Out-String).Trim())) {
