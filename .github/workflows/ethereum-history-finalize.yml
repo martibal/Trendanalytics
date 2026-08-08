@@ -192,12 +192,10 @@ jobs:
 
           materialize_summaries(derived_dir)
 
-          # Guardrails: newer main-produced days must survive the historical overlay.
           latest_gold = read_json(gold_dir / "latest.json")
           if latest_gold.get("date") < "2026-08-06":
               raise SystemExit(f"Ethereum latest regressed: {latest_gold.get('date')}")
 
-          # Representative historical unit checks from the validated rebuild.
           early = read_json(gold_dir / "2025-01-15.json")
           recent = read_json(gold_dir / "2026-08-05.json")
           if not math.isclose(float(early["value_transferred_native"]), 1317721.5092639036, rel_tol=0, abs_tol=1e-9):
@@ -232,7 +230,7 @@ jobs:
         run: node scripts/publication-integrity-audit.mjs
 
       - name: Validate published dataset
-        run: python pipeline/tools/validate_published_dataset.py --root data/published/v1 --chains bitcoin,ethereum,arbitrum,base
+        run: python pipeline/tools/validate_published_dataset.py --published-root data/published/v1 --chains bitcoin,ethereum,arbitrum,base
 
       - name: Commit finalized migration
         shell: bash
