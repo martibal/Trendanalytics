@@ -1,0 +1,108 @@
+name: Agent Ethereum Republish
+
+on:
+  push:
+    branches:
+      - agent/ethereum-republish-helper
+    paths:
+      - .github/workflows/agent-ethereum-republish.yml
+
+jobs:
+  republish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout clean data branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/ethereum-history-data-clean
+          fetch-depth: 0
+          persist-credentials: true
+          clean: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web-v1-app/package-lock.json
+
+      - name: Republish from existing calculated JSON only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python pipeline/tools/publish_artifacts.py \
+            --root . \
+            --calculated-root data/calculated \
+            --published-root data/published/v1 \
+            --chains bitcoin,ethereum,arbitrum,base \
+            --genres gold,meta,derived \
+            --windows 7,30,90,180,365
+
+      - name: Validate published dataset
+        shell: bash
+        run: |
+          set -euo pipefail
+          python pipeline/tools/validate_published_dataset.py \
+            --published-root data/published/v1 \
+            --chains bitcoin,ethereum,arbitrum,base \
+            --genres gold,meta,derived \
+            --windows 7,30,90,180,365
+          python pipeline/tools/validate_meta_methodology_safety.py \
+            --root . \
+            --meta-root data/published/v1/meta
+
+      - name: Sync private web mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          python pipeline/tools/sync_web_data.py --root .
+
+      - name: Run publication integrity audit
+        working-directory: web-v1-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run check:publication-integrity
+
+      - name: Verify calculated Ethereum checkpoint unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet HEAD -- data/calculated/gold_json/ethereum data/calculated/derived/ethereum data/calculated/meta/ethereum; then
+            echo "Calculated Ethereum checkpoint changed during republish."
+            git diff --name-only HEAD -- data/calculated/gold_json/ethereum data/calculated/derived/ethereum data/calculated/meta/ethereum
+            exit 1
+          fi
+          echo "Calculated Ethereum checkpoint unchanged."
+
+      - name: Commit republished artifacts to clean data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -- data/published/v1 web-v1-app/.private-data/published/v1
+
+          if git diff --cached --quiet; then
+            echo "Republish produced no changes."
+            exit 0
+          fi
+
+          echo "Republish changed files:"
+          git diff --cached --name-only | head -200
+          git commit -m "Republish Ethereum history with current provenance contract"
+          git push origin HEAD:agent/ethereum-history-data-clean
