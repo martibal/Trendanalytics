@@ -166,6 +166,43 @@ function Get-FinalizerLookbackDays {
     return 90
 }
 
+function Invoke-L2CapacityIfAvailable {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $tool = Join-Path $RepoRoot "pipeline\tools\apply_l2_capacity.py"
+    if (-not (Test-Path -LiteralPath $tool)) {
+        Write-Log "L2 capacity postprocessor not found, skipping: $tool"
+        return
+    }
+
+    $goldRoot = Join-Path $RepoRoot "data\calculated\gold"
+    if (-not (Test-Path -LiteralPath $goldRoot)) {
+        Write-Log "L2 capacity postprocessor skipped because GOLD parquet root is missing: $goldRoot"
+        return
+    }
+
+    $rawRoot = [Environment]::GetEnvironmentVariable("CSS_RAW_ROOT")
+    if ([string]::IsNullOrWhiteSpace($rawRoot)) {
+        $rawRoot = Join-Path $RepoRoot "data\raw"
+    }
+
+    $publishedRoot = Join-Path $RepoRoot "data\published\v1"
+    if (-not (Test-Path -LiteralPath $publishedRoot)) {
+        Write-Log "L2 capacity postprocessor skipped because published root is missing: $publishedRoot"
+        return
+    }
+
+    $python = Resolve-PythonExecutable
+    Write-Log "STEP 1A: Apply chain-specific L2 capacity pressure before V3 finalization"
+    Invoke-Native -WorkingDirectory $RepoRoot -FilePath $python -Arguments @(
+        $tool,
+        "--gold-root", $goldRoot,
+        "--raw-root", $rawRoot,
+        "--published-root", $publishedRoot,
+        "--chains", "arbitrum,base"
+    )
+}
+
 function Invoke-SafeJsonFinalizer {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
@@ -425,6 +462,7 @@ try {
         "-Mode", "incremental"
     )
 
+    Invoke-L2CapacityIfAvailable -RepoRoot $RootDir
     Invoke-SafeJsonFinalizer -RepoRoot $RootDir -LookbackDays $JsonFinalizerLookbackDays
 
     Invoke-WebBriefsBuilderIfPresent -RepoRoot $RootDir
