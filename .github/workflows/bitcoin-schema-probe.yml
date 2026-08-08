@@ -22,27 +22,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          REGION=$(aws s3api get-bucket-location --bucket aws-public-blockchain --no-sign-request --query LocationConstraint --output text)
-          if [ "$REGION" = "None" ] || [ -z "$REGION" ]; then REGION=us-east-1; fi
-          echo "bucket_region=$REGION"
-          export BTC_S3_REGION="$REGION"
+          PREFIX='s3://aws-public-blockchain/v1.0/btc/transactions/date=2026-08-06/'
+          aws s3 ls "$PREFIX" --recursive --no-sign-request > /tmp/btc_ls.txt
+          cat /tmp/btc_ls.txt | head -20
+          LINE=$(awk '/\.parquet$/ {print $3 " " $4}' /tmp/btc_ls.txt | sort -n | head -1)
+          SIZE=$(echo "$LINE" | awk '{print $1}')
+          KEY=$(echo "$LINE" | cut -d' ' -f2-)
+          if [ -z "$KEY" ]; then echo 'No parquet file found'; exit 1; fi
+          echo "selected_size=$SIZE"
+          echo "selected_key=$KEY"
+          aws s3 cp "s3://aws-public-blockchain/$KEY" /tmp/btc.parquet --no-sign-request --only-show-errors
           python - <<'PY'
-          import os
-          import pyarrow.fs as fs
           import pyarrow.parquet as pq
-
-          region = os.environ['BTC_S3_REGION']
-          s3 = fs.S3FileSystem(anonymous=True, region=region)
-          prefix = 'aws-public-blockchain/v1.0/btc/transactions/date=2026-08-06'
-          infos = [x for x in s3.get_file_info(fs.FileSelector(prefix, recursive=True)) if x.type == fs.FileType.File and x.path.endswith('.parquet')]
-          print('files=', len(infos))
-          for info in sorted(infos, key=lambda x: x.size)[:5]:
-              print('candidate', info.path, 'size=', info.size)
-          if not infos:
-              raise SystemExit('No parquet files found')
-          target = sorted(infos, key=lambda x: x.size)[0]
-          print('selected=', target.path, 'size=', target.size)
-          pf = pq.ParquetFile(s3.open_input_file(target.path))
+          pf = pq.ParquetFile('/tmp/btc.parquet')
           print('schema_arrow=')
           print(pf.schema_arrow)
           print('row_groups=', pf.num_row_groups)
@@ -50,5 +42,6 @@ jobs:
           print('selected_columns=', cols)
           table = pf.read_row_group(0, columns=cols).slice(0, 3)
           print('sample=')
-          print(table.to_pylist())
+          for row in table.to_pylist():
+              print(row)
           PY
