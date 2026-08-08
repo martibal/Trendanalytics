@@ -1,0 +1,252 @@
+name: Ethereum history finalize
+
+on:
+  push:
+    branches:
+      - agent/ethereum-history-final-builder
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout final data branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/ethereum-history-data-final
+          fetch-depth: 0
+
+      - name: Overlay validated history and finalize Ethereum publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git fetch origin eb9e58e || true
+
+          python - <<'PY'
+          import datetime as dt
+          import hashlib
+          import json
+          import math
+          import pathlib
+          import re
+          import subprocess
+
+          CHECKPOINT = "eb9e58e"
+          CUTOFF = "2026-08-05"
+          DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\.json$")
+          OVERLAY_DIRS = [
+              "data/calculated/gold_json/ethereum",
+              "data/calculated/derived/ethereum",
+              "data/calculated/meta/ethereum",
+              "data/published/v1/gold/ethereum",
+              "data/published/v1/meta/ethereum",
+          ]
+
+          def run(*args):
+              subprocess.run(args, check=True)
+
+          for directory in OVERLAY_DIRS:
+              listing = subprocess.check_output(
+                  ["git", "ls-tree", "-r", "--name-only", CHECKPOINT, "--", directory],
+                  text=True,
+              )
+              selected = []
+              for raw in listing.splitlines():
+                  path = raw.strip()
+                  name = pathlib.Path(path).name
+                  if DAY_RE.match(name) and name[:-5] <= CUTOFF:
+                      selected.append(path)
+              if not selected:
+                  raise SystemExit(f"No checkpoint day files selected for {directory}")
+              for i in range(0, len(selected), 100):
+                  run("git", "checkout", CHECKPOINT, "--", *selected[i:i+100])
+              print(f"overlay {directory}: {len(selected)} day files")
+
+          def read_json(path):
+              return json.loads(path.read_text(encoding="utf-8"))
+
+          def write_json(path, obj):
+              path.write_text(
+                  json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False) + "\n",
+                  encoding="utf-8",
+              )
+
+          def day_files(directory):
+              return sorted(p for p in directory.glob("????-??-??.json") if DAY_RE.match(p.name))
+
+          def materialize_summaries(directory):
+              files = day_files(directory)
+              if not files:
+                  raise SystemExit(f"No day files in {directory}")
+              records = [read_json(p) for p in files]
+              write_json(directory / "latest.json", records[-1])
+              for window in (7, 30, 90, 180, 365):
+                  write_json(directory / f"last{window}d.json", records[-min(window, len(records)):])
+              print(f"summaries {directory}: latest={files[-1].stem} days={len(files)}")
+
+          for directory in [
+              pathlib.Path("data/calculated/gold_json/ethereum"),
+              pathlib.Path("data/calculated/derived/ethereum"),
+              pathlib.Path("data/calculated/meta/ethereum"),
+              pathlib.Path("data/published/v1/gold/ethereum"),
+              pathlib.Path("data/published/v1/meta/ethereum"),
+          ]:
+              materialize_summaries(directory)
+
+          BASE_METRICS = [
+              "tx_count_daily",
+              "unique_active_addresses",
+              "value_transferred_native",
+              "median_tx_value_native",
+              "median_tx_fee_native",
+              "failed_tx_rate",
+              "gas_utilization_pct",
+              "avg_block_time_sec",
+              "block_count_daily",
+          ]
+
+          gold_dir = pathlib.Path("data/published/v1/gold/ethereum")
+          derived_dir = pathlib.Path("data/published/v1/derived/ethereum")
+          derived_dir.mkdir(parents=True, exist_ok=True)
+
+          gold_paths = {p.stem: p for p in day_files(gold_dir)}
+          gold_objects = {day: read_json(path) for day, path in gold_paths.items()}
+
+          def metrics_of(obj):
+              if isinstance(obj.get("gold"), dict):
+                  gold = obj["gold"]
+                  if isinstance(gold.get("metrics"), dict):
+                      return gold["metrics"]
+                  return gold
+              if isinstance(obj.get("metrics"), dict):
+                  return obj["metrics"]
+              return obj
+
+          gold_metrics = {day: metrics_of(obj) for day, obj in gold_objects.items()}
+
+          def numeric(metrics, key):
+              value = metrics.get(key)
+              if isinstance(value, bool) or not isinstance(value, (int, float)):
+                  return None
+              value = float(value)
+              return value if math.isfinite(value) else None
+
+          def shift(day, delta):
+              return (dt.date.fromisoformat(day) + dt.timedelta(days=delta)).isoformat()
+
+          def rolling(metric, day, window):
+              values = []
+              for offset in range(window - 1, -1, -1):
+                  candidate = shift(day, -offset)
+                  metrics = gold_metrics.get(candidate)
+                  if metrics is None:
+                      continue
+                  value = numeric(metrics, metric)
+                  if value is not None:
+                      values.append(value)
+              return (sum(values) / len(values)) if values else None
+
+          for day in sorted(gold_paths):
+              metrics = gold_metrics[day]
+              metric_cols = [m for m in BASE_METRICS if numeric(metrics, m) is not None]
+              derived_metrics = {}
+              for metric in metric_cols:
+                  derived_metrics[f"{metric}__ma7"] = rolling(metric, day, 7)
+                  derived_metrics[f"{metric}__ma30"] = rolling(metric, day, 30)
+
+              target = derived_dir / f"{day}.json"
+              meta_confidence = {}
+              if target.exists():
+                  try:
+                      previous = read_json(target)
+                      candidate = previous.get("derived", {}).get("meta_confidence", {})
+                      if isinstance(candidate, dict):
+                          meta_confidence = candidate
+                  except Exception:
+                      pass
+
+              gold_hash = hashlib.sha256(gold_paths[day].read_bytes()).hexdigest()
+              record = {
+                  "chain": "ethereum",
+                  "date": day,
+                  "derived": {
+                      "context_blocks": [],
+                      "meta_confidence": meta_confidence,
+                      "metrics": derived_metrics,
+                      "source": {
+                          "producer": "published-derived-from-published-gold-v2",
+                          "formula": "calendar rolling mean over final data/published/v1/gold rows; min_periods=1 over available finite values",
+                          "chain": "ethereum",
+                          "date": day,
+                          "gold_sha256": gold_hash,
+                          "gold_source": "data/published/v1/gold/ethereum",
+                          "metric_columns": metric_cols,
+                          "rolling_windows": [7, 30],
+                      },
+                  },
+              }
+              write_json(target, record)
+
+          materialize_summaries(derived_dir)
+
+          # Guardrails: newer main-produced days must survive the historical overlay.
+          latest_gold = read_json(gold_dir / "latest.json")
+          if latest_gold.get("date") < "2026-08-06":
+              raise SystemExit(f"Ethereum latest regressed: {latest_gold.get('date')}")
+
+          # Representative historical unit checks from the validated rebuild.
+          early = read_json(gold_dir / "2025-01-15.json")
+          recent = read_json(gold_dir / "2026-08-05.json")
+          if not math.isclose(float(early["value_transferred_native"]), 1317721.5092639036, rel_tol=0, abs_tol=1e-9):
+              raise SystemExit("2025-01-15 value_transferred_native mismatch")
+          if not math.isclose(float(early["median_tx_fee_native"]), 0.00033828785167800004, rel_tol=0, abs_tol=1e-18):
+              raise SystemExit("2025-01-15 median_tx_fee_native mismatch")
+          if not math.isclose(float(recent["median_tx_fee_native"]), 4.621483536460001e-06, rel_tol=0, abs_tol=1e-18):
+              raise SystemExit("2026-08-05 median_tx_fee_native mismatch")
+
+          print("Ethereum historical overlay + v2 derived provenance finalized")
+          PY
+
+      - name: Sync private mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf web-v1-app/.private-data/published/v1
+          mkdir -p web-v1-app/.private-data/published
+          cp -a data/published/v1 web-v1-app/.private-data/published/v1
+
+      - name: Verify non-Ethereum and global publication files unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          for chain in bitcoin arbitrum base; do
+            git diff --exit-code origin/main -- "data/published/v1/gold/$chain" "data/published/v1/meta/$chain" "data/published/v1/derived/$chain"
+          done
+          git diff --exit-code origin/main -- data/published/v1/dataset.json data/published/v1/index.json data/published/v1/latest.json data/published/v1/landing data/published/v1/contract.json
+
+      - name: Publication integrity audit
+        working-directory: web-v1-app
+        run: node scripts/publication-integrity-audit.mjs
+
+      - name: Validate published dataset
+        run: python pipeline/tools/validate_published_dataset.py --root data/published/v1 --chains bitcoin,ethereum,arbitrum,base
+
+      - name: Commit finalized migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/calculated/gold_json/ethereum data/calculated/derived/ethereum data/calculated/meta/ethereum
+          git add data/published/v1/gold/ethereum data/published/v1/meta/ethereum data/published/v1/derived/ethereum
+          git add web-v1-app/.private-data/published/v1
+          git status --short
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 1
+          fi
+          git commit -m "Migrate Ethereum historical native units"
+          git push origin HEAD:agent/ethereum-history-data-final
