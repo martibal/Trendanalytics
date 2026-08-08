@@ -1,0 +1,47 @@
+name: Bitcoin schema probe
+
+on:
+  push:
+    branches:
+      - agent/bitcoin-nested-io-correctness
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pyarrow
+        run: pip install 'pyarrow>=18,<19'
+      - name: Probe BTC transaction parquet schema
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pyarrow.fs as fs
+          import pyarrow.parquet as pq
+
+          s3 = fs.S3FileSystem(anonymous=True, region='us-east-1')
+          prefix = 'aws-public-blockchain/v1.0/btc/transactions/date=2026-08-06'
+          infos = [x for x in s3.get_file_info(fs.FileSelector(prefix, recursive=True)) if x.type == fs.FileType.File and x.path.endswith('.parquet')]
+          print('files=', len(infos))
+          for info in sorted(infos, key=lambda x: x.size)[:5]:
+              print('candidate', info.path, 'size=', info.size)
+          if not infos:
+              raise SystemExit('No parquet files found')
+          target = sorted(infos, key=lambda x: x.size)[0]
+          print('selected=', target.path, 'size=', target.size)
+          pf = pq.ParquetFile(s3.open_input_file(target.path))
+          print('schema_arrow=')
+          print(pf.schema_arrow)
+          print('schema_parquet=')
+          print(pf.schema)
+          print('row_groups=', pf.num_row_groups)
+          table = pf.read_row_group(0, columns=[c for c in ['inputs','outputs','input_value','output_value','fee','virtual_size','is_coinbase'] if c in pf.schema_arrow.names]).slice(0, 3)
+          print('sample=')
+          print(table.to_pylist())
+          PY
