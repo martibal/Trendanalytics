@@ -1,0 +1,101 @@
+name: L2 Capacity Test
+
+on:
+  pull_request:
+    paths:
+      - "pipeline/tools/apply_l2_capacity.py"
+      - ".github/workflows/l2-capacity-test.yml"
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: pip install -r .\pipeline\requirements.txt
+
+      - name: Build deterministic fixture
+        shell: pwsh
+        run: |
+          @'
+          from datetime import date, timedelta
+          from pathlib import Path
+          import polars as pl
+
+          root = Path(".test-l2-capacity")
+          gold = root / "gold"
+          raw = root / "raw"
+          published = root / "published" / "gold"
+          gold.mkdir(parents=True, exist_ok=True)
+
+          start = date(2026, 1, 1)
+          days = [(start + timedelta(days=i)).isoformat() for i in range(40)]
+
+          for chain in ("arbitrum", "base"):
+              pl.DataFrame({
+                  "date": days,
+                  "chain": [chain] * len(days),
+                  "tx_count_daily": [1000 + i for i in range(len(days))],
+              }).write_parquet(gold / f"{chain}.parquet")
+
+          for i, day in enumerate(days):
+              arb_dir = raw / "arbitrum" / "transactions" / f"date={day}"
+              arb_dir.mkdir(parents=True, exist_ok=True)
+              pl.DataFrame({"GAS_USED_FOR_L1": [100 + i, 200 + i]}).write_parquet(arb_dir / "part.parquet")
+
+              base_dir = raw / "base" / "blocks" / f"date={day}"
+              base_dir.mkdir(parents=True, exist_ok=True)
+              pl.DataFrame({"BLOB_GAS_USED": [1000 + 10 * i, 2000 + 10 * i]}).write_parquet(base_dir / "part.parquet")
+          '@ | python -
+
+      - name: Run L2 capacity postprocessor
+        shell: pwsh
+        run: |
+          python .\pipeline\tools\apply_l2_capacity.py `
+            --gold-root .\.test-l2-capacity\gold `
+            --raw-root .\.test-l2-capacity\raw `
+            --published-root .\.test-l2-capacity\published `
+            --chains arbitrum,base
+
+      - name: Verify output
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          import polars as pl
+
+          root = Path(".test-l2-capacity/gold")
+
+          arb = pl.read_parquet(root / "arbitrum.parquet")
+          base = pl.read_parquet(root / "base.parquet")
+
+          assert "capacity_util_pct" in arb.columns
+          assert "capacity_util_pct" in base.columns
+          assert "arbitrum_l1_gas_used_daily" in arb.columns
+          assert "base_blob_gas_used_daily" in base.columns
+
+          assert arb["arbitrum_l1_gas_used_daily"][0] == 300.0
+          assert base["base_blob_gas_used_daily"][0] == 3000.0
+
+          for frame in (arb, base):
+              cap = frame["capacity_util_pct"]
+              assert cap[:7].null_count() == 7
+              finite = cap.drop_nulls()
+              assert len(finite) == 33
+              assert finite.min() >= 0.0
+              assert finite.max() <= 1.0
+
+          print("L2 capacity fixture OK")
+          '@ | python -
