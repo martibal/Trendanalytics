@@ -8,6 +8,10 @@ on:
         required: false
         default: ""
         type: string
+  pull_request:
+    paths:
+      - ".github/workflows/l2-source-schema-probe.yml"
+      - "pipeline/tools/l2_source_schema_probe.py"
 
 jobs:
   probe:
@@ -38,7 +42,7 @@ jobs:
         id: download
         shell: pwsh
         env:
-          REQUESTED_DATE: ${{ inputs.probe_date }}
+          REQUESTED_DATE: ${{ github.event_name == 'workflow_dispatch' && inputs.probe_date || '' }}
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force -Path .\probe-input | Out-Null
