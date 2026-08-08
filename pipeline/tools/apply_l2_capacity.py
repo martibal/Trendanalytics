@@ -33,17 +33,9 @@ def _parquet_files(day_dir: Path) -> list[str]:
     return [str(path) for path in sorted(day_dir.rglob("*.parquet")) if path.is_file() and path.stat().st_size > 0]
 
 
-def _column_map(files: list[str]) -> Dict[str, str]:
-    if not files:
-        return {}
-    schema = pl.read_parquet_schema(files[0])
-    return {name.lower(): name for name in schema.names()}
-
-
 def _sum_column(files: list[str], wanted: str) -> Optional[float]:
     if not files:
         return None
-
     frames: list[pl.LazyFrame] = []
     for file in files:
         try:
@@ -52,33 +44,25 @@ def _sum_column(files: list[str], wanted: str) -> Optional[float]:
             continue
     if not frames:
         return None
-
     lf = pl.concat(frames, how="diagonal_relaxed")
     ci = {name.lower(): name for name in lf.collect_schema().names()}
     actual = ci.get(wanted.lower())
     if actual is None:
         return None
-
-    value = lf.select(
-        pl.col(actual).cast(pl.Float64, strict=False).sum().alias("value")
-    ).collect().item()
+    value = lf.select(pl.col(actual).cast(pl.Float64, strict=False).sum().alias("value")).collect().item()
     if value is None:
         return None
     value = float(value)
-    if not math.isfinite(value) or value < 0:
-        return None
-    return value
+    return value if math.isfinite(value) and value >= 0 else None
 
 
 def _raw_capacity_from_local_raw(raw_root: Path, chain: str, day: str) -> Optional[float]:
     if chain == "arbitrum":
         tx_dir = _day_dir(raw_root, chain, "transactions", day)
         return _sum_column(_parquet_files(tx_dir), "gas_used_for_l1") if tx_dir else None
-
     if chain == "base":
         block_dir = _day_dir(raw_root, chain, "blocks", day)
         return _sum_column(_parquet_files(block_dir), "blob_gas_used") if block_dir else None
-
     return None
 
 
@@ -98,7 +82,6 @@ def _published_raw_history(published_root: Path, chain: str) -> Dict[str, float]
     chain_dir = published_root / "gold" / chain
     if not chain_dir.exists():
         return out
-
     for path in sorted(chain_dir.glob("????-??-??.json")):
         try:
             obj = json.loads(path.read_text(encoding="utf-8"))
@@ -106,27 +89,22 @@ def _published_raw_history(published_root: Path, chain: str) -> Dict[str, float]
             continue
         if not isinstance(obj, dict):
             continue
-
         candidates: Iterable[dict] = (
             obj,
             obj.get("metrics") if isinstance(obj.get("metrics"), dict) else {},
             obj.get("gold") if isinstance(obj.get("gold"), dict) else {},
         )
-        value = None
         for candidate in candidates:
             if raw_col in candidate:
                 value = _finite_number(candidate.get(raw_col))
                 if value is not None:
+                    out[path.stem] = value
                     break
-        if value is not None:
-            out[path.stem] = value
     return out
 
 
 def _rolling_capacity(df: pl.DataFrame, raw_col: str) -> pl.Series:
     raw = df.get_column(raw_col).cast(pl.Float64, strict=False)
-    # Use only PRIOR observations for the denominator. This prevents today's
-    # observation from moving its own baseline and preserves deterministic history.
     baseline = raw.shift(1).rolling_quantile(
         quantile=0.95,
         window_size=BASELINE_WINDOW_DAYS,
@@ -142,17 +120,47 @@ def _rolling_capacity(df: pl.DataFrame, raw_col: str) -> pl.Series:
     return df.select(ratio).to_series()
 
 
+def _write_json_atomic(path: Path, obj: dict) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _persist_published_gold(df: pl.DataFrame, published_root: Path, chain: str) -> int:
+    raw_col = RAW_VALUE_COLUMNS[chain]
+    chain_dir = published_root / "gold" / chain
+    if not chain_dir.exists():
+        return 0
+    written = 0
+    for row in df.select(["date", raw_col, CAPACITY_COLUMN]).iter_rows(named=True):
+        day = str(row["date"])
+        target = chain_dir / f"{day}.json"
+        if not target.exists():
+            continue
+        try:
+            obj = json.loads(target.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        raw_value = _finite_number(row.get(raw_col))
+        cap_value = _finite_number(row.get(CAPACITY_COLUMN))
+        obj[raw_col] = raw_value
+        obj[CAPACITY_COLUMN] = cap_value
+        _write_json_atomic(target, obj)
+        written += 1
+    return written
+
+
 def _apply_chain(gold_root: Path, raw_root: Path, published_root: Path, chain: str) -> None:
     gold_path = gold_root / f"{chain}.parquet"
     if not gold_path.exists():
         print(f"[L2_CAPACITY] {chain}: missing gold parquet, skip: {gold_path}")
         return
-
     df = pl.read_parquet(gold_path)
     if df.is_empty() or "date" not in df.columns:
         print(f"[L2_CAPACITY] {chain}: empty/missing date, skip")
         return
-
     df = df.with_columns(pl.col("date").cast(pl.Utf8)).sort("date")
     raw_col = RAW_VALUE_COLUMNS[chain]
     published_history = _published_raw_history(published_root, chain)
@@ -165,10 +173,7 @@ def _apply_chain(gold_root: Path, raw_root: Path, published_root: Path, chain: s
                 existing[str(day)] = numeric
 
     raw_values: list[Optional[float]] = []
-    local_count = 0
-    persisted_count = 0
-    missing_count = 0
-
+    local_count = persisted_count = missing_count = 0
     for day in df.get_column("date").to_list():
         day = str(day)
         value = existing.get(day)
@@ -186,29 +191,20 @@ def _apply_chain(gold_root: Path, raw_root: Path, published_root: Path, chain: s
 
     df = df.with_columns(pl.Series(raw_col, raw_values, dtype=pl.Float64))
     df = df.with_columns(_rolling_capacity(df, raw_col))
-
-    if chain == "arbitrum":
-        if "base_blob_gas_used_daily" not in df.columns:
-            df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias("base_blob_gas_used_daily"))
-    elif chain == "base":
-        if "arbitrum_l1_gas_used_daily" not in df.columns:
-            df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias("arbitrum_l1_gas_used_daily"))
-
     df.write_parquet(gold_path)
+    published_written = _persist_published_gold(df, published_root, chain)
 
     non_null_capacity = df.get_column(CAPACITY_COLUMN).drop_nulls().len()
     print(
         f"[L2_CAPACITY] {chain}: rows={df.height} raw_local={local_count} "
         f"raw_persisted={persisted_count} raw_missing={missing_count} "
-        f"capacity_non_null={non_null_capacity} formula=min(raw/prior_30d_p95,1) "
-        f"min_baseline_days={MIN_BASELINE_DAYS}"
+        f"capacity_non_null={non_null_capacity} published_days_updated={published_written} "
+        f"formula=min(raw/prior_30d_p95,1) min_baseline_days={MIN_BASELINE_DAYS}"
     )
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="Add transparent chain-specific L2 capacity pressure and normalized capacity_util_pct to GOLD."
-    )
+    ap = argparse.ArgumentParser(description="Add chain-specific L2 capacity pressure and normalized capacity_util_pct to GOLD.")
     ap.add_argument("--gold-root", required=True)
     ap.add_argument("--raw-root", required=True)
     ap.add_argument("--published-root", required=True)
@@ -219,14 +215,11 @@ def main() -> int:
     raw_root = Path(args.raw_root).resolve()
     published_root = Path(args.published_root).resolve()
     chains = [c.strip().lower() for c in args.chains.split(",") if c.strip()]
-
     unsupported = [c for c in chains if c not in L2_CHAINS]
     if unsupported:
         raise SystemExit(f"Unsupported L2 chain(s): {', '.join(unsupported)}")
-
     for chain in chains:
         _apply_chain(gold_root, raw_root, published_root, chain)
-
     return 0
 
 
