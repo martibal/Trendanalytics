@@ -1,0 +1,128 @@
+name: L2 Capacity Backfill Validation
+
+on:
+  push:
+    branches:
+      - agent/l2-capacity-backfill-validation
+    paths:
+      - ".github/workflows/l2-capacity-backfill-validation.yml"
+
+jobs:
+  validate-backfill:
+    runs-on: windows-latest
+    timeout-minutes: 180
+
+    permissions:
+      contents: read
+
+    env:
+      CSS_PYTHON: python
+      CSS_CHAINS: "arbitrum,base"
+      CSS_REBUILD_START_DATE: "2024-12-01"
+      CSS_SYNC_WEB: "0"
+      CSS_CLEANUP_EPHEMERAL_RAW: "0"
+
+    steps:
+      - name: Checkout validation branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify AWS CLI
+        shell: pwsh
+        run: aws --version
+
+      - name: Install pipeline dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r .\pipeline\requirements.txt
+
+      - name: Run isolated historical L2 rebuild
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\pipeline\tools\full_pipeline.ps1 -Mode rebuild
+
+      - name: Validate published contract
+        shell: pwsh
+        run: |
+          python .\pipeline\tools\validate_published_dataset.py --published-root .\data\published\v1 --chains bitcoin,ethereum,arbitrum,base --genres gold,meta,derived --windows 7,30,90,180,365
+          python .\pipeline\tools\validate_meta_methodology_safety.py --root . --meta-root .\data\published\v1\meta
+
+      - name: Build L2 backfill report
+        shell: pwsh
+        run: |
+          @'
+          import json
+          import math
+          from pathlib import Path
+
+          root = Path('data/published/v1')
+          report = {'chains': {}}
+
+          for chain, raw_col in {
+              'arbitrum': 'arbitrum_l1_gas_used_daily',
+              'base': 'base_blob_gas_used_daily',
+          }.items():
+              rows = []
+              for p in sorted((root / 'gold' / chain).glob('????-??-??.json')):
+                  obj = json.loads(p.read_text(encoding='utf-8'))
+                  raw = obj.get(raw_col)
+                  cap = obj.get('capacity_util_pct')
+                  rows.append((p.stem, raw, cap))
+
+              finite_raw = [(d, float(v)) for d, v, _ in rows if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v))]
+              finite_cap = [(d, float(v)) for d, _, v in rows if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v))]
+              invalid_cap = [(d, v) for d, _, v in rows if isinstance(v, (int, float)) and not isinstance(v, bool) and (not math.isfinite(float(v)) or float(v) < 0 or float(v) > 1)]
+
+              if not finite_raw:
+                  raise SystemExit(f'{chain}: no finite {raw_col} values after rebuild')
+              if len(finite_cap) < 30:
+                  raise SystemExit(f'{chain}: expected at least 30 finite capacity_util_pct values, got {len(finite_cap)}')
+              if invalid_cap:
+                  raise SystemExit(f'{chain}: invalid capacity_util_pct values: {invalid_cap[:5]}')
+
+              meta_latest = json.loads((root / 'meta' / chain / 'latest.json').read_text(encoding='utf-8'))
+              signals = ((meta_latest.get('regime') or {}).get('signals') or {})
+              cap_signal = signals.get('capacity_util_pct')
+              if not isinstance(cap_signal, dict):
+                  raise SystemExit(f'{chain}: META latest missing capacity_util_pct regime signal')
+
+              report['chains'][chain] = {
+                  'gold_days': len(rows),
+                  'raw_column': raw_col,
+                  'raw_non_null_days': len(finite_raw),
+                  'capacity_non_null_days': len(finite_cap),
+                  'capacity_first_date': finite_cap[0][0],
+                  'capacity_last_date': finite_cap[-1][0],
+                  'capacity_min': min(v for _, v in finite_cap),
+                  'capacity_max': max(v for _, v in finite_cap),
+                  'capacity_latest': finite_cap[-1][1],
+                  'meta_capacity_signal': cap_signal,
+                  'meta_label': (meta_latest.get('regime') or {}).get('label'),
+              }
+
+          out = Path('reports/l2-capacity-backfill-validation.json')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          '@ | Set-Content -Encoding UTF8 .\validate_l2_backfill.py
+          python .\validate_l2_backfill.py
+
+      - name: Upload validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-capacity-backfill-validation
+          path: |
+            reports/l2-capacity-backfill-validation.json
+            data/published/v1/gold/arbitrum/latest.json
+            data/published/v1/gold/base/latest.json
+            data/published/v1/meta/arbitrum/latest.json
+            data/published/v1/meta/base/latest.json
+          if-no-files-found: error
+          retention-days: 7
