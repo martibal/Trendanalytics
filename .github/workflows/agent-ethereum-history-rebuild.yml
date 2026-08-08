@@ -154,18 +154,17 @@ jobs:
           $forbidden = @(
             $changed | Where-Object {
               $_ -match '^(data/calculated/(gold_json|derived|meta)/(bitcoin|arbitrum|base)/)' -or
-              $_ -match '^(data/published/v1/(gold|derived|meta)/(bitcoin|arbitrum|base)/)' -or
-              $_ -match '^(web-v1-app/\.private-data/published/v1/(gold|derived|meta)/(bitcoin|arbitrum|base)/)'
+              $_ -match '^(data/published/v1/(gold|derived|meta)/(bitcoin|arbitrum|base)/)'
             }
           )
 
           if ($forbidden.Count -gt 0) {
-            Write-Host "Unexpected non-Ethereum history changes:"
+            Write-Host "Unexpected non-Ethereum canonical history changes:"
             $forbidden | ForEach-Object { Write-Host "  $_" }
-            throw "Ethereum-only rebuild modified non-Ethereum historical artifacts."
+            throw "Ethereum-only rebuild modified non-Ethereum canonical historical artifacts."
           }
 
-          Write-Host "Non-Ethereum historical artifact invariant passed."
+          Write-Host "Non-Ethereum canonical historical artifact invariant passed."
 
       - name: Validate published dataset
         shell: pwsh
@@ -183,7 +182,7 @@ jobs:
       - name: Commit regenerated history to rebuild branch
         shell: pwsh
         run: |
-          git add -- data/calculated/gold_json/ethereum data/calculated/derived/ethereum data/calculated/meta/ethereum data/published/v1 web-v1-app/.private-data/published/v1
+          git add -- data/calculated/gold_json/ethereum data/calculated/derived/ethereum data/calculated/meta/ethereum data/published/v1 web-v1-app/.private-data/published/v1/gold/ethereum web-v1-app/.private-data/published/v1/derived/ethereum web-v1-app/.private-data/published/v1/meta/ethereum
 
           $staged = git diff --cached --name-only
           if ([string]::IsNullOrWhiteSpace(($staged | Out-String).Trim())) {
