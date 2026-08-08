@@ -1,0 +1,131 @@
+name: L2 Source Schema Probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      probe_date:
+        description: "Optional YYYY-MM-DD. Leave blank to use latest common blocks/transactions day per chain."
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify AWS CLI
+        shell: pwsh
+        run: aws --version
+
+      - name: Install probe dependencies
+        shell: pwsh
+        run: python -m pip install "pyarrow>=18,<19"
+
+      - name: Discover and download smallest representative parquet shards
+        id: download
+        shell: pwsh
+        env:
+          REQUESTED_DATE: ${{ inputs.probe_date }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path .\probe-input | Out-Null
+
+          $bases = @{
+            arbitrum = "s3://aws-public-blockchain/v1.1/sonarx/arbitrum"
+            base     = "s3://aws-public-blockchain/v1.1/sonarx/base"
+          }
+
+          $downloaded = @()
+
+          function Get-AvailableDays([string]$Prefix) {
+            $lines = aws s3 ls "$Prefix/" --no-sign-request
+            if ($LASTEXITCODE -ne 0) { throw "Failed to list $Prefix" }
+            $days = @()
+            foreach ($line in $lines) {
+              if ($line -match "PRE\s+(?:date=)?(\d{4}-\d{2}-\d{2})/") {
+                $days += $Matches[1]
+              }
+            }
+            return @($days | Sort-Object -Unique)
+          }
+
+          function Resolve-Day([string]$Base) {
+            if ($env:REQUESTED_DATE -and $env:REQUESTED_DATE.Trim()) {
+              return $env:REQUESTED_DATE.Trim()
+            }
+            $txDays = Get-AvailableDays "$Base/transactions"
+            $blockDays = Get-AvailableDays "$Base/blocks"
+            $common = @($txDays | Where-Object { $blockDays -contains $_ } | Sort-Object)
+            if ($common.Count -eq 0) { throw "No common blocks/transactions dates under $Base" }
+            return $common[-1]
+          }
+
+          function Get-DayPrefix([string]$Base, [string]$Table, [string]$Day) {
+            foreach ($candidate in @("$Base/$Table/date=$Day", "$Base/$Table/$Day")) {
+              $probe = aws s3 ls "$candidate/" --no-sign-request
+              if ($LASTEXITCODE -eq 0 -and $probe) { return $candidate }
+            }
+            throw "No source prefix found for $Base/$Table on $Day"
+          }
+
+          function Download-SmallestParquet([string]$Chain, [string]$Table, [string]$Prefix, [string]$Day) {
+            $listing = aws s3 ls "$Prefix/" --recursive --no-sign-request
+            if ($LASTEXITCODE -ne 0) { throw "Failed recursive listing for $Prefix" }
+
+            $objects = @()
+            foreach ($line in $listing) {
+              if ($line -match "^\s*\S+\s+\S+\s+(\d+)\s+(.+\.parquet)$") {
+                $objects += [pscustomobject]@{ Size = [int64]$Matches[1]; Key = $Matches[2] }
+              }
+            }
+            if ($objects.Count -eq 0) { throw "No parquet objects found under $Prefix" }
+
+            $pick = $objects | Sort-Object Size, Key | Select-Object -First 1
+            $bucketRoot = ($Prefix -replace '^s3://([^/]+)/.*$', 's3://$1')
+            $dest = ".\probe-input\$Chain-$Table-$Day.parquet"
+            Write-Host "Downloading representative shard: chain=$Chain table=$Table day=$Day size=$($pick.Size) key=$($pick.Key)"
+            aws s3 cp "$bucketRoot/$($pick.Key)" $dest --no-sign-request --only-show-errors
+            if ($LASTEXITCODE -ne 0) { throw "Failed downloading $($pick.Key)" }
+            return $dest
+          }
+
+          foreach ($chain in @("arbitrum", "base")) {
+            $base = $bases[$chain]
+            $day = Resolve-Day $base
+            Write-Host "=== $chain selected date: $day ==="
+
+            foreach ($table in @("blocks", "transactions")) {
+              $prefix = Get-DayPrefix $base $table $day
+              $file = Download-SmallestParquet $chain $table $prefix $day
+              $downloaded += $file
+            }
+          }
+
+          "files=$($downloaded -join ';')" >> $env:GITHUB_OUTPUT
+
+      - name: Inspect schemas and candidate L2 capacity fields
+        shell: pwsh
+        run: |
+          $files = "${{ steps.download.outputs.files }}" -split ';'
+          python .\pipeline\tools\l2_source_schema_probe.py @files --output .\reports\l2-source-schema-probe.json
+
+      - name: Upload schema probe report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-source-schema-probe
+          path: reports/l2-source-schema-probe.json
+          if-no-files-found: error
+          retention-days: 7
