@@ -40,6 +40,20 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Detect persisted rebuild checkpoint
+        id: checkpoint
+        shell: pwsh
+        run: |
+          $checkpoint = '.agent-state/ethereum-history-rebuild-checkpoint.json'
+          if (Test-Path -LiteralPath $checkpoint) {
+            Write-Host "Persisted Ethereum rebuild checkpoint found. Heavy raw/feature rebuild will be skipped."
+            "exists=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+          else {
+            Write-Host "No persisted checkpoint found. Heavy rebuild is required once."
+            "exists=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -52,6 +66,7 @@ jobs:
           pip install -r .\pipeline\requirements.txt
 
       - name: Stream Ethereum raw history into daily features
+        if: steps.checkpoint.outputs.exists != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -90,6 +105,7 @@ jobs:
             python .\pipeline\src\feature_daily_agg.py --chain ethereum --date $day --raw_root $rawRoot --out_root $featuresRoot
             if ($LASTEXITCODE -ne 0) { throw "feature_daily_agg.py failed for $day" }
 
+            # Preserve only the first raw day as the rebuild start anchor.
             if ($day -ne '2024-12-01') {
               Remove-Item -LiteralPath $blockDst -Recurse -Force -ErrorAction SilentlyContinue
               Remove-Item -LiteralPath $txDst -Recurse -Force -ErrorAction SilentlyContinue
@@ -101,9 +117,94 @@ jobs:
           if ($featureCount -lt 500) { throw "Expected at least 500 Ethereum feature days; found $featureCount" }
 
       - name: Rebuild Gold Derived META and published artifacts from streamed features
+        if: steps.checkpoint.outputs.exists != 'true'
         shell: pwsh
         run: |
           powershell -ExecutionPolicy Bypass -File .\pipeline\tools\full_pipeline.ps1 -Mode rebuild -SkipRawDownload
+
+      - name: Restore non-Ethereum chain artifacts before checkpoint
+        if: steps.checkpoint.outputs.exists != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $paths = @(
+            'data/calculated/gold_json/bitcoin',
+            'data/calculated/gold_json/arbitrum',
+            'data/calculated/gold_json/base',
+            'data/calculated/derived/bitcoin',
+            'data/calculated/derived/arbitrum',
+            'data/calculated/derived/base',
+            'data/calculated/meta/bitcoin',
+            'data/calculated/meta/arbitrum',
+            'data/calculated/meta/base',
+            'data/published/v1/gold/bitcoin',
+            'data/published/v1/gold/arbitrum',
+            'data/published/v1/gold/base',
+            'data/published/v1/derived/bitcoin',
+            'data/published/v1/derived/arbitrum',
+            'data/published/v1/derived/base',
+            'data/published/v1/meta/bitcoin',
+            'data/published/v1/meta/arbitrum',
+            'data/published/v1/meta/base',
+            'web-v1-app/.private-data/published/v1/gold/bitcoin',
+            'web-v1-app/.private-data/published/v1/gold/arbitrum',
+            'web-v1-app/.private-data/published/v1/gold/base',
+            'web-v1-app/.private-data/published/v1/derived/bitcoin',
+            'web-v1-app/.private-data/published/v1/derived/arbitrum',
+            'web-v1-app/.private-data/published/v1/derived/base',
+            'web-v1-app/.private-data/published/v1/meta/bitcoin',
+            'web-v1-app/.private-data/published/v1/meta/arbitrum',
+            'web-v1-app/.private-data/published/v1/meta/base'
+          )
+
+          foreach ($path in $paths) {
+            git restore --source=HEAD --worktree -- $path
+            if ($LASTEXITCODE -ne 0) { throw "Failed to restore non-Ethereum path: $path" }
+          }
+
+          $forbidden = @(
+            git diff --name-only HEAD | Where-Object {
+              $_ -match '^(data/calculated/(gold_json|derived|meta)/(bitcoin|arbitrum|base)/)' -or
+              $_ -match '^(data/published/v1/(gold|derived|meta)/(bitcoin|arbitrum|base)/)'
+            }
+          )
+          if ($forbidden.Count -gt 0) {
+            $forbidden | ForEach-Object { Write-Host "Unexpected canonical change remains: $_" }
+            throw 'Non-Ethereum canonical restore did not fully clean the targeted rebuild.'
+          }
+          Write-Host 'Non-Ethereum canonical artifacts restored to pre-rebuild HEAD.'
+
+      - name: Persist rebuilt Ethereum data checkpoint
+        if: steps.checkpoint.outputs.exists != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path '.agent-state' | Out-Null
+          @{
+            chain = 'ethereum'
+            start = '2024-12-01'
+            created_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+            purpose = 'Persist heavy rebuild output before post-build validation'
+          } | ConvertTo-Json | Set-Content -LiteralPath '.agent-state/ethereum-history-rebuild-checkpoint.json' -Encoding utf8
+
+          git add -- `
+            data/calculated/gold_json/ethereum `
+            data/calculated/derived/ethereum `
+            data/calculated/meta/ethereum `
+            data/published/v1 `
+            web-v1-app/.private-data/published/v1/gold/ethereum `
+            web-v1-app/.private-data/published/v1/derived/ethereum `
+            web-v1-app/.private-data/published/v1/meta/ethereum `
+            .agent-state/ethereum-history-rebuild-checkpoint.json
+
+          $staged = @(git diff --cached --name-only)
+          if ($staged.Count -eq 0) { throw 'Heavy rebuild produced no checkpointable changes.' }
+
+          Write-Host "Checkpointing $($staged.Count) tracked files before validation."
+          git commit -m "Checkpoint rebuilt Ethereum history before validation"
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to create Ethereum rebuild checkpoint commit.' }
+          git push origin HEAD:agent/ethereum-history-rebuild-run
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to push Ethereum rebuild checkpoint commit.' }
 
       - name: Validate Ethereum native-unit history
         shell: pwsh
@@ -147,24 +248,23 @@ jobs:
               print(root, "days=", len(files), "numeric=", numeric, "max=", maxima)
           '@ | python -
 
-      - name: Reject non-Ethereum historical data changes
+      - name: Verify non-Ethereum canonical history equals main
         shell: pwsh
         run: |
-          $changed = @(git diff --name-only HEAD)
+          $ErrorActionPreference = 'Stop'
+          git fetch origin main --quiet
           $forbidden = @(
-            $changed | Where-Object {
+            git diff --name-only origin/main...HEAD | Where-Object {
               $_ -match '^(data/calculated/(gold_json|derived|meta)/(bitcoin|arbitrum|base)/)' -or
               $_ -match '^(data/published/v1/(gold|derived|meta)/(bitcoin|arbitrum|base)/)'
             }
           )
-
           if ($forbidden.Count -gt 0) {
-            Write-Host "Unexpected non-Ethereum canonical history changes:"
+            Write-Host 'Unexpected non-Ethereum canonical changes relative to main:'
             $forbidden | ForEach-Object { Write-Host "  $_" }
-            throw "Ethereum-only rebuild modified non-Ethereum canonical historical artifacts."
+            throw 'Ethereum checkpoint contains non-Ethereum canonical historical changes.'
           }
-
-          Write-Host "Non-Ethereum canonical historical artifact invariant passed."
+          Write-Host 'Non-Ethereum canonical history matches main.'
 
       - name: Validate published dataset
         shell: pwsh
@@ -175,19 +275,21 @@ jobs:
       - name: Show migration summary
         shell: pwsh
         run: |
-          $changed = @(git diff --name-only HEAD)
-          Write-Host "Changed tracked files before commit: $($changed.Count)"
+          git fetch origin main --quiet
+          $changed = @(git diff --name-only origin/main...HEAD)
+          Write-Host "Changed tracked files versus main: $($changed.Count)"
           $changed | Group-Object { ($_ -split '/')[0..([Math]::Min(4,(($_ -split '/').Length-1)))] -join '/' } | Sort-Object Count -Descending | Select-Object -First 30 | Format-Table Count, Name -AutoSize
 
-      - name: Commit regenerated history to rebuild branch
+      - name: Mark checkpoint validated
         shell: pwsh
         run: |
-          git add -- data/calculated/gold_json/ethereum data/calculated/derived/ethereum data/calculated/meta/ethereum data/published/v1 web-v1-app/.private-data/published/v1/gold/ethereum web-v1-app/.private-data/published/v1/derived/ethereum web-v1-app/.private-data/published/v1/meta/ethereum
-
-          $staged = git diff --cached --name-only
-          if ([string]::IsNullOrWhiteSpace(($staged | Out-String).Trim())) {
-            throw "Historical rebuild produced no committable data changes."
+          $ErrorActionPreference = 'Stop'
+          if (Test-Path -LiteralPath '.agent-state/ethereum-history-rebuild-checkpoint.json') {
+            Remove-Item -LiteralPath '.agent-state/ethereum-history-rebuild-checkpoint.json' -Force
+            git add -u -- .agent-state/ethereum-history-rebuild-checkpoint.json
+            git commit -m "Validate Ethereum historical rebuild checkpoint"
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to commit checkpoint validation marker removal.' }
+            git push origin HEAD:agent/ethereum-history-rebuild-run
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to push validated checkpoint state.' }
           }
-
-          git commit -m "Rebuild Ethereum history with normalized native units"
-          git push origin HEAD:agent/ethereum-history-rebuild-run
+          Write-Host 'Ethereum historical rebuild checkpoint validated.'
