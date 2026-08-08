@@ -162,9 +162,27 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
     if tx is not None:
         tx_count = tx.select(pl.len().cast(pl.UInt32).alias("tx_count_daily"))
 
-        # value (native) candidates
+        # value (native) candidates. Bitcoin's AWS transaction schema exposes
+        # total transaction outputs as output_value; prefer it over generic aliases
+        # because UTXO transactions do not have a single top-level transfer value.
         value_col = None
-        for cand in ["value", "value_native", "value_transferred", "amount", "native_value", "tx_value"]:
+        value_candidates = [
+            "output_value",
+            "value",
+            "value_native",
+            "value_transferred",
+            "amount",
+            "native_value",
+            "tx_value",
+        ] if str(chain).lower() in {"bitcoin", "btc"} else [
+            "value",
+            "value_native",
+            "value_transferred",
+            "amount",
+            "native_value",
+            "tx_value",
+        ]
+        for cand in value_candidates:
             if _ci_has(tx_ci, cand):
                 value_col = cand
                 break
@@ -264,25 +282,53 @@ def compute_daily_features(chain: str, day_str: str, raw_root: Path) -> Optional
             failed_tx_rate = tx.select((_ci_safe_f64(tx_ci, "status") != 1.0).mean().alias("failed_tx_rate"))
 
         # unique_active_addresses
-        from_candidates = ["from_address", "from", "sender"]
-        to_candidates = ["to_address", "to", "recipient"]
-        from_col = next((c for c in from_candidates if _ci_has(tx_ci, c)), None)
-        to_col = next((c for c in to_candidates if _ci_has(tx_ci, c)), None)
+        # Bitcoin is UTXO-based: AWS stores participant addresses inside
+        # inputs[].address and outputs[].address rather than top-level from/to fields.
+        # Count the union across both nested collections, excluding null/blank addresses.
+        if str(chain).lower() in {"bitcoin", "btc"} and (
+            _ci_has(tx_ci, "inputs") or _ci_has(tx_ci, "outputs")
+        ):
+            nested_addr_frames = []
+            for io_col in ["inputs", "outputs"]:
+                if _ci_has(tx_ci, io_col):
+                    nested_addr_frames.append(
+                        tx.select(
+                            _ci_col(tx_ci, io_col)
+                            .explode()
+                            .struct.field("address")
+                            .cast(pl.Utf8, strict=False)
+                            .str.strip_chars()
+                            .alias("address")
+                        )
+                    )
+            if nested_addr_frames:
+                unique_addrs = pl.concat(nested_addr_frames, how="vertical_relaxed").select(
+                    pl.col("address")
+                    .filter(pl.col("address").is_not_null() & (pl.col("address") != ""))
+                    .n_unique()
+                    .cast(pl.UInt32)
+                    .alias("unique_active_addresses")
+                )
+        else:
+            from_candidates = ["from_address", "from", "sender"]
+            to_candidates = ["to_address", "to", "recipient"]
+            from_col = next((c for c in from_candidates if _ci_has(tx_ci, c)), None)
+            to_col = next((c for c in to_candidates if _ci_has(tx_ci, c)), None)
 
-        addr_exprs = []
-        if from_col:
-            addr_exprs.append(_ci_col(tx_ci, from_col))
-        if to_col:
-            addr_exprs.append(_ci_col(tx_ci, to_col))
-        if addr_exprs:
-            unique_addrs = tx.select(
-                pl.concat_list(addr_exprs)
-                .list.explode()
-                .drop_nulls()
-                .n_unique()
-                .cast(pl.UInt32)
-                .alias("unique_active_addresses")
-            )
+            addr_exprs = []
+            if from_col:
+                addr_exprs.append(_ci_col(tx_ci, from_col))
+            if to_col:
+                addr_exprs.append(_ci_col(tx_ci, to_col))
+            if addr_exprs:
+                unique_addrs = tx.select(
+                    pl.concat_list(addr_exprs)
+                    .list.explode()
+                    .drop_nulls()
+                    .n_unique()
+                    .cast(pl.UInt32)
+                    .alias("unique_active_addresses")
+                )
 
     # Blocks-derived features
     blk_ci = _ci_map_columns(blocks) if blocks is not None else {}
