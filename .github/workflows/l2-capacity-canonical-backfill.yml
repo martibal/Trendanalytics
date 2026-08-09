@@ -13,13 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      actions: read
       contents: write
 
     steps:
       - name: Checkout canonical backfill branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -29,10 +30,22 @@ jobs:
       - name: Install pipeline dependencies
         run: pip install -r pipeline/requirements.txt
 
+      - name: Download exact validated combined backfill artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .validated-l2-backfill
+          gh run download 31304152726 \
+            --repo martibal/Trendanalytics \
+            --name l2-capacity-backfill-combined \
+            --dir .validated-l2-backfill
+          sha256sum .validated-l2-backfill/l2-capacity-backfill-combined.json
+          test "$(sha256sum .validated-l2-backfill/l2-capacity-backfill-combined.json | cut -d' ' -f1)" = "2768ddac6a40a1fe054c6b2b34df78f6978b669106f6768944fd4500ae6adda2"
+
       - name: Apply validated capacity seed to published Gold
         run: |
           python pipeline/tools/apply_l2_capacity_backfill_seed.py \
-            --seed pipeline/backfill/l2-capacity-backfill-combined.json \
+            --seed .validated-l2-backfill/l2-capacity-backfill-combined.json \
             --published-root data/published/v1
 
       - name: Regenerate META from canonical published Gold
