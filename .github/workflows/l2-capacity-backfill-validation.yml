@@ -12,7 +12,7 @@ on:
 jobs:
   preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     permissions:
       contents: read
@@ -31,14 +31,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install "pyarrow>=18,<19"
 
-      - name: Run real-source capacity preflight
+      - name: Probe Arbitrum capacity continuity around zero period
         run: |
           python ./pipeline/tools/l2_capacity_s3_preflight.py \
-            --dates 2024-12-15,2025-06-15,2026-01-15,2026-08-02 \
-            --chains arbitrum,base \
+            --dates 2025-11-15,2025-12-01,2025-12-15,2026-01-01,2026-01-15,2026-02-01,2026-02-15,2026-03-01 \
+            --chains arbitrum \
             --history-days 615 \
-            --max-sample-seconds 180 \
-            --max-projected-serial-minutes 120 \
+            --max-sample-seconds 60 \
+            --max-projected-serial-minutes 60 \
             --output ./reports/l2-capacity-s3-preflight.json
 
       - name: Upload preflight report
