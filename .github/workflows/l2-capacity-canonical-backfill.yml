@@ -48,7 +48,7 @@ jobs:
             --seed .validated-l2-backfill/l2-capacity-backfill-combined.json \
             --published-root data/published/v1
 
-      - name: Regenerate META from canonical published Gold
+      - name: Regenerate META and Derived from canonical published Gold
         run: |
           python pipeline/tools/regenerate_json_safe.py \
             --root . \
@@ -91,14 +91,46 @@ jobs:
               print(chain, "label=", regime.get("label"), "capacity_axis=", axis, "capacity_signal=", signals["capacity_util_pct"])
           PY
 
-      - name: Commit canonical backfill to branch
+      - name: Restore non-L2 published layers from main
+        run: |
+          git fetch origin main --depth=1
+          git checkout origin/main -- \
+            data/published/v1/meta/bitcoin \
+            data/published/v1/meta/ethereum \
+            data/published/v1/derived/bitcoin \
+            data/published/v1/derived/ethereum
+
+          echo "Diff after non-L2 restore:"
+          git diff --stat
+
+      - name: Revalidate scoped published dataset
+        run: |
+          python pipeline/tools/validate_published_dataset.py \
+            --published-root data/published/v1
+          python pipeline/tools/validate_meta_methodology_safety.py \
+            --root . \
+            --meta-root data/published/v1/meta
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for chain in ("arbitrum", "base"):
+              meta = json.loads(Path(f"data/published/v1/meta/{chain}/latest.json").read_text(encoding="utf-8"))
+              signal = ((meta.get("regime") or {}).get("signals") or {}).get("capacity_util_pct") or {}
+              axis = ((meta.get("regime") or {}).get("axes") or {}).get("capacity") or {}
+              assert signal.get("informative") is True, (chain, signal)
+              assert int(axis.get("informative_count") or 0) >= 1, (chain, axis)
+          print("Scoped L2 publication validation OK")
+          PY
+
+      - name: Commit scoped canonical backfill to branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/published/v1 pipeline/tools/apply_l2_capacity.py .github/workflows/l2-capacity-test.yml
+          git add data/published/v1 pipeline/tools/apply_l2_capacity.py pipeline/tools/regenerate_json_safe.py .github/workflows/l2-capacity-test.yml
           if git diff --cached --quiet; then
-            echo "No canonical data changes to commit."
+            echo "No scoped canonical data changes to commit."
           else
-            git commit -m "chore(data): backfill canonical L2 capacity history"
+            git commit -m "chore(data): scope canonical L2 capacity backfill"
             git push origin HEAD:agent/l2-capacity-canonical-backfill
           fi
