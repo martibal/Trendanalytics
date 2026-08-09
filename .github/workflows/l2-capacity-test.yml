@@ -1,6 +1,12 @@
 name: L2 Capacity Test
 
 on:
+  push:
+    branches:
+      - agent/l2-capacity-backfill-validation
+    paths:
+      - "pipeline/tools/apply_l2_capacity.py"
+      - ".github/workflows/l2-capacity-test.yml"
   pull_request:
     paths:
       - "pipeline/tools/apply_l2_capacity.py"
@@ -32,6 +38,7 @@ jobs:
           @'
           from datetime import date, timedelta
           from pathlib import Path
+          import json
           import polars as pl
 
           root = Path(".test-l2-capacity")
@@ -44,20 +51,32 @@ jobs:
           days = [(start + timedelta(days=i)).isoformat() for i in range(40)]
 
           for chain in ("arbitrum", "base"):
-              pl.DataFrame({
+              frame = pl.DataFrame({
                   "date": days,
                   "chain": [chain] * len(days),
                   "tx_count_daily": [1000 + i for i in range(len(days))],
-              }).write_parquet(gold / f"{chain}.parquet")
+              })
+              if chain == "base":
+                  frame = frame.with_columns(pl.Series("base_blob_gas_used_daily", [999.0] * len(days)))
+              frame.write_parquet(gold / f"{chain}.parquet")
+              chain_pub = published / chain
+              chain_pub.mkdir(parents=True, exist_ok=True)
+              for day in days:
+                  obj = {"date": day, "chain": chain}
+                  if chain == "base":
+                      obj["base_blob_gas_used_daily"] = 999.0
+                  (chain_pub / f"{day}.json").write_text(json.dumps(obj), encoding="utf-8")
 
           for i, day in enumerate(days):
               arb_dir = raw / "arbitrum" / "transactions" / f"date={day}"
               arb_dir.mkdir(parents=True, exist_ok=True)
-              pl.DataFrame({"GAS_USED_FOR_L1": [100 + i, 200 + i]}).write_parquet(arb_dir / "part.parquet")
+              # Entire-day zero is a source-evidence gap and must become null.
+              arb_values = [0, 0] if i == 20 else [100 + i, 200 + i]
+              pl.DataFrame({"GAS_USED_FOR_L1": arb_values}).write_parquet(arb_dir / "part.parquet")
 
-              base_dir = raw / "base" / "blocks" / f"date={day}"
+              base_dir = raw / "base" / "transactions" / f"date={day}"
               base_dir.mkdir(parents=True, exist_ok=True)
-              pl.DataFrame({"BLOB_GAS_USED": [1000 + 10 * i, 2000 + 10 * i]}).write_parquet(base_dir / "part.parquet")
+              pl.DataFrame({"L1_GAS_USED": [1000 + 10 * i, 2000 + 10 * i]}).write_parquet(base_dir / "part.parquet")
           '@ | python -
 
       - name: Run L2 capacity postprocessor
@@ -74,6 +93,7 @@ jobs:
         run: |
           @'
           from pathlib import Path
+          import json
           import polars as pl
 
           root = Path(".test-l2-capacity/gold")
@@ -84,18 +104,28 @@ jobs:
           assert "capacity_util_pct" in arb.columns
           assert "capacity_util_pct" in base.columns
           assert "arbitrum_l1_gas_used_daily" in arb.columns
-          assert "base_blob_gas_used_daily" in base.columns
+          assert "base_l1_gas_used_daily" in base.columns
+          assert "base_blob_gas_used_daily" not in base.columns
 
           assert arb["arbitrum_l1_gas_used_daily"][0] == 300.0
-          assert base["base_blob_gas_used_daily"][0] == 3000.0
+          assert arb["arbitrum_l1_gas_used_daily"][20] is None
+          assert arb["capacity_util_pct"][20] is None
+          assert base["base_l1_gas_used_daily"][0] == 3000.0
 
           for frame in (arb, base):
-              cap = frame["capacity_util_pct"]
-              assert cap[:7].null_count() == 7
-              finite = cap.drop_nulls()
-              assert len(finite) == 33
+              finite = frame["capacity_util_pct"].drop_nulls()
               assert finite.min() >= 0.0
               assert finite.max() <= 1.0
+
+          assert base["capacity_util_pct"][:7].null_count() == 7
+          assert len(base["capacity_util_pct"].drop_nulls()) == 33
+          assert len(arb["capacity_util_pct"].drop_nulls()) == 32
+
+          base_pub = json.loads(
+              Path(".test-l2-capacity/published/gold/base/2026-01-01.json").read_text(encoding="utf-8")
+          )
+          assert base_pub["base_l1_gas_used_daily"] == 3000.0
+          assert "base_blob_gas_used_daily" not in base_pub
 
           print("L2 capacity fixture OK")
           '@ | python -
