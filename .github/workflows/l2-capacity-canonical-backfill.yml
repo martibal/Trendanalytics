@@ -123,14 +123,45 @@ jobs:
           print("Scoped L2 publication validation OK")
           PY
 
+      - name: Sync canonical published data to private web mirror
+        shell: pwsh
+        run: |
+          ./sync-published-data.ps1 \
+            -SourceRoot "${{ github.workspace }}/data/published/v1" \
+            -TargetRoot "${{ github.workspace }}/web-v1-app/.private-data/published/v1" \
+            -SkipGitStatus
+
+      - name: Verify private mirror byte identity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          source = Path("data/published/v1")
+          mirror = Path("web-v1-app/.private-data/published/v1")
+
+          source_files = sorted(p.relative_to(source) for p in source.rglob("*") if p.is_file())
+          mirror_files = sorted(p.relative_to(mirror) for p in mirror.rglob("*") if p.is_file())
+          assert source_files == mirror_files, (len(source_files), len(mirror_files))
+
+          for rel in source_files:
+              a = source / rel
+              b = mirror / rel
+              ah = hashlib.sha256(a.read_bytes()).digest()
+              bh = hashlib.sha256(b.read_bytes()).digest()
+              assert ah == bh, rel.as_posix()
+
+          print(f"Private mirror byte identity OK: {len(source_files)} files")
+          PY
+
       - name: Commit scoped canonical backfill to branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/published/v1 pipeline/tools/apply_l2_capacity.py pipeline/tools/regenerate_json_safe.py .github/workflows/l2-capacity-test.yml
+          git add data/published/v1 web-v1-app/.private-data/published/v1 pipeline/tools/apply_l2_capacity.py pipeline/tools/regenerate_json_safe.py .github/workflows/l2-capacity-test.yml
           if git diff --cached --quiet; then
             echo "No scoped canonical data changes to commit."
           else
-            git commit -m "chore(data): scope canonical L2 capacity backfill"
+            git commit -m "chore(data): sync canonical L2 capacity mirrors"
             git push origin HEAD:agent/l2-capacity-canonical-backfill
           fi
