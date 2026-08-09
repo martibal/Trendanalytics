@@ -1,0 +1,146 @@
+name: Ethereum Native Unit Narrow Copy
+
+on:
+  push:
+    branches:
+      - agent/eth-native-unit-repair-narrow
+    paths:
+      - .github/workflows/eth-native-unit-narrow-copy.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  narrow-copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout narrow branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/eth-native-unit-repair-narrow
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web-v1-app/package-lock.json
+
+      - name: Fetch validated repair branch
+        run: git fetch origin agent/eth-native-unit-repair --prune
+
+      - name: Copy only causally affected Ethereum repair files
+        shell: bash
+        run: |
+          set -euo pipefail
+          paths=(
+            ".github/workflows/pipeline.yml"
+            "pipeline/tools/validate_native_units.py"
+            "data/calculated/gold_json/ethereum/2026-08-06.json"
+            "data/calculated/meta/ethereum/2026-08-06.json"
+            "data/calculated/meta/ethereum/2026-08-07.json"
+            "data/calculated/meta/ethereum/2026-08-08.json"
+            "data/calculated/meta/ethereum/last7d.json"
+            "data/calculated/meta/ethereum/last30d.json"
+            "data/calculated/meta/ethereum/last90d.json"
+            "data/calculated/meta/ethereum/last180d.json"
+            "data/calculated/meta/ethereum/last365d.json"
+            "data/calculated/meta/ethereum/latest.json"
+            "data/published/v1/gold/ethereum/2026-08-06.json"
+            "data/published/v1/gold/ethereum/last7d.json"
+            "data/published/v1/gold/ethereum/last30d.json"
+            "data/published/v1/gold/ethereum/last90d.json"
+            "data/published/v1/gold/ethereum/last180d.json"
+            "data/published/v1/gold/ethereum/last365d.json"
+            "data/published/v1/derived/ethereum/2026-08-06.json"
+            "data/published/v1/derived/ethereum/2026-08-07.json"
+            "data/published/v1/derived/ethereum/2026-08-08.json"
+            "data/published/v1/derived/ethereum/last7d.json"
+            "data/published/v1/derived/ethereum/last30d.json"
+            "data/published/v1/derived/ethereum/last90d.json"
+            "data/published/v1/derived/ethereum/last180d.json"
+            "data/published/v1/derived/ethereum/last365d.json"
+            "data/published/v1/derived/ethereum/latest.json"
+            "data/published/v1/derived/ethereum/manifest.json"
+            "data/published/v1/meta/ethereum/2026-08-06.json"
+            "data/published/v1/meta/ethereum/2026-08-07.json"
+            "data/published/v1/meta/ethereum/2026-08-08.json"
+            "data/published/v1/meta/ethereum/last7d.json"
+            "data/published/v1/meta/ethereum/last30d.json"
+            "data/published/v1/meta/ethereum/last90d.json"
+            "data/published/v1/meta/ethereum/last180d.json"
+            "data/published/v1/meta/ethereum/last365d.json"
+            "data/published/v1/meta/ethereum/latest.json"
+            "data/published/v1/meta/ethereum/manifest.json"
+            "web-v1-app/.private-data/published/v1/gold/ethereum/2026-08-06.json"
+            "web-v1-app/.private-data/published/v1/gold/ethereum/last7d.json"
+            "web-v1-app/.private-data/published/v1/gold/ethereum/last30d.json"
+            "web-v1-app/.private-data/published/v1/gold/ethereum/last90d.json"
+            "web-v1-app/.private-data/published/v1/gold/ethereum/last180d.json"
+            "web-v1-app/.private-data/published/v1/gold/ethereum/last365d.json"
+            "web-v1-app/.private-data/published/v1/derived/ethereum/2026-08-06.json"
+            "web-v1-app/.private-data/published/v1/derived/ethereum/2026-08-07.json"
+            "web-v1-app/.private-data/published/v1/derived/ethereum/2026-08-08.json"
+            "web-v1-app/.private-data/published/v1/derived/ethereum/last7d.json"
+            "web-v1-app/.private-data/published/v1/derived/ethereum/last30d.json"
+            "web-v1-app/.private-data/published/v1/derived/ethereum/last90d.json"
+            "web-v1-app/.private-data/published/v1/derived/ethereum/last180d.json"
+            "web-v1-app/.private-data/published/v1/derived/ethereum/last365d.json"
+            "web-v1-app/.private-data/published/v1/derived/ethereum/latest.json"
+            "web-v1-app/.private-data/published/v1/derived/ethereum/manifest.json"
+            "web-v1-app/.private-data/published/v1/meta/ethereum/2026-08-06.json"
+            "web-v1-app/.private-data/published/v1/meta/ethereum/2026-08-07.json"
+            "web-v1-app/.private-data/published/v1/meta/ethereum/2026-08-08.json"
+            "web-v1-app/.private-data/published/v1/meta/ethereum/last7d.json"
+            "web-v1-app/.private-data/published/v1/meta/ethereum/last30d.json"
+            "web-v1-app/.private-data/published/v1/meta/ethereum/last90d.json"
+            "web-v1-app/.private-data/published/v1/meta/ethereum/last180d.json"
+            "web-v1-app/.private-data/published/v1/meta/ethereum/last365d.json"
+            "web-v1-app/.private-data/published/v1/meta/ethereum/latest.json"
+            "web-v1-app/.private-data/published/v1/meta/ethereum/manifest.json"
+          )
+          git checkout origin/agent/eth-native-unit-repair -- "${paths[@]}"
+
+      - name: Validate Ethereum native units
+        run: python pipeline/tools/validate_native_units.py --published-root data/published/v1
+
+      - name: Install web dependencies
+        working-directory: web-v1-app
+        run: npm ci
+
+      - name: Run publication integrity audit
+        working-directory: web-v1-app
+        run: npm run check:publication-integrity
+
+      - name: Verify diff scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad=$(git diff --name-only HEAD -- . ':!data/calculated/gold_json/ethereum/**' ':!data/calculated/meta/ethereum/**' ':!data/published/v1/gold/ethereum/**' ':!data/published/v1/derived/ethereum/**' ':!data/published/v1/meta/ethereum/**' ':!web-v1-app/.private-data/published/v1/gold/ethereum/**' ':!web-v1-app/.private-data/published/v1/derived/ethereum/**' ':!web-v1-app/.private-data/published/v1/meta/ethereum/**' ':!.github/workflows/pipeline.yml' ':!pipeline/tools/validate_native_units.py')
+          if [ -n "$bad" ]; then
+            echo "Unexpected paths in narrow repair:"
+            echo "$bad"
+            exit 1
+          fi
+
+      - name: Commit narrow repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "fix(data): repair Ethereum native-unit history narrowly"
+          git push origin HEAD:agent/eth-native-unit-repair-narrow
