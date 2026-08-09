@@ -56,10 +56,13 @@ jobs:
             --skip-web-sync \
             --skip-briefs
 
-      - name: Run strict publication validators
+      - name: Run publication validators
         run: |
-          python pipeline/tools/validate_publish.py --strict --root data/published/v1
-          python pipeline/tools/validate_methodology_v3.py --strict --published-root data/published/v1
+          python pipeline/tools/validate_published_dataset.py \
+            --published-root data/published/v1
+          python pipeline/tools/validate_meta_methodology_safety.py \
+            --root . \
+            --meta-root data/published/v1/meta
 
       - name: Verify L2 capacity is informative in latest META
         run: |
