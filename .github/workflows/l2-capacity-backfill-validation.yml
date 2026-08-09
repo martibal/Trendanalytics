@@ -6,13 +6,17 @@ on:
       - agent/l2-capacity-backfill-validation
     paths:
       - ".github/workflows/l2-capacity-backfill-validation.yml"
-      - "pipeline/tools/l2_capacity_s3_preflight.py"
+      - "pipeline/tools/l2_capacity_backfill_chunk.py"
   workflow_dispatch:
 
 jobs:
-  preflight:
+  pilot:
+    strategy:
+      fail-fast: false
+      matrix:
+        chain: [arbitrum, base]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     permissions:
       contents: read
@@ -26,25 +30,44 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install minimal preflight dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install "pyarrow>=18,<19"
+      - name: Install minimal backfill dependencies
+        run: pip install "pyarrow>=18,<19"
 
-      - name: Probe Arbitrum capacity continuity around zero period
+      - name: Run three-day real-source backfill pilot
         run: |
-          python ./pipeline/tools/l2_capacity_s3_preflight.py \
-            --dates 2025-11-15,2025-12-01,2025-12-15,2026-01-01,2026-01-15,2026-02-01,2026-02-15,2026-03-01 \
-            --chains arbitrum \
-            --history-days 615 \
-            --max-sample-seconds 60 \
-            --max-projected-serial-minutes 60 \
-            --output ./reports/l2-capacity-s3-preflight.json
+          python ./pipeline/tools/l2_capacity_backfill_chunk.py \
+            --chain ${{ matrix.chain }} \
+            --start 2026-01-14 \
+            --end 2026-01-16 \
+            --max-days 3 \
+            --max-day-seconds 60 \
+            --output ./reports/l2-capacity-${{ matrix.chain }}-pilot.json
 
-      - name: Upload preflight report
+      - name: Validate pilot semantics
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          chain = "${{ matrix.chain }}"
+          p = Path(f"reports/l2-capacity-{chain}-pilot.json")
+          obj = json.loads(p.read_text(encoding="utf-8"))
+          assert obj["day_count"] == 3
+          assert len(obj["rows"]) == 3
+          if chain == "arbitrum":
+              assert obj["available_days"] == 0
+              assert obj["unavailable_all_zero_days"] == 3
+              assert all(row["raw_value"] is None for row in obj["rows"])
+          else:
+              assert obj["available_days"] == 3
+              assert obj["unavailable_all_zero_days"] == 0
+              assert all(row["raw_value"] is not None and row["raw_value"] > 0 for row in obj["rows"])
+          print(f"pilot semantics OK: {chain}")
+          PY
+
+      - name: Upload pilot report
         uses: actions/upload-artifact@v4
         with:
-          name: l2-capacity-s3-preflight
-          path: reports/l2-capacity-s3-preflight.json
+          name: l2-capacity-${{ matrix.chain }}-pilot
+          path: reports/l2-capacity-${{ matrix.chain }}-pilot.json
           if-no-files-found: error
           retention-days: 7
