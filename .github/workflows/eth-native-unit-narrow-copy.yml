@@ -89,10 +89,8 @@ jobs:
                   if not isinstance(rows, list):
                       raise SystemExit(f"Expected list window: {window_path}")
 
-                  present = {row.get("date") for row in rows if isinstance(row, dict)}
-                  replacement_dates = [d for d in dates if d in present]
-                  if replacement_dates:
-                      replacements = set(replacement_dates)
+                  replacements = set(d for d in dates if d in {row.get("date") for row in rows if isinstance(row, dict)})
+                  if replacements:
                       rows = [
                           day_rows[row.get("date")]
                           if isinstance(row, dict) and row.get("date") in replacements
@@ -104,12 +102,14 @@ jobs:
                           encoding="utf-8",
                       )
 
-              latest_day = max(dates)
               latest_path = root / layer / "ethereum" / "latest.json"
-              latest_path.write_text(
-                  json.dumps(day_rows[latest_day], indent=2, ensure_ascii=False) + "\n",
-                  encoding="utf-8",
-              )
+              latest_row = json.loads(latest_path.read_text(encoding="utf-8-sig"))
+              latest_date = latest_row.get("date") if isinstance(latest_row, dict) else None
+              if latest_date in day_rows:
+                  latest_path.write_text(
+                      json.dumps(day_rows[latest_date], indent=2, ensure_ascii=False) + "\n",
+                      encoding="utf-8",
+                  )
 
               changed_names = [f"{d}.json" for d in dates] + windows + ["latest.json"]
               for name in changed_names:
