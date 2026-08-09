@@ -1,0 +1,142 @@
+name: Ethereum Native Unit Finalize
+
+on:
+  push:
+    branches:
+      - agent/eth-native-unit-repair-final
+    paths:
+      - .github/workflows/eth-native-unit-finalize.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout final branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/eth-native-unit-repair-final
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web-v1-app/package-lock.json
+
+      - name: Fetch validated repair branch
+        run: git fetch origin agent/eth-native-unit-repair --prune
+
+      - name: Copy direct repaired files only
+        shell: bash
+        run: |
+          set -euo pipefail
+          paths=(
+            "pipeline/tools/validate_native_units.py"
+            "data/calculated/gold_json/ethereum/2026-08-06.json"
+            "data/calculated/meta/ethereum/2026-08-06.json"
+            "data/calculated/meta/ethereum/2026-08-07.json"
+            "data/calculated/meta/ethereum/2026-08-08.json"
+            "data/published/v1/gold/ethereum/2026-08-06.json"
+            "data/published/v1/derived/ethereum/2026-08-06.json"
+            "data/published/v1/derived/ethereum/2026-08-07.json"
+            "data/published/v1/derived/ethereum/2026-08-08.json"
+            "data/published/v1/meta/ethereum/2026-08-06.json"
+            "data/published/v1/meta/ethereum/2026-08-07.json"
+            "data/published/v1/meta/ethereum/2026-08-08.json"
+          )
+          git checkout origin/agent/eth-native-unit-repair -- "${paths[@]}"
+
+      - name: Patch affected dates inside current main-derived windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import shutil
+          from pathlib import Path
+
+          windows = ["last7d.json", "last30d.json", "last90d.json", "last180d.json", "last365d.json"]
+          affected = {
+              "gold": ["2026-08-06"],
+              "derived": ["2026-08-06", "2026-08-07", "2026-08-08"],
+              "meta": ["2026-08-06", "2026-08-07", "2026-08-08"],
+          }
+          root = Path("data/published/v1")
+          mirror_root = Path("web-v1-app/.private-data/published/v1")
+
+          for layer, dates in affected.items():
+              day_rows = {
+                  d: json.loads((root / layer / "ethereum" / f"{d}.json").read_text(encoding="utf-8-sig"))
+                  for d in dates
+              }
+              for window_name in windows:
+                  window_path = root / layer / "ethereum" / window_name
+                  rows = json.loads(window_path.read_text(encoding="utf-8-sig"))
+                  if not isinstance(rows, list):
+                      raise SystemExit(f"Expected list window: {window_path}")
+                  replacements = set(d for d in dates if d in {r.get("date") for r in rows if isinstance(r, dict)})
+                  if replacements:
+                      rows = [day_rows[r.get("date")] if isinstance(r, dict) and r.get("date") in replacements else r for r in rows]
+                      window_path.write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+              latest_path = root / layer / "ethereum" / "latest.json"
+              latest_row = json.loads(latest_path.read_text(encoding="utf-8-sig"))
+              latest_date = latest_row.get("date") if isinstance(latest_row, dict) else None
+              if latest_date in day_rows:
+                  latest_path.write_text(json.dumps(day_rows[latest_date], indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+              changed_names = [f"{d}.json" for d in dates] + windows + ["latest.json"]
+              for name in changed_names:
+                  src = root / layer / "ethereum" / name
+                  dst = mirror_root / layer / "ethereum" / name
+                  dst.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(src, dst)
+          PY
+
+      - name: Validate Ethereum native units
+        run: python pipeline/tools/validate_native_units.py --published-root data/published/v1
+
+      - name: Install web dependencies
+        working-directory: web-v1-app
+        run: npm ci
+
+      - name: Run publication integrity audit
+        working-directory: web-v1-app
+        run: npm run check:publication-integrity
+
+      - name: Verify diff scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad=$(git diff --name-only HEAD -- . ':!data/calculated/gold_json/ethereum/**' ':!data/calculated/meta/ethereum/**' ':!data/published/v1/gold/ethereum/**' ':!data/published/v1/derived/ethereum/**' ':!data/published/v1/meta/ethereum/**' ':!web-v1-app/.private-data/published/v1/gold/ethereum/**' ':!web-v1-app/.private-data/published/v1/derived/ethereum/**' ':!web-v1-app/.private-data/published/v1/meta/ethereum/**' ':!pipeline/tools/validate_native_units.py')
+          if [ -n "$bad" ]; then
+            echo "Unexpected paths in final repair:"
+            echo "$bad"
+            exit 1
+          fi
+
+      - name: Commit final repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git reset .github/workflows/eth-native-unit-finalize.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "fix(data): repair Ethereum native-unit history"
+          git push origin HEAD:agent/eth-native-unit-repair-final
