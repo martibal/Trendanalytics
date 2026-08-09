@@ -1,0 +1,88 @@
+name: L2 Capacity Canonical Backfill
+
+on:
+  push:
+    branches:
+      - agent/l2-capacity-canonical-backfill
+    paths:
+      - ".github/workflows/l2-capacity-canonical-backfill.yml"
+  workflow_dispatch:
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout canonical backfill branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pipeline dependencies
+        run: pip install -r pipeline/requirements.txt
+
+      - name: Apply validated capacity seed to published Gold
+        run: |
+          python pipeline/tools/apply_l2_capacity_backfill_seed.py \
+            --seed pipeline/backfill/l2-capacity-backfill-combined.json \
+            --published-root data/published/v1
+
+      - name: Regenerate META from canonical published Gold
+        run: |
+          python pipeline/tools/regenerate_json_safe.py \
+            --root . \
+            --start 2024-12-01 \
+            --skip-web-sync \
+            --skip-briefs
+
+      - name: Run strict publication validators
+        run: |
+          python pipeline/tools/validate_publish.py --strict --root data/published/v1
+          python pipeline/tools/validate_methodology_v3.py --strict --published-root data/published/v1
+
+      - name: Verify L2 capacity is informative in latest META
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          expected = {
+              "arbitrum": ("arbitrum_l1_gas_used_daily", 0.09217485575914006),
+              "base": ("base_l1_gas_used_daily", 0.5062384755062305),
+          }
+          for chain, (raw_key, expected_capacity) in expected.items():
+              gold = json.loads(Path(f"data/published/v1/gold/{chain}/2026-08-02.json").read_text(encoding="utf-8"))
+              assert raw_key in gold, (chain, raw_key)
+              assert abs(float(gold["capacity_util_pct"]) - expected_capacity) < 1e-12, chain
+              if chain == "base":
+                  assert "base_blob_gas_used_daily" not in gold
+
+              meta = json.loads(Path(f"data/published/v1/meta/{chain}/latest.json").read_text(encoding="utf-8"))
+              regime = meta.get("regime") or {}
+              signals = regime.get("signals") or {}
+              axis = (regime.get("axes") or {}).get("capacity") or {}
+              assert "capacity_util_pct" in signals, (chain, signals.keys())
+              assert signals["capacity_util_pct"].get("informative") is True, (chain, signals["capacity_util_pct"])
+              assert int(axis.get("informative_count") or 0) >= 1, (chain, axis)
+              print(chain, "label=", regime.get("label"), "capacity_axis=", axis, "capacity_signal=", signals["capacity_util_pct"])
+          PY
+
+      - name: Commit canonical backfill to branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/published/v1 pipeline/tools/apply_l2_capacity.py .github/workflows/l2-capacity-test.yml
+          if git diff --cached --quiet; then
+            echo "No canonical data changes to commit."
+          else
+            git commit -m "chore(data): backfill canonical L2 capacity history"
+            git push origin HEAD:agent/l2-capacity-canonical-backfill
+          fi
