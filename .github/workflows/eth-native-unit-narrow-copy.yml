@@ -37,7 +37,7 @@ jobs:
       - name: Fetch validated repair branch
         run: git fetch origin agent/eth-native-unit-repair --prune
 
-      - name: Copy only causally affected Ethereum repair files
+      - name: Copy direct repaired files only
         shell: bash
         run: |
           set -euo pipefail
@@ -48,66 +48,76 @@ jobs:
             "data/calculated/meta/ethereum/2026-08-06.json"
             "data/calculated/meta/ethereum/2026-08-07.json"
             "data/calculated/meta/ethereum/2026-08-08.json"
-            "data/calculated/meta/ethereum/last7d.json"
-            "data/calculated/meta/ethereum/last30d.json"
-            "data/calculated/meta/ethereum/last90d.json"
-            "data/calculated/meta/ethereum/last180d.json"
-            "data/calculated/meta/ethereum/last365d.json"
-            "data/calculated/meta/ethereum/latest.json"
             "data/published/v1/gold/ethereum/2026-08-06.json"
-            "data/published/v1/gold/ethereum/last7d.json"
-            "data/published/v1/gold/ethereum/last30d.json"
-            "data/published/v1/gold/ethereum/last90d.json"
-            "data/published/v1/gold/ethereum/last180d.json"
-            "data/published/v1/gold/ethereum/last365d.json"
             "data/published/v1/derived/ethereum/2026-08-06.json"
             "data/published/v1/derived/ethereum/2026-08-07.json"
             "data/published/v1/derived/ethereum/2026-08-08.json"
-            "data/published/v1/derived/ethereum/last7d.json"
-            "data/published/v1/derived/ethereum/last30d.json"
-            "data/published/v1/derived/ethereum/last90d.json"
-            "data/published/v1/derived/ethereum/last180d.json"
-            "data/published/v1/derived/ethereum/last365d.json"
-            "data/published/v1/derived/ethereum/latest.json"
-            "data/published/v1/derived/ethereum/manifest.json"
             "data/published/v1/meta/ethereum/2026-08-06.json"
             "data/published/v1/meta/ethereum/2026-08-07.json"
             "data/published/v1/meta/ethereum/2026-08-08.json"
-            "data/published/v1/meta/ethereum/last7d.json"
-            "data/published/v1/meta/ethereum/last30d.json"
-            "data/published/v1/meta/ethereum/last90d.json"
-            "data/published/v1/meta/ethereum/last180d.json"
-            "data/published/v1/meta/ethereum/last365d.json"
-            "data/published/v1/meta/ethereum/latest.json"
-            "data/published/v1/meta/ethereum/manifest.json"
-            "web-v1-app/.private-data/published/v1/gold/ethereum/2026-08-06.json"
-            "web-v1-app/.private-data/published/v1/gold/ethereum/last7d.json"
-            "web-v1-app/.private-data/published/v1/gold/ethereum/last30d.json"
-            "web-v1-app/.private-data/published/v1/gold/ethereum/last90d.json"
-            "web-v1-app/.private-data/published/v1/gold/ethereum/last180d.json"
-            "web-v1-app/.private-data/published/v1/gold/ethereum/last365d.json"
-            "web-v1-app/.private-data/published/v1/derived/ethereum/2026-08-06.json"
-            "web-v1-app/.private-data/published/v1/derived/ethereum/2026-08-07.json"
-            "web-v1-app/.private-data/published/v1/derived/ethereum/2026-08-08.json"
-            "web-v1-app/.private-data/published/v1/derived/ethereum/last7d.json"
-            "web-v1-app/.private-data/published/v1/derived/ethereum/last30d.json"
-            "web-v1-app/.private-data/published/v1/derived/ethereum/last90d.json"
-            "web-v1-app/.private-data/published/v1/derived/ethereum/last180d.json"
-            "web-v1-app/.private-data/published/v1/derived/ethereum/last365d.json"
-            "web-v1-app/.private-data/published/v1/derived/ethereum/latest.json"
-            "web-v1-app/.private-data/published/v1/derived/ethereum/manifest.json"
-            "web-v1-app/.private-data/published/v1/meta/ethereum/2026-08-06.json"
-            "web-v1-app/.private-data/published/v1/meta/ethereum/2026-08-07.json"
-            "web-v1-app/.private-data/published/v1/meta/ethereum/2026-08-08.json"
-            "web-v1-app/.private-data/published/v1/meta/ethereum/last7d.json"
-            "web-v1-app/.private-data/published/v1/meta/ethereum/last30d.json"
-            "web-v1-app/.private-data/published/v1/meta/ethereum/last90d.json"
-            "web-v1-app/.private-data/published/v1/meta/ethereum/last180d.json"
-            "web-v1-app/.private-data/published/v1/meta/ethereum/last365d.json"
-            "web-v1-app/.private-data/published/v1/meta/ethereum/latest.json"
-            "web-v1-app/.private-data/published/v1/meta/ethereum/manifest.json"
           )
           git checkout origin/agent/eth-native-unit-repair -- "${paths[@]}"
+
+      - name: Patch only affected dates inside canonical Ethereum windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import shutil
+          from pathlib import Path
+
+          windows = ["last7d.json", "last30d.json", "last90d.json", "last180d.json", "last365d.json"]
+          affected = {
+              "gold": ["2026-08-06"],
+              "derived": ["2026-08-06", "2026-08-07", "2026-08-08"],
+              "meta": ["2026-08-06", "2026-08-07", "2026-08-08"],
+          }
+
+          root = Path("data/published/v1")
+          mirror_root = Path("web-v1-app/.private-data/published/v1")
+
+          for layer, dates in affected.items():
+              day_rows = {}
+              for date in dates:
+                  day_path = root / layer / "ethereum" / f"{date}.json"
+                  day_rows[date] = json.loads(day_path.read_text(encoding="utf-8-sig"))
+
+              for window_name in windows:
+                  window_path = root / layer / "ethereum" / window_name
+                  rows = json.loads(window_path.read_text(encoding="utf-8-sig"))
+                  if not isinstance(rows, list):
+                      raise SystemExit(f"Expected list window: {window_path}")
+
+                  present = {row.get("date") for row in rows if isinstance(row, dict)}
+                  replacement_dates = [d for d in dates if d in present]
+                  if replacement_dates:
+                      replacements = set(replacement_dates)
+                      rows = [
+                          day_rows[row.get("date")]
+                          if isinstance(row, dict) and row.get("date") in replacements
+                          else row
+                          for row in rows
+                      ]
+                      window_path.write_text(
+                          json.dumps(rows, indent=2, ensure_ascii=False) + "\n",
+                          encoding="utf-8",
+                      )
+
+              latest_day = max(dates)
+              latest_path = root / layer / "ethereum" / "latest.json"
+              latest_path.write_text(
+                  json.dumps(day_rows[latest_day], indent=2, ensure_ascii=False) + "\n",
+                  encoding="utf-8",
+              )
+
+              changed_names = [f"{d}.json" for d in dates] + windows + ["latest.json"]
+              for name in changed_names:
+                  src = root / layer / "ethereum" / name
+                  dst = mirror_root / layer / "ethereum" / name
+                  dst.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(src, dst)
+          PY
 
       - name: Validate Ethereum native units
         run: python pipeline/tools/validate_native_units.py --published-root data/published/v1
