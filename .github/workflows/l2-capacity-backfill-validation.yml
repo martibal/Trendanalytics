@@ -7,19 +7,55 @@ on:
     paths:
       - ".github/workflows/l2-capacity-backfill-validation.yml"
       - "pipeline/tools/l2_capacity_backfill_chunk.py"
+      - "pipeline/tools/l2_capacity_combine_chunks.py"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  pilot:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - id: matrix
+        name: Build 14-day chunk matrix
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import date, timedelta
+
+          start = date(2024, 12, 1)
+          end = date(2026, 8, 2)
+          chunk_days = 14
+          include = []
+          for chain in ("arbitrum", "base"):
+              current = start
+              while current <= end:
+                  chunk_end = min(current + timedelta(days=chunk_days - 1), end)
+                  include.append({
+                      "chain": chain,
+                      "start": current.isoformat(),
+                      "end": chunk_end.isoformat(),
+                  })
+                  current = chunk_end + timedelta(days=1)
+          matrix = json.dumps({"include": include}, separators=(",", ":"))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"matrix={matrix}\n")
+          print(f"planned_chunks={len(include)}")
+          PY
+
+  backfill:
+    needs: plan
     strategy:
       fail-fast: false
-      matrix:
-        chain: [arbitrum, base]
+      max-parallel: 8
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    permissions:
-      contents: read
+    timeout-minutes: 7
 
     steps:
       - name: Checkout validation branch
@@ -33,41 +69,60 @@ jobs:
       - name: Install minimal backfill dependencies
         run: pip install "pyarrow>=18,<19"
 
-      - name: Run three-day real-source backfill pilot
+      - name: Read bounded historical chunk
         run: |
           python ./pipeline/tools/l2_capacity_backfill_chunk.py \
             --chain ${{ matrix.chain }} \
-            --start 2026-01-14 \
-            --end 2026-01-16 \
-            --max-days 3 \
+            --start ${{ matrix.start }} \
+            --end ${{ matrix.end }} \
+            --max-days 14 \
             --max-day-seconds 60 \
-            --output ./reports/l2-capacity-${{ matrix.chain }}-pilot.json
+            --output ./reports/chunks/${{ matrix.chain }}-${{ matrix.start }}-${{ matrix.end }}.json
 
-      - name: Validate pilot semantics
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          chain = "${{ matrix.chain }}"
-          p = Path(f"reports/l2-capacity-{chain}-pilot.json")
-          obj = json.loads(p.read_text(encoding="utf-8"))
-          assert obj["day_count"] == 3
-          assert len(obj["rows"]) == 3
-          if chain == "arbitrum":
-              assert obj["available_days"] == 0
-              assert obj["unavailable_all_zero_days"] == 3
-              assert all(row["raw_value"] is None for row in obj["rows"])
-          else:
-              assert obj["available_days"] == 3
-              assert obj["unavailable_all_zero_days"] == 0
-              assert all(row["raw_value"] is not None and row["raw_value"] > 0 for row in obj["rows"])
-          print(f"pilot semantics OK: {chain}")
-          PY
-
-      - name: Upload pilot report
+      - name: Upload chunk
         uses: actions/upload-artifact@v4
         with:
-          name: l2-capacity-${{ matrix.chain }}-pilot
-          path: reports/l2-capacity-${{ matrix.chain }}-pilot.json
+          name: l2-capacity-chunk-${{ matrix.chain }}-${{ matrix.start }}-${{ matrix.end }}
+          path: reports/chunks/${{ matrix.chain }}-${{ matrix.start }}-${{ matrix.end }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  combine:
+    needs: backfill
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout validation branch
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install combine dependency
+        run: pip install "polars>=1,<2"
+
+      - name: Download all chunk artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: l2-capacity-chunk-*
+          path: reports/chunks
+          merge-multiple: true
+
+      - name: Combine and validate complete history
+        run: |
+          python ./pipeline/tools/l2_capacity_combine_chunks.py \
+            --chunks-root ./reports/chunks \
+            --start 2024-12-01 \
+            --end 2026-08-02 \
+            --output ./reports/l2-capacity-backfill-combined.json
+
+      - name: Upload validated combined history
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-capacity-backfill-combined
+          path: reports/l2-capacity-backfill-combined.json
           if-no-files-found: error
           retention-days: 7
