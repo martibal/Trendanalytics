@@ -12,6 +12,9 @@ import polars as pl
 L2_CHAINS = {"arbitrum", "base"}
 RAW_VALUE_COLUMNS = {
     "arbitrum": "arbitrum_l1_gas_used_daily",
+    "base": "base_l1_gas_used_daily",
+}
+LEGACY_RAW_VALUE_COLUMNS = {
     "base": "base_blob_gas_used_daily",
 }
 CAPACITY_COLUMN = "capacity_util_pct"
@@ -53,7 +56,7 @@ def _sum_column(files: list[str], wanted: str) -> Optional[float]:
     if value is None:
         return None
     value = float(value)
-    return value if math.isfinite(value) and value >= 0 else None
+    return value if math.isfinite(value) and value > 0 else None
 
 
 def _raw_capacity_from_local_raw(raw_root: Path, chain: str, day: str) -> Optional[float]:
@@ -61,8 +64,8 @@ def _raw_capacity_from_local_raw(raw_root: Path, chain: str, day: str) -> Option
         tx_dir = _day_dir(raw_root, chain, "transactions", day)
         return _sum_column(_parquet_files(tx_dir), "gas_used_for_l1") if tx_dir else None
     if chain == "base":
-        block_dir = _day_dir(raw_root, chain, "blocks", day)
-        return _sum_column(_parquet_files(block_dir), "blob_gas_used") if block_dir else None
+        tx_dir = _day_dir(raw_root, chain, "transactions", day)
+        return _sum_column(_parquet_files(tx_dir), "l1_gas_used") if tx_dir else None
     return None
 
 
@@ -74,6 +77,11 @@ def _finite_number(value) -> Optional[float]:
     except Exception:
         return None
     return f if math.isfinite(f) and f >= 0 else None
+
+
+def _positive_finite_number(value) -> Optional[float]:
+    value = _finite_number(value)
+    return value if value is not None and value > 0 else None
 
 
 def _published_raw_history(published_root: Path, chain: str) -> Dict[str, float]:
@@ -96,7 +104,7 @@ def _published_raw_history(published_root: Path, chain: str) -> Dict[str, float]
         )
         for candidate in candidates:
             if raw_col in candidate:
-                value = _finite_number(candidate.get(raw_col))
+                value = _positive_finite_number(candidate.get(raw_col))
                 if value is not None:
                     out[path.stem] = value
                     break
@@ -105,14 +113,15 @@ def _published_raw_history(published_root: Path, chain: str) -> Dict[str, float]
 
 def _rolling_capacity(df: pl.DataFrame, raw_col: str) -> pl.Series:
     raw = df.get_column(raw_col).cast(pl.Float64, strict=False)
-    baseline = raw.shift(1).rolling_quantile(
+    baseline_input = pl.when(raw > 0).then(raw).otherwise(None)
+    baseline = baseline_input.shift(1).rolling_quantile(
         quantile=0.95,
         window_size=BASELINE_WINDOW_DAYS,
         min_samples=MIN_BASELINE_DAYS,
         interpolation="nearest",
     )
     ratio = (
-        pl.when(raw.is_not_null() & baseline.is_not_null() & (baseline > 0))
+        pl.when((raw > 0) & baseline.is_not_null() & (baseline > 0))
         .then((raw / baseline).clip(0.0, 1.0))
         .otherwise(None)
         .alias(CAPACITY_COLUMN)
@@ -128,6 +137,7 @@ def _write_json_atomic(path: Path, obj: dict) -> None:
 
 def _persist_published_gold(df: pl.DataFrame, published_root: Path, chain: str) -> int:
     raw_col = RAW_VALUE_COLUMNS[chain]
+    legacy_raw_col = LEGACY_RAW_VALUE_COLUMNS.get(chain)
     chain_dir = published_root / "gold" / chain
     if not chain_dir.exists():
         return 0
@@ -143,8 +153,10 @@ def _persist_published_gold(df: pl.DataFrame, published_root: Path, chain: str) 
             continue
         if not isinstance(obj, dict):
             continue
-        raw_value = _finite_number(row.get(raw_col))
+        raw_value = _positive_finite_number(row.get(raw_col))
         cap_value = _finite_number(row.get(CAPACITY_COLUMN))
+        if legacy_raw_col:
+            obj.pop(legacy_raw_col, None)
         obj[raw_col] = raw_value
         obj[CAPACITY_COLUMN] = cap_value
         _write_json_atomic(target, obj)
@@ -163,12 +175,15 @@ def _apply_chain(gold_root: Path, raw_root: Path, published_root: Path, chain: s
         return
     df = df.with_columns(pl.col("date").cast(pl.Utf8)).sort("date")
     raw_col = RAW_VALUE_COLUMNS[chain]
+    legacy_raw_col = LEGACY_RAW_VALUE_COLUMNS.get(chain)
+    if legacy_raw_col and legacy_raw_col in df.columns:
+        df = df.drop(legacy_raw_col)
     published_history = _published_raw_history(published_root, chain)
 
     existing: Dict[str, float] = {}
     if raw_col in df.columns:
         for day, value in df.select(["date", raw_col]).iter_rows():
-            numeric = _finite_number(value)
+            numeric = _positive_finite_number(value)
             if numeric is not None:
                 existing[str(day)] = numeric
 
@@ -204,7 +219,7 @@ def _apply_chain(gold_root: Path, raw_root: Path, published_root: Path, chain: s
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Add chain-specific L2 capacity pressure and normalized capacity_util_pct to GOLD.")
+    ap = argparse.ArgumentParser(description="Add chain-specific L2 L1-data pressure and normalized capacity_util_pct to GOLD.")
     ap.add_argument("--gold-root", required=True)
     ap.add_argument("--raw-root", required=True)
     ap.add_argument("--published-root", required=True)
