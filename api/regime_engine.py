@@ -274,7 +274,7 @@ class ProfileSpec:
 PROFILE_SPECS: Dict[str, ProfileSpec] = {
     "eth_l1": ProfileSpec(
         profile_type="eth_l1",
-        ruleset_id="eth_l1_v1",
+        ruleset_id="eth_l1_v2",
         demand_metrics=("tx_count_daily", "unique_active_addresses"),
         friction_metrics=("median_tx_fee_native", "failed_tx_rate"),
         capacity_metrics=("gas_utilization_pct",),
@@ -434,6 +434,17 @@ def compute_regime(
             sig["trend"] = _trend(sig["momentum_7d_vs_30d"])
             demand.append(sig)
 
+    calldata_sig: Optional[Dict[str, Any]] = None
+    if spec.profile_type == "eth_l1":
+        calldata_sig = _signal_for_metric(d, "nonempty_calldata_share")
+        if calldata_sig:
+            calldata_sig["band"] = _band(
+                calldata_sig["pct_90d"],
+                calldata_sig["z_robust"],
+                informative=bool(calldata_sig.get("informative", True)),
+            )
+            calldata_sig["trend"] = _trend(calldata_sig["momentum_7d_vs_30d"])
+
     friction: List[Dict[str, Any]] = []
     for m in spec.friction_metrics:
         sig = _signal_for_metric(d, m)
@@ -485,6 +496,8 @@ def compute_regime(
 
     for s in demand:
         _emit("demand", s)
+    if calldata_sig:
+        _emit("demand", calldata_sig)
     for s in friction:
         _emit("friction", s)
     for s in capacity:
@@ -524,6 +537,27 @@ def compute_regime(
             label = "HEATING"
         else:
             label = "STABLE"
+    elif spec.profile_type == "eth_l1":
+        # ETH v2 preserve-baseline corroboration semantics:
+        # - existing congestion/cheap/core-demand HEATING behavior is unchanged;
+        # - calldata is supplemental Demand evidence only;
+        # - calldata can create a new HEATING label only when core Demand is
+        #   already HIGH/EXTREME_HIGH and calldata trend is HEATING.
+        calldata_heating = bool(
+            calldata_sig
+            and bool(calldata_sig.get("informative", True))
+            and calldata_sig.get("trend") == "HEATING"
+        )
+        if (friction_high and capacity_high) or (capacity_extreme and ax_c["trend"] == "HEATING"):
+            label = "CONGESTED"
+        elif friction_low and (capacity_low or not capacity_high):
+            label = "CHEAP"
+        elif demand_high and ax_d["trend"] == "HEATING":
+            label = "HEATING"
+        elif demand_high and calldata_heating:
+            label = "HEATING"
+        else:
+            label = "STABLE"
     elif (friction_high and capacity_high) or (capacity_extreme and ax_c["trend"] == "HEATING"):
         label = "CONGESTED"
     elif friction_low and (capacity_low or not capacity_high):
@@ -540,6 +574,8 @@ def compute_regime(
     for s in demand:
         if bool(s.get("informative", True)):
             candidates.append((_driver_score(s, 1.0), {**s, "axis": "demand"}))
+    if calldata_sig and bool(calldata_sig.get("informative", True)):
+        candidates.append((_driver_score(calldata_sig, 1.0), {**calldata_sig, "axis": "demand"}))
     for s in friction:
         if bool(s.get("informative", True)):
             candidates.append((_driver_score(s, 1.1), {**s, "axis": "friction"}))
@@ -624,6 +660,11 @@ def compute_regime(
         "methodology_notes": [
             "Non-informative low-variance distributions are neutralized before band aggregation.",
             "Raw block time is not used directly for congestion; blocktime_instability is used instead.",
+            *(
+                ["Ethereum calldata activity is supplemental Demand evidence: it does not alter the core Demand axis and can create HEATING only when core Demand is already HIGH/EXTREME_HIGH and calldata trend is HEATING."]
+                if spec.profile_type == "eth_l1"
+                else []
+            ),
         ],
         "signals": signals,
         "signal_aliases": alias_to_signal,
