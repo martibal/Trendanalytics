@@ -1,0 +1,123 @@
+name: Ethereum Tx Gas Used Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-tx-gas-used-audit
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r pipeline/requirements.txt
+
+      - name: Run bounded 90-day side-by-side
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          from collections import Counter
+          from dataclasses import replace
+          from pathlib import Path
+          import json
+          import pandas as pd
+
+          import api.regime_engine as re
+
+          root = Path("data/published/v1/gold/ethereum")
+          files = sorted(p for p in root.glob("????-??-??.json"))
+          rows = [json.loads(p.read_text(encoding="utf-8")) for p in files]
+          df = pd.DataFrame(rows).sort_values("date").reset_index(drop=True)
+          if len(df) < 180:
+              raise SystemExit(f"insufficient ETH history: {len(df)}")
+
+          audit_dates = list(df["date"].astype(str).tail(90))
+          original = re.PROFILE_SPECS["eth_l1"]
+          variants = {
+              "current": original,
+              "tx_gas_replace": replace(original, demand_metrics=("median_tx_gas_used", "unique_active_addresses")),
+              "combined": replace(original, demand_metrics=("tx_count_daily", "unique_active_addresses", "median_tx_gas_used")),
+          }
+
+          out_rows = {k: [] for k in variants}
+          for date in audit_dates:
+              hist = df[pd.to_datetime(df["date"]) <= pd.Timestamp(date)].copy()
+              for name, spec in variants.items():
+                  re.PROFILE_SPECS["eth_l1"] = spec
+                  r = re.compute_regime(
+                      hist,
+                      chain="ethereum",
+                      profile={"type": "eth_l1"},
+                      asof_date=date,
+                      confidence_score=1.0,
+                  )
+                  sig = (r.get("signals") or {}).get("median_tx_gas_used")
+                  ax = (r.get("axes") or {}).get("demand") or {}
+                  out_rows[name].append({
+                      "date": date,
+                      "label": r.get("label"),
+                      "demand_high": ax.get("band_high"),
+                      "demand_low": ax.get("band_low"),
+                      "demand_trend": ax.get("trend"),
+                      "demand_informative_count": ax.get("informative_count"),
+                      "drivers": [d.get("metric") for d in (r.get("drivers") or [])],
+                      "tx_gas_signal": sig,
+                  })
+
+          re.PROFILE_SPECS["eth_l1"] = original
+
+          def changed(field, variant):
+              cur = {r["date"]: r[field] for r in out_rows["current"]}
+              return [r["date"] for r in out_rows[variant] if r[field] != cur[r["date"]]]
+
+          report = {
+              "date_range": [audit_dates[0], audit_dates[-1]],
+              "coverage": {
+                  "days": 90,
+                  "median_tx_gas_used_non_null": int(pd.to_numeric(df.tail(90)["median_tx_gas_used"], errors="coerce").notna().sum()),
+                  "tx_count_daily_non_null": int(pd.to_numeric(df.tail(90)["tx_count_daily"], errors="coerce").notna().sum()),
+              },
+              "tx_gas_informative_days": sum(1 for r in out_rows["combined"] if (r.get("tx_gas_signal") or {}).get("informative") is True),
+              "tx_gas_driver_days_combined": sum(1 for r in out_rows["combined"] if "median_tx_gas_used" in r["drivers"]),
+              "label_changes_vs_current": {
+                  "tx_gas_replace": changed("label", "tx_gas_replace"),
+                  "combined": changed("label", "combined"),
+              },
+              "demand_band_changes_vs_current": {
+                  "tx_gas_replace": changed("demand_high", "tx_gas_replace"),
+                  "combined": changed("demand_high", "combined"),
+              },
+              "labels": {k: dict(Counter(r["label"] for r in v)) for k, v in out_rows.items()},
+              "demand_high": {k: dict(Counter(r["demand_high"] for r in v)) for k, v in out_rows.items()},
+              "rows": out_rows,
+          }
+          Path("ethereum-tx-gas-used-90d.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+          print(json.dumps({
+              "coverage": report["coverage"],
+              "informative_days": report["tx_gas_informative_days"],
+              "driver_days_combined": report["tx_gas_driver_days_combined"],
+              "label_changes_replace": len(report["label_changes_vs_current"]["tx_gas_replace"]),
+              "label_changes_combined": len(report["label_changes_vs_current"]["combined"]),
+              "demand_band_changes_replace": len(report["demand_band_changes_vs_current"]["tx_gas_replace"]),
+              "demand_band_changes_combined": len(report["demand_band_changes_vs_current"]["combined"]),
+          }, indent=2))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-tx-gas-used-90d
+          path: ethereum-tx-gas-used-90d.json
+          retention-days: 7
