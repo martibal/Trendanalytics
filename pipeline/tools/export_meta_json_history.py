@@ -20,6 +20,7 @@ import hashlib
 import os
 import datetime as dt
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict
@@ -48,6 +49,49 @@ def _normalize_daily_df(df: pd.DataFrame) -> pd.DataFrame:
         d["date"] = pd.to_datetime(d["date"], errors="coerce").dt.date
         d = d.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
     return d
+
+
+def _is_meta_snapshot_file(path: Path) -> bool:
+    if path.name == "latest.json":
+        return True
+    if path.name.startswith("last") and path.name.endswith("d.json"):
+        return True
+    try:
+        dt.date.fromisoformat(path.stem)
+        return path.suffix == ".json"
+    except Exception:
+        return False
+
+
+def _seed_incremental_chain_from_published(repo_root: Path, out_root: Path, chain: str) -> int:
+    """Replace incremental META staging with the current canonical published chain history.
+
+    data/calculated/meta is version-controlled and may contain stale historical regime
+    outputs. Incremental export only recomputes a recent slice, so publishing that stale
+    staging directory can otherwise roll canonical history back to an older ruleset.
+
+    Canonical data/published/v1/meta is therefore the starting point for incremental
+    META generation. Rebuild mode intentionally does not use this helper.
+    """
+    canonical_chain = repo_root / "data" / "published" / "v1" / "meta" / chain
+    if not canonical_chain.exists():
+        return 0
+
+    ch_out = out_root / chain
+    ch_out.mkdir(parents=True, exist_ok=True)
+
+    for existing in ch_out.glob("*.json"):
+        if _is_meta_snapshot_file(existing):
+            existing.unlink()
+
+    copied = 0
+    for source in canonical_chain.glob("*.json"):
+        if not _is_meta_snapshot_file(source):
+            continue
+        shutil.copy2(source, ch_out / source.name)
+        copied += 1
+
+    return copied
 
 
 def main() -> None:
@@ -114,6 +158,15 @@ def main() -> None:
 
         ch_out = out_root / chain
         ch_out.mkdir(parents=True, exist_ok=True)
+
+        if mode == "incremental":
+            seeded = _seed_incremental_chain_from_published(repo_root, out_root, chain)
+            if seeded:
+                print(
+                    f"[META_INCREMENTAL_SEED] chain={chain} copied={seeded} "
+                    f"source={repo_root / 'data' / 'published' / 'v1' / 'meta' / chain}",
+                    flush=True,
+                )
 
         cur = start
         while cur <= end:
