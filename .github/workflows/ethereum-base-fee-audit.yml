@@ -1,0 +1,150 @@
+name: Ethereum Base Fee Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-base-fee-audit
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Run bounded 90-day side-by-side
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          from collections import Counter
+          from dataclasses import replace
+          from pathlib import Path
+
+          import pandas as pd
+
+          import api.regime_engine as re
+
+          ROOT = Path("data/published/v1/gold/ethereum")
+          day_files = sorted(
+              p for p in ROOT.glob("????-??-??.json")
+              if p.stem[:4].isdigit()
+          )
+          rows = [json.loads(p.read_text(encoding="utf-8")) for p in day_files]
+          df = pd.DataFrame(rows)
+          df["date"] = pd.to_datetime(df["date"], errors="coerce")
+          df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+          target_dates = list(df["date"].dt.strftime("%Y-%m-%d"))[-90:]
+          if len(target_dates) != 90:
+              raise SystemExit(f"expected 90 target dates, got {len(target_dates)}")
+
+          original = re.PROFILE_SPECS["eth_l1"]
+          variants = {
+              "current": original,
+              "base_fee_replace": replace(
+                  original,
+                  friction_metrics=("median_block_base_fee_per_gas", "failed_tx_rate"),
+              ),
+              "combined": replace(
+                  original,
+                  friction_metrics=("median_tx_fee_native", "median_block_base_fee_per_gas", "failed_tx_rate"),
+              ),
+          }
+
+          results = {name: [] for name in variants}
+          try:
+              for date in target_dates:
+                  hist = df[df["date"] <= pd.Timestamp(date)].copy()
+                  for name, spec in variants.items():
+                      re.PROFILE_SPECS["eth_l1"] = spec
+                      out = re.compute_regime(
+                          hist,
+                          chain="ethereum",
+                          profile={"type": "eth_l1"},
+                          asof_date=date,
+                          confidence_score=1.0,
+                      )
+                      results[name].append({
+                          "date": date,
+                          "label": out.get("label"),
+                          "friction_high": ((out.get("axes") or {}).get("friction") or {}).get("band_high"),
+                          "friction_low": ((out.get("axes") or {}).get("friction") or {}).get("band_low"),
+                          "friction_trend": ((out.get("axes") or {}).get("friction") or {}).get("trend"),
+                          "friction_informative_count": ((out.get("axes") or {}).get("friction") or {}).get("informative_count"),
+                          "base_fee_signal": (out.get("signals") or {}).get("median_block_base_fee_per_gas"),
+                          "tx_fee_signal": (out.get("signals") or {}).get("median_tx_fee_native"),
+                          "drivers": [d.get("metric") for d in (out.get("drivers") or [])],
+                      })
+          finally:
+              re.PROFILE_SPECS["eth_l1"] = original
+
+          current = {r["date"]: r for r in results["current"]}
+          replace_rows = {r["date"]: r for r in results["base_fee_replace"]}
+          combined_rows = {r["date"]: r for r in results["combined"]}
+
+          def changed(other, field):
+              return [d for d in target_dates if current[d][field] != other[d][field]]
+
+          report = {
+              "date_range": [target_dates[0], target_dates[-1]],
+              "coverage": {
+                  "days": 90,
+                  "median_block_base_fee_per_gas_non_null": int(
+                      df[df["date"].dt.strftime("%Y-%m-%d").isin(target_dates)]["median_block_base_fee_per_gas"].notna().sum()
+                  ),
+                  "median_tx_fee_native_non_null": int(
+                      df[df["date"].dt.strftime("%Y-%m-%d").isin(target_dates)]["median_tx_fee_native"].notna().sum()
+                  ),
+              },
+              "labels": {
+                  name: dict(sorted(Counter(r["label"] for r in rows_).items()))
+                  for name, rows_ in results.items()
+              },
+              "friction_high": {
+                  name: dict(sorted(Counter(r["friction_high"] for r in rows_).items()))
+                  for name, rows_ in results.items()
+              },
+              "label_changes_vs_current": {
+                  "base_fee_replace": changed(replace_rows, "label"),
+                  "combined": changed(combined_rows, "label"),
+              },
+              "friction_band_changes_vs_current": {
+                  "base_fee_replace": changed(replace_rows, "friction_high"),
+                  "combined": changed(combined_rows, "friction_high"),
+              },
+              "base_fee_driver_days_combined": sum(
+                  1 for r in results["combined"] if "median_block_base_fee_per_gas" in r["drivers"]
+              ),
+              "base_fee_informative_days": sum(
+                  1 for r in results["combined"]
+                  if r["base_fee_signal"] and r["base_fee_signal"].get("informative") is True
+              ),
+              "rows": results,
+          }
+
+          out = Path("ethereum-base-fee-90d.json")
+          out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps({k: v for k, v in report.items() if k != "rows"}, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-base-fee-90d
+          path: ethereum-base-fee-90d.json
+          retention-days: 7
