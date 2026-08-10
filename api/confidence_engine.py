@@ -10,7 +10,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tupl
 import pandas as pd
 
 
-CONFIDENCE_METHODOLOGY_VERSION = "confidence_v2_profile_evidence"
+CONFIDENCE_METHODOLOGY_VERSION = "confidence_v3_l2_capacity_required"
 CONFIDENCE_FORMULA = "sqrt(data_quality_score * label_confidence_score)"
 DEFAULT_CONFIDENCE_THRESHOLD = 0.40
 
@@ -73,6 +73,7 @@ CHAIN_SIGNAL_PROFILES: Dict[str, ChainSignalProfile] = {
             "median_tx_fee_native",
             "unique_active_addresses",
             "avg_block_time_sec",
+            "capacity_util_pct",
         ),
         structurally_not_applicable=(
             "gas_utilization_pct",
@@ -83,7 +84,7 @@ CHAIN_SIGNAL_PROFILES: Dict[str, ChainSignalProfile] = {
             "value_transferred_native",
         ),
         notes=(
-            "Arbitrum confidence is scored against the L2 evidence surface and does not penalize hidden L1-only gas-utilization or failed-tx semantics.",
+            "Arbitrum confidence is scored against the L2 evidence surface, including capacity utilization, and does not penalize hidden L1-only gas-utilization or failed-tx semantics.",
         ),
     ),
     "base": ChainSignalProfile(
@@ -93,6 +94,7 @@ CHAIN_SIGNAL_PROFILES: Dict[str, ChainSignalProfile] = {
             "median_tx_fee_native",
             "unique_active_addresses",
             "avg_block_time_sec",
+            "capacity_util_pct",
         ),
         structurally_not_applicable=(
             "gas_utilization_pct",
@@ -103,7 +105,7 @@ CHAIN_SIGNAL_PROFILES: Dict[str, ChainSignalProfile] = {
             "value_transferred_native",
         ),
         notes=(
-            "Base confidence is scored against the L2 evidence surface and does not penalize hidden L1-only gas-utilization or failed-tx semantics.",
+            "Base confidence is scored against the L2 evidence surface, including capacity utilization, and does not penalize hidden L1-only gas-utilization or failed-tx semantics.",
         ),
     ),
 }
