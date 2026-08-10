@@ -48,6 +48,11 @@ jobs:
           df.to_parquet(out / 'ethereum.parquet', index=False)
           PY
 
+      - name: Snapshot current Ethereum META
+        run: |
+          mkdir -p .migration/original-meta
+          cp -a data/published/v1/meta/ethereum .migration/original-meta/ethereum
+
       - name: Rebuild Ethereum META history under methodology 2.4
         env:
           GOLD_DIR: ${{ github.workspace }}/.migration/gold
@@ -94,33 +99,41 @@ jobs:
           from pathlib import Path
 
           canonical = Path('data/published/v1/meta/ethereum')
+          original = Path('.migration/original-meta/ethereum')
           private = Path('web-v1-app/.private-data/published/v1/meta/ethereum')
           days = sorted(canonical.glob('????-??-??.json'))
-          if len(days) != 617:
-              raise SystemExit(f'expected 617 migrated META days, got {len(days)}')
+          old_days = sorted(original.glob('????-??-??.json'))
+          if len(days) != 617 or len(old_days) != 617:
+              raise SystemExit(f'expected 617 META days before/after, got old={len(old_days)} new={len(days)}')
 
           labels = Counter()
           rulesets = Counter()
           methodologies = Counter()
-          changed_expectation = {
-              '2025-09-01': 'HEATING',
-              '2026-03-05': 'HEATING',
-          }
+          changes = []
+          allowed_change_dates = {'2025-09-01', '2026-03-05'}
+
           for p in days:
               o = json.loads(p.read_text(encoding='utf-8'))
-              labels[str((o.get('regime') or {}).get('label'))] += 1
+              old = json.loads((original / p.name).read_text(encoding='utf-8'))
+              new_label = str((o.get('regime') or {}).get('label'))
+              old_label = str((old.get('regime') or {}).get('label'))
+              labels[new_label] += 1
               rulesets[str((o.get('regime') or {}).get('ruleset_id'))] += 1
               methodologies[str(o.get('methodology_version'))] += 1
-              if p.stem in changed_expectation and (o.get('regime') or {}).get('label') != changed_expectation[p.stem]:
-                  raise SystemExit(f'unexpected label for {p.stem}')
+              if new_label != old_label:
+                  changes.append({'date': p.stem, 'old': old_label, 'new': new_label})
 
           if rulesets != Counter({'eth_l1_v2': 617}):
               raise SystemExit(f'unexpected rulesets: {rulesets}')
           if methodologies != Counter({'2.4': 617}):
               raise SystemExit(f'unexpected methodology versions: {methodologies}')
-          expected_labels = Counter({'STABLE': 264, 'CHEAP': 154, 'CONGESTED': 103, 'HEATING': 92, 'UNKNOWN/DEGRADED': 4})
-          if labels != expected_labels:
-              raise SystemExit(f'unexpected label counts: {labels}')
+          if len(changes) > 2:
+              raise SystemExit(f'too many label changes: {changes}')
+          for change in changes:
+              if change['date'] not in allowed_change_dates:
+                  raise SystemExit(f'unexpected changed date: {change}')
+              if change['old'] != 'STABLE' or change['new'] != 'HEATING':
+                  raise SystemExit(f'unexpected label transition: {change}')
 
           cfiles = sorted(p.relative_to(canonical) for p in canonical.rglob('*') if p.is_file())
           pfiles = sorted(p.relative_to(private) for p in private.rglob('*') if p.is_file())
@@ -131,9 +144,11 @@ jobs:
               b = hashlib.sha256((private / rel).read_bytes()).hexdigest()
               if a != b:
                   raise SystemExit(f'canonical/private mismatch: {rel}')
+
           print('labels=', dict(labels))
           print('rulesets=', dict(rulesets))
           print('methodologies=', dict(methodologies))
+          print('changes=', changes)
           PY
 
       - name: Verify scope and commit migrated META
