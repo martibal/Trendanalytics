@@ -1,0 +1,104 @@
+name: Ethereum EIP-1559 Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-eip1559-audit
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Run bounded 90-day side-by-side
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import json
+          from collections import Counter
+          from dataclasses import replace
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as re
+
+          root = Path('data/published/v1/gold/ethereum')
+          files = sorted([p for p in root.glob('????-??-??.json')])[-90:]
+          rows = [json.loads(p.read_text(encoding='utf-8')) for p in files]
+          df = pd.DataFrame(rows).sort_values('date').reset_index(drop=True)
+          metric = 'eip1559_type2_tx_share'
+          if metric not in df.columns:
+              raise SystemExit(f'missing {metric}')
+
+          current_spec = re.PROFILE_SPECS['eth_l1']
+          specs = {
+              'current': current_spec,
+              'eip1559_replace': replace(current_spec, demand_metrics=(metric, 'unique_active_addresses')),
+              'combined': replace(current_spec, demand_metrics=('tx_count_daily', 'unique_active_addresses', metric)),
+          }
+
+          def run_variant(name, spec):
+              original = re.PROFILE_SPECS['eth_l1']
+              re.PROFILE_SPECS['eth_l1'] = spec
+              out = []
+              try:
+                  for i in range(len(df)):
+                      sub = df.iloc[:i+1].copy()
+                      day = str(sub.iloc[-1]['date'])
+                      r = re.compute_regime(sub, chain='ethereum', profile={'type':'eth_l1'}, asof_date=day, confidence_score=1.0)
+                      sig = (r.get('signals') or {}).get(metric)
+                      out.append({
+                          'date': day,
+                          'label': r.get('label'),
+                          'demand_high': ((r.get('axes') or {}).get('demand') or {}).get('band_high'),
+                          'demand_low': ((r.get('axes') or {}).get('demand') or {}).get('band_low'),
+                          'demand_trend': ((r.get('axes') or {}).get('demand') or {}).get('trend'),
+                          'demand_informative_count': ((r.get('axes') or {}).get('demand') or {}).get('informative_count'),
+                          'drivers': [d.get('metric') for d in (r.get('drivers') or [])],
+                          'eip1559_signal': sig,
+                      })
+              finally:
+                  re.PROFILE_SPECS['eth_l1'] = original
+              return out
+
+          results = {k: run_variant(k, v) for k, v in specs.items()}
+          current = results['current']
+          report = {
+              'date_range': [str(df.iloc[0]['date']), str(df.iloc[-1]['date'])],
+              'coverage': {
+                  'days': len(df),
+                  'eip1559_type2_tx_share_non_null': int(df[metric].notna().sum()),
+                  'tx_count_daily_non_null': int(df['tx_count_daily'].notna().sum()),
+              },
+              'labels': {k: dict(Counter(r['label'] for r in v)) for k,v in results.items()},
+              'demand_high': {k: dict(Counter(r['demand_high'] for r in v)) for k,v in results.items()},
+              'label_changes_vs_current': {},
+              'demand_band_changes_vs_current': {},
+              'eip1559_informative_days': sum(1 for r in results['combined'] if (r.get('eip1559_signal') or {}).get('informative')),
+              'eip1559_driver_days_combined': sum(1 for r in results['combined'] if metric in r['drivers']),
+          }
+          for k in ('eip1559_replace','combined'):
+              report['label_changes_vs_current'][k] = [r['date'] for i,r in enumerate(results[k]) if r['label'] != current[i]['label']]
+              report['demand_band_changes_vs_current'][k] = [r['date'] for i,r in enumerate(results[k]) if (r['demand_high'],r['demand_low'],r['demand_trend']) != (current[i]['demand_high'],current[i]['demand_low'],current[i]['demand_trend'])]
+          Path('ethereum-eip1559-90d.json').write_text(json.dumps(report, indent=2, sort_keys=True), encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-eip1559-90d
+          path: ethereum-eip1559-90d.json
+          retention-days: 7
