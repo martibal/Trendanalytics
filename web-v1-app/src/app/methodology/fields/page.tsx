@@ -169,11 +169,11 @@ const GOLD_FIELDS: FieldEntry[] = [
     meaning: "Average share of Bitcoin's maximum block weight used across blocks produced that day.",
     notes: (
       <>
-        Bitcoin-only observational capacity field calculated from block weight divided by the
-        4,000,000 weight-unit consensus maximum. Published on a 0–1 scale and null for non-Bitcoin
-        chains. It is included in Gold and weekly capacity summaries, but does not yet drive the
-        public regime label, scorecard, or confidence calculation while historical behaviour is
-        being validated.
+        Bitcoin-only capacity field calculated from block weight divided by the 4,000,000
+        weight-unit consensus maximum. Published on a 0–1 scale and null for non-Bitcoin chains.
+        It drives the BTC Capacity axis with weight 1.0 alongside block-time instability. High
+        block-weight utilization can veto a CHEAP classification, while block weight alone does
+        not create a CONGESTED classification.
       </>
     ),
   },
@@ -428,6 +428,7 @@ function AxisMappingTable() {
             </td>
             <td className="px-4 py-4">
               <ul className="grid gap-2">
+                <AxisComponent field="block_weight_utilization_pct" weight="1.0" transform="none" />
                 <AxisComponent field="blocktime_instability" weight="0.7" transform="instability" />
               </ul>
             </td>
@@ -695,19 +696,20 @@ export default function MethodologyFieldsPage() {
               <Section title="Field note: Bitcoin blocktime instability">
                 <NotePanel title="BTC capacity component">
                   <p>
-                    For BTC capacity interpretation, the capacity axis does not score raw block time
-                    directionally and does not combine with gas utilization. For BTC,{" "}
-                    <FieldCode>blocktime_instability</FieldCode> is the only capacity component.
+                    For BTC capacity interpretation, the Capacity axis combines direct blockspace
+                    occupancy from <FieldCode>block_weight_utilization_pct</FieldCode> with{" "}
+                    <FieldCode>blocktime_instability</FieldCode>. Raw block time is not scored
+                    directionally, and BTC does not use gas utilization.
                   </p>
                   <FormulaBlock>{"|block_time - median30(block_time)| / median30(block_time)"}</FormulaBlock>
                   <p>The field is then smoothed before scoring.</p>
                 </NotePanel>
                 <WarningCallout title="Directional consequence">
                   <p>
-                    This means the BTC capacity score is not a direct measure of slow blocks only. It is a
-                    measure of unusual block-time behaviour around the recent norm in either direction.
-                    Customers should read BTC capacity as a stress-or-instability proxy, not as a
-                    directional slow-block indicator.
+                    BTC Capacity therefore combines blockspace occupancy with unusual block-time
+                    behaviour around the recent norm. High Capacity can veto CHEAP, but block-weight
+                    pressure alone does not create CONGESTED; simultaneous Friction pressure is also
+                    required by the BTC regime rule.
                   </p>
                 </WarningCallout>
               </Section>
