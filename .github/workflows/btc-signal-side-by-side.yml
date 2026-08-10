@@ -1,0 +1,148 @@
+name: BTC Signal Side-by-Side
+
+on:
+  push:
+    branches:
+      - agent/btc-signal-pilot
+    paths:
+      - .github/workflows/btc-signal-side-by-side.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install analysis dependencies
+        run: pip install pandas numpy
+
+      - name: Download bounded pilot artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .pilot/report
+          gh run download 31362768822 -n btc-signal-pilot-report -D .pilot/report
+          test -f .pilot/report/btc_candidate_signals.csv
+
+      - name: Run side-by-side signal analysis
+        run: |
+          python - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+          import numpy as np
+          import pandas as pd
+          import api.regime_engine as re
+
+          p = Path('.pilot/report/btc_candidate_signals.csv')
+          df = pd.read_csv(p)
+          df['date'] = pd.to_datetime(df['date'])
+
+          def signal(metric):
+              s = re._signal_for_metric(df, metric)
+              if s is None:
+                  return None
+              s = dict(s)
+              s['band'] = re._band(s['pct_90d'], s['z_robust'], informative=s.get('informative', True))
+              s['trend'] = re._trend(s['momentum_7d_vs_30d'])
+              return s
+
+          bt = re._signal_for_blocktime_instability(df)
+          if bt:
+              bt = dict(bt)
+              bt['band'] = re._band(bt['pct_90d'], bt['z_robust'], informative=bt.get('informative', True))
+              bt['trend'] = re._trend(bt['momentum_7d_vs_30d'])
+
+          sig = {
+              'tx_count_daily': signal('tx_count_daily'),
+              'unique_active_addresses': signal('unique_active_addresses'),
+              'median_tx_fee_native': signal('median_tx_fee_native'),
+              'median_tx_fee_rate_sat_vbyte': signal('median_tx_fee_rate_sat_vbyte'),
+              'block_weight_utilization_pct': signal('block_weight_utilization_pct'),
+              'blocktime_instability': bt,
+          }
+
+          def axis(names):
+              xs = [sig[n] for n in names if sig.get(n) is not None]
+              return re._aggregate_axis(xs)
+
+          scenarios = {
+              'current_engine_with_backfilled_active_addresses': {
+                  'demand': axis(['tx_count_daily', 'unique_active_addresses']),
+                  'friction': axis(['median_tx_fee_native']),
+                  'capacity': axis(['blocktime_instability']),
+              },
+              'scorecard_aligned_demand': {
+                  'demand': axis(['tx_count_daily']),
+                  'friction': axis(['median_tx_fee_native']),
+                  'capacity': axis(['blocktime_instability']),
+              },
+              'candidate_btc_native_semantics': {
+                  'demand': axis(['tx_count_daily', 'unique_active_addresses']),
+                  'friction': axis(['median_tx_fee_rate_sat_vbyte']),
+                  'capacity': axis(['blocktime_instability', 'block_weight_utilization_pct']),
+              },
+          }
+
+          # Descriptive rule projection matching the current regime rule ordering.
+          def projected_label(a):
+              d, f, c = a['demand'], a['friction'], a['capacity']
+              high = lambda x: x.get('band_high') in ('HIGH', 'EXTREME_HIGH')
+              extreme_high = lambda x: x.get('band_high') == 'EXTREME_HIGH'
+              low = lambda x: x.get('band_low') in ('LOW', 'EXTREME_LOW')
+              if (high(f) and high(c)) or (extreme_high(c) and c.get('trend') == 'HEATING'):
+                  return 'CONGESTED'
+              if low(f) and not high(c):
+                  return 'CHEAP'
+              if high(d) and d.get('trend') == 'HEATING':
+                  return 'HEATING'
+              return 'STABLE'
+
+          for v in scenarios.values():
+              v['projected_label'] = projected_label(v)
+
+          corr = df[[
+              'tx_count_daily','unique_active_addresses','median_tx_fee_native',
+              'median_tx_fee_rate_sat_vbyte','block_weight_utilization_pct','avg_block_time_sec'
+          ]].corr().round(6).to_dict()
+
+          out = {
+              'date': str(df['date'].max().date()),
+              'rows': len(df),
+              'signals': sig,
+              'scenarios': scenarios,
+              'correlations': corr,
+              'scope_note': 'Exploratory 35-day bounded pilot. No methodology or published outputs modified.'
+          }
+          Path('.pilot/side-by-side.json').write_text(json.dumps(out, indent=2, default=str) + '\n')
+          print(json.dumps(out, indent=2, default=str))
+          PY
+
+      - name: Assert production data untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed=$(git status --porcelain -- data/published data/calculated web-v1-app/.private-data || true)
+          if [ -n "$changed" ]; then
+            echo "$changed"
+            exit 1
+          fi
+
+      - name: Upload side-by-side report
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-signal-side-by-side
+          path: .pilot/side-by-side.json
+          retention-days: 7
