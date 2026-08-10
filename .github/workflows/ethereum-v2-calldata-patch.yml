@@ -1,0 +1,273 @@
+name: Ethereum v2 Calldata Patch
+
+on:
+  push:
+    branches:
+      - fix/ethereum-v2-calldata-corroboration
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: fix/ethereum-v2-calldata-corroboration
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Apply exact Ethereum v2 patch
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+
+          path = Path("api/regime_engine.py")
+          text = path.read_text(encoding="utf-8")
+
+          replacements = [
+              (
+                  '        ruleset_id="eth_l1_v1",\n',
+                  '        ruleset_id="eth_l1_v2",\n',
+              ),
+              (
+                  '    friction: List[Dict[str, Any]] = []\n',
+                  '    calldata_sig: Optional[Dict[str, Any]] = None\n'
+                  '    if spec.profile_type == "eth_l1":\n'
+                  '        calldata_sig = _signal_for_metric(d, "nonempty_calldata_share")\n'
+                  '        if calldata_sig:\n'
+                  '            calldata_sig["band"] = _band(\n'
+                  '                calldata_sig["pct_90d"],\n'
+                  '                calldata_sig["z_robust"],\n'
+                  '                informative=bool(calldata_sig.get("informative", True)),\n'
+                  '            )\n'
+                  '            calldata_sig["trend"] = _trend(calldata_sig["momentum_7d_vs_30d"])\n'
+                  '\n'
+                  '    friction: List[Dict[str, Any]] = []\n',
+              ),
+              (
+                  '    for s in demand:\n        _emit("demand", s)\n    for s in friction:\n',
+                  '    for s in demand:\n        _emit("demand", s)\n'
+                  '    if calldata_sig:\n'
+                  '        _emit("demand", calldata_sig)\n'
+                  '    for s in friction:\n',
+              ),
+              (
+                  '    elif (friction_high and capacity_high) or (capacity_extreme and ax_c["trend"] == "HEATING"):\n'
+                  '        label = "CONGESTED"\n'
+                  '    elif friction_low and (capacity_low or not capacity_high):\n'
+                  '        label = "CHEAP"\n'
+                  '    elif demand_high and ax_d["trend"] == "HEATING":\n'
+                  '        label = "HEATING"\n'
+                  '    else:\n'
+                  '        label = "STABLE"\n',
+                  '    elif spec.profile_type == "eth_l1":\n'
+                  '        # ETH v2 preserve-baseline corroboration semantics:\n'
+                  '        # - existing congestion/cheap/core-demand HEATING behavior is unchanged;\n'
+                  '        # - calldata is supplemental Demand evidence only;\n'
+                  '        # - calldata can create a new HEATING label only when core Demand is\n'
+                  '        #   already HIGH/EXTREME_HIGH and calldata trend is HEATING.\n'
+                  '        calldata_heating = bool(\n'
+                  '            calldata_sig\n'
+                  '            and bool(calldata_sig.get("informative", True))\n'
+                  '            and calldata_sig.get("trend") == "HEATING"\n'
+                  '        )\n'
+                  '        if (friction_high and capacity_high) or (capacity_extreme and ax_c["trend"] == "HEATING"):\n'
+                  '            label = "CONGESTED"\n'
+                  '        elif friction_low and (capacity_low or not capacity_high):\n'
+                  '            label = "CHEAP"\n'
+                  '        elif demand_high and ax_d["trend"] == "HEATING":\n'
+                  '            label = "HEATING"\n'
+                  '        elif demand_high and calldata_heating:\n'
+                  '            label = "HEATING"\n'
+                  '        else:\n'
+                  '            label = "STABLE"\n'
+                  '    elif (friction_high and capacity_high) or (capacity_extreme and ax_c["trend"] == "HEATING"):\n'
+                  '        label = "CONGESTED"\n'
+                  '    elif friction_low and (capacity_low or not capacity_high):\n'
+                  '        label = "CHEAP"\n'
+                  '    elif demand_high and ax_d["trend"] == "HEATING":\n'
+                  '        label = "HEATING"\n'
+                  '    else:\n'
+                  '        label = "STABLE"\n',
+              ),
+              (
+                  '    for s in demand:\n        if bool(s.get("informative", True)):\n            candidates.append((_driver_score(s, 1.0), {**s, "axis": "demand"}))\n    for s in friction:\n',
+                  '    for s in demand:\n'
+                  '        if bool(s.get("informative", True)):\n'
+                  '            candidates.append((_driver_score(s, 1.0), {**s, "axis": "demand"}))\n'
+                  '    if calldata_sig and bool(calldata_sig.get("informative", True)):\n'
+                  '        candidates.append((_driver_score(calldata_sig, 1.0), {**calldata_sig, "axis": "demand"}))\n'
+                  '    for s in friction:\n',
+              ),
+              (
+                  '        "methodology_notes": [\n'
+                  '            "Non-informative low-variance distributions are neutralized before band aggregation.",\n'
+                  '            "Raw block time is not used directly for congestion; blocktime_instability is used instead.",\n'
+                  '        ],\n',
+                  '        "methodology_notes": [\n'
+                  '            "Non-informative low-variance distributions are neutralized before band aggregation.",\n'
+                  '            "Raw block time is not used directly for congestion; blocktime_instability is used instead.",\n'
+                  '            *(\n'
+                  '                ["Ethereum calldata activity is supplemental Demand evidence: it does not alter the core Demand axis and can create HEATING only when core Demand is already HIGH/EXTREME_HIGH and calldata trend is HEATING."]\n'
+                  '                if spec.profile_type == "eth_l1"\n'
+                  '                else []\n'
+                  '            ),\n'
+                  '        ],\n',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one match, got {count}: {old[:80]!r}")
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding="utf-8")
+
+          manifest_path = Path("pipeline/methodology-version.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          if manifest.get("methodology_version") != "2.3":
+              raise SystemExit(f"expected methodology 2.3, got {manifest.get('methodology_version')}")
+          manifest["methodology_version"] = "2.4"
+          manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+      - name: Write targeted Ethereum semantics test
+        shell: python
+        run: |
+          from pathlib import Path
+
+          test = r'''#!/usr/bin/env python3
+import pandas as pd
+
+import api.regime_engine as re
+
+
+def signal(metric: str, *, band: str = "NORMAL", trend: str = "FLAT"):
+    band_values = {
+        "NORMAL": (50.0, 0.0),
+        "HIGH": (85.0, 1.8),
+        "EXTREME_HIGH": (95.0, 3.0),
+        "LOW": (15.0, -1.8),
+        "EXTREME_LOW": (5.0, -3.0),
+    }
+    trend_values = {"FLAT": 0.0, "HEATING": 0.30, "COOLING": -0.30}
+    pct, z = band_values[band]
+    return {
+        "metric": metric,
+        "current": 1.0,
+        "z_robust": z,
+        "pct_90d": pct,
+        "momentum_7d_vs_30d": trend_values[trend],
+        "informative": True,
+        "neutralized": False,
+        "neutral_reason": None,
+    }
+
+
+def evaluate(name: str, scenario, expected: str):
+    original_signal = re._signal_for_metric
+    original_instability = re._signal_for_blocktime_instability
+
+    def fake_signal(_df, metric):
+        value = scenario.get(metric)
+        return dict(value) if value is not None else None
+
+    try:
+        re._signal_for_metric = fake_signal
+        re._signal_for_blocktime_instability = lambda *args, **kwargs: None
+        out = re.compute_regime(
+            pd.DataFrame({"date": ["2026-08-09"]}),
+            chain="ethereum",
+            profile={"type": "eth_l1"},
+            asof_date="2026-08-09",
+            confidence_score=1.0,
+        )
+    finally:
+        re._signal_for_metric = original_signal
+        re._signal_for_blocktime_instability = original_instability
+
+    assert out["ruleset_id"] == "eth_l1_v2", out
+    assert out["label"] == expected, f"{name}: expected {expected}, got {out['label']}"
+    assert "nonempty_calldata_share" in out["signals"], out
+    assert out["signals"]["nonempty_calldata_share"]["axis"] == "demand", out
+    assert out["axes"]["demand"]["informative_count"] == 2, out
+    print(f"[ETH_CALLDATA] {name}: {out['label']}")
+
+
+def base(*, core_band="NORMAL", core_trend="FLAT", calldata_trend="FLAT"):
+    return {
+        "tx_count_daily": signal("tx_count_daily", band=core_band, trend=core_trend),
+        "unique_active_addresses": signal("unique_active_addresses", band=core_band, trend=core_trend),
+        "nonempty_calldata_share": signal("nonempty_calldata_share", band="NORMAL", trend=calldata_trend),
+        "median_tx_fee_native": signal("median_tx_fee_native"),
+        "failed_tx_rate": signal("failed_tx_rate"),
+        "gas_utilization_pct": signal("gas_utilization_pct"),
+    }
+
+
+evaluate(
+    "baseline_heating_preserved",
+    base(core_band="HIGH", core_trend="HEATING", calldata_trend="FLAT"),
+    "HEATING",
+)
+evaluate(
+    "new_heating_requires_core_high_and_calldata_heating",
+    base(core_band="HIGH", core_trend="FLAT", calldata_trend="HEATING"),
+    "HEATING",
+)
+evaluate(
+    "calldata_cannot_heat_without_core_high",
+    base(core_band="NORMAL", core_trend="FLAT", calldata_trend="HEATING"),
+    "STABLE",
+)
+evaluate(
+    "core_high_alone_without_heating_remains_stable",
+    base(core_band="HIGH", core_trend="FLAT", calldata_trend="FLAT"),
+    "STABLE",
+)
+
+print("[ETH_CALLDATA] OK: eth_l1_v2 preserve-baseline corroboration semantics validated")
+'''
+          Path("pipeline/tools/test_eth_calldata_corroboration_semantics.py").write_text(test, encoding="utf-8")
+
+      - name: Run targeted test and governance validator
+        run: |
+          python -m pipeline.tools.test_eth_calldata_corroboration_semantics
+          python pipeline/tools/validate_meta_methodology_safety.py --root . --meta-root data/published/v1/meta
+
+      - name: Verify scope and commit substantive patch
+        run: |
+          python - <<'PY'
+          import subprocess
+
+          allowed = {
+              "api/regime_engine.py",
+              "pipeline/methodology-version.json",
+              "pipeline/tools/test_eth_calldata_corroboration_semantics.py",
+          }
+          changed = set(subprocess.check_output(["git", "status", "--porcelain"], text=True).splitlines())
+          paths = {line[3:] for line in changed if len(line) >= 4}
+          unexpected = paths - allowed
+          if unexpected:
+              raise SystemExit(f"unexpected changed paths: {sorted(unexpected)}")
+          if paths != allowed:
+              raise SystemExit(f"expected exactly {sorted(allowed)}, got {sorted(paths)}")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/regime_engine.py pipeline/methodology-version.json pipeline/tools/test_eth_calldata_corroboration_semantics.py
+          git commit -m "feat: add guarded Ethereum calldata corroboration"
+          git push origin HEAD:fix/ethereum-v2-calldata-corroboration
