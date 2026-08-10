@@ -1,0 +1,116 @@
+name: Ethereum v2 Governance Repair
+
+on:
+  push:
+    branches:
+      - agent/ethereum-v2-history-migration
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/ethereum-v2-history-migration
+
+      - name: Repair Ethereum META version metadata only
+        run: |
+          python - <<'PY'
+          import copy
+          import hashlib
+          import json
+          import shutil
+          from pathlib import Path
+
+          canonical = Path('data/published/v1/meta/ethereum')
+          private = Path('web-v1-app/.private-data/published/v1/meta/ethereum')
+          day_paths = sorted(canonical.glob('????-??-??.json'))
+          if len(day_paths) != 617:
+              raise SystemExit(f'expected 617 Ethereum META days, got {len(day_paths)}')
+
+          before_semantics = {}
+          for p in day_paths:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              regime = copy.deepcopy(obj.get('regime'))
+              confidence = copy.deepcopy(obj.get('confidence'))
+              data_confidence = copy.deepcopy(obj.get('data_confidence'))
+              publish_confidence = copy.deepcopy(obj.get('publish_confidence'))
+              scorecard = copy.deepcopy(obj.get('scorecard'))
+              status = copy.deepcopy(obj.get('status'))
+              before_semantics[p.name] = (regime, confidence, data_confidence, publish_confidence, scorecard, status)
+              if str((regime or {}).get('ruleset_id')) != 'eth_l1_v2':
+                  raise SystemExit(f'unexpected ruleset before repair: {p.name}: {(regime or {}).get("ruleset_id")}')
+              obj['methodology_version'] = '1.1'
+              p.write_text(json.dumps(obj, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          for p in day_paths:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              if obj.get('methodology_version') != '1.1':
+                  raise SystemExit(f'top-level methodology repair failed: {p.name}')
+              current = (
+                  obj.get('regime'), obj.get('confidence'), obj.get('data_confidence'),
+                  obj.get('publish_confidence'), obj.get('scorecard'), obj.get('status')
+              )
+              if current != before_semantics[p.name]:
+                  raise SystemExit(f'semantic drift during metadata-only repair: {p.name}')
+
+          # Re-materialize convenience files from repaired day objects.
+          latest_obj = json.loads(day_paths[-1].read_text(encoding='utf-8'))
+          (canonical / 'latest.json').write_text(json.dumps(latest_obj, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          for n in (7, 30, 90, 180, 365):
+              payload = [json.loads(p.read_text(encoding='utf-8')) for p in day_paths[-n:]]
+              (canonical / f'last{n}d.json').write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          manifest_path = canonical / 'manifest.json'
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          manifest['methodology_version'] = 'v1'
+          manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+
+          if private.exists():
+              shutil.rmtree(private)
+          shutil.copytree(canonical, private)
+
+          cfiles = sorted(p.relative_to(canonical) for p in canonical.rglob('*') if p.is_file())
+          pfiles = sorted(p.relative_to(private) for p in private.rglob('*') if p.is_file())
+          if cfiles != pfiles:
+              raise SystemExit('canonical/private file lists differ')
+          for rel in cfiles:
+              if hashlib.sha256((canonical / rel).read_bytes()).digest() != hashlib.sha256((private / rel).read_bytes()).digest():
+                  raise SystemExit(f'canonical/private mismatch: {rel}')
+
+          # Explicit governance assertions.
+          if json.loads((canonical / 'manifest.json').read_text(encoding='utf-8')).get('methodology_version') != 'v1':
+              raise SystemExit('manifest methodology_version must be v1')
+          for p in day_paths:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              if obj.get('methodology_version') != '1.1' or (obj.get('regime') or {}).get('ruleset_id') != 'eth_l1_v2':
+                  raise SystemExit(f'governance assertion failed: {p.name}')
+          PY
+
+      - name: Verify scope and commit repair
+        run: |
+          python - <<'PY'
+          import subprocess
+          lines = subprocess.check_output(['git', 'status', '--porcelain'], text=True).splitlines()
+          paths = [line[3:] for line in lines if len(line) >= 4]
+          allowed = (
+              'data/published/v1/meta/ethereum/',
+              'web-v1-app/.private-data/published/v1/meta/ethereum/',
+          )
+          unexpected = [p for p in paths if not p.startswith(allowed)]
+          if unexpected:
+              raise SystemExit(f'unexpected changed paths: {unexpected[:20]}')
+          if not paths:
+              raise SystemExit('governance repair produced no changes')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/published/v1/meta/ethereum web-v1-app/.private-data/published/v1/meta/ethereum
+          git commit -m "data: align Ethereum META version metadata with publication contract [skip ci]"
+          git push origin HEAD:agent/ethereum-v2-history-migration
