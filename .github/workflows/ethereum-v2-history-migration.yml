@@ -1,0 +1,161 @@
+name: Ethereum v2 History Migration
+
+on:
+  push:
+    branches:
+      - agent/ethereum-v2-history-migration
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/ethereum-v2-history-migration
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r pipeline/requirements.txt
+
+      - name: Build temporary Ethereum parquet from canonical Gold day files
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+
+          src = Path('data/published/v1/gold/ethereum')
+          files = sorted(src.glob('????-??-??.json'))
+          if len(files) != 617:
+              raise SystemExit(f'expected 617 Ethereum Gold days, got {len(files)}')
+          rows = [json.loads(p.read_text(encoding='utf-8')) for p in files]
+          df = pd.DataFrame(rows).sort_values('date').reset_index(drop=True)
+          if int(df['nonempty_calldata_share'].notna().sum()) != len(df):
+              raise SystemExit('nonempty_calldata_share is not complete across Ethereum history')
+          out = Path('.migration/gold')
+          out.mkdir(parents=True, exist_ok=True)
+          df.to_parquet(out / 'ethereum.parquet', index=False)
+          PY
+
+      - name: Rebuild Ethereum META history under methodology 2.4
+        env:
+          GOLD_DIR: ${{ github.workspace }}/.migration/gold
+          METHODOLOGY_VERSION: "2.4"
+        run: |
+          python pipeline/tools/export_meta_json_history.py \
+            --root . \
+            --out-root .migration/calculated/meta \
+            --start 2024-12-01 \
+            --mode rebuild \
+            --chains ethereum
+
+      - name: Publish only Ethereum META
+        run: |
+          python pipeline/tools/publish_meta_only.py \
+            --root . \
+            --calculated .migration/calculated \
+            --published data/published/v1 \
+            --chains ethereum
+
+      - name: Normalize manifest methodology and mirror private copy
+        run: |
+          python - <<'PY'
+          import json, shutil
+          from pathlib import Path
+
+          canonical = Path('data/published/v1/meta/ethereum')
+          manifest = canonical / 'manifest.json'
+          obj = json.loads(manifest.read_text(encoding='utf-8'))
+          obj['methodology_version'] = '2.4'
+          manifest.write_text(json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+
+          private = Path('web-v1-app/.private-data/published/v1/meta/ethereum')
+          if private.exists():
+              shutil.rmtree(private)
+          shutil.copytree(canonical, private)
+          PY
+
+      - name: Validate migrated history and byte parity
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from collections import Counter
+          from pathlib import Path
+
+          canonical = Path('data/published/v1/meta/ethereum')
+          private = Path('web-v1-app/.private-data/published/v1/meta/ethereum')
+          days = sorted(canonical.glob('????-??-??.json'))
+          if len(days) != 617:
+              raise SystemExit(f'expected 617 migrated META days, got {len(days)}')
+
+          labels = Counter()
+          rulesets = Counter()
+          methodologies = Counter()
+          changed_expectation = {
+              '2025-09-01': 'HEATING',
+              '2026-03-05': 'HEATING',
+          }
+          for p in days:
+              o = json.loads(p.read_text(encoding='utf-8'))
+              labels[str((o.get('regime') or {}).get('label'))] += 1
+              rulesets[str((o.get('regime') or {}).get('ruleset_id'))] += 1
+              methodologies[str(o.get('methodology_version'))] += 1
+              if p.stem in changed_expectation and (o.get('regime') or {}).get('label') != changed_expectation[p.stem]:
+                  raise SystemExit(f'unexpected label for {p.stem}')
+
+          if rulesets != Counter({'eth_l1_v2': 617}):
+              raise SystemExit(f'unexpected rulesets: {rulesets}')
+          if methodologies != Counter({'2.4': 617}):
+              raise SystemExit(f'unexpected methodology versions: {methodologies}')
+          expected_labels = Counter({'STABLE': 264, 'CHEAP': 154, 'CONGESTED': 103, 'HEATING': 92, 'UNKNOWN/DEGRADED': 4})
+          if labels != expected_labels:
+              raise SystemExit(f'unexpected label counts: {labels}')
+
+          cfiles = sorted(p.relative_to(canonical) for p in canonical.rglob('*') if p.is_file())
+          pfiles = sorted(p.relative_to(private) for p in private.rglob('*') if p.is_file())
+          if cfiles != pfiles:
+              raise SystemExit('canonical/private META file lists differ')
+          for rel in cfiles:
+              a = hashlib.sha256((canonical / rel).read_bytes()).hexdigest()
+              b = hashlib.sha256((private / rel).read_bytes()).hexdigest()
+              if a != b:
+                  raise SystemExit(f'canonical/private mismatch: {rel}')
+          print('labels=', dict(labels))
+          print('rulesets=', dict(rulesets))
+          print('methodologies=', dict(methodologies))
+          PY
+
+      - name: Verify scope and commit migrated META
+        run: |
+          rm -rf .migration
+          python - <<'PY'
+          import subprocess
+
+          lines = subprocess.check_output(['git', 'status', '--porcelain'], text=True).splitlines()
+          paths = [line[3:] for line in lines if len(line) >= 4]
+          allowed_prefixes = (
+              'data/published/v1/meta/ethereum/',
+              'web-v1-app/.private-data/published/v1/meta/ethereum/',
+          )
+          unexpected = [p for p in paths if not p.startswith(allowed_prefixes)]
+          if unexpected:
+              raise SystemExit(f'unexpected changed paths: {unexpected[:20]}')
+          if not paths:
+              raise SystemExit('migration produced no changed META files')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/published/v1/meta/ethereum web-v1-app/.private-data/published/v1/meta/ethereum
+          git commit -m "data: migrate Ethereum META history to v2.4"
+          git push origin HEAD:agent/ethereum-v2-history-migration
