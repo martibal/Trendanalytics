@@ -33,16 +33,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p .pilot/report
-          gh run download 31362768822 -n btc-signal-pilot-report -D .pilot/report
+          gh run download 31363474868 -n btc-signal-pilot-report -D .pilot/report
           test -f .pilot/report/btc_candidate_signals.csv
 
       - name: Run side-by-side signal analysis
         run: |
           python - <<'PY'
           import json
-          import math
           from pathlib import Path
-          import numpy as np
           import pandas as pd
           import api.regime_engine as re
 
@@ -96,7 +94,6 @@ jobs:
               },
           }
 
-          # Descriptive rule projection matching the current regime rule ordering.
           def projected_label(a):
               d, f, c = a['demand'], a['friction'], a['capacity']
               high = lambda x: x.get('band_high') in ('HIGH', 'EXTREME_HIGH')
@@ -124,7 +121,7 @@ jobs:
               'signals': sig,
               'scenarios': scenarios,
               'correlations': corr,
-              'scope_note': 'Exploratory 35-day bounded pilot. No methodology or published outputs modified.'
+              'scope_note': 'Exploratory 90-day bounded pilot. No methodology or published outputs modified.'
           }
           Path('.pilot/side-by-side.json').write_text(json.dumps(out, indent=2, default=str) + '\n')
           print(json.dumps(out, indent=2, default=str))
