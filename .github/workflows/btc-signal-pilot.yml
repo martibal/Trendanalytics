@@ -1,0 +1,179 @@
+name: BTC Signal Pilot
+
+on:
+  push:
+    branches:
+      - agent/btc-signal-pilot
+    paths:
+      - .github/workflows/btc-signal-pilot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PILOT_START: "2026-07-06"
+      RAW_ROOT: "${{ github.workspace }}/.pilot/btc-raw"
+      OUT_ROOT: "${{ github.workspace }}/.pilot/features_agg"
+      REPORT_ROOT: "${{ github.workspace }}/.pilot/report"
+      CSS_AWS_TIMEOUT_SECONDS: "180"
+      CSS_AWS_MAX_ATTEMPTS: "3"
+      CSS_AWS_BACKOFF_SECONDS: "2"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify AWS CLI
+        run: aws --version
+
+      - name: Install pipeline dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r pipeline/requirements.txt
+
+      - name: Download bounded BTC raw history
+        run: |
+          mkdir -p "$RAW_ROOT" "$OUT_ROOT" "$REPORT_ROOT"
+          python pipeline/tools/download_up_to_date_minimal.py \
+            --root "${{ github.workspace }}" \
+            --raw-root "$RAW_ROOT" \
+            --published-root data/published/v1 \
+            --include-published \
+            --start "$PILOT_START" \
+            --chains bitcoin \
+            --lag-l1-days 1 \
+            --lag-l2-days 7
+
+      - name: Aggregate available BTC days in isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from datetime import date, timedelta
+          import os
+          import subprocess
+          from pathlib import Path
+
+          start = date.fromisoformat(os.environ["PILOT_START"])
+          end = date.today() - timedelta(days=1)
+          raw_root = Path(os.environ["RAW_ROOT"])
+          out_root = Path(os.environ["OUT_ROOT"])
+
+          attempted = 0
+          produced = 0
+          day = start
+          while day <= end:
+              d = day.isoformat()
+              tx_dirs = [
+                  raw_root / "bitcoin" / "transactions" / d,
+                  raw_root / "bitcoin" / "transactions" / f"date={d}",
+              ]
+              blk_dirs = [
+                  raw_root / "bitcoin" / "blocks" / d,
+                  raw_root / "bitcoin" / "blocks" / f"date={d}",
+              ]
+              if any(p.exists() for p in tx_dirs + blk_dirs):
+                  attempted += 1
+                  cp = subprocess.run([
+                      "python", "pipeline/src/feature_daily_agg.py",
+                      "--chain", "bitcoin",
+                      "--date", d,
+                      "--raw_root", str(raw_root),
+                      "--out_root", str(out_root),
+                  ])
+                  if cp.returncode == 0:
+                      produced += 1
+                  elif cp.returncode != 2:
+                      raise SystemExit(cp.returncode)
+              day += timedelta(days=1)
+
+          print(f"attempted_days={attempted} produced_days={produced}")
+          if produced < 30:
+              raise SystemExit(f"Pilot produced only {produced} days; need >=30 for informative-distribution evaluation")
+          PY
+
+      - name: Build BTC candidate-signal report
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import polars as pl
+
+          out_dir = Path(os.environ["OUT_ROOT"]) / "bitcoin"
+          report_dir = Path(os.environ["REPORT_ROOT"])
+          report_dir.mkdir(parents=True, exist_ok=True)
+          files = sorted(out_dir.glob("*.parquet"))
+          if not files:
+              raise SystemExit("No pilot feature parquet files produced")
+
+          df = pl.concat([pl.read_parquet(p) for p in files], how="diagonal_relaxed").sort("date")
+          cols = [
+              "date",
+              "tx_count_daily",
+              "unique_active_addresses",
+              "median_tx_fee_native",
+              "median_tx_fee_rate_sat_vbyte",
+              "block_weight_utilization_pct",
+              "avg_block_time_sec",
+          ]
+          df = df.select([c for c in cols if c in df.columns])
+          df.write_csv(report_dir / "btc_candidate_signals.csv")
+
+          candidates = [
+              "unique_active_addresses",
+              "median_tx_fee_rate_sat_vbyte",
+              "block_weight_utilization_pct",
+          ]
+          summary = {
+              "start": df["date"].min(),
+              "end": df["date"].max(),
+              "rows": df.height,
+              "candidates": {},
+              "note": "Exploratory artifact only. No canonical or private published data is modified.",
+          }
+          for col in candidates:
+              if col not in df.columns:
+                  summary["candidates"][col] = {"non_null": 0, "coverage": 0.0, "min": None, "median": None, "max": None}
+                  continue
+              s = df[col].drop_nulls()
+              summary["candidates"][col] = {
+                  "non_null": s.len(),
+                  "coverage": s.len() / df.height if df.height else 0.0,
+                  "min": s.min() if s.len() else None,
+                  "median": s.median() if s.len() else None,
+                  "max": s.max() if s.len() else None,
+              }
+
+          (report_dir / "summary.json").write_text(json.dumps(summary, indent=2, default=str) + "\n", encoding="utf-8")
+          print(json.dumps(summary, indent=2, default=str))
+
+          bad = [name for name, x in summary["candidates"].items() if x["non_null"] < 30]
+          if bad:
+              raise SystemExit("Insufficient >=30-day candidate coverage: " + ", ".join(bad))
+          PY
+
+      - name: Assert production data untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- data/published web-v1-app/.private-data data/calculated
+
+      - name: Upload pilot report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-signal-pilot-report
+          path: .pilot/report
+          if-no-files-found: warn
+          retention-days: 7
