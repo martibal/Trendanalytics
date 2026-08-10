@@ -1,0 +1,189 @@
+name: Ethereum p90 Capacity Guard Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-p90-capacity-guard-audit
+    paths:
+      - ".github/workflows/ethereum-p90-capacity-guard-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas numpy
+
+      - name: Run bounded 180d guard audit
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          import pandas as pd
+          import api.regime_engine as engine
+
+          gold_root = Path("data/published/v1/gold/ethereum")
+          meta_root = Path("data/published/v1/meta/ethereum")
+          paths = sorted(gold_root.glob("????-??-??.json"))
+          rows = []
+          for p in paths:
+              obj = json.loads(p.read_text(encoding="utf-8"))
+              obj.setdefault("date", p.stem)
+              rows.append(obj)
+
+          df = pd.DataFrame(rows)
+          df["date"] = pd.to_datetime(df["date"], errors="coerce")
+          df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+          if len(df) < 180:
+              raise SystemExit(f"need >=180 Ethereum Gold days, got {len(df)}")
+          if "block_gas_utilization_p90" not in df.columns:
+              raise SystemExit("missing block_gas_utilization_p90")
+
+          start_idx = len(df) - 180
+          records = []
+
+          def is_high(band):
+              return band in ("HIGH", "EXTREME_HIGH")
+
+          for i in range(start_idx, len(df)):
+              day = df.loc[i, "date"].date().isoformat()
+              sub = df.iloc[: i + 1].copy()
+              meta_path = meta_root / f"{day}.json"
+              confidence = None
+              published_label = None
+              if meta_path.exists():
+                  meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                  confidence = (meta.get("confidence") or {}).get("confidence_score")
+                  published_label = (meta.get("regime") or {}).get("label")
+
+              baseline = engine.compute_regime(
+                  sub,
+                  chain="ethereum",
+                  profile={"type": "eth_l1"},
+                  asof_date=day,
+                  confidence_score=confidence,
+              )
+              baseline_label = baseline.get("label")
+
+              p90 = engine._signal_for_metric(sub, "block_gas_utilization_p90")
+              if p90:
+                  p90_band = engine._band(
+                      float(p90.get("pct_90d", 50.0)),
+                      float(p90.get("z_robust", 0.0)),
+                      informative=bool(p90.get("informative", True)),
+                  )
+                  p90_trend = engine._trend(float(p90.get("momentum_7d_vs_30d", 0.0)))
+              else:
+                  p90_band = "NORMAL"
+                  p90_trend = "FLAT"
+
+              axes = baseline.get("axes") or {}
+              friction = axes.get("friction") or {}
+              friction_high = is_high(str(friction.get("band_high", "NORMAL"))) and int(friction.get("informative_count", 0) or 0) > 0
+              p90_high = is_high(p90_band) and bool((p90 or {}).get("informative", False))
+
+              guarded = baseline_label
+              reason = "baseline_preserved"
+
+              # Conservative Capacity-only guard semantics:
+              # 1) p90 can veto CHEAP when block gas pressure is high.
+              # 2) p90 can create CONGESTED only when existing Friction is already high.
+              # 3) p90 never creates HEATING and never rewrites an existing CONGESTED label.
+              if baseline_label == "CHEAP" and p90_high:
+                  guarded = "STABLE"
+                  reason = "p90_high_vetoes_cheap"
+              elif baseline_label == "STABLE" and p90_high and friction_high:
+                  guarded = "CONGESTED"
+                  reason = "p90_high_plus_existing_friction_high"
+
+              records.append({
+                  "date": day,
+                  "published_label": published_label,
+                  "baseline_label": baseline_label,
+                  "guarded_label": guarded,
+                  "changed": guarded != baseline_label,
+                  "reason": reason,
+                  "p90_band": p90_band,
+                  "p90_trend": p90_trend,
+                  "p90_informative": bool((p90 or {}).get("informative", False)),
+                  "p90_pct_90d": (p90 or {}).get("pct_90d"),
+                  "p90_z_robust": (p90 or {}).get("z_robust"),
+                  "friction_band_high": friction.get("band_high"),
+                  "friction_trend": friction.get("trend"),
+                  "friction_high": friction_high,
+              })
+
+          changes = [r for r in records if r["changed"]]
+          transition_counts = Counter(f"{r['baseline_label']}->{r['guarded_label']}" for r in changes)
+          reason_counts = Counter(r["reason"] for r in changes)
+          p90_high_days = [r["date"] for r in records if r["p90_band"] in ("HIGH", "EXTREME_HIGH")]
+          p90_high_friction_high = [r["date"] for r in records if r["p90_band"] in ("HIGH", "EXTREME_HIGH") and r["friction_high"]]
+          published_mismatch = [r for r in records if r["published_label"] is not None and r["published_label"] != r["baseline_label"]]
+
+          report = {
+              "scope": {
+                  "start": records[0]["date"],
+                  "end": records[-1]["date"],
+                  "days": len(records),
+                  "gold_days_total": len(df),
+              },
+              "guard_semantics": {
+                  "cheap_veto": "baseline CHEAP + informative p90 HIGH/EXTREME_HIGH -> STABLE",
+                  "congestion_corroboration": "baseline STABLE + informative p90 HIGH/EXTREME_HIGH + existing Friction HIGH/EXTREME_HIGH -> CONGESTED",
+                  "heating_creation": false,
+                  "existing_congested_rewrite": false,
+              },
+              "result": {
+                  "baseline_counts": dict(Counter(r["baseline_label"] for r in records)),
+                  "guarded_counts": dict(Counter(r["guarded_label"] for r in records)),
+                  "change_count": len(changes),
+                  "transition_counts": dict(transition_counts),
+                  "reason_counts": dict(reason_counts),
+                  "changes": changes,
+                  "p90_high_days": len(p90_high_days),
+                  "p90_high_friction_high_days": len(p90_high_friction_high),
+                  "p90_high_friction_high_dates": p90_high_friction_high,
+              },
+              "baseline_alignment": {
+                  "published_compared_days": sum(1 for r in records if r["published_label"] is not None),
+                  "mismatch_count": len(published_mismatch),
+                  "mismatch_dates": [r["date"] for r in published_mismatch],
+              },
+              "guardrails": [
+                  "Observational audit only; no production files or profile definitions are changed.",
+                  "The p90 signal is evaluated separately from the core Capacity axis.",
+                  "The guard cannot create HEATING, preventing the precedence side effect seen in naive additive p90.",
+                  "The guard cannot downgrade or rewrite existing CONGESTED labels.",
+              ],
+          }
+
+          Path("ethereum-p90-capacity-guard-audit.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-p90-capacity-guard-audit
+          path: ethereum-p90-capacity-guard-audit.json
+          if-no-files-found: error
+          retention-days: 7
