@@ -1,0 +1,125 @@
+name: Ethereum v2 History Preflight
+
+on:
+  push:
+    branches:
+      - agent/ethereum-v2-history-preflight
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Run full-history Ethereum v2 preflight
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+
+          from api.regime_engine import compute_regime, reconcile_regime_with_scorecard
+
+          gold_root = Path('data/published/v1/gold/ethereum')
+          meta_root = Path('data/published/v1/meta/ethereum')
+          gold_files = sorted(gold_root.glob('????-??-??.json'))
+          if not gold_files:
+              raise SystemExit('no Ethereum Gold day files found')
+
+          rows = [json.loads(p.read_text(encoding='utf-8')) for p in gold_files]
+          df = pd.DataFrame(rows).sort_values('date').reset_index(drop=True)
+
+          metric = 'nonempty_calldata_share'
+          coverage_non_null = int(df[metric].notna().sum()) if metric in df.columns else 0
+          missing_metric_dates = []
+          changed = []
+          current_labels = Counter()
+          v2_labels = Counter()
+          current_rulesets = Counter()
+          v2_rulesets = Counter()
+          missing_meta_dates = []
+
+          for i in range(len(df)):
+              day = str(df.iloc[i]['date'])
+              if metric not in df.columns or pd.isna(df.iloc[i].get(metric)):
+                  missing_metric_dates.append(day)
+
+              meta_path = meta_root / f'{day}.json'
+              if not meta_path.exists():
+                  missing_meta_dates.append(day)
+                  continue
+              meta = json.loads(meta_path.read_text(encoding='utf-8'))
+              current_regime = meta.get('regime') or {}
+              current_label = current_regime.get('label')
+              current_ruleset = current_regime.get('ruleset_id')
+              current_labels[current_label] += 1
+              current_rulesets[current_ruleset] += 1
+
+              confidence = meta.get('confidence') or {}
+              confidence_score = confidence.get('confidence_score')
+              sub = df.iloc[:i+1].copy()
+              out = compute_regime(
+                  sub,
+                  chain='ethereum',
+                  profile={'type': 'eth_l1'},
+                  asof_date=day,
+                  confidence_score=confidence_score,
+              )
+              scorecard = meta.get('scorecard') or {}
+              out = reconcile_regime_with_scorecard(out, scorecard)
+              v2_label = out.get('label')
+              v2_labels[v2_label] += 1
+              v2_rulesets[out.get('ruleset_id')] += 1
+
+              if v2_label != current_label:
+                  changed.append({
+                      'date': day,
+                      'current': current_label,
+                      'v2': v2_label,
+                      'confidence_score': confidence_score,
+                  })
+
+          report = {
+              'date_range': [str(df.iloc[0]['date']), str(df.iloc[-1]['date'])],
+              'gold_days': len(df),
+              'meta_days_compared': len(df) - len(missing_meta_dates),
+              'calldata_non_null_days': coverage_non_null,
+              'calldata_missing_days': len(missing_metric_dates),
+              'calldata_missing_dates': missing_metric_dates,
+              'missing_meta_days': len(missing_meta_dates),
+              'missing_meta_dates': missing_meta_dates,
+              'current_rulesets': dict(current_rulesets),
+              'v2_rulesets': dict(v2_rulesets),
+              'current_labels': dict(current_labels),
+              'v2_labels': dict(v2_labels),
+              'label_change_count': len(changed),
+              'label_changes': changed,
+          }
+          Path('ethereum-v2-history-preflight.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True), encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          if any(k not in (None, 'eth_l1_v2') for k in v2_rulesets):
+              raise SystemExit(f'unexpected v2 ruleset(s): {dict(v2_rulesets)}')
+          PY
+
+      - name: Upload preflight report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-v2-history-preflight
+          path: ethereum-v2-history-preflight.json
+          retention-days: 7
