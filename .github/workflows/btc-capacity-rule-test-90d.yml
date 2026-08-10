@@ -1,0 +1,213 @@
+name: BTC Capacity Rule Test 90d
+
+on:
+  push:
+    branches:
+      - agent/btc-signal-pilot
+    paths:
+      - .github/workflows/btc-capacity-rule-test-90d.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install analysis dependencies
+        run: pip install pandas numpy
+
+      - name: Download 90-day BTC pilot artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .pilot/report
+          gh run download 31363474868 -n btc-signal-pilot-report -D .pilot/report
+          test -f .pilot/report/btc_candidate_signals.csv
+
+      - name: Compare BTC capacity rule semantics day by day
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as re
+
+          src = Path('.pilot/report/btc_candidate_signals.csv')
+          df = pd.read_csv(src)
+          df['date'] = pd.to_datetime(df['date'])
+          df = df.sort_values('date').reset_index(drop=True)
+
+          def metric_signal(hist, metric):
+              s = re._signal_for_metric(hist, metric)
+              if s is None:
+                  return None
+              s = dict(s)
+              s['band'] = re._band(s['pct_90d'], s['z_robust'], informative=s.get('informative', True))
+              s['trend'] = re._trend(s['momentum_7d_vs_30d'])
+              return s
+
+          def blocktime_signal(hist):
+              s = re._signal_for_blocktime_instability(hist)
+              if s is None:
+                  return None
+              s = dict(s)
+              s['band'] = re._band(s['pct_90d'], s['z_robust'], informative=s.get('informative', True))
+              s['trend'] = re._trend(s['momentum_7d_vs_30d'])
+              return s
+
+          def aggregate(signals):
+              return re._aggregate_axis([s for s in signals if s is not None])
+
+          def high(axis):
+              return axis.get('band_high') in ('HIGH', 'EXTREME_HIGH')
+
+          def extreme_high(axis):
+              return axis.get('band_high') == 'EXTREME_HIGH'
+
+          def low(axis):
+              return axis.get('band_low') in ('LOW', 'EXTREME_LOW')
+
+          def baseline_label(demand, friction, capacity):
+              if (high(friction) and high(capacity)) or (extreme_high(capacity) and capacity.get('trend') == 'HEATING'):
+                  return 'CONGESTED'
+              if low(friction) and not high(capacity):
+                  return 'CHEAP'
+              if high(demand) and demand.get('trend') == 'HEATING':
+                  return 'HEATING'
+              return 'STABLE'
+
+          def strong_capacity_label(demand, friction, capacity):
+              # Same generic rule ordering as the current engine, but capacity now
+              # includes block_weight_utilization_pct in addition to block-time instability.
+              return baseline_label(demand, friction, capacity)
+
+          def cheap_veto_label(demand, friction, capacity):
+              # BTC-specific candidate: high blockspace use can veto CHEAP, but
+              # CONGESTED still requires simultaneous high fee/friction pressure.
+              if high(friction) and high(capacity):
+                  return 'CONGESTED'
+              if low(friction) and not high(capacity):
+                  return 'CHEAP'
+              if high(demand) and demand.get('trend') == 'HEATING':
+                  return 'HEATING'
+              return 'STABLE'
+
+          rows = []
+          warmup = 29
+          for i in range(warmup, len(df)):
+              hist = df.iloc[:i+1].copy()
+              tx = metric_signal(hist, 'tx_count_daily')
+              aa = metric_signal(hist, 'unique_active_addresses')
+              fee = metric_signal(hist, 'median_tx_fee_native')
+              bw = metric_signal(hist, 'block_weight_utilization_pct')
+              bt = blocktime_signal(hist)
+
+              demand = aggregate([tx, aa])
+              friction = aggregate([fee])
+              baseline_capacity = aggregate([bt])
+              candidate_capacity = aggregate([bt, bw])
+
+              current = baseline_label(demand, friction, baseline_capacity)
+              strong = strong_capacity_label(demand, friction, candidate_capacity)
+              veto = cheap_veto_label(demand, friction, candidate_capacity)
+
+              rows.append({
+                  'date': hist.iloc[-1]['date'].date().isoformat(),
+                  'current_label': current,
+                  'strong_capacity_label': strong,
+                  'cheap_veto_label': veto,
+                  'strong_changed': strong != current,
+                  'veto_changed': veto != current,
+                  'strong_vs_veto_changed': strong != veto,
+                  'friction_band_high': friction.get('band_high'),
+                  'friction_band_low': friction.get('band_low'),
+                  'capacity_band_high': candidate_capacity.get('band_high'),
+                  'capacity_band_low': candidate_capacity.get('band_low'),
+                  'capacity_trend': candidate_capacity.get('trend'),
+                  'block_weight_current': None if bw is None else bw.get('current'),
+                  'block_weight_pct_90d': None if bw is None else bw.get('pct_90d'),
+                  'block_weight_band': None if bw is None else bw.get('band'),
+                  'block_weight_trend': None if bw is None else bw.get('trend'),
+                  'fee_current': None if fee is None else fee.get('current'),
+                  'fee_pct_90d': None if fee is None else fee.get('pct_90d'),
+                  'fee_band': None if fee is None else fee.get('band'),
+              })
+
+          out_df = pd.DataFrame(rows)
+          out_df.to_csv('.pilot/btc-capacity-rule-test-90d.csv', index=False)
+
+          def transitions(target_col):
+              return dict(Counter(f"{r.current_label}->{getattr(r, target_col)}" for r in out_df.itertuples() if getattr(r, target_col) != r.current_label))
+
+          def label_counts(col):
+              return dict(Counter(out_df[col].tolist()))
+
+          strong_changed = int(out_df['strong_changed'].sum())
+          veto_changed = int(out_df['veto_changed'].sum())
+          disagree = int(out_df['strong_vs_veto_changed'].sum())
+
+          summary = {
+              'source_rows': int(len(df)),
+              'warmup_days': warmup,
+              'evaluable_days': int(len(out_df)),
+              'current_label_counts': label_counts('current_label'),
+              'strong_capacity': {
+                  'changed_days': strong_changed,
+                  'changed_pct': strong_changed / len(out_df) if len(out_df) else 0.0,
+                  'label_counts': label_counts('strong_capacity_label'),
+                  'transitions_vs_current': transitions('strong_capacity_label'),
+              },
+              'cheap_veto': {
+                  'changed_days': veto_changed,
+                  'changed_pct': veto_changed / len(out_df) if len(out_df) else 0.0,
+                  'label_counts': label_counts('cheap_veto_label'),
+                  'transitions_vs_current': transitions('cheap_veto_label'),
+              },
+              'strong_vs_veto': {
+                  'disagreement_days': disagree,
+                  'disagreement_pct': disagree / len(out_df) if len(out_df) else 0.0,
+                  'dates': out_df.loc[out_df['strong_vs_veto_changed'], [
+                      'date','current_label','strong_capacity_label','cheap_veto_label',
+                      'friction_band_high','friction_band_low','capacity_band_high','capacity_trend',
+                      'block_weight_current','block_weight_pct_90d','block_weight_band','fee_current','fee_pct_90d','fee_band'
+                  ]].to_dict(orient='records'),
+              },
+              'scope_note': 'Exploratory BTC-only 90-day rule-semantics comparison. No methodology or published outputs modified.'
+          }
+
+          Path('.pilot/btc-capacity-rule-test-90d.json').write_text(json.dumps(summary, indent=2, default=str) + '\n', encoding='utf-8')
+          print(json.dumps(summary, indent=2, default=str))
+          PY
+
+      - name: Assert production data untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed=$(git status --porcelain -- data/published data/calculated web-v1-app/.private-data api pipeline/methodology-version.json || true)
+          if [ -n "$changed" ]; then
+            echo "$changed"
+            exit 1
+          fi
+
+      - name: Upload BTC capacity rule report
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-capacity-rule-test-90d
+          path: |
+            .pilot/btc-capacity-rule-test-90d.json
+            .pilot/btc-capacity-rule-test-90d.csv
+          retention-days: 7
