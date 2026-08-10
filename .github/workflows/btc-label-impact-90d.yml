@@ -1,0 +1,214 @@
+name: BTC Label Impact 90d
+
+on:
+  push:
+    branches:
+      - agent/btc-signal-pilot
+    paths:
+      - .github/workflows/btc-label-impact-90d.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  impact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install analysis dependencies
+        run: pip install pandas numpy
+
+      - name: Download 90-day BTC pilot artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .pilot/report
+          gh run download 31363474868 -n btc-signal-pilot-report -D .pilot/report
+          test -f .pilot/report/btc_candidate_signals.csv
+
+      - name: Run day-by-day label impact analysis
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as re
+
+          src = Path('.pilot/report/btc_candidate_signals.csv')
+          df = pd.read_csv(src)
+          df['date'] = pd.to_datetime(df['date'])
+          df = df.sort_values('date').reset_index(drop=True)
+
+          def metric_signal(frame, metric):
+              s = re._signal_for_metric(frame, metric)
+              if s is None:
+                  return None
+              s = dict(s)
+              s['band'] = re._band(s['pct_90d'], s['z_robust'], informative=s.get('informative', True))
+              s['trend'] = re._trend(s['momentum_7d_vs_30d'])
+              return s
+
+          def blocktime_signal(frame):
+              s = re._signal_for_blocktime_instability(frame)
+              if s is None:
+                  return None
+              s = dict(s)
+              s['band'] = re._band(s['pct_90d'], s['z_robust'], informative=s.get('informative', True))
+              s['trend'] = re._trend(s['momentum_7d_vs_30d'])
+              return s
+
+          def axis(signals):
+              return re._aggregate_axis([x for x in signals if x is not None])
+
+          def projected_label(demand, friction, capacity):
+              high = lambda x: x.get('band_high') in ('HIGH', 'EXTREME_HIGH')
+              extreme_high = lambda x: x.get('band_high') == 'EXTREME_HIGH'
+              low = lambda x: x.get('band_low') in ('LOW', 'EXTREME_LOW')
+              if (high(friction) and high(capacity)) or (extreme_high(capacity) and capacity.get('trend') == 'HEATING'):
+                  return 'CONGESTED'
+              if low(friction) and not high(capacity):
+                  return 'CHEAP'
+              if high(demand) and demand.get('trend') == 'HEATING':
+                  return 'HEATING'
+              return 'STABLE'
+
+          rows = []
+          for i in range(len(df)):
+              frame = df.iloc[:i+1].copy()
+              date = frame['date'].iloc[-1].date().isoformat()
+
+              tx = metric_signal(frame, 'tx_count_daily')
+              aa = metric_signal(frame, 'unique_active_addresses')
+              fee = metric_signal(frame, 'median_tx_fee_native')
+              weight = metric_signal(frame, 'block_weight_utilization_pct')
+              bt = blocktime_signal(frame)
+
+              demand = axis([tx, aa])
+              friction = axis([fee])
+              current_capacity = axis([bt])
+              candidate_capacity = axis([bt, weight])
+
+              current_label = projected_label(demand, friction, current_capacity)
+              candidate_label = projected_label(demand, friction, candidate_capacity)
+
+              rows.append({
+                  'date': date,
+                  'history_points': i + 1,
+                  'current_label': current_label,
+                  'candidate_label': candidate_label,
+                  'changed': current_label != candidate_label,
+                  'current_capacity_high': current_capacity.get('band_high'),
+                  'current_capacity_low': current_capacity.get('band_low'),
+                  'current_capacity_trend': current_capacity.get('trend'),
+                  'candidate_capacity_high': candidate_capacity.get('band_high'),
+                  'candidate_capacity_low': candidate_capacity.get('band_low'),
+                  'candidate_capacity_trend': candidate_capacity.get('trend'),
+                  'block_weight_current': None if weight is None else weight.get('current'),
+                  'block_weight_pct90': None if weight is None else weight.get('pct_90d'),
+                  'block_weight_z': None if weight is None else weight.get('z_robust'),
+                  'block_weight_band': None if weight is None else weight.get('band'),
+                  'block_weight_trend': None if weight is None else weight.get('trend'),
+                  'fee_band': None if fee is None else fee.get('band'),
+                  'demand_high': demand.get('band_high'),
+                  'demand_low': demand.get('band_low'),
+                  'demand_trend': demand.get('trend'),
+              })
+
+          out_df = pd.DataFrame(rows)
+          # Regime signals require >=30 observations to become informative. Treat the
+          # first 29 days as warm-up, not as evidence for methodology comparison.
+          eval_df = out_df[out_df['history_points'] >= 30].copy()
+
+          transitions = Counter(
+              f"{r.current_label}->{r.candidate_label}"
+              for r in eval_df.itertuples()
+              if r.changed
+          )
+          current_counts = Counter(eval_df['current_label'])
+          candidate_counts = Counter(eval_df['candidate_label'])
+          changed_dates = eval_df.loc[eval_df['changed'], 'date'].tolist()
+
+          # Consecutive changed-day streaks, useful for distinguishing isolated flips
+          # from persistent structural effects.
+          streaks = []
+          cur = []
+          prev = None
+          for r in eval_df[eval_df['changed']].itertuples():
+              d = pd.Timestamp(r.date)
+              if prev is not None and (d - prev).days == 1:
+                  cur.append(r.date)
+              else:
+                  if cur:
+                      streaks.append(cur)
+                  cur = [r.date]
+              prev = d
+          if cur:
+              streaks.append(cur)
+
+          report = {
+              'scope': {
+                  'source_rows': len(df),
+                  'source_start': df['date'].min().date().isoformat(),
+                  'source_end': df['date'].max().date().isoformat(),
+                  'evaluation_start_after_warmup': eval_df['date'].min() if len(eval_df) else None,
+                  'evaluation_days': len(eval_df),
+                  'warmup_days_excluded': 29,
+                  'production_modified': False,
+              },
+              'comparison': {
+                  'current_capacity': ['blocktime_instability'],
+                  'candidate_capacity': ['blocktime_instability', 'block_weight_utilization_pct'],
+                  'demand_unchanged': ['tx_count_daily', 'unique_active_addresses'],
+                  'friction_unchanged': ['median_tx_fee_native'],
+              },
+              'impact': {
+                  'changed_days': int(eval_df['changed'].sum()),
+                  'changed_share': float(eval_df['changed'].mean()) if len(eval_df) else 0.0,
+                  'transitions': dict(sorted(transitions.items())),
+                  'current_label_counts': dict(sorted(current_counts.items())),
+                  'candidate_label_counts': dict(sorted(candidate_counts.items())),
+                  'changed_dates': changed_dates,
+                  'changed_streaks': [
+                      {'start': s[0], 'end': s[-1], 'days': len(s)} for s in streaks
+                  ],
+                  'max_changed_streak_days': max((len(s) for s in streaks), default=0),
+              },
+          }
+
+          Path('.pilot/btc-label-impact-90d.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+          out_df.to_csv('.pilot/btc-label-impact-90d.csv', index=False)
+          print(json.dumps(report, indent=2))
+
+          if len(eval_df) < 60:
+              raise SystemExit(f'Expected at least 60 evaluated days after warm-up; got {len(eval_df)}')
+          PY
+
+      - name: Assert production data untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed=$(git status --porcelain -- data/published data/calculated web-v1-app/.private-data api pipeline || true)
+          if [ -n "$changed" ]; then
+            echo "$changed"
+            exit 1
+          fi
+
+      - name: Upload label-impact report
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-label-impact-90d
+          path: |
+            .pilot/btc-label-impact-90d.json
+            .pilot/btc-label-impact-90d.csv
+          retention-days: 7
