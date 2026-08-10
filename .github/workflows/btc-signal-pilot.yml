@@ -14,9 +14,9 @@ permissions:
 jobs:
   pilot:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
-      PILOT_START: "2026-07-06"
+      PILOT_START: "2026-05-12"
       RAW_ROOT: "${{ github.workspace }}/.pilot/btc-raw"
       OUT_ROOT: "${{ github.workspace }}/.pilot/features_agg"
       REPORT_ROOT: "${{ github.workspace }}/.pilot/report"
@@ -98,8 +98,8 @@ jobs:
               day += timedelta(days=1)
 
           print(f"attempted_days={attempted} produced_days={produced}")
-          if produced < 30:
-              raise SystemExit(f"Pilot produced only {produced} days; need >=30 for informative-distribution evaluation")
+          if produced < 90:
+              raise SystemExit(f"Pilot produced only {produced} days; need 90 for the extended evaluation")
           PY
 
       - name: Build BTC candidate-signal report
@@ -158,9 +158,9 @@ jobs:
           (report_dir / "summary.json").write_text(json.dumps(summary, indent=2, default=str) + "\n", encoding="utf-8")
           print(json.dumps(summary, indent=2, default=str))
 
-          bad = [name for name, x in summary["candidates"].items() if x["non_null"] < 30]
+          bad = [name for name, x in summary["candidates"].items() if x["non_null"] < 90]
           if bad:
-              raise SystemExit("Insufficient >=30-day candidate coverage: " + ", ".join(bad))
+              raise SystemExit("Insufficient 90-day candidate coverage: " + ", ".join(bad))
           PY
 
       - name: Assert production data untouched
