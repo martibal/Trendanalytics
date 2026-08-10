@@ -1,0 +1,173 @@
+name: Ethereum Calldata Guard 180d
+
+on:
+  push:
+    branches:
+      - agent/ethereum-calldata-guard-180d
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Run bounded 180-day guarded corroboration audit
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import json
+          from collections import Counter
+          from dataclasses import replace
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as re
+
+          root = Path('data/published/v1/gold/ethereum')
+          files = sorted(root.glob('????-??-??.json'))[-180:]
+          rows = [json.loads(p.read_text(encoding='utf-8')) for p in files]
+          df = pd.DataFrame(rows).sort_values('date').reset_index(drop=True)
+
+          metric = 'nonempty_calldata_share'
+          core_metrics = ('tx_count_daily', 'unique_active_addresses')
+          for col in (*core_metrics, metric):
+              if col not in df.columns:
+                  raise SystemExit(f'missing {col}')
+
+          current_spec = re.PROFILE_SPECS['eth_l1']
+          combined_spec = replace(
+              current_spec,
+              demand_metrics=('tx_count_daily', 'unique_active_addresses', metric),
+          )
+
+          def run_with_spec(spec):
+              original = re.PROFILE_SPECS['eth_l1']
+              re.PROFILE_SPECS['eth_l1'] = spec
+              out = []
+              try:
+                  for i in range(len(df)):
+                      sub = df.iloc[:i+1].copy()
+                      day = str(sub.iloc[-1]['date'])
+                      r = re.compute_regime(
+                          sub,
+                          chain='ethereum',
+                          profile={'type':'eth_l1'},
+                          asof_date=day,
+                          confidence_score=1.0,
+                      )
+                      out.append(r)
+              finally:
+                  re.PROFILE_SPECS['eth_l1'] = original
+              return out
+
+          current = run_with_spec(current_spec)
+          combined = run_with_spec(combined_spec)
+
+          guarded = []
+          veto_dates = []
+          allowed_new_heating_dates = []
+
+          def sig_band(sig):
+              if not sig or not sig.get('informative', True):
+                  return 'NORMAL'
+              return re._band(float(sig.get('pct_90d', 50.0)), float(sig.get('z_robust', 0.0)), informative=True)
+
+          def sig_trend(sig):
+              if not sig:
+                  return 'FLAT'
+              return re._trend(float(sig.get('momentum_7d_vs_30d', 0.0)))
+
+          for cur, cand in zip(current, combined):
+              day = cand.get('asof_date')
+              label = cand.get('label')
+              if label == 'HEATING' and cur.get('label') != 'HEATING':
+                  signals = cand.get('signals') or {}
+                  core_high = any(
+                      sig_band(signals.get(m)) in {'HIGH', 'EXTREME_HIGH'}
+                      for m in core_metrics
+                  )
+                  calldata_heating = sig_trend(signals.get(metric)) == 'HEATING'
+                  if core_high and calldata_heating:
+                      allowed_new_heating_dates.append(day)
+                  else:
+                      label = cur.get('label')
+                      veto_dates.append(day)
+
+              copy = dict(cand)
+              copy['label'] = label
+              guarded.append(copy)
+
+          def labels(xs):
+              return dict(Counter(r.get('label') for r in xs))
+
+          def changed_dates(xs):
+              return [
+                  xs[i].get('asof_date')
+                  for i in range(len(xs))
+                  if xs[i].get('label') != current[i].get('label')
+              ]
+
+          def demand_state_changes(xs):
+              out = []
+              for i, r in enumerate(xs):
+                  a = ((r.get('axes') or {}).get('demand') or {})
+                  b = ((current[i].get('axes') or {}).get('demand') or {})
+                  key_a = (a.get('band_high'), a.get('band_low'), a.get('trend'))
+                  key_b = (b.get('band_high'), b.get('band_low'), b.get('trend'))
+                  if key_a != key_b:
+                      out.append(r.get('asof_date'))
+              return out
+
+          report = {
+              'date_range': [str(df.iloc[0]['date']), str(df.iloc[-1]['date'])],
+              'coverage': {
+                  'days': len(df),
+                  'nonempty_calldata_share_non_null': int(df[metric].notna().sum()),
+              },
+              'labels': {
+                  'current': labels(current),
+                  'naive_combined': labels(combined),
+                  'guarded': labels(guarded),
+              },
+              'label_changes_vs_current': {
+                  'naive_combined': changed_dates(combined),
+                  'guarded': changed_dates(guarded),
+              },
+              'demand_state_changes_vs_current': {
+                  'naive_combined': demand_state_changes(combined),
+                  'guarded': demand_state_changes(guarded),
+              },
+              'guard': {
+                  'rule': 'A new HEATING label from calldata is allowed only when at least one core Demand signal (tx_count_daily or unique_active_addresses) is HIGH/EXTREME_HIGH and calldata trend is HEATING.',
+                  'veto_dates': veto_dates,
+                  'allowed_new_heating_dates': allowed_new_heating_dates,
+              },
+              'calldata_driver_days_naive_combined': sum(
+                  1 for r in combined
+                  if metric in [d.get('metric') for d in (r.get('drivers') or [])]
+              ),
+          }
+
+          Path('ethereum-calldata-guard-180d.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True), encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-calldata-guard-180d
+          path: ethereum-calldata-guard-180d.json
+          retention-days: 7
