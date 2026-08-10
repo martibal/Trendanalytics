@@ -1,0 +1,138 @@
+name: Ethereum Demand Shortlist 180d
+
+on:
+  push:
+    branches:
+      - agent/ethereum-demand-shortlist-180d
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Run bounded 180-day shortlist
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import json
+          from collections import Counter
+          from dataclasses import replace
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as re
+
+          root = Path('data/published/v1/gold/ethereum')
+          files = sorted(root.glob('????-??-??.json'))[-180:]
+          rows = [json.loads(p.read_text(encoding='utf-8')) for p in files]
+          df = pd.DataFrame(rows).sort_values('date').reset_index(drop=True)
+
+          calldata = 'nonempty_calldata_share'
+          eip1559 = 'eip1559_type2_tx_share'
+          required = ['tx_count_daily', 'unique_active_addresses', calldata, eip1559]
+          missing_cols = [c for c in required if c not in df.columns]
+          if missing_cols:
+              raise SystemExit(f'missing columns: {missing_cols}')
+
+          base = re.PROFILE_SPECS['eth_l1']
+          specs = {
+              'current': base,
+              'calldata': replace(base, demand_metrics=('tx_count_daily', 'unique_active_addresses', calldata)),
+              'eip1559': replace(base, demand_metrics=('tx_count_daily', 'unique_active_addresses', eip1559)),
+              'calldata_eip1559': replace(base, demand_metrics=('tx_count_daily', 'unique_active_addresses', calldata, eip1559)),
+          }
+
+          def run_variant(spec):
+              original = re.PROFILE_SPECS['eth_l1']
+              re.PROFILE_SPECS['eth_l1'] = spec
+              out = []
+              try:
+                  for i in range(len(df)):
+                      sub = df.iloc[:i+1].copy()
+                      day = str(sub.iloc[-1]['date'])
+                      r = re.compute_regime(sub, chain='ethereum', profile={'type':'eth_l1'}, asof_date=day, confidence_score=1.0)
+                      axes = r.get('axes') or {}
+                      demand = axes.get('demand') or {}
+                      signals = r.get('signals') or {}
+                      drivers = [d.get('metric') for d in (r.get('drivers') or [])]
+                      out.append({
+                          'date': day,
+                          'label': r.get('label'),
+                          'demand_high': demand.get('band_high'),
+                          'demand_low': demand.get('band_low'),
+                          'demand_trend': demand.get('trend'),
+                          'drivers': drivers,
+                          'calldata_informative': bool((signals.get(calldata) or {}).get('informative')),
+                          'eip1559_informative': bool((signals.get(eip1559) or {}).get('informative')),
+                      })
+              finally:
+                  re.PROFILE_SPECS['eth_l1'] = original
+              return out
+
+          results = {k: run_variant(v) for k,v in specs.items()}
+          current = results['current']
+
+          report = {
+              'date_range': [str(df.iloc[0]['date']), str(df.iloc[-1]['date'])],
+              'coverage': {
+                  'days': len(df),
+                  'tx_count_daily_non_null': int(df['tx_count_daily'].notna().sum()),
+                  'unique_active_addresses_non_null': int(df['unique_active_addresses'].notna().sum()),
+                  'nonempty_calldata_share_non_null': int(df[calldata].notna().sum()),
+                  'eip1559_type2_tx_share_non_null': int(df[eip1559].notna().sum()),
+              },
+              'labels': {k: dict(Counter(r['label'] for r in v)) for k,v in results.items()},
+              'label_changes_vs_current': {},
+              'demand_state_changes_vs_current': {},
+              'driver_days': {},
+              'informative_days': {
+                  calldata: sum(1 for r in results['calldata_eip1559'] if r['calldata_informative']),
+                  eip1559: sum(1 for r in results['calldata_eip1559'] if r['eip1559_informative']),
+              },
+          }
+
+          for k in ('calldata','eip1559','calldata_eip1559'):
+              report['label_changes_vs_current'][k] = [
+                  r['date'] for i,r in enumerate(results[k]) if r['label'] != current[i]['label']
+              ]
+              report['demand_state_changes_vs_current'][k] = [
+                  r['date'] for i,r in enumerate(results[k])
+                  if (r['demand_high'], r['demand_low'], r['demand_trend']) !=
+                     (current[i]['demand_high'], current[i]['demand_low'], current[i]['demand_trend'])
+              ]
+              report['driver_days'][k] = {
+                  calldata: sum(1 for r in results[k] if calldata in r['drivers']),
+                  eip1559: sum(1 for r in results[k] if eip1559 in r['drivers']),
+              }
+
+          cset = set(report['label_changes_vs_current']['calldata'])
+          eset = set(report['label_changes_vs_current']['eip1559'])
+          bset = set(report['label_changes_vs_current']['calldata_eip1559'])
+          report['overlap'] = {
+              'calldata_and_eip1559': sorted(cset & eset),
+              'bundle_only': sorted(bset - cset - eset),
+              'bundle_union_overlap_count': len(bset & (cset | eset)),
+          }
+
+          Path('ethereum-demand-shortlist-180d.json').write_text(json.dumps(report, indent=2, sort_keys=True), encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-demand-shortlist-180d
+          path: ethereum-demand-shortlist-180d.json
+          retention-days: 7
