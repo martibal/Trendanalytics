@@ -58,6 +58,15 @@ const steps = [
     args: ["run", "check:pipeline-environment-parity"],
   },
   {
+    name: "Native unit publication sanity",
+    command: "python",
+    args: [
+      "../pipeline/tools/validate_native_units.py",
+      "--published-root",
+      "../data/published/v1",
+    ],
+  },
+  {
     name: "Publication integrity audit",
     command: "npm",
     args: ["run", "check:publication-integrity"],
