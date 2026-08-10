@@ -1,0 +1,225 @@
+name: L2 Confidence Audit
+
+on:
+  push:
+    branches:
+      - agent/l2-confidence-audit
+    paths:
+      - .github/workflows/l2-confidence-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r pipeline/requirements.txt
+
+      - name: Run 90-day L2 confidence side-by-side
+        run: |
+          mkdir -p reports
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import math
+          from copy import deepcopy
+          from pathlib import Path
+
+          import pandas as pd
+
+          import api.confidence_engine as ce
+          from api.main import (
+              CONFIDENCE_THRESHOLD,
+              PUBLISH_LAG_DAYS_POLICY,
+              _build_confidence_payload,
+              _compute_confidence_from_gold,
+              _load_gold_df,
+              _load_gold_status,
+              get_chain_profile,
+          )
+          from api.market_scorecard import compute_market_scorecard
+          from api.regime_engine import compute_regime, reconcile_regime_with_scorecard
+
+          CHAINS = ("arbitrum", "base")
+          DAYS = 90
+
+          def finite(v):
+              try:
+                  x = float(v)
+                  return x if math.isfinite(x) else None
+              except Exception:
+                  return None
+
+          def normalize(df: pd.DataFrame) -> pd.DataFrame:
+              d = df.copy()
+              if "date" not in d.columns and "day" in d.columns:
+                  d = d.rename(columns={"day": "date"})
+              d["date"] = pd.to_datetime(d["date"], errors="coerce").dt.date
+              return d.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+
+          def evaluate(slice_df: pd.DataFrame, chain: str, asof: str, gold_status: dict):
+              profile = get_chain_profile(chain)
+              data_quality_seed = _compute_confidence_from_gold(slice_df, chain=chain, gold_status=gold_status)
+              prelim_scorecard = compute_market_scorecard(
+                  slice_df,
+                  chain=chain,
+                  confidence_score=data_quality_seed,
+                  window_days=7,
+              )
+              prelim_scorecard = dict(prelim_scorecard)
+              prelim_scorecard["asof_date"] = asof
+              prelim_regime = compute_regime(
+                  slice_df,
+                  chain=chain,
+                  profile=profile,
+                  asof_date=asof,
+                  window_days=7,
+                  confidence_score=data_quality_seed,
+                  confidence_threshold=0.0,
+              )
+              prelim_regime = reconcile_regime_with_scorecard(prelim_regime, prelim_scorecard)
+              confidence = _build_confidence_payload(
+                  slice_df,
+                  chain=chain,
+                  gold_status=gold_status,
+                  scorecard=prelim_scorecard,
+                  regime=prelim_regime,
+                  asof_date=asof,
+              )
+              effective = finite(confidence.get("confidence_score"))
+              scorecard = compute_market_scorecard(
+                  slice_df,
+                  chain=chain,
+                  confidence_score=effective,
+                  window_days=7,
+              )
+              scorecard = dict(scorecard)
+              scorecard["asof_date"] = asof
+              regime = compute_regime(
+                  slice_df,
+                  chain=chain,
+                  profile=profile,
+                  asof_date=asof,
+                  window_days=7,
+                  confidence_score=effective,
+                  confidence_threshold=CONFIDENCE_THRESHOLD,
+              )
+              regime = reconcile_regime_with_scorecard(regime, scorecard)
+              return {
+                  "data_quality_score": finite(confidence.get("data_quality_score")),
+                  "label_confidence_score": finite(confidence.get("label_confidence_score")),
+                  "confidence_score": effective,
+                  "label": regime.get("label"),
+                  "required_metrics": ((confidence.get("components") or {}).get("required_metrics") or []),
+              }
+
+          original_profiles = deepcopy(ce.CHAIN_SIGNAL_PROFILES)
+          report = {
+              "window_days": DAYS,
+              "confidence_threshold": CONFIDENCE_THRESHOLD,
+              "chains": {},
+          }
+
+          for chain in CHAINS:
+              df = normalize(_load_gold_df(chain, "daily"))
+              if df.empty:
+                  raise SystemExit(f"no Gold history for {chain}")
+              dates = list(df["date"].drop_duplicates())[-DAYS:]
+              gs = _load_gold_status(chain)
+              rows = []
+
+              for day in dates:
+                  asof = day.isoformat()
+                  slice_df = df[df["date"] <= day].copy()
+
+                  ce.CHAIN_SIGNAL_PROFILES = deepcopy(original_profiles)
+                  current = evaluate(slice_df, chain, asof, gs)
+
+                  base_profile = original_profiles[chain]
+                  required = tuple(base_profile.required_for_confidence)
+                  if "capacity_util_pct" not in required:
+                      required = required + ("capacity_util_pct",)
+                  ce.CHAIN_SIGNAL_PROFILES = deepcopy(original_profiles)
+                  ce.CHAIN_SIGNAL_PROFILES[chain] = ce.ChainSignalProfile(
+                      required_for_confidence=required,
+                      structurally_not_applicable=base_profile.structurally_not_applicable,
+                      optional_not_penalized=base_profile.optional_not_penalized,
+                      notes=base_profile.notes + (
+                          "Audit candidate: capacity_util_pct is required because it drives the L2 Capacity regime axis.",
+                      ),
+                  )
+                  candidate = evaluate(slice_df, chain, asof, gs)
+
+                  gold_row = slice_df.iloc[-1]
+                  cap_present = "capacity_util_pct" in gold_row.index and pd.notna(gold_row.get("capacity_util_pct"))
+                  rows.append({
+                      "date": asof,
+                      "capacity_util_present": bool(cap_present),
+                      "current": current,
+                      "candidate": candidate,
+                      "delta_data_quality": None if current["data_quality_score"] is None or candidate["data_quality_score"] is None else candidate["data_quality_score"] - current["data_quality_score"],
+                      "delta_confidence": None if current["confidence_score"] is None or candidate["confidence_score"] is None else candidate["confidence_score"] - current["confidence_score"],
+                      "label_changed": current["label"] != candidate["label"],
+                      "eligibility_changed": ((current["confidence_score"] or 0.0) >= CONFIDENCE_THRESHOLD) != ((candidate["confidence_score"] or 0.0) >= CONFIDENCE_THRESHOLD),
+                  })
+
+              cap_missing = sum(1 for r in rows if not r["capacity_util_present"])
+              dq_changed = [r for r in rows if r["delta_data_quality"] not in (None, 0.0)]
+              conf_changed = [r for r in rows if r["delta_confidence"] not in (None, 0.0)]
+              label_changed = [r for r in rows if r["label_changed"]]
+              elig_changed = [r for r in rows if r["eligibility_changed"]]
+              current_full_dq_when_cap_missing = [
+                  r for r in rows
+                  if not r["capacity_util_present"] and finite(r["current"]["data_quality_score"]) == 1.0
+              ]
+
+              report["chains"][chain] = {
+                  "days": len(rows),
+                  "start": rows[0]["date"],
+                  "end": rows[-1]["date"],
+                  "capacity_util_missing_days": cap_missing,
+                  "current_dq_1_while_capacity_missing_days": len(current_full_dq_when_cap_missing),
+                  "data_quality_changed_days": len(dq_changed),
+                  "confidence_changed_days": len(conf_changed),
+                  "eligibility_changed_days": len(elig_changed),
+                  "label_changed_days": len(label_changed),
+                  "mean_delta_data_quality": (sum(r["delta_data_quality"] for r in dq_changed) / len(dq_changed)) if dq_changed else 0.0,
+                  "mean_delta_confidence": (sum(r["delta_confidence"] for r in conf_changed) / len(conf_changed)) if conf_changed else 0.0,
+                  "changed_dates": [r["date"] for r in label_changed],
+                  "eligibility_changed_dates": [r["date"] for r in elig_changed],
+                  "rows": rows,
+              }
+
+          ce.CHAIN_SIGNAL_PROFILES = original_profiles
+          out = Path("reports/l2-confidence-audit-90d.json")
+          out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+          summary = {
+              chain: {k: v for k, v in payload.items() if k != "rows"}
+              for chain, payload in report["chains"].items()
+          }
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-confidence-audit-90d
+          path: reports/l2-confidence-audit-90d.json
+          if-no-files-found: error
+          retention-days: 7
