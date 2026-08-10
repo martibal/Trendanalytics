@@ -1,0 +1,248 @@
+name: Ethereum Cross-Axis Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-cross-axis-audit
+    paths:
+      - ".github/workflows/ethereum-cross-axis-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas numpy
+
+      - name: Run bounded 180d cross-axis audit
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          import numpy as np
+          import pandas as pd
+          import api.regime_engine as engine
+
+          gold_root = Path("data/published/v1/gold/ethereum")
+          meta_root = Path("data/published/v1/meta/ethereum")
+          paths = sorted(gold_root.glob("????-??-??.json"))
+          if len(paths) < 180:
+              raise SystemExit(f"need >=180 Ethereum Gold days, got {len(paths)}")
+
+          rows = []
+          for p in paths:
+              obj = json.loads(p.read_text(encoding="utf-8"))
+              obj.setdefault("date", p.stem)
+              rows.append(obj)
+          df = pd.DataFrame(rows)
+          df["date"] = pd.to_datetime(df["date"], errors="coerce")
+          df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+
+          required = ["block_gas_utilization_p90", "median_block_base_fee_per_gas"]
+          missing = [m for m in required if m not in df.columns]
+          if missing:
+              raise SystemExit(f"missing candidate metrics: {missing}")
+
+          audit_dates = [d.date().isoformat() for d in df["date"].iloc[-180:]]
+          start_idx = len(df) - 180
+
+          base_spec = engine.PROFILE_SPECS["eth_l1"]
+          variants = {
+              "baseline": engine.ProfileSpec(
+                  profile_type="eth_l1",
+                  ruleset_id="eth_l1_v2",
+                  demand_metrics=base_spec.demand_metrics,
+                  friction_metrics=base_spec.friction_metrics,
+                  capacity_metrics=base_spec.capacity_metrics,
+              ),
+              "p90_capacity": engine.ProfileSpec(
+                  profile_type="eth_l1",
+                  ruleset_id="eth_l1_v2_audit_p90",
+                  demand_metrics=base_spec.demand_metrics,
+                  friction_metrics=base_spec.friction_metrics,
+                  capacity_metrics=base_spec.capacity_metrics + ("block_gas_utilization_p90",),
+              ),
+              "basefee_friction": engine.ProfileSpec(
+                  profile_type="eth_l1",
+                  ruleset_id="eth_l1_v2_audit_basefee",
+                  demand_metrics=base_spec.demand_metrics,
+                  friction_metrics=base_spec.friction_metrics + ("median_block_base_fee_per_gas",),
+                  capacity_metrics=base_spec.capacity_metrics,
+              ),
+              "both": engine.ProfileSpec(
+                  profile_type="eth_l1",
+                  ruleset_id="eth_l1_v2_audit_both",
+                  demand_metrics=base_spec.demand_metrics,
+                  friction_metrics=base_spec.friction_metrics + ("median_block_base_fee_per_gas",),
+                  capacity_metrics=base_spec.capacity_metrics + ("block_gas_utilization_p90",),
+              ),
+          }
+
+          labels = {k: {} for k in variants}
+          published = {}
+          both_signal_state = {}
+
+          try:
+              for i in range(start_idx, len(df)):
+                  day = df.loc[i, "date"].date().isoformat()
+                  sub = df.iloc[: i + 1].copy()
+                  meta_path = meta_root / f"{day}.json"
+                  confidence = None
+                  if meta_path.exists():
+                      meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                      published[day] = ((meta.get("regime") or {}).get("label"))
+                      confidence = (meta.get("confidence") or {}).get("confidence_score")
+
+                  for name, spec in variants.items():
+                      engine.PROFILE_SPECS["eth_l1"] = spec
+                      out = engine.compute_regime(
+                          sub,
+                          chain="ethereum",
+                          profile={"type": "eth_l1"},
+                          asof_date=day,
+                          confidence_score=confidence,
+                      )
+                      labels[name][day] = out.get("label")
+                      if name == "both":
+                          sigs = out.get("signals") or {}
+                          state = {}
+                          for metric in required:
+                              sig = sigs.get(metric) or {}
+                              informative = bool(sig.get("informative", False))
+                              pct = float(sig.get("pct_90d", 50.0) or 50.0)
+                              z = float(sig.get("z_robust", 0.0) or 0.0)
+                              mom = float(sig.get("momentum_7d_vs_30d", 0.0) or 0.0)
+                              band = engine._band(pct, z, informative=informative)
+                              trend = engine._trend(mom)
+                              state[metric] = {
+                                  "informative": informative,
+                                  "band": band,
+                                  "trend": trend,
+                                  "pct_90d": pct,
+                                  "z_robust": z,
+                                  "momentum": mom,
+                              }
+                          both_signal_state[day] = state
+          finally:
+              engine.PROFILE_SPECS["eth_l1"] = base_spec
+
+          base = labels["baseline"]
+          def changes(name):
+              return [
+                  {"date": d, "baseline": base[d], "candidate": labels[name][d]}
+                  for d in audit_dates
+                  if labels[name][d] != base[d]
+              ]
+
+          p90_changes = changes("p90_capacity")
+          basefee_changes = changes("basefee_friction")
+          both_changes = changes("both")
+
+          p90_days = {x["date"] for x in p90_changes}
+          basefee_days = {x["date"] for x in basefee_changes}
+          both_days = {x["date"] for x in both_changes}
+
+          window = df.iloc[-180:].copy()
+          a = pd.to_numeric(window["block_gas_utilization_p90"], errors="coerce")
+          b = pd.to_numeric(window["median_block_base_fee_per_gas"], errors="coerce")
+          common = pd.DataFrame({"a": a, "b": b}).dropna()
+          spearman = None
+          if len(common) >= 2:
+              spearman = float(common["a"].rank(method="average").corr(common["b"].rank(method="average")))
+
+          simultaneous_informative = []
+          simultaneous_high = []
+          p90_high = []
+          basefee_high = []
+          for d in audit_dates:
+              st = both_signal_state.get(d, {})
+              ps = st.get("block_gas_utilization_p90", {})
+              bs = st.get("median_block_base_fee_per_gas", {})
+              if ps.get("informative") and bs.get("informative"):
+                  simultaneous_informative.append(d)
+              if ps.get("band") in ("HIGH", "EXTREME_HIGH"):
+                  p90_high.append(d)
+              if bs.get("band") in ("HIGH", "EXTREME_HIGH"):
+                  basefee_high.append(d)
+              if ps.get("band") in ("HIGH", "EXTREME_HIGH") and bs.get("band") in ("HIGH", "EXTREME_HIGH"):
+                  simultaneous_high.append(d)
+
+          baseline_vs_published = [
+              {"date": d, "published": published.get(d), "computed_baseline": base[d]}
+              for d in audit_dates
+              if published.get(d) is not None and published.get(d) != base[d]
+          ]
+
+          report = {
+              "scope": {
+                  "start": audit_dates[0],
+                  "end": audit_dates[-1],
+                  "days": len(audit_dates),
+                  "gold_days_total": len(df),
+                  "common_raw_metric_days": len(common),
+              },
+              "raw_metric_overlap": {
+                  "spearman_rank_correlation": spearman,
+                  "simultaneous_informative_days": len(simultaneous_informative),
+                  "p90_high_days": len(p90_high),
+                  "basefee_high_days": len(basefee_high),
+                  "simultaneous_high_days": len(simultaneous_high),
+                  "simultaneous_high_dates": simultaneous_high,
+              },
+              "label_effect": {
+                  "baseline_counts": dict(Counter(base.values())),
+                  "p90_capacity_change_count": len(p90_changes),
+                  "basefee_friction_change_count": len(basefee_changes),
+                  "both_change_count": len(both_changes),
+                  "p90_capacity_changes": p90_changes,
+                  "basefee_friction_changes": basefee_changes,
+                  "both_changes": both_changes,
+                  "p90_only_change_dates": sorted(p90_days - basefee_days),
+                  "basefee_only_change_dates": sorted(basefee_days - p90_days),
+                  "single_variant_overlap_dates": sorted(p90_days & basefee_days),
+                  "both_only_incremental_dates": sorted(both_days - (p90_days | basefee_days)),
+                  "both_missing_single_variant_dates": sorted((p90_days | basefee_days) - both_days),
+              },
+              "baseline_alignment": {
+                  "published_compared_days": sum(1 for d in audit_dates if published.get(d) is not None),
+                  "mismatch_count": len(baseline_vs_published),
+                  "mismatches": baseline_vs_published,
+              },
+              "interpretation_guardrails": [
+                  "Observational audit only; no production profile is changed.",
+                  "Candidate effects are measured against the same computed eth_l1_v2 baseline and historical confidence gate.",
+                  "Calldata corroboration remains enabled identically in every variant.",
+                  "A high correlation or overlapping high-state days is evidence of possible redundancy, not proof of causal double-counting.",
+              ],
+          }
+
+          Path("ethereum-cross-axis-audit.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-cross-axis-audit
+          path: ethereum-cross-axis-audit.json
+          if-no-files-found: error
+          retention-days: 7
