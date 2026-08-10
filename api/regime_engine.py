@@ -288,10 +288,10 @@ PROFILE_SPECS: Dict[str, ProfileSpec] = {
     ),
     "btc": ProfileSpec(
         profile_type="btc",
-        ruleset_id="btc_v1",
+        ruleset_id="btc_v2",
         demand_metrics=("tx_count_daily", "unique_active_addresses"),
         friction_metrics=("median_tx_fee_native",),
-        capacity_metrics=(),
+        capacity_metrics=("block_weight_utilization_pct",),
     ),
 }
 
@@ -301,6 +301,7 @@ SIGNAL_ALIASES_BY_PROFILE: Dict[str, Dict[str, str]] = {
         "tx_count": "tx_count_daily",
         # IMPORTANT: map scorecard instability component to a matching instability signal (not raw bt)
         "blocktime_instability": "blocktime_instability",
+        "block_weight_utilization": "block_weight_utilization_pct",
         "fee_burden_proxy": "median_tx_fee_native",
     },
     "eth_l1": {
@@ -512,7 +513,18 @@ def compute_regime(
     capacity_extreme = is_extreme_high(ax_c["band_high"]) and int(ax_c.get("informative_count", 0)) > 0
 
     label = "STABLE"
-    if (friction_high and capacity_high) or (capacity_extreme and ax_c["trend"] == "HEATING"):
+    if spec.profile_type == "btc":
+        # BTC cheap-veto semantics: high blockspace use can veto CHEAP, but
+        # CONGESTED still requires simultaneous Friction and Capacity pressure.
+        if friction_high and capacity_high:
+            label = "CONGESTED"
+        elif friction_low and not capacity_high:
+            label = "CHEAP"
+        elif demand_high and ax_d["trend"] == "HEATING":
+            label = "HEATING"
+        else:
+            label = "STABLE"
+    elif (friction_high and capacity_high) or (capacity_extreme and ax_c["trend"] == "HEATING"):
         label = "CONGESTED"
     elif friction_low and (capacity_low or not capacity_high):
         label = "CHEAP"

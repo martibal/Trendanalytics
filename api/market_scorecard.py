@@ -30,10 +30,11 @@ PROFILE_COMPONENTS: Dict[str, Dict[str, List[Tuple[str, float, str]]]] = {
         "friction": [
             ("median_tx_fee_native", 1.0, "log1p"),
         ],
-        # BTC has no EVM capacity utilisation semantics in this product layer.
-        # Block-time instability remains visible as a component only when present,
-        # but is not required for a friction/cheap label to be explainable.
+        # BTC capacity combines direct blockspace occupancy with block-time
+        # instability. High block weight is descriptive capacity pressure and can
+        # veto CHEAP, while CONGESTED still requires simultaneous Friction pressure.
         "capacity": [
+            ("block_weight_utilization_pct", 1.0, "none"),
             ("blocktime_instability", 0.7, "instability"),
         ],
     },
