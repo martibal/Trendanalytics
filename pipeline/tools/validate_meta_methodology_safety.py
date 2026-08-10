@@ -22,6 +22,9 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 
 LABELS = {"STABLE", "HEATING", "CONGESTED", "CHEAP", "UNKNOWN/DEGRADED"}
+REQUIRED_RULESET_BY_CHAIN = {
+    "ethereum": "eth_l1_v2",
+}
 
 
 def _repo_root_from_here() -> Path:
@@ -213,6 +216,7 @@ def main() -> int:
         raise SystemExit(f"META root not found: {meta_root}")
 
     counts: Counter[str] = Counter()
+    ruleset_counts: Counter[str] = Counter()
     errors: List[str] = []
     total = 0
     adjusted = 0
@@ -226,7 +230,20 @@ def main() -> int:
             continue
         label = _label(obj)
         counts[label] += 1
-        sanity = ((obj.get("regime") or {}).get("sanity") or {})
+        regime = obj.get("regime") or {}
+        ruleset_id = str(regime.get("ruleset_id") or "")
+        ruleset_counts[f"{path.parent.name}:{ruleset_id or 'missing'}"] += 1
+
+        expected_ruleset = REQUIRED_RULESET_BY_CHAIN.get(path.parent.name)
+        if expected_ruleset and ruleset_id != expected_ruleset:
+            errors.append(
+                f"{path.parent.name}/{path.name}: {_date(obj, path.stem)} "
+                f"ruleset_id={ruleset_id!r}, expected {expected_ruleset!r}"
+            )
+            if len(errors) >= int(args.max_errors):
+                break
+
+        sanity = (regime.get("sanity") or {})
         if sanity.get("adjusted") is True:
             adjusted += 1
         basis_counts[str(sanity.get("support_basis") or "n/a")] += 1
@@ -246,6 +263,7 @@ def main() -> int:
     print(f"[validate_meta_methodology_safety] meta_root={meta_root}")
     print(f"[validate_meta_methodology_safety] checked={total}")
     print(f"[validate_meta_methodology_safety] label_counts={dict(counts)}")
+    print(f"[validate_meta_methodology_safety] ruleset_counts={dict(ruleset_counts)}")
     print(f"[validate_meta_methodology_safety] sanity_adjusted={adjusted}")
     print(f"[validate_meta_methodology_safety] support_basis_counts={dict(basis_counts)}")
 
