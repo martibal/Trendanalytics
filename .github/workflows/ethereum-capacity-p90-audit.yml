@@ -1,0 +1,162 @@
+name: Ethereum Capacity p90 Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-capacity-p90-audit
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r pipeline/requirements.txt
+
+      - name: Run bounded 90-day side-by-side
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import re
+          from collections import Counter
+          from pathlib import Path
+
+          import pandas as pd
+
+          import api.regime_engine as re_engine
+
+          root = Path("data/published/v1/gold/ethereum")
+          day_re = re.compile(r"^\d{4}-\d{2}-\d{2}\.json$")
+          paths = sorted(p for p in root.glob("*.json") if day_re.match(p.name))
+          if len(paths) < 180:
+              raise SystemExit(f"Need >=180 Ethereum Gold dayfiles, found {len(paths)}")
+
+          rows = [json.loads(p.read_text(encoding="utf-8")) for p in paths]
+          df = pd.DataFrame(rows)
+          df["date"] = pd.to_datetime(df["date"], errors="raise")
+          df = df.sort_values("date").reset_index(drop=True)
+
+          audit_dates = list(df["date"].iloc[-90:])
+          coverage = {
+              "days": 90,
+              "gas_utilization_pct_non_null": int(df.iloc[-90:]["gas_utilization_pct"].notna().sum()),
+              "block_gas_utilization_p90_non_null": int(df.iloc[-90:]["block_gas_utilization_p90"].notna().sum()),
+          }
+
+          variants = {
+              "current": ("gas_utilization_pct",),
+              "p90_replace": ("block_gas_utilization_p90",),
+              "combined": ("gas_utilization_pct", "block_gas_utilization_p90"),
+          }
+
+          original = re_engine.PROFILE_SPECS["eth_l1"]
+          results = {name: [] for name in variants}
+
+          try:
+              for dt in audit_dates:
+                  hist = df[df["date"] <= dt].copy()
+                  asof = dt.date().isoformat()
+                  for name, capacity_metrics in variants.items():
+                      re_engine.PROFILE_SPECS["eth_l1"] = re_engine.ProfileSpec(
+                          profile_type=original.profile_type,
+                          ruleset_id=f"eth_l1_audit_{name}",
+                          demand_metrics=original.demand_metrics,
+                          friction_metrics=original.friction_metrics,
+                          capacity_metrics=capacity_metrics,
+                      )
+                      out = re_engine.compute_regime(
+                          hist,
+                          chain="ethereum",
+                          profile={"type": "eth_l1"},
+                          asof_date=asof,
+                          window_days=7,
+                          confidence_score=1.0,
+                          confidence_threshold=0.40,
+                      )
+                      cap = out["axes"]["capacity"]
+                      signals = out.get("signals") or {}
+                      results[name].append({
+                          "date": asof,
+                          "label": out["label"],
+                          "capacity_high": cap["band_high"],
+                          "capacity_low": cap["band_low"],
+                          "capacity_trend": cap["trend"],
+                          "capacity_informative_count": cap["informative_count"],
+                          "gas_band": next((d.get("band") for d in out.get("drivers", []) if d.get("metric") == "gas_utilization_pct"), None),
+                          "p90_signal": signals.get("block_gas_utilization_p90"),
+                          "gas_signal": signals.get("gas_utilization_pct"),
+                          "drivers": [d.get("metric") for d in out.get("drivers", [])],
+                      })
+          finally:
+              re_engine.PROFILE_SPECS["eth_l1"] = original
+
+          def diff_dates(a, b, key):
+              return [x["date"] for x, y in zip(results[a], results[b]) if x[key] != y[key]]
+
+          report = {
+              "coverage": coverage,
+              "date_range": [audit_dates[0].date().isoformat(), audit_dates[-1].date().isoformat()],
+              "labels": {k: dict(Counter(x["label"] for x in v)) for k, v in results.items()},
+              "capacity_high": {k: dict(Counter(x["capacity_high"] for x in v)) for k, v in results.items()},
+              "label_changes_vs_current": {
+                  "p90_replace": diff_dates("current", "p90_replace", "label"),
+                  "combined": diff_dates("current", "combined", "label"),
+              },
+              "capacity_band_changes_vs_current": {
+                  "p90_replace": diff_dates("current", "p90_replace", "capacity_high"),
+                  "combined": diff_dates("current", "combined", "capacity_high"),
+              },
+              "p90_informative_days": sum(
+                  1 for x in results["combined"]
+                  if (x.get("p90_signal") or {}).get("informative") is True
+              ),
+              "p90_driver_days_combined": sum(
+                  1 for x in results["combined"] if "block_gas_utilization_p90" in x["drivers"]
+              ),
+              "rows": results,
+          }
+
+          out_dir = Path(".audit")
+          out_dir.mkdir(exist_ok=True)
+          (out_dir / "ethereum-capacity-p90-90d.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True), encoding="utf-8"
+          )
+
+          summary = {
+              "date_range": report["date_range"],
+              "coverage": coverage,
+              "labels": report["labels"],
+              "capacity_high": report["capacity_high"],
+              "label_change_counts_vs_current": {
+                  k: len(v) for k, v in report["label_changes_vs_current"].items()
+              },
+              "capacity_band_change_counts_vs_current": {
+                  k: len(v) for k, v in report["capacity_band_changes_vs_current"].items()
+              },
+              "p90_informative_days": report["p90_informative_days"],
+              "p90_driver_days_combined": report["p90_driver_days_combined"],
+          }
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-capacity-p90-90d
+          path: .audit/ethereum-capacity-p90-90d.json
+          retention-days: 7
