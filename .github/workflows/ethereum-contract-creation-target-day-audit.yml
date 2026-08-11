@@ -1,0 +1,117 @@
+name: Ethereum Contract Creation Target-Day Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-contract-creation-target-day-audit
+    paths:
+      - .github/workflows/ethereum-contract-creation-target-day-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ethereum-contract-creation-target-day-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install pandas numpy
+      - name: Run target-day semantic audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          target='2026-05-13'
+          start='2026-05-09'
+          end='2026-05-17'
+          gold_root=Path('data/published/v1/gold/ethereum')
+          meta_root=Path('data/published/v1/meta/ethereum')
+          gold_paths=sorted(gold_root.glob('????-??-??.json'))
+          meta_paths=sorted(meta_root.glob('????-??-??.json'))
+          if not gold_paths or len(gold_paths)!=len(meta_paths) or gold_paths[-1].stem!=meta_paths[-1].stem:
+              raise SystemExit(f'Gold/META parity failure gold={len(gold_paths)} meta={len(meta_paths)}')
+
+          rows=[]
+          for p in gold_paths:
+              obj=json.loads(p.read_text(encoding='utf-8'))
+              obj.setdefault('date',p.stem)
+              rows.append(obj)
+          df=pd.DataFrame(rows)
+          df['date']=pd.to_datetime(df['date'],errors='coerce')
+          df=df.dropna(subset=['date']).sort_values('date').reset_index(drop=True)
+
+          out=[]
+          for i in range(len(df)):
+              day=df.loc[i,'date'].date().isoformat()
+              if day<start or day>end:
+                  continue
+              meta=json.loads((meta_root/f'{day}.json').read_text(encoding='utf-8'))
+              regime=meta.get('regime') or {}
+              if regime.get('ruleset_id')!='eth_l1_v2':
+                  raise SystemExit(f'unexpected ruleset on {day}: {regime.get("ruleset_id")}')
+              confidence=(meta.get('confidence') or {}).get('confidence_score')
+              hist=df.iloc[:i+1].copy()
+              ev=engine.compute_regime(hist,chain='ethereum',profile={'type':'eth_l1'},asof_date=day,confidence_score=confidence)
+              sig=engine._signal_for_metric(hist,'contract_creation_tx_share')
+              demand=((ev.get('axes') or {}).get('demand') or {})
+              core_sigs={}
+              for metric,s in (ev.get('signals') or {}).items():
+                  if s.get('axis')=='demand':
+                      core_sigs[metric]={k:s.get(k) for k in ('current','pct_90d','z_robust','momentum_7d_vs_30d','trend','informative')}
+              out.append({
+                  'date':day,
+                  'target':day==target,
+                  'published_label':regime.get('label'),
+                  'recomputed_label':ev.get('label'),
+                  'confidence':confidence,
+                  'demand_axis':demand,
+                  'core_demand_signals':core_sigs,
+                  'contract_creation_tx_share':sig,
+                  'drivers':regime.get('drivers'),
+                  'scorecard_demand':((meta.get('scorecard') or {}).get('dimensions') or {}).get('demand'),
+              })
+
+          target_rows=[r for r in out if r['target']]
+          if len(target_rows)!=1:
+              raise SystemExit(f'expected one target row, got {len(target_rows)}')
+          r=target_rows[0]
+          sig=r['contract_creation_tx_share'] or {}
+          pct=float(sig.get('pct_90d',50))
+          z=float(sig.get('z_robust',0))
+          mom=float(sig.get('momentum_7d_vs_30d',0))
+          if not (r['published_label']=='STABLE' and str(r['demand_axis'].get('band_high')) in ('HIGH','EXTREME_HIGH') and pct>=80 and z>=1.5 and engine._trend(mom)=='HEATING'):
+              raise SystemExit('target no longer satisfies corroboration rule')
+
+          report={
+              'scope':{'start':start,'end':end,'days':len(out),'history_days':len(gold_paths),'latest':gold_paths[-1].stem},
+              'target_date':target,
+              'question':'Does contract_creation_tx_share identify a genuinely missed HEATING day on 2026-05-13, or only transaction-composition variation?',
+              'rows':out,
+              'counterfactual':{'date':target,'from':'STABLE','to':'HEATING'},
+              'guardrails':['Observational only; no production files modified.','Published label is baseline.','Target must still satisfy strict pct+z+HEATING corroboration rule.'],
+          }
+          Path('ethereum-contract-creation-target-day-audit.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print(json.dumps(report,indent=2,sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-contract-creation-target-day-audit
+          path: ethereum-contract-creation-target-day-audit.json
+          if-no-files-found: error
+          retention-days: 7
