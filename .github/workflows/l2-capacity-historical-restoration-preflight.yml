@@ -1,0 +1,158 @@
+name: L2 Capacity Historical Restoration Preflight
+
+on:
+  push:
+    branches: [agent/l2-capacity-historical-restoration-preflight]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install pandas numpy
+      - name: Run historical restoration preflight
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          source_commit = 'fb3b81f4e3f24e6fb271fcaaaf3a3eb298d00fcc'
+          report = {
+              'source_commit': source_commit,
+              'chains': {},
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Capacity fields are restored in memory from the exact canonical backfill commit.',
+                  'Published META label and confidence_score remain the frozen comparison baseline.',
+                  'No new methodology is introduced; recompute uses current l2_v1 engine.',
+              ],
+          }
+
+          def git_show(path):
+              try:
+                  return subprocess.check_output(
+                      ['git', 'show', f'{source_commit}:{path}'], text=True, stderr=subprocess.DEVNULL
+                  )
+              except subprocess.CalledProcessError:
+                  return None
+
+          source_fields = {
+              'arbitrum': ('capacity_util_pct', 'arbitrum_l1_gas_used_daily'),
+              'base': ('capacity_util_pct', 'base_l1_gas_used_daily', 'base_blob_gas_used_daily'),
+          }
+
+          for chain, fields in source_fields.items():
+              gold_root = Path('data/published/v1/gold') / chain
+              meta_root = Path('data/published/v1/meta') / chain
+              gold_paths = sorted(gold_root.glob('????-??-??.json'))
+              meta_paths = sorted(meta_root.glob('????-??-??.json'))
+              if not gold_paths or len(gold_paths) != len(meta_paths):
+                  raise SystemExit(f'{chain}: Gold/META parity failure gold={len(gold_paths)} meta={len(meta_paths)}')
+
+              rows = []
+              source_days = 0
+              restored_days = []
+              conflicts = []
+
+              for p in gold_paths:
+                  obj = json.loads(p.read_text(encoding='utf-8'))
+                  obj.setdefault('date', p.stem)
+                  source_text = git_show(f'data/published/v1/gold/{chain}/{p.name}')
+                  source_obj = json.loads(source_text) if source_text else {}
+                  if source_obj.get('capacity_util_pct') is not None:
+                      source_days += 1
+
+                  changed = False
+                  for field in fields:
+                      sv = source_obj.get(field)
+                      cv = obj.get(field)
+                      if sv is None:
+                          continue
+                      if cv is None:
+                          obj[field] = sv
+                          changed = True
+                      elif cv != sv:
+                          conflicts.append({'date': p.stem, 'field': field, 'current': cv, 'source': sv})
+                  if changed:
+                      restored_days.append(p.stem)
+                  rows.append(obj)
+
+              df = pd.DataFrame(rows)
+              df['date'] = pd.to_datetime(df['date'], errors='coerce')
+              df = df.dropna(subset=['date']).sort_values('date').reset_index(drop=True)
+
+              published_counts = Counter()
+              recomputed_counts = Counter()
+              transitions = Counter()
+              mismatches = []
+
+              for i in range(len(df)):
+                  day = df.loc[i, 'date'].date().isoformat()
+                  meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+                  regime = meta.get('regime') or {}
+                  published = regime.get('label')
+                  confidence = (meta.get('confidence') or {}).get('confidence_score')
+                  ev = engine.compute_regime(
+                      df.iloc[:i+1].copy(),
+                      chain=chain,
+                      profile={'type': 'l2'},
+                      asof_date=day,
+                      confidence_score=confidence,
+                  )
+                  recomputed = ev.get('label')
+                  published_counts[published] += 1
+                  recomputed_counts[recomputed] += 1
+                  if published != recomputed:
+                      transitions[f'{published}->{recomputed}'] += 1
+                      mismatches.append({
+                          'date': day,
+                          'published': published,
+                          'recomputed': recomputed,
+                          'confidence': confidence,
+                          'capacity_axis': (ev.get('axes') or {}).get('capacity'),
+                      })
+
+              report['chains'][chain] = {
+                  'days': len(gold_paths),
+                  'source_capacity_days': source_days,
+                  'restored_missing_capacity_days': len(restored_days),
+                  'restored_first': restored_days[:10],
+                  'restored_last': restored_days[-10:],
+                  'non_null_source_vs_current_conflicts': len(conflicts),
+                  'conflicts_first': conflicts[:10],
+                  'published_label_counts': dict(published_counts),
+                  'recomputed_label_counts': dict(recomputed_counts),
+                  'mismatch_count': len(mismatches),
+                  'transition_counts': dict(transitions),
+                  'mismatches_first': mismatches[:20],
+              }
+
+          Path('l2-capacity-historical-restoration-preflight.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-capacity-historical-restoration-preflight
+          path: l2-capacity-historical-restoration-preflight.json
+          if-no-files-found: error
+          retention-days: 7
