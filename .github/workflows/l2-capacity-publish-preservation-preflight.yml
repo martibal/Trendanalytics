@@ -1,0 +1,98 @@
+name: L2 Capacity Publish Preservation Preflight
+
+on:
+  push:
+    branches: [agent/l2-capacity-publish-preservation-preflight]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run preservation preflight
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = {'chains': {}, 'guardrails': [
+              'Observational only; no production files modified.',
+              'Canonical published Gold is the baseline.',
+              'Simulation preserves only existing canonical L2 capacity fields when calculated staging omits them.',
+              'No historical backfill or recomputation is performed.',
+          ]}
+
+          fields = {
+              'arbitrum': ('capacity_util_pct', 'arbitrum_l1_gas_used_daily'),
+              'base': ('capacity_util_pct', 'base_l1_gas_used_daily', 'base_blob_gas_used_daily'),
+          }
+
+          for chain, preserve_fields in fields.items():
+              pub_root = Path('data/published/v1/gold') / chain
+              calc_root = Path('data/calculated/gold_json') / chain
+              at_risk = []
+              conflicting = []
+              preserved = []
+              calc_days = 0
+              canonical_capacity_days = 0
+
+              for pub_path in sorted(pub_root.glob('????-??-??.json')):
+                  day = pub_path.stem
+                  pub = json.loads(pub_path.read_text(encoding='utf-8'))
+                  if pub.get('capacity_util_pct') is not None:
+                      canonical_capacity_days += 1
+                  calc_path = calc_root / pub_path.name
+                  if not calc_path.exists():
+                      continue
+                  calc_days += 1
+                  calc = json.loads(calc_path.read_text(encoding='utf-8'))
+
+                  if pub.get('capacity_util_pct') is not None and calc.get('capacity_util_pct') is None:
+                      at_risk.append(day)
+
+                  for field in preserve_fields:
+                      pv = pub.get(field)
+                      cv = calc.get(field)
+                      if pv is not None and cv is not None and pv != cv:
+                          conflicting.append({'date': day, 'field': field, 'canonical': pv, 'calculated': cv})
+
+                  merged = dict(calc)
+                  for field in preserve_fields:
+                      if merged.get(field) is None and pub.get(field) is not None:
+                          merged[field] = pub.get(field)
+                  if pub.get('capacity_util_pct') is not None and merged.get('capacity_util_pct') == pub.get('capacity_util_pct'):
+                      preserved.append(day)
+
+              report['chains'][chain] = {
+                  'canonical_capacity_days': canonical_capacity_days,
+                  'calculated_day_files_overlapping_canonical': calc_days,
+                  'capacity_days_at_risk_on_plain_publish': len(at_risk),
+                  'at_risk_first': at_risk[:10],
+                  'at_risk_last': at_risk[-10:],
+                  'non_null_conflicts_count': len(conflicting),
+                  'non_null_conflicts_first': conflicting[:10],
+                  'capacity_days_preserved_by_fill_missing_only': len(preserved),
+              }
+
+          Path('l2-capacity-publish-preservation-preflight.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-capacity-publish-preservation-preflight
+          path: l2-capacity-publish-preservation-preflight.json
+          if-no-files-found: error
+          retention-days: 7
