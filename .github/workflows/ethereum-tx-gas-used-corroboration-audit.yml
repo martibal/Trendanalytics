@@ -1,0 +1,152 @@
+name: Ethereum Tx Gas Used Corroboration Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-tx-gas-used-corroboration-audit
+    paths:
+      - .github/workflows/ethereum-tx-gas-used-corroboration-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ethereum-tx-gas-used-corroboration-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas numpy
+
+      - name: Run full-history corroboration audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          gold_root = Path('data/published/v1/gold/ethereum')
+          meta_root = Path('data/published/v1/meta/ethereum')
+          gold_paths = sorted(gold_root.glob('????-??-??.json'))
+          meta_paths = sorted(meta_root.glob('????-??-??.json'))
+          if not gold_paths or len(gold_paths) != len(meta_paths):
+              raise SystemExit(f'Gold/META parity failure: gold={len(gold_paths)} meta={len(meta_paths)}')
+          if gold_paths[-1].stem != meta_paths[-1].stem:
+              raise SystemExit(f'latest date mismatch: gold={gold_paths[-1].stem} meta={meta_paths[-1].stem}')
+
+          rows = []
+          for p in gold_paths:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              obj.setdefault('date', p.stem)
+              rows.append(obj)
+          df = pd.DataFrame(rows)
+          df['date'] = pd.to_datetime(df['date'], errors='coerce')
+          df = df.dropna(subset=['date']).sort_values('date').reset_index(drop=True)
+
+          rulesets = Counter()
+          informative_days = 0
+          consensus_days = 0
+          eligible_stable_days = 0
+          changes = []
+
+          for i in range(len(df)):
+              day = df.loc[i, 'date'].date().isoformat()
+              meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+              regime = meta.get('regime') or {}
+              rulesets[regime.get('ruleset_id')] += 1
+              if regime.get('ruleset_id') != 'eth_l1_v2':
+                  raise SystemExit(f'unexpected ruleset on {day}: {regime.get("ruleset_id")}')
+
+              confidence = (meta.get('confidence') or {}).get('confidence_score')
+              ev = engine.compute_regime(
+                  df.iloc[:i+1].copy(),
+                  chain='ethereum',
+                  profile={'type': 'eth_l1'},
+                  asof_date=day,
+                  confidence_score=confidence,
+              )
+              demand = ((ev.get('axes') or {}).get('demand') or {})
+              core_demand_high = str(demand.get('band_high', 'NORMAL')) in ('HIGH', 'EXTREME_HIGH')
+
+              sig = engine._signal_for_metric(df.iloc[:i+1].copy(), 'median_tx_gas_used')
+              if not sig or not bool(sig.get('informative', False)):
+                  continue
+              informative_days += 1
+              pct = float(sig.get('pct_90d', 50.0))
+              z = float(sig.get('z_robust', 0.0))
+              mom = float(sig.get('momentum_7d_vs_30d', 0.0))
+              trend = engine._trend(mom)
+              consensus = pct >= 80.0 and z >= 1.5 and trend == 'HEATING'
+              if consensus:
+                  consensus_days += 1
+
+              published = regime.get('label')
+              eligible = published == 'STABLE' and core_demand_high and consensus
+              if eligible:
+                  eligible_stable_days += 1
+                  changes.append({
+                      'date': day,
+                      'from': 'STABLE',
+                      'to': 'HEATING',
+                      'confidence': confidence,
+                      'core_demand_band_high': demand.get('band_high'),
+                      'core_demand_band_low': demand.get('band_low'),
+                      'core_demand_trend': demand.get('trend'),
+                      'pct_90d': pct,
+                      'z_robust': z,
+                      'momentum_7d_vs_30d': mom,
+                      'trend': trend,
+                  })
+
+          report = {
+              'scope': {
+                  'start': gold_paths[0].stem,
+                  'end': gold_paths[-1].stem,
+                  'days': len(gold_paths),
+              },
+              'baseline': 'published META regime.label',
+              'rulesets': dict(rulesets),
+              'candidate_metric': 'median_tx_gas_used',
+              'candidate_role': 'supplemental Demand corroborator only',
+              'rule': 'Only published STABLE may become HEATING when core Demand is already HIGH/EXTREME_HIGH and median_tx_gas_used is informative with pct_90d>=80 AND z_robust>=1.5 AND trend=HEATING; every other published label is frozen.',
+              'informative_days': informative_days,
+              'consensus_days': consensus_days,
+              'change_count': len(changes),
+              'transition_counts': {'STABLE->HEATING': len(changes)},
+              'changes': changes,
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Published labels are the immutable baseline.',
+                  'Existing CHEAP, CONGESTED, HEATING and UNKNOWN/DEGRADED labels are never rewritten.',
+                  'Candidate cannot make core Demand high by itself.',
+                  'Candidate requires percentile + robust-z consensus and HEATING momentum.',
+              ],
+          }
+          Path('ethereum-tx-gas-used-corroboration-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-tx-gas-used-corroboration-audit
+          path: ethereum-tx-gas-used-corroboration-audit.json
+          if-no-files-found: error
+          retention-days: 7
