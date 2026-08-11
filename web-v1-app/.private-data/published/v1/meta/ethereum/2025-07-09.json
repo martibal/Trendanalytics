@@ -330,169 +330,98 @@
   },
   "publish_lag_days_policy": 1,
   "regime": {
-    "chain": "ethereum",
-    "missing": false,
-    "label": "CHEAP",
     "asof_date": "2025-07-09",
-    "window_days": 7,
-    "ruleset_id": "eth_l1_v2",
-    "drivers": [
-      {
-        "metric": "nonempty_calldata_share",
-        "axis": "demand",
-        "current": 0.6361683778346344,
-        "z_robust": -0.8234162087337251,
-        "pct_90d": 21.666666666666668,
-        "trend": "COOLING",
-        "momentum_7d_vs_30d": -0.7846885724400734,
-        "informative": true
-      },
-      {
-        "metric": "failed_tx_rate",
-        "axis": "friction",
-        "current": 0.01378979968947495,
-        "z_robust": -0.6480386875618307,
-        "pct_90d": 11.666666666666666,
-        "trend": "COOLING",
-        "momentum_7d_vs_30d": -0.5005453010315061,
-        "informative": true
-      },
-      {
-        "metric": "median_tx_fee_native",
-        "axis": "friction",
-        "current": 0.0001188412915120725,
-        "z_robust": 0.7988777814977848,
-        "pct_90d": 71.66666666666667,
-        "trend": "COOLING",
-        "momentum_7d_vs_30d": -0.4909932384355396,
-        "informative": true
-      }
-    ],
-    "determinism_hash": "b0e41609054b",
-    "gate": {
-      "type": "confidence_threshold",
-      "threshold": 0.4,
-      "confidence_score": 0.9107914736183262,
-      "status": "ok",
-      "explanation": "OK"
-    },
     "axes": {
+      "capacity": {
+        "band_high": "NORMAL",
+        "band_low": "NORMAL",
+        "informative_count": 1,
+        "trend": "FLAT"
+      },
       "demand": {
         "band_high": "EXTREME_HIGH",
         "band_low": "NORMAL",
-        "trend": "FLAT",
-        "informative_count": 2
+        "informative_count": 2,
+        "trend": "FLAT"
       },
       "friction": {
         "band_high": "NORMAL",
         "band_low": "LOW",
-        "trend": "COOLING",
-        "informative_count": 2
-      },
-      "capacity": {
-        "band_high": "NORMAL",
-        "band_low": "NORMAL",
-        "trend": "FLAT",
-        "informative_count": 1
+        "informative_count": 2,
+        "trend": "COOLING"
       }
     },
+    "chain": "ethereum",
+    "determinism_hash": "b0e41609054b",
+    "drivers": [
+      {
+        "axis": "demand",
+        "current": 0.6361683778346344,
+        "informative": true,
+        "metric": "nonempty_calldata_share",
+        "momentum_7d_vs_30d": -0.7846885724400734,
+        "pct_90d": 21.666666666666668,
+        "trend": "COOLING",
+        "z_robust": -0.8234162087337251
+      },
+      {
+        "axis": "friction",
+        "current": 0.01378979968947495,
+        "informative": true,
+        "metric": "failed_tx_rate",
+        "momentum_7d_vs_30d": -0.5005453010315061,
+        "pct_90d": 11.666666666666666,
+        "trend": "COOLING",
+        "z_robust": -0.6480386875618307
+      },
+      {
+        "axis": "friction",
+        "current": 0.0001188412915120725,
+        "informative": true,
+        "metric": "median_tx_fee_native",
+        "momentum_7d_vs_30d": -0.4909932384355396,
+        "pct_90d": 71.66666666666667,
+        "trend": "COOLING",
+        "z_robust": 0.7988777814977848
+      }
+    ],
+    "gate": {
+      "confidence_score": 0.9107914736183262,
+      "explanation": "OK",
+      "status": "ok",
+      "threshold": 0.4,
+      "type": "confidence_threshold"
+    },
+    "label": "CHEAP",
     "methodology_notes": [
       "Non-informative low-variance distributions are neutralized before band aggregation.",
       "Raw block time is not used directly for congestion; blocktime_instability is used instead.",
       "Ethereum calldata activity is supplemental Demand evidence: it does not alter the core Demand axis and can create HEATING only when core Demand is already HIGH/EXTREME_HIGH and calldata trend is HEATING."
     ],
-    "signals": {
-      "tx_count_daily": {
-        "axis": "demand",
-        "current": 1463328.0,
-        "pct_90d": 91.66666666666666,
-        "z_robust": 1.296765173952763,
-        "momentum_7d_vs_30d": -0.01961572475676887,
-        "informative": true,
-        "neutralized": false,
-        "neutral_reason": null
-      },
-      "unique_active_addresses": {
-        "axis": "demand",
-        "current": 535221.0,
-        "pct_90d": 79.44444444444444,
-        "z_robust": 0.7503547760700711,
-        "momentum_7d_vs_30d": 0.04563928584544563,
-        "informative": true,
-        "neutralized": false,
-        "neutral_reason": null
-      },
-      "nonempty_calldata_share": {
-        "axis": "demand",
-        "current": 0.6361683778346344,
-        "pct_90d": 21.666666666666668,
-        "z_robust": -0.8234162087337251,
-        "momentum_7d_vs_30d": -0.7846885724400734,
-        "informative": true,
-        "neutralized": false,
-        "neutral_reason": null
-      },
-      "median_tx_fee_native": {
-        "axis": "friction",
-        "current": 0.0001188412915120725,
-        "pct_90d": 71.66666666666667,
-        "z_robust": 0.7988777814977848,
-        "momentum_7d_vs_30d": -0.4909932384355396,
-        "informative": true,
-        "neutralized": false,
-        "neutral_reason": null
-      },
-      "failed_tx_rate": {
-        "axis": "friction",
-        "current": 0.01378979968947495,
-        "pct_90d": 11.666666666666666,
-        "z_robust": -0.6480386875618307,
-        "momentum_7d_vs_30d": -0.5005453010315061,
-        "informative": true,
-        "neutralized": false,
-        "neutral_reason": null
-      },
-      "gas_utilization_pct": {
-        "axis": "capacity",
-        "current": 0.5046980902659168,
-        "pct_90d": 20.555555555555554,
-        "z_robust": -0.8658436504388131,
-        "momentum_7d_vs_30d": -0.12660596104266675,
-        "informative": true,
-        "neutralized": false,
-        "neutral_reason": null
-      },
-      "blocktime_instability": {
-        "axis": "capacity",
-        "current": 0.0,
-        "pct_90d": 50.0,
-        "z_robust": 0.0,
-        "momentum_7d_vs_30d": 0.0,
-        "informative": false,
-        "neutralized": true,
-        "neutral_reason": "low_variance_or_insufficient_distribution",
-        "current_raw": 12.0,
-        "transform": {
-          "type": "instability_proxy",
-          "input_metric": "avg_block_time_sec",
-          "instability_rolling_median_days": 30,
-          "window_days": 7,
-          "formula": "rolling_mean(|bt - median_30| / median_30)"
-        }
-      }
-    },
-    "signal_aliases": {
-      "tx_count": "tx_count_daily",
-      "active_addresses": "unique_active_addresses",
-      "fee_burden_proxy": "median_tx_fee_native",
-      "failed_tx_rate": "failed_tx_rate",
-      "utilization": "gas_utilization_pct",
-      "blocktime_instability": "blocktime_instability"
-    },
+    "missing": false,
+    "ruleset_id": "eth_l1_v2",
     "sanity": {
-      "status": "ok",
       "adjusted": false,
-      "support_basis": "regime_axes",
+      "axis_support": {
+        "capacity": {
+          "band_high": "NORMAL",
+          "band_low": "NORMAL",
+          "informative_count": 1,
+          "trend": "FLAT"
+        },
+        "demand": {
+          "band_high": "EXTREME_HIGH",
+          "band_low": "NORMAL",
+          "informative_count": 2,
+          "trend": "FLAT"
+        },
+        "friction": {
+          "band_high": "NORMAL",
+          "band_low": "LOW",
+          "informative_count": 2,
+          "trend": "COOLING"
+        }
+      },
       "scorecard_support": {
         "capacity": {
           "level": "Balanced",
@@ -507,28 +436,99 @@
           "score": 39.2659315960469
         }
       },
-      "axis_support": {
-        "demand": {
-          "band_high": "EXTREME_HIGH",
-          "band_low": "NORMAL",
-          "trend": "FLAT",
-          "informative_count": 2
-        },
-        "friction": {
-          "band_high": "NORMAL",
-          "band_low": "LOW",
-          "trend": "COOLING",
-          "informative_count": 2
-        },
-        "capacity": {
-          "band_high": "NORMAL",
-          "band_low": "NORMAL",
-          "trend": "FLAT",
-          "informative_count": 1
-        }
-      },
+      "status": "ok",
+      "support_basis": "regime_axes",
       "support_reason": "regime axes require informative low friction and no high capacity pressure."
-    }
+    },
+    "signal_aliases": {
+      "active_addresses": "unique_active_addresses",
+      "blocktime_instability": "blocktime_instability",
+      "failed_tx_rate": "failed_tx_rate",
+      "fee_burden_proxy": "median_tx_fee_native",
+      "tx_count": "tx_count_daily",
+      "utilization": "gas_utilization_pct"
+    },
+    "signals": {
+      "blocktime_instability": {
+        "axis": "capacity",
+        "current": 0.0,
+        "current_raw": 12.0,
+        "informative": false,
+        "momentum_7d_vs_30d": 0.0,
+        "neutral_reason": "low_variance_or_insufficient_distribution",
+        "neutralized": true,
+        "pct_90d": 50.0,
+        "transform": {
+          "formula": "rolling_mean(|bt - median_30| / median_30)",
+          "input_metric": "avg_block_time_sec",
+          "instability_rolling_median_days": 30,
+          "type": "instability_proxy",
+          "window_days": 7
+        },
+        "z_robust": 0.0
+      },
+      "failed_tx_rate": {
+        "axis": "friction",
+        "current": 0.01378979968947495,
+        "informative": true,
+        "momentum_7d_vs_30d": -0.5005453010315061,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 11.666666666666666,
+        "z_robust": -0.6480386875618307
+      },
+      "gas_utilization_pct": {
+        "axis": "capacity",
+        "current": 0.5046980902659168,
+        "informative": true,
+        "momentum_7d_vs_30d": -0.12660596104266675,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 20.555555555555554,
+        "z_robust": -0.8658436504388131
+      },
+      "median_tx_fee_native": {
+        "axis": "friction",
+        "current": 0.0001188412915120725,
+        "informative": true,
+        "momentum_7d_vs_30d": -0.4909932384355396,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 71.66666666666667,
+        "z_robust": 0.7988777814977848
+      },
+      "nonempty_calldata_share": {
+        "axis": "demand",
+        "current": 0.6361683778346344,
+        "informative": true,
+        "momentum_7d_vs_30d": -0.7846885724400734,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 21.666666666666668,
+        "z_robust": -0.8234162087337251
+      },
+      "tx_count_daily": {
+        "axis": "demand",
+        "current": 1463328.0,
+        "informative": true,
+        "momentum_7d_vs_30d": -0.01961572475676887,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 91.66666666666666,
+        "z_robust": 1.296765173952763
+      },
+      "unique_active_addresses": {
+        "axis": "demand",
+        "current": 535221.0,
+        "informative": true,
+        "momentum_7d_vs_30d": 0.04563928584544563,
+        "neutral_reason": null,
+        "neutralized": false,
+        "pct_90d": 79.44444444444444,
+        "z_robust": 0.7503547760700711
+      }
+    },
+    "window_days": 7
   },
   "revision_id": 62628606,
   "scorecard": {
@@ -660,15 +660,42 @@
     "window_days": 7
   },
   "status": {
-    "label": "CHEAP",
     "color": "blue",
-    "one_liner": "Lower-friction regime: regime-axis evidence shows low friction from failed transaction rate, with no high capacity pressure.",
     "explanation_support": {
       "basis": "regime_axes",
       "label": "CHEAP",
       "reason": "regime axes require informative low friction and no high capacity pressure.",
-      "status_note": "Lower-friction regime: regime-axis evidence shows low friction from failed transaction rate, with no high capacity pressure.",
+      "regime_axes": {
+        "capacity": {
+          "band_high": "NORMAL",
+          "band_low": "NORMAL",
+          "informative_count": 1,
+          "trend": "FLAT"
+        },
+        "demand": {
+          "band_high": "EXTREME_HIGH",
+          "band_low": "NORMAL",
+          "informative_count": 2,
+          "trend": "FLAT"
+        },
+        "friction": {
+          "band_high": "NORMAL",
+          "band_low": "LOW",
+          "informative_count": 2,
+          "trend": "COOLING"
+        }
+      },
+      "regime_support": {
+        "cheap_supported": false,
+        "congested_supported": false,
+        "heating_supported": true
+      },
       "scorecard": {
+        "capacity": {
+          "level": "Balanced",
+          "score": 45.42123241672561,
+          "score_raw": 39.9455194390782
+        },
         "demand": {
           "level": "High",
           "score": 69.15140645806228,
@@ -678,39 +705,12 @@
           "level": "Normal",
           "score": 39.2659315960469,
           "score_raw": 38.214570826723296
-        },
-        "capacity": {
-          "level": "Balanced",
-          "score": 45.42123241672561,
-          "score_raw": 39.9455194390782
         }
       },
-      "regime_support": {
-        "heating_supported": true,
-        "cheap_supported": false,
-        "congested_supported": false
-      },
-      "regime_axes": {
-        "demand": {
-          "band_high": "EXTREME_HIGH",
-          "band_low": "NORMAL",
-          "trend": "FLAT",
-          "informative_count": 2
-        },
-        "friction": {
-          "band_high": "NORMAL",
-          "band_low": "LOW",
-          "trend": "COOLING",
-          "informative_count": 2
-        },
-        "capacity": {
-          "band_high": "NORMAL",
-          "band_low": "NORMAL",
-          "trend": "FLAT",
-          "informative_count": 1
-        }
-      }
-    }
+      "status_note": "Lower-friction regime: regime-axis evidence shows low friction from failed transaction rate, with no high capacity pressure."
+    },
+    "label": "CHEAP",
+    "one_liner": "Lower-friction regime: regime-axis evidence shows low friction from failed transaction rate, with no high capacity pressure."
   },
   "tier_used": "standard",
   "updated_through": "2025-07-09"
