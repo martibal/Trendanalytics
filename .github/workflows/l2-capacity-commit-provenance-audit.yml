@@ -1,0 +1,102 @@
+name: L2 Capacity Commit Provenance Audit
+
+on:
+  push:
+    branches: [agent/l2-capacity-commit-provenance-audit]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run commit provenance audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          target = '50a9491ce0201399aabe2764a01e29c39db57798'
+          parent = subprocess.check_output(['git','rev-parse',f'{target}^'], text=True).strip()
+
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True, stderr=subprocess.STDOUT)
+
+          changed = git('diff','--name-only',parent,target).splitlines()
+          relevant = [p for p in changed if p.startswith(('api/','pipeline/','data/published/v1/gold/arbitrum/','data/published/v1/gold/base/'))]
+
+          probes = {}
+          for ref in (parent, target):
+              rows = {}
+              for path in (
+                  'api/regime_engine.py',
+                  'pipeline/tools/export_meta_json_history.py',
+                  'pipeline/tools/regenerate_json_safe.py',
+                  'pipeline/tools/apply_l2_capacity.py',
+              ):
+                  try:
+                      text = git('show', f'{ref}:{path}')
+                  except subprocess.CalledProcessError:
+                      rows[path] = None
+                      continue
+                  hits = [line for line in text.splitlines() if 'capacity_util_pct' in line or 'l2' in line.lower() and 'capacity' in line.lower()]
+                  rows[path] = hits[:100]
+              probes[ref] = rows
+
+          gold_samples = {}
+          for chain in ('arbitrum','base'):
+              chain_rows = {}
+              for day in ('2026-05-07','2026-05-08','2026-05-09'):
+                  path = f'data/published/v1/gold/{chain}/{day}.json'
+                  versions = {}
+                  for ref in (parent, target):
+                      try:
+                          obj = json.loads(git('show', f'{ref}:{path}'))
+                          versions[ref] = {
+                              'capacity_util_pct': obj.get('capacity_util_pct'),
+                              'arbitrum_l1_gas_used_daily': obj.get('arbitrum_l1_gas_used_daily'),
+                              'base_l1_gas_used_daily': obj.get('base_l1_gas_used_daily'),
+                              'base_blob_gas_used_daily': obj.get('base_blob_gas_used_daily'),
+                          }
+                      except Exception:
+                          versions[ref] = None
+                  chain_rows[day] = versions
+              gold_samples[chain] = chain_rows
+
+          history = git('log','--all','--date=iso-strict','--pretty=format:%H\t%ad\t%s','--','api/regime_engine.py','pipeline/tools/export_meta_json_history.py','pipeline/tools/regenerate_json_safe.py').splitlines()
+
+          report = {
+              'target_commit': target,
+              'parent_commit': parent,
+              'changed_files_relevant': relevant,
+              'capacity_code_probes': probes,
+              'gold_boundary_samples': gold_samples,
+              'nearby_methodology_history': history[:80],
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Commit-level provenance only; no repair is applied.',
+                  'Published Gold/META remain immutable baseline.',
+              ],
+          }
+          Path('l2-capacity-commit-provenance-audit.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-capacity-commit-provenance-audit
+          path: l2-capacity-commit-provenance-audit.json
+          if-no-files-found: error
+          retention-days: 7
