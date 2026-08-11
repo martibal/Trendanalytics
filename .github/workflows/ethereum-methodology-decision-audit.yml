@@ -1,0 +1,121 @@
+name: Ethereum Methodology Decision Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-methodology-decision-audit
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run methodology decision audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          meta_root = Path('data/published/v1/meta/ethereum')
+          days = sorted(meta_root.glob('????-??-??.json'))
+          if not days:
+              raise SystemExit('no published Ethereum META days found')
+
+          rulesets = Counter()
+          for p in days:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              ruleset = ((obj.get('regime') or {}).get('ruleset_id'))
+              rulesets[ruleset] += 1
+              if ruleset != 'eth_l1_v2':
+                  raise SystemExit(f'unexpected Ethereum ruleset on {p.stem}: {ruleset}')
+
+          decisions = [
+              {
+                  'candidate': 'nonempty_calldata_share',
+                  'axis': 'Demand',
+                  'decision': 'KEEP_IN_PRODUCTION',
+                  'role': 'supplemental corroborator only',
+                  'reason': 'Already promoted in eth_l1_v2 after preserve-baseline full-history and semantic validation; cannot make core Demand high by itself.'
+              },
+              {
+                  'candidate': 'block_gas_utilization_p90',
+                  'axis': 'Capacity',
+                  'decision': 'REJECT_FOR_LABEL_LOGIC',
+                  'role': 'observational telemetry only',
+                  'reason': 'Persistence narrowed to one episode, but target-day semantic audit showed CHEAP remained valid when core Capacity normalized and Friction was low.'
+              },
+              {
+                  'candidate': 'median_block_base_fee_per_gas',
+                  'axis': 'Friction',
+                  'decision': 'REJECT_FOR_LABEL_LOGIC',
+                  'role': 'observational telemetry only',
+                  'reason': 'Strong basefee episodes exposed internal Friction signal conflict, but semantic audit did not support overriding CHEAP; aggregate Friction score remained Normal.'
+              },
+              {
+                  'candidate': 'median_tx_gas_used',
+                  'axis': 'Demand',
+                  'decision': 'REJECT_AS_CORROBORATOR',
+                  'role': 'observational telemetry only',
+                  'reason': 'Strict preserve-baseline full-history audit produced zero incremental STABLE-to-HEATING labels.'
+              },
+              {
+                  'candidate': 'contract_creation_tx_share',
+                  'axis': 'Demand',
+                  'decision': 'REJECT_AS_CORROBORATOR',
+                  'role': 'observational telemetry only',
+                  'reason': 'Only one strict candidate appeared; target-day audit showed core Demand trend COOLING and Normal Demand scorecard, consistent with composition rather than broad demand shift.'
+              },
+              {
+                  'candidate': 'eip1559_type2_tx_share',
+                  'axis': 'Demand',
+                  'decision': 'REJECT_AS_CORROBORATOR',
+                  'role': 'observational telemetry only',
+                  'reason': 'Six strict STABLE-to-HEATING candidates appeared, but none had core Demand trend HEATING; signal represents transaction-format/adoption composition rather than demand acceleration.'
+              },
+          ]
+
+          report = {
+              'scope': {
+                  'start': days[0].stem,
+                  'end': days[-1].stem,
+                  'days': len(days),
+              },
+              'rulesets': dict(rulesets),
+              'production_conclusion': {
+                  'ruleset': 'eth_l1_v2',
+                  'action': 'NO_NEW_PRODUCTION_METHODOLOGY_CHANGE',
+                  'statement': 'Retain current ETH v2 label semantics. nonempty_calldata_share remains the only supplemental Demand corroborator promoted from this research cycle.'
+              },
+              'candidate_decisions': decisions,
+              'guardrails': [
+                  'Audit only; no production methodology or published data modified.',
+                  'Temporary research workflows must not be merged into main.',
+                  'Do not promote observational metrics merely because they alter historical labels.',
+              ],
+          }
+
+          Path('ethereum-methodology-decision-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-methodology-decision-audit
+          path: ethereum-methodology-decision-audit.json
+          if-no-files-found: error
+          retention-days: 7
