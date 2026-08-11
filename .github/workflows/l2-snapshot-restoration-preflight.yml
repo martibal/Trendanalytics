@@ -1,0 +1,187 @@
+name: L2 Snapshot Restoration Preflight
+
+on:
+  push:
+    branches:
+      - agent/l2-snapshot-restoration-preflight
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install "pandas>=2.2,<2.3" "numpy>=1.26,<3"
+
+      - name: Run snapshot restoration preflight
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          source = "fb3b81f4e3f24e6fb271fcaaaf3a3eb298d00fcc"
+          report = {
+              "source_commit": source,
+              "guardrails": [
+                  "Observational only; no production files modified.",
+                  "Gold and META are restored together from the exact canonical L2 backfill snapshot for overlapping source dates.",
+                  "Dates newer than the source snapshot remain from current main.",
+                  "Recompute uses current l2_v1 with each selected META record's frozen confidence_score.",
+              ],
+              "chains": {},
+          }
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True, stderr=subprocess.STDOUT).strip()
+
+          def show_json(ref, path):
+              try:
+                  return json.loads(git("show", f"{ref}:{path}"))
+              except Exception:
+                  return None
+
+          def source_days(chain, genre):
+              root = f"data/published/v1/{genre}/{chain}"
+              try:
+                  paths = git("ls-tree", "-r", "--name-only", source, root).splitlines()
+              except subprocess.CalledProcessError:
+                  return []
+              out = []
+              for p in paths:
+                  name = Path(p).name
+                  stem = Path(p).stem
+                  if p.endswith(".json") and len(stem) == 10 and stem[4] == "-" and stem[7] == "-":
+                      out.append(stem)
+              return sorted(set(out))
+
+          for chain in ("arbitrum", "base"):
+              src_gold_days = source_days(chain, "gold")
+              src_meta_days = source_days(chain, "meta")
+              common_source = sorted(set(src_gold_days) & set(src_meta_days))
+              if not common_source:
+                  raise SystemExit(f"{chain}: source snapshot has no common Gold/META days")
+              source_end = common_source[-1]
+
+              current_gold_root = Path("data/published/v1/gold") / chain
+              current_meta_root = Path("data/published/v1/meta") / chain
+              current_days = sorted(p.stem for p in current_gold_root.glob("????-??-??.json"))
+              current_meta_days = sorted(p.stem for p in current_meta_root.glob("????-??-??.json"))
+              current_common = sorted(set(current_days) & set(current_meta_days))
+
+              selected_days = sorted(set(common_source) | {d for d in current_common if d > source_end})
+              rows = []
+              selected_meta = {}
+              provenance = Counter()
+              rulesets = Counter()
+              confidence_versions = Counter()
+              capacity_days = 0
+
+              for day in selected_days:
+                  if day <= source_end and day in common_source:
+                      gold = show_json(source, f"data/published/v1/gold/{chain}/{day}.json")
+                      meta = show_json(source, f"data/published/v1/meta/{chain}/{day}.json")
+                      provenance["source_snapshot"] += 1
+                  else:
+                      gold = json.loads((current_gold_root / f"{day}.json").read_text(encoding="utf-8"))
+                      meta = json.loads((current_meta_root / f"{day}.json").read_text(encoding="utf-8"))
+                      provenance["current_newer"] += 1
+                  if not isinstance(gold, dict) or not isinstance(meta, dict):
+                      raise SystemExit(f"{chain} {day}: missing selected Gold/META")
+                  gold.setdefault("date", day)
+                  rows.append(gold)
+                  selected_meta[day] = meta
+                  if gold.get("capacity_util_pct") is not None:
+                      capacity_days += 1
+                  regime = meta.get("regime") or {}
+                  rulesets[regime.get("ruleset_id")] += 1
+                  confidence_versions[(meta.get("confidence") or {}).get("methodology_version")] += 1
+
+              df = pd.DataFrame(rows)
+              df["date"] = pd.to_datetime(df["date"], errors="coerce")
+              df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+
+              mismatches = []
+              transitions = Counter()
+              source_mismatch = 0
+              newer_mismatch = 0
+              for i in range(len(df)):
+                  day = df.loc[i, "date"].date().isoformat()
+                  meta = selected_meta[day]
+                  regime = meta.get("regime") or {}
+                  published = regime.get("label")
+                  confidence = (meta.get("confidence") or {}).get("confidence_score")
+                  ev = engine.compute_regime(
+                      df.iloc[: i + 1].copy(),
+                      chain=chain,
+                      profile={"type": "l2"},
+                      asof_date=day,
+                      confidence_score=confidence,
+                  )
+                  recomputed = ev.get("label")
+                  if published != recomputed:
+                      origin = "source_snapshot" if day <= source_end else "current_newer"
+                      if origin == "source_snapshot":
+                          source_mismatch += 1
+                      else:
+                          newer_mismatch += 1
+                      transitions[f"{published}->{recomputed}"] += 1
+                      mismatches.append({
+                          "date": day,
+                          "origin": origin,
+                          "published": published,
+                          "recomputed": recomputed,
+                          "confidence": confidence,
+                          "capacity_axis": (ev.get("axes") or {}).get("capacity"),
+                      })
+
+              report["chains"][chain] = {
+                  "source_gold_days": len(src_gold_days),
+                  "source_meta_days": len(src_meta_days),
+                  "source_common_days": len(common_source),
+                  "source_end": source_end,
+                  "current_common_days": len(current_common),
+                  "selected_days": len(selected_days),
+                  "selected_from": selected_days[0],
+                  "selected_to": selected_days[-1],
+                  "provenance_counts": dict(provenance),
+                  "capacity_non_null_days": capacity_days,
+                  "ruleset_counts": {str(k): v for k, v in rulesets.items()},
+                  "confidence_methodology_counts": {str(k): v for k, v in confidence_versions.items()},
+                  "mismatch_count": len(mismatches),
+                  "source_snapshot_mismatch_count": source_mismatch,
+                  "current_newer_mismatch_count": newer_mismatch,
+                  "transition_counts": dict(transitions),
+                  "mismatches_first": mismatches[:30],
+              }
+
+          Path("l2-snapshot-restoration-preflight.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-snapshot-restoration-preflight
+          path: l2-snapshot-restoration-preflight.json
+          if-no-files-found: error
+          retention-days: 7
