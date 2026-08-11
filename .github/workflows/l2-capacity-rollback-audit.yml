@@ -1,0 +1,70 @@
+name: L2 Capacity Rollback Audit
+
+on:
+  push:
+    branches: [agent/l2-capacity-rollback-audit]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run rollback audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+
+          backfill='fb3b81f4e3f24e6fb271fcaaaf3a3eb298d00fcc'
+          rollback='2453fb11c3876eb6d4f87d6138db980940fe3b8e'
+          def git(*args):
+              return subprocess.check_output(['git',*args], text=True, stderr=subprocess.STDOUT).strip()
+          report={'backfill_commit':backfill,'rollback_commit':rollback,'chains':{},'workflow_evidence':{},'guardrails':['Observational only; no production files modified.','Published META labels are frozen evidence, not recomputed.']}
+          for chain in ('arbitrum','base'):
+              removed=[]; changed=[]; retained=[]; meta_changed=[]
+              paths=git('diff','--name-only',backfill,rollback,'--',f'data/published/v1/gold/{chain}').splitlines()
+              for path in paths:
+                  if not path.endswith('.json') or Path(path).name.startswith(('last','latest','manifest')): continue
+                  try: a=json.loads(git('show',f'{backfill}:{path}'))
+                  except Exception: continue
+                  try: b=json.loads(git('show',f'{rollback}:{path}'))
+                  except Exception: continue
+                  av=a.get('capacity_util_pct'); bv=b.get('capacity_util_pct')
+                  if av is not None and bv is None: removed.append(Path(path).stem)
+                  elif av is not None and bv is not None:
+                      if abs(float(av)-float(bv))>1e-12: changed.append(Path(path).stem)
+                      else: retained.append(Path(path).stem)
+              mpaths=git('diff','--name-only',backfill,rollback,'--',f'data/published/v1/meta/{chain}').splitlines()
+              for p in mpaths:
+                  if p.endswith('.json') and not Path(p).name.startswith(('last','latest','manifest')): meta_changed.append(Path(p).stem)
+              report['chains'][chain]={'gold_day_files_changed':len([p for p in paths if p.endswith('.json')]),'capacity_removed_count':len(removed),'capacity_removed_first':removed[:10],'capacity_removed_last':removed[-10:],'capacity_value_changed_count':len(changed),'capacity_retained_in_changed_files_count':len(retained),'meta_day_files_changed_count':len(meta_changed),'meta_changed_first':meta_changed[:10]}
+          for ref in (backfill,rollback):
+              ev={}
+              for path in ('.github/workflows/pipeline.yml','pipeline/tools/publish_artifacts.py','pipeline/tools/apply_l2_capacity.py'):
+                  try: txt=git('show',f'{ref}:{path}')
+                  except subprocess.CalledProcessError:
+                      ev[path]=None; continue
+                  ev[path]=[line for line in txt.splitlines() if any(k in line.lower() for k in ('apply_l2_capacity','publish_artifacts','calculated/gold','published/v1/gold','gold-root','published-root'))][:80]
+              report['workflow_evidence'][ref]=ev
+          Path('l2-capacity-rollback-audit.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print(json.dumps(report,indent=2,sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-capacity-rollback-audit
+          path: l2-capacity-rollback-audit.json
+          if-no-files-found: error
+          retention-days: 7
