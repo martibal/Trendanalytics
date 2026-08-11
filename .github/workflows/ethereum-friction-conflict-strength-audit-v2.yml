@@ -1,0 +1,163 @@
+name: Ethereum Friction Conflict Strength Audit v2
+
+on:
+  push:
+    branches:
+      - agent/ethereum-friction-conflict-strength-audit-v2
+    paths:
+      - .github/workflows/ethereum-friction-conflict-strength-audit-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas numpy
+
+      - name: Run corrected friction conflict strength audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          gold_root = Path('data/published/v1/gold/ethereum')
+          meta_root = Path('data/published/v1/meta/ethereum')
+          gold_paths = sorted(gold_root.glob('????-??-??.json'))
+          meta_paths = sorted(meta_root.glob('????-??-??.json'))
+          if len(gold_paths) != 617 or len(meta_paths) != 617:
+              raise SystemExit(f'expected 617 Ethereum Gold/META days, got gold={len(gold_paths)} meta={len(meta_paths)}')
+
+          rows = []
+          for p in gold_paths:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              obj.setdefault('date', p.stem)
+              rows.append(obj)
+          df = pd.DataFrame(rows)
+          df['date'] = pd.to_datetime(df['date'], errors='coerce')
+          df = df.dropna(subset=['date']).sort_values('date').reset_index(drop=True)
+
+          rulesets = Counter()
+          cheap_conflicts = []
+          strong_bilateral = []
+          strong_high_only = []
+          strong_low_only = []
+          weak_or_only = []
+
+          for i in range(len(df)):
+              day = df.loc[i, 'date'].date().isoformat()
+              meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+              regime = meta.get('regime') or {}
+              rulesets[regime.get('ruleset_id')] += 1
+              if regime.get('label') != 'CHEAP':
+                  continue
+
+              confidence = (meta.get('confidence') or {}).get('confidence_score')
+              ev = engine.compute_regime(
+                  df.iloc[:i+1].copy(),
+                  chain='ethereum',
+                  profile={'type': 'eth_l1'},
+                  asof_date=day,
+                  confidence_score=confidence,
+              )
+              friction_axis = ((ev.get('axes') or {}).get('friction') or {})
+              friction_high = str(friction_axis.get('band_high', 'NORMAL')) in ('HIGH', 'EXTREME_HIGH')
+              friction_low = str(friction_axis.get('band_low', 'NORMAL')) in ('LOW', 'EXTREME_LOW')
+              if not (friction_high and friction_low):
+                  continue
+
+              sigs = []
+              for metric, s in (ev.get('signals') or {}).items():
+                  if s.get('axis') != 'friction' or not bool(s.get('informative', True)):
+                      continue
+                  sigs.append({
+                      'metric': metric,
+                      'pct_90d': float(s.get('pct_90d', 50.0)),
+                      'z_robust': float(s.get('z_robust', 0.0)),
+                      'momentum_7d_vs_30d': float(s.get('momentum_7d_vs_30d', 0.0)),
+                  })
+              if not sigs:
+                  raise SystemExit(f'no friction signals exposed for conflict day {day}')
+
+              strong_high = [s for s in sigs if s['pct_90d'] >= 80.0 and s['z_robust'] >= 1.5]
+              strong_low = [s for s in sigs if s['pct_90d'] <= 20.0 and s['z_robust'] <= -1.5]
+
+              row = {
+                  'date': day,
+                  'confidence': confidence,
+                  'friction_band_high': friction_axis.get('band_high'),
+                  'friction_band_low': friction_axis.get('band_low'),
+                  'friction_trend': friction_axis.get('trend'),
+                  'signals': sigs,
+                  'strong_high_metrics': [s['metric'] for s in strong_high],
+                  'strong_low_metrics': [s['metric'] for s in strong_low],
+              }
+              cheap_conflicts.append(row)
+              if strong_high and strong_low:
+                  strong_bilateral.append(row)
+              elif strong_high:
+                  strong_high_only.append(row)
+              elif strong_low:
+                  strong_low_only.append(row)
+              else:
+                  weak_or_only.append(row)
+
+          if rulesets != Counter({'eth_l1_v2': 617}):
+              raise SystemExit(f'unexpected rulesets: {dict(rulesets)}')
+          if len(cheap_conflicts) != 22:
+              raise SystemExit(f'expected 22 CHEAP friction-conflict days, got {len(cheap_conflicts)}')
+
+          report = {
+              'scope': {'start': df.iloc[0]['date'].date().isoformat(), 'end': df.iloc[-1]['date'].date().isoformat(), 'days': len(df)},
+              'baseline': 'published META regime.label',
+              'rulesets': dict(rulesets),
+              'cheap_conflict_count': len(cheap_conflicts),
+              'strong_high_definition': 'pct_90d>=80 AND z_robust>=1.5 on an existing core Friction signal',
+              'strong_low_definition': 'pct_90d<=20 AND z_robust<=-1.5 on an existing core Friction signal',
+              'strong_bilateral_count': len(strong_bilateral),
+              'strong_high_only_count': len(strong_high_only),
+              'strong_low_only_count': len(strong_low_only),
+              'weak_or_only_count': len(weak_or_only),
+              'strong_bilateral_dates': [r['date'] for r in strong_bilateral],
+              'strong_high_only_dates': [r['date'] for r in strong_high_only],
+              'strong_low_only_dates': [r['date'] for r in strong_low_only],
+              'weak_or_only_dates': [r['date'] for r in weak_or_only],
+              'rows': cheap_conflicts,
+              'candidate_counterfactual': {
+                  'rule': 'Only published CHEAP days with strong bilateral core-Friction evidence would be vetoed to STABLE.',
+                  'change_count': len(strong_bilateral),
+                  'dates': [r['date'] for r in strong_bilateral],
+              },
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Published labels remain baseline.',
+                  'Signal evidence is read from top-level compute_regime signals, not axes.',
+                  'Invariant requires at least one exposed Friction signal for every CHEAP conflict day.',
+              ],
+          }
+          Path('ethereum-friction-conflict-strength-audit-v2.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-friction-conflict-strength-audit-v2
+          path: ethereum-friction-conflict-strength-audit-v2.json
+          if-no-files-found: error
+          retention-days: 7
