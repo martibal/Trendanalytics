@@ -46,8 +46,11 @@ jobs:
           gold_root = Path('data/published/v1/gold/ethereum')
           meta_root = Path('data/published/v1/meta/ethereum')
           gold_paths = sorted(gold_root.glob('????-??-??.json'))
-          if len(gold_paths) != 617:
-              raise SystemExit(f'expected 617 Ethereum Gold days, got {len(gold_paths)}')
+          meta_paths = sorted(meta_root.glob('????-??-??.json'))
+          if not gold_paths or len(gold_paths) != len(meta_paths):
+              raise SystemExit(f'expected non-empty Ethereum Gold/META parity, got gold={len(gold_paths)} meta={len(meta_paths)}')
+          if gold_paths[-1].stem != meta_paths[-1].stem:
+              raise SystemExit(f'latest Gold/META date mismatch: gold={gold_paths[-1].stem} meta={meta_paths[-1].stem}')
 
           rows = []
           for p in gold_paths:
@@ -123,6 +126,7 @@ jobs:
 
           report = {
               'scope': {'start': window_start, 'end': window_end, 'days': len(report_rows)},
+              'history_counts': {'gold_days': len(gold_paths), 'meta_days': len(meta_paths), 'latest_date': gold_paths[-1].stem},
               'baseline': 'published META regime.label',
               'target_dates': sorted(target_dates),
               'question': 'Are the two strong bilateral Friction-conflict CHEAP days semantically better classified as CHEAP or STABLE?',
@@ -136,6 +140,7 @@ jobs:
                   'Published labels remain baseline.',
                   'Only the two strong-bilateral dates are considered for a label veto.',
                   'Target days must expose both existing core Friction signals and satisfy strict two-sided pct+z evidence.',
+                  'History-size validation is dynamic: canonical Gold/META day counts and latest dates must match.',
               ],
           }
           Path('ethereum-friction-two-day-semantic-audit.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
