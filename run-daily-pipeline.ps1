@@ -462,7 +462,6 @@ try {
         "-Mode", "incremental"
     )
 
-    Invoke-L2CapacityIfAvailable -RepoRoot $RootDir
     Invoke-SafeJsonFinalizer -RepoRoot $RootDir -LookbackDays $JsonFinalizerLookbackDays
 
     Invoke-WebBriefsBuilderIfPresent -RepoRoot $RootDir
