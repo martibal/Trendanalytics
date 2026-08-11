@@ -330,87 +330,159 @@
   },
   "publish_lag_days_policy": 1,
   "regime": {
+    "chain": "ethereum",
+    "missing": false,
+    "label": "CONGESTED",
     "asof_date": "2025-12-10",
-    "axes": {
-      "capacity": {
-        "band_high": "EXTREME_HIGH",
-        "band_low": "NORMAL",
-        "informative_count": 1,
-        "trend": "HEATING"
+    "window_days": 7,
+    "ruleset_id": "eth_l1_v2",
+    "drivers": [
+      {
+        "metric": "gas_utilization_pct",
+        "axis": "capacity",
+        "current": 0.5101234499266616,
+        "z_robust": 4.15829759631362,
+        "pct_90d": 93.88888888888889,
+        "trend": "HEATING",
+        "momentum_7d_vs_30d": 2.2984680029989653,
+        "informative": true
       },
+      {
+        "metric": "failed_tx_rate",
+        "axis": "friction",
+        "current": 0.021203365078572588,
+        "z_robust": 2.7316329885895616,
+        "pct_90d": 96.11111111111111,
+        "trend": "COOLING",
+        "momentum_7d_vs_30d": -0.1898882693031076,
+        "informative": true
+      }
+    ],
+    "determinism_hash": "2c3ccceecabb",
+    "gate": {
+      "type": "confidence_threshold",
+      "threshold": 0.4,
+      "confidence_score": 0.9635896489283028,
+      "status": "ok",
+      "explanation": "OK"
+    },
+    "axes": {
       "demand": {
         "band_high": "NORMAL",
         "band_low": "NORMAL",
-        "informative_count": 2,
-        "trend": "COOLING"
+        "trend": "COOLING",
+        "informative_count": 2
       },
       "friction": {
         "band_high": "EXTREME_HIGH",
         "band_low": "NORMAL",
-        "informative_count": 2,
-        "trend": "COOLING"
-      }
-    },
-    "chain": "ethereum",
-    "determinism_hash": "b3a2dd5cc92a",
-    "drivers": [
-      {
-        "axis": "capacity",
-        "current": 0.5101234499266616,
-        "informative": true,
-        "metric": "gas_utilization_pct",
-        "momentum_7d_vs_30d": 2.2984680029989653,
-        "pct_90d": 93.88888888888889,
-        "trend": "HEATING",
-        "z_robust": 4.15829759631362
-      },
-      {
-        "axis": "friction",
-        "current": 0.021203365078572588,
-        "informative": true,
-        "metric": "failed_tx_rate",
-        "momentum_7d_vs_30d": -0.1898882693031076,
-        "pct_90d": 96.11111111111111,
         "trend": "COOLING",
-        "z_robust": 2.7316329885895616
+        "informative_count": 2
+      },
+      "capacity": {
+        "band_high": "EXTREME_HIGH",
+        "band_low": "NORMAL",
+        "trend": "HEATING",
+        "informative_count": 1
       }
-    ],
-    "gate": {
-      "confidence_score": 0.9635896489283028,
-      "explanation": "OK",
-      "status": "ok",
-      "threshold": 0.4,
-      "type": "confidence_threshold"
     },
-    "label": "CONGESTED",
     "methodology_notes": [
       "Non-informative low-variance distributions are neutralized before band aggregation.",
-      "Raw block time is not used directly for congestion; blocktime_instability is used instead."
+      "Raw block time is not used directly for congestion; blocktime_instability is used instead.",
+      "Ethereum calldata activity is supplemental Demand evidence: it does not alter the core Demand axis and can create HEATING only when core Demand is already HIGH/EXTREME_HIGH and calldata trend is HEATING."
     ],
-    "missing": false,
-    "ruleset_id": "eth_l1_v1",
-    "sanity": {
-      "adjusted": false,
-      "axis_support": {
-        "capacity": {
-          "band_high": "EXTREME_HIGH",
-          "band_low": "NORMAL",
-          "informative_count": 1,
-          "trend": "HEATING"
-        },
-        "demand": {
-          "band_high": "NORMAL",
-          "band_low": "NORMAL",
-          "informative_count": 2,
-          "trend": "COOLING"
-        },
-        "friction": {
-          "band_high": "EXTREME_HIGH",
-          "band_low": "NORMAL",
-          "informative_count": 2,
-          "trend": "COOLING"
-        }
+    "signals": {
+      "tx_count_daily": {
+        "axis": "demand",
+        "current": 1602340.0,
+        "pct_90d": 61.66666666666667,
+        "z_robust": 0.15091105192361834,
+        "momentum_7d_vs_30d": -0.3598792226576865,
+        "informative": true,
+        "neutralized": false,
+        "neutral_reason": null
       },
+      "unique_active_addresses": {
+        "axis": "demand",
+        "current": 565678.0,
+        "pct_90d": 45.0,
+        "z_robust": -0.1438036494893027,
+        "momentum_7d_vs_30d": -0.465689604112,
+        "informative": true,
+        "neutralized": false,
+        "neutral_reason": null
+      },
+      "nonempty_calldata_share": {
+        "axis": "demand",
+        "current": 0.6701617634209968,
+        "pct_90d": 70.55555555555556,
+        "z_robust": 0.8265399441280867,
+        "momentum_7d_vs_30d": 0.13257217041101055,
+        "informative": true,
+        "neutralized": false,
+        "neutral_reason": null
+      },
+      "median_tx_fee_native": {
+        "axis": "friction",
+        "current": 1.8930910709966502e-05,
+        "pct_90d": 23.88888888888889,
+        "z_robust": -0.8686381618650914,
+        "momentum_7d_vs_30d": -0.15214097360590728,
+        "informative": true,
+        "neutralized": false,
+        "neutral_reason": null
+      },
+      "failed_tx_rate": {
+        "axis": "friction",
+        "current": 0.021203365078572588,
+        "pct_90d": 96.11111111111111,
+        "z_robust": 2.7316329885895616,
+        "momentum_7d_vs_30d": -0.1898882693031076,
+        "informative": true,
+        "neutralized": false,
+        "neutral_reason": null
+      },
+      "gas_utilization_pct": {
+        "axis": "capacity",
+        "current": 0.5101234499266616,
+        "pct_90d": 93.88888888888889,
+        "z_robust": 4.15829759631362,
+        "momentum_7d_vs_30d": 2.2984680029989653,
+        "informative": true,
+        "neutralized": false,
+        "neutral_reason": null
+      },
+      "blocktime_instability": {
+        "axis": "capacity",
+        "current": 0.0,
+        "pct_90d": 50.0,
+        "z_robust": 0.0,
+        "momentum_7d_vs_30d": 0.0,
+        "informative": false,
+        "neutralized": true,
+        "neutral_reason": "low_variance_or_insufficient_distribution",
+        "current_raw": 12.0,
+        "transform": {
+          "type": "instability_proxy",
+          "input_metric": "avg_block_time_sec",
+          "instability_rolling_median_days": 30,
+          "window_days": 7,
+          "formula": "rolling_mean(|bt - median_30| / median_30)"
+        }
+      }
+    },
+    "signal_aliases": {
+      "tx_count": "tx_count_daily",
+      "active_addresses": "unique_active_addresses",
+      "fee_burden_proxy": "median_tx_fee_native",
+      "failed_tx_rate": "failed_tx_rate",
+      "utilization": "gas_utilization_pct",
+      "blocktime_instability": "blocktime_instability"
+    },
+    "sanity": {
+      "status": "ok",
+      "adjusted": false,
+      "support_basis": "regime_axes",
       "scorecard_support": {
         "capacity": {
           "level": "Tight",
@@ -425,89 +497,28 @@
           "score": 33.097045110978215
         }
       },
-      "status": "ok",
-      "support_basis": "regime_axes",
-      "support_reason": "regime axes require informative friction/capacity support."
-    },
-    "signal_aliases": {
-      "active_addresses": "unique_active_addresses",
-      "blocktime_instability": "blocktime_instability",
-      "failed_tx_rate": "failed_tx_rate",
-      "fee_burden_proxy": "median_tx_fee_native",
-      "tx_count": "tx_count_daily",
-      "utilization": "gas_utilization_pct"
-    },
-    "signals": {
-      "blocktime_instability": {
-        "axis": "capacity",
-        "current": 0.0,
-        "current_raw": 12.0,
-        "informative": false,
-        "momentum_7d_vs_30d": 0.0,
-        "neutral_reason": "low_variance_or_insufficient_distribution",
-        "neutralized": true,
-        "pct_90d": 50.0,
-        "transform": {
-          "formula": "rolling_mean(|bt - median_30| / median_30)",
-          "input_metric": "avg_block_time_sec",
-          "instability_rolling_median_days": 30,
-          "type": "instability_proxy",
-          "window_days": 7
+      "axis_support": {
+        "demand": {
+          "band_high": "NORMAL",
+          "band_low": "NORMAL",
+          "trend": "COOLING",
+          "informative_count": 2
         },
-        "z_robust": 0.0
+        "friction": {
+          "band_high": "EXTREME_HIGH",
+          "band_low": "NORMAL",
+          "trend": "COOLING",
+          "informative_count": 2
+        },
+        "capacity": {
+          "band_high": "EXTREME_HIGH",
+          "band_low": "NORMAL",
+          "trend": "HEATING",
+          "informative_count": 1
+        }
       },
-      "failed_tx_rate": {
-        "axis": "friction",
-        "current": 0.021203365078572588,
-        "informative": true,
-        "momentum_7d_vs_30d": -0.1898882693031076,
-        "neutral_reason": null,
-        "neutralized": false,
-        "pct_90d": 96.11111111111111,
-        "z_robust": 2.7316329885895616
-      },
-      "gas_utilization_pct": {
-        "axis": "capacity",
-        "current": 0.5101234499266616,
-        "informative": true,
-        "momentum_7d_vs_30d": 2.2984680029989653,
-        "neutral_reason": null,
-        "neutralized": false,
-        "pct_90d": 93.88888888888889,
-        "z_robust": 4.15829759631362
-      },
-      "median_tx_fee_native": {
-        "axis": "friction",
-        "current": 1.8930910709966502e-05,
-        "informative": true,
-        "momentum_7d_vs_30d": -0.15214097360590728,
-        "neutral_reason": null,
-        "neutralized": false,
-        "pct_90d": 23.88888888888889,
-        "z_robust": -0.8686381618650914
-      },
-      "tx_count_daily": {
-        "axis": "demand",
-        "current": 1602340.0,
-        "informative": true,
-        "momentum_7d_vs_30d": -0.3598792226576865,
-        "neutral_reason": null,
-        "neutralized": false,
-        "pct_90d": 61.66666666666667,
-        "z_robust": 0.15091105192361834
-      },
-      "unique_active_addresses": {
-        "axis": "demand",
-        "current": 565678.0,
-        "informative": true,
-        "momentum_7d_vs_30d": -0.465689604112,
-        "neutral_reason": null,
-        "neutralized": false,
-        "pct_90d": 45.0,
-        "z_robust": -0.1438036494893027
-      }
-    },
-    "window_days": 7
+      "support_reason": "regime axes require informative friction/capacity support."
+    }
   },
   "revision_id": 9311494,
   "scorecard": {
@@ -639,42 +650,15 @@
     "window_days": 7
   },
   "status": {
+    "label": "CONGESTED",
     "color": "red",
+    "one_liner": "Congested regime: regime-axis evidence shows elevated friction from failed transaction rate and capacity pressure from gas utilization.",
     "explanation_support": {
       "basis": "regime_axes",
       "label": "CONGESTED",
       "reason": "regime axes require informative friction/capacity support.",
-      "regime_axes": {
-        "capacity": {
-          "band_high": "EXTREME_HIGH",
-          "band_low": "NORMAL",
-          "informative_count": 1,
-          "trend": "HEATING"
-        },
-        "demand": {
-          "band_high": "NORMAL",
-          "band_low": "NORMAL",
-          "informative_count": 2,
-          "trend": "COOLING"
-        },
-        "friction": {
-          "band_high": "EXTREME_HIGH",
-          "band_low": "NORMAL",
-          "informative_count": 2,
-          "trend": "COOLING"
-        }
-      },
-      "regime_support": {
-        "cheap_supported": false,
-        "congested_supported": false,
-        "heating_supported": false
-      },
+      "status_note": "Congested regime: regime-axis evidence shows elevated friction from failed transaction rate and capacity pressure from gas utilization.",
       "scorecard": {
-        "capacity": {
-          "level": "Tight",
-          "score": 69.24955928018156,
-          "score_raw": 89.95385235113469
-        },
         "demand": {
           "level": "Normal",
           "score": 59.804128230934495,
@@ -684,12 +668,39 @@
           "level": "Normal",
           "score": 33.097045110978215,
           "score_raw": 32.458347380732945
+        },
+        "capacity": {
+          "level": "Tight",
+          "score": 69.24955928018156,
+          "score_raw": 89.95385235113469
         }
       },
-      "status_note": "Congested regime: regime-axis evidence shows elevated friction from failed transaction rate and capacity pressure from gas utilization."
-    },
-    "label": "CONGESTED",
-    "one_liner": "Congested regime: regime-axis evidence shows elevated friction from failed transaction rate and capacity pressure from gas utilization."
+      "regime_support": {
+        "heating_supported": false,
+        "cheap_supported": false,
+        "congested_supported": false
+      },
+      "regime_axes": {
+        "demand": {
+          "band_high": "NORMAL",
+          "band_low": "NORMAL",
+          "trend": "COOLING",
+          "informative_count": 2
+        },
+        "friction": {
+          "band_high": "EXTREME_HIGH",
+          "band_low": "NORMAL",
+          "trend": "COOLING",
+          "informative_count": 2
+        },
+        "capacity": {
+          "band_high": "EXTREME_HIGH",
+          "band_low": "NORMAL",
+          "trend": "HEATING",
+          "informative_count": 1
+        }
+      }
+    }
   },
   "tier_used": "standard",
   "updated_through": "2025-12-10"
