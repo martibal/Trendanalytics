@@ -1,0 +1,179 @@
+name: L2 Capacity Seed Fidelity Audit
+
+on:
+  push:
+    branches:
+      - agent/l2-capacity-seed-fidelity-audit
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install pandas numpy
+      - name: Run L2 capacity seed fidelity audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          chains = ('arbitrum', 'base')
+          seed_path = Path('pipeline/backfill/l2-capacity-backfill-combined.json')
+          seed = json.loads(seed_path.read_text(encoding='utf-8'))
+          history = seed.get('history') or {}
+          report = {
+              'seed': {
+                  'path': str(seed_path),
+                  'start': seed.get('start'),
+                  'end': seed.get('end'),
+                  'baseline': seed.get('baseline'),
+              },
+              'chains': {},
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Published META labels and confidence are immutable baseline.',
+                  'Seed capacity_util_pct is injected in-memory only.',
+              ],
+          }
+
+          for chain in chains:
+              gold_root = Path('data/published/v1/gold') / chain
+              meta_root = Path('data/published/v1/meta') / chain
+              gold_paths = sorted(gold_root.glob('????-??-??.json'))
+              meta_paths = sorted(meta_root.glob('????-??-??.json'))
+              if not gold_paths or len(gold_paths) != len(meta_paths):
+                  raise SystemExit(f'{chain}: Gold/META parity failure gold={len(gold_paths)} meta={len(meta_paths)}')
+
+              seed_rows = history.get(chain)
+              if not isinstance(seed_rows, list) or not seed_rows:
+                  raise SystemExit(f'{chain}: seed history missing')
+              seed_by_date = {str(r.get('date')): r.get('capacity_util_pct') for r in seed_rows}
+
+              raw_rows = []
+              patched_rows = []
+              seed_overrides = 0
+              seed_fills_missing = 0
+              seed_matches_existing = 0
+              seed_conflicts_existing = []
+              for p in gold_paths:
+                  obj = json.loads(p.read_text(encoding='utf-8'))
+                  obj.setdefault('date', p.stem)
+                  raw_rows.append(dict(obj))
+                  patched = dict(obj)
+                  if p.stem in seed_by_date:
+                      seed_val = seed_by_date[p.stem]
+                      current = obj.get('capacity_util_pct')
+                      if seed_val is not None:
+                          seed_overrides += 1
+                          if current is None:
+                              seed_fills_missing += 1
+                          else:
+                              try:
+                                  if abs(float(current) - float(seed_val)) <= 1e-12:
+                                      seed_matches_existing += 1
+                                  else:
+                                      seed_conflicts_existing.append({
+                                          'date': p.stem,
+                                          'published_gold': current,
+                                          'seed': seed_val,
+                                      })
+                              except Exception:
+                                  seed_conflicts_existing.append({
+                                      'date': p.stem,
+                                      'published_gold': current,
+                                      'seed': seed_val,
+                                  })
+                          patched['capacity_util_pct'] = seed_val
+                  patched_rows.append(patched)
+
+              raw_df = pd.DataFrame(raw_rows)
+              patched_df = pd.DataFrame(patched_rows)
+              for df in (raw_df, patched_df):
+                  df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                  df.dropna(subset=['date'], inplace=True)
+                  df.sort_values('date', inplace=True)
+                  df.reset_index(drop=True, inplace=True)
+
+              if len(raw_df) != len(patched_df):
+                  raise SystemExit(f'{chain}: dataframe length mismatch')
+
+              baseline_mismatches = []
+              patched_mismatches = []
+              repaired_dates = []
+              introduced_dates = []
+              baseline_transitions = Counter()
+              patched_transitions = Counter()
+
+              for i in range(len(raw_df)):
+                  day = raw_df.loc[i, 'date'].date().isoformat()
+                  meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+                  regime = meta.get('regime') or {}
+                  published = regime.get('label')
+                  confidence_score = (meta.get('confidence') or {}).get('confidence_score')
+
+                  raw_ev = engine.compute_regime(
+                      raw_df.iloc[:i+1].copy(), chain=chain, profile={'type':'l2'},
+                      asof_date=day, confidence_score=confidence_score,
+                  )
+                  patched_ev = engine.compute_regime(
+                      patched_df.iloc[:i+1].copy(), chain=chain, profile={'type':'l2'},
+                      asof_date=day, confidence_score=confidence_score,
+                  )
+                  raw_label = raw_ev.get('label')
+                  patched_label = patched_ev.get('label')
+
+                  if raw_label != published:
+                      baseline_mismatches.append(day)
+                      baseline_transitions[f'{published}->{raw_label}'] += 1
+                  if patched_label != published:
+                      patched_mismatches.append(day)
+                      patched_transitions[f'{published}->{patched_label}'] += 1
+                  if raw_label != published and patched_label == published:
+                      repaired_dates.append(day)
+                  if raw_label == published and patched_label != published:
+                      introduced_dates.append(day)
+
+              report['chains'][chain] = {
+                  'scope': {'start': gold_paths[0].stem, 'end': gold_paths[-1].stem, 'days': len(gold_paths)},
+                  'seed_rows': len(seed_rows),
+                  'seed_non_null_capacity': sum(v is not None for v in seed_by_date.values()),
+                  'seed_overrides_non_null': seed_overrides,
+                  'seed_fills_missing_gold': seed_fills_missing,
+                  'seed_matches_existing_gold': seed_matches_existing,
+                  'seed_conflicts_existing_gold_count': len(seed_conflicts_existing),
+                  'seed_conflicts_existing_gold': seed_conflicts_existing[:50],
+                  'baseline_mismatch_count': len(baseline_mismatches),
+                  'baseline_mismatch_dates': baseline_mismatches,
+                  'baseline_transition_counts': dict(baseline_transitions),
+                  'patched_mismatch_count': len(patched_mismatches),
+                  'patched_mismatch_dates': patched_mismatches,
+                  'patched_transition_counts': dict(patched_transitions),
+                  'repaired_mismatch_count': len(repaired_dates),
+                  'repaired_mismatch_dates': repaired_dates,
+                  'introduced_mismatch_count': len(introduced_dates),
+                  'introduced_mismatch_dates': introduced_dates,
+              }
+
+          Path('l2-capacity-seed-fidelity-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-capacity-seed-fidelity-audit
+          path: l2-capacity-seed-fidelity-audit.json
+          if-no-files-found: error
+          retention-days: 7
