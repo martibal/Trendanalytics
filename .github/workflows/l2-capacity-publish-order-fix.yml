@@ -23,54 +23,52 @@ jobs:
           fetch-depth: 0
 
       - name: Patch publish order deterministically
-        shell: pwsh
+        shell: bash
         run: |
-          $full = Get-Content -LiteralPath "pipeline/tools/full_pipeline.ps1" -Raw
-          $daily = Get-Content -LiteralPath "run-daily-pipeline.ps1" -Raw
+          python - <<'PY'
+          from pathlib import Path
 
-          $declNeedle = "  `$PY_PUBLISH = Join-Path `$PIPELINE_ROOT 'tools\publish_artifacts.py'"
-          if (($full.Split($declNeedle).Count - 1) -ne 1) {
-            throw "Expected exactly one publish tool declaration marker"
-          }
-          $declReplacement = @"
-  `$PY_L2_CAPACITY = Join-Path `$PIPELINE_ROOT 'tools\apply_l2_capacity.py'
-$declNeedle
-"@
-          $full = $full.Replace($declNeedle, $declReplacement.TrimEnd("`r","`n"))
+          full_path = Path("pipeline/tools/full_pipeline.ps1")
+          daily_path = Path("run-daily-pipeline.ps1")
+          full = full_path.read_text(encoding="utf-8")
+          daily = daily_path.read_text(encoding="utf-8")
 
-          $syncInvocation = "    & `$PY -u `$PY_SYNC_GOLD"
-          $syncIndex = $full.IndexOf($syncInvocation)
-          if ($syncIndex -lt 0) {
-            throw "Could not find GOLD JSON sync invocation"
-          }
-          if ($full.IndexOf($syncInvocation, $syncIndex + 1) -ge 0) {
-            throw "Expected exactly one GOLD JSON sync invocation"
-          }
+          decl = "  $PY_PUBLISH = Join-Path $PIPELINE_ROOT 'tools\\publish_artifacts.py'"
+          if full.count(decl) != 1:
+              raise SystemExit(f"expected one publish declaration, got {full.count(decl)}")
+          replacement = "\n".join([
+              "  $PY_L2_CAPACITY = Join-Path $PIPELINE_ROOT 'tools\\apply_l2_capacity.py'",
+              decl,
+          ])
+          full = full.replace(decl, replacement, 1)
 
-          $capacityBlock = @"
-    if (Test-Path `$PY_L2_CAPACITY) {
-      Write-Log 'STEP 4A: Apply chain-specific L2 capacity before GOLD JSON export/publish'
-      & `$PY -u `$PY_L2_CAPACITY --gold-root `$GOLD_PARQUET_ROOT --raw-root `$RAW_ROOT --published-root `$PUBLISHED_ROOT --chains 'arbitrum,base'
-      if (`$LASTEXITCODE -ne 0) {
-        throw "apply_l2_capacity.py failed rc=`$LASTEXITCODE"
-      }
-    }
+          sync = "    & $PY -u $PY_SYNC_GOLD"
+          if full.count(sync) != 1:
+              raise SystemExit(f"expected one GOLD JSON sync invocation, got {full.count(sync)}")
+          block = "\n".join([
+              "    if (Test-Path $PY_L2_CAPACITY) {",
+              "      Write-Log 'STEP 4A: Apply chain-specific L2 capacity before GOLD JSON export/publish'",
+              "      & $PY -u $PY_L2_CAPACITY --gold-root $GOLD_PARQUET_ROOT --raw-root $RAW_ROOT --published-root $PUBLISHED_ROOT --chains 'arbitrum,base'",
+              "      if ($LASTEXITCODE -ne 0) {",
+              "        throw \"apply_l2_capacity.py failed rc=$LASTEXITCODE\"",
+              "      }",
+              "    }",
+              "",
+              "",
+          ])
+          full = full.replace(sync, block + sync, 1)
 
-"@
-          $full = $full.Insert($syncIndex, $capacityBlock)
+          late = "    Invoke-L2CapacityIfAvailable -RepoRoot $RootDir"
+          if daily.count(late) != 1:
+              raise SystemExit(f"expected one late L2 invocation, got {daily.count(late)}")
+          daily = daily.replace(late + "\r\n", "", 1)
+          daily = daily.replace(late + "\n", "", 1)
+          if late in daily:
+              raise SystemExit("late L2 invocation still present")
 
-          $lateCall = "    Invoke-L2CapacityIfAvailable -RepoRoot `$RootDir`"
-          if (($daily.Split($lateCall).Count - 1) -ne 1) {
-            throw "Expected exactly one late L2 capacity invocation in run-daily-pipeline.ps1"
-          }
-          $daily = $daily.Replace($lateCall + "`r`n", "")
-          $daily = $daily.Replace($lateCall + "`n", "")
-          if ($daily.Contains($lateCall)) {
-            throw "Late L2 capacity invocation still present"
-          }
-
-          Set-Content -LiteralPath "pipeline/tools/full_pipeline.ps1" -Value $full -NoNewline
-          Set-Content -LiteralPath "run-daily-pipeline.ps1" -Value $daily -NoNewline
+          full_path.write_text(full, encoding="utf-8")
+          daily_path.write_text(daily, encoding="utf-8")
+          PY
 
       - name: Validate ordering contract
         shell: pwsh
