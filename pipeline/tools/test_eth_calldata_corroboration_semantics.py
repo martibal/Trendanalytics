@@ -4,6 +4,34 @@ import pandas as pd
 import api.regime_engine as re
 
 
+ETH_V2_CORE_DEMAND = ("tx_count_daily", "unique_active_addresses")
+ETH_V2_FRICTION = ("median_tx_fee_native", "failed_tx_rate")
+ETH_V2_CAPACITY = ("gas_utilization_pct",)
+ETH_V2_REJECTED_LABEL_METRICS = {
+    "block_gas_utilization_p90",
+    "median_block_base_fee_per_gas",
+    "median_tx_gas_used",
+    "contract_creation_tx_share",
+    "eip1559_type2_tx_share",
+}
+
+
+def validate_profile_contract():
+    spec = re.PROFILE_SPECS["eth_l1"]
+    assert spec.ruleset_id == "eth_l1_v2", spec
+    assert spec.demand_metrics == ETH_V2_CORE_DEMAND, spec
+    assert spec.friction_metrics == ETH_V2_FRICTION, spec
+    assert spec.capacity_metrics == ETH_V2_CAPACITY, spec
+
+    label_metrics = set(spec.demand_metrics + spec.friction_metrics + spec.capacity_metrics)
+    leaked = ETH_V2_REJECTED_LABEL_METRICS & label_metrics
+    assert not leaked, f"rejected observational metrics leaked into ETH label profile: {sorted(leaked)}"
+    assert "nonempty_calldata_share" not in spec.demand_metrics, (
+        "calldata must remain supplemental corroboration, not a core Demand metric"
+    )
+    print("[ETH_CALLDATA] profile contract: eth_l1_v2 core axes locked")
+
+
 def signal(metric: str, *, band: str = "NORMAL", trend: str = "FLAT"):
     band_values = {
         "NORMAL": (50.0, 0.0),
@@ -53,6 +81,11 @@ def evaluate(name: str, scenario, expected: str):
     assert "nonempty_calldata_share" in out["signals"], out
     assert out["signals"]["nonempty_calldata_share"]["axis"] == "demand", out
     assert out["axes"]["demand"]["informative_count"] == 2, out
+
+    rejected_present = ETH_V2_REJECTED_LABEL_METRICS & set(out["signals"])
+    assert not rejected_present, (
+        f"{name}: rejected observational metrics entered regime signals: {sorted(rejected_present)}"
+    )
     print(f"[ETH_CALLDATA] {name}: {out['label']}")
 
 
@@ -67,6 +100,7 @@ def base(*, core_band="NORMAL", core_trend="FLAT", calldata_trend="FLAT"):
     }
 
 
+validate_profile_contract()
 evaluate(
     "baseline_heating_preserved",
     base(core_band="HIGH", core_trend="HEATING", calldata_trend="FLAT"),
@@ -88,4 +122,4 @@ evaluate(
     "STABLE",
 )
 
-print("[ETH_CALLDATA] OK: eth_l1_v2 preserve-baseline corroboration semantics validated")
+print("[ETH_CALLDATA] OK: eth_l1_v2 methodology contract and corroboration semantics validated")
