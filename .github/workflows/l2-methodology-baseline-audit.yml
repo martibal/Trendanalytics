@@ -1,0 +1,138 @@
+name: L2 Methodology Baseline Audit
+
+on:
+  push:
+    branches:
+      - agent/l2-methodology-baseline-audit
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas numpy
+
+      - name: Run L2 baseline audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          chains = ('arbitrum', 'base')
+          report = {'chains': {}, 'guardrails': [
+              'Observational only; no production files modified.',
+              'Published META regime.label is the baseline.',
+              'Audit current l2_v1 behavior before considering new metrics or rules.'
+          ]}
+
+          for chain in chains:
+              gold_root = Path('data/published/v1/gold') / chain
+              meta_root = Path('data/published/v1/meta') / chain
+              gold_paths = sorted(gold_root.glob('????-??-??.json'))
+              meta_paths = sorted(meta_root.glob('????-??-??.json'))
+              if not gold_paths or len(gold_paths) != len(meta_paths):
+                  raise SystemExit(f'{chain}: Gold/META parity failure gold={len(gold_paths)} meta={len(meta_paths)}')
+              if gold_paths[-1].stem != meta_paths[-1].stem:
+                  raise SystemExit(f'{chain}: latest mismatch gold={gold_paths[-1].stem} meta={meta_paths[-1].stem}')
+
+              rows = []
+              for p in gold_paths:
+                  obj = json.loads(p.read_text(encoding='utf-8'))
+                  obj.setdefault('date', p.stem)
+                  rows.append(obj)
+              df = pd.DataFrame(rows)
+              df['date'] = pd.to_datetime(df['date'], errors='coerce')
+              df = df.dropna(subset=['date']).sort_values('date').reset_index(drop=True)
+
+              labels = Counter()
+              rulesets = Counter()
+              axis_conflicts = Counter()
+              label_axis_patterns = Counter()
+              driver_metrics = Counter()
+              recompute_mismatches = []
+
+              for i in range(len(df)):
+                  day = df.loc[i, 'date'].date().isoformat()
+                  meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+                  regime = meta.get('regime') or {}
+                  label = regime.get('label')
+                  labels[label] += 1
+                  ruleset = regime.get('ruleset_id')
+                  rulesets[ruleset] += 1
+                  if ruleset != 'l2_v1':
+                      raise SystemExit(f'{chain}: unexpected ruleset on {day}: {ruleset}')
+
+                  confidence = (meta.get('confidence') or {}).get('confidence_score')
+                  hist = df.iloc[:i+1].copy()
+                  ev = engine.compute_regime(
+                      hist,
+                      chain=chain,
+                      profile={'type': 'l2'},
+                      asof_date=day,
+                      confidence_score=confidence,
+                  )
+
+                  if ev.get('label') != label:
+                      recompute_mismatches.append({'date': day, 'published': label, 'recomputed': ev.get('label')})
+
+                  axes = ev.get('axes') or {}
+                  pattern = []
+                  for axis in ('demand', 'friction', 'capacity'):
+                      a = axes.get(axis) or {}
+                      hi = str(a.get('band_high', 'NORMAL'))
+                      lo = str(a.get('band_low', 'NORMAL'))
+                      if hi in ('HIGH', 'EXTREME_HIGH') and lo in ('LOW', 'EXTREME_LOW'):
+                          axis_conflicts[axis] += 1
+                      pattern.append(f'{axis}:{hi}/{lo}/{a.get("trend", "FLAT")}')
+                  label_axis_patterns[(label, ' | '.join(pattern))] += 1
+
+                  for d in regime.get('drivers') or []:
+                      metric = d.get('metric')
+                      if metric:
+                          driver_metrics[(label, metric)] += 1
+
+              report['chains'][chain] = {
+                  'scope': {'start': gold_paths[0].stem, 'end': gold_paths[-1].stem, 'days': len(gold_paths)},
+                  'rulesets': dict(rulesets),
+                  'labels': dict(labels),
+                  'axis_conflicts': dict(axis_conflicts),
+                  'top_label_axis_patterns': [
+                      {'label': k[0], 'pattern': k[1], 'count': v}
+                      for k, v in label_axis_patterns.most_common(20)
+                  ],
+                  'top_driver_metrics_by_label': [
+                      {'label': k[0], 'metric': k[1], 'count': v}
+                      for k, v in driver_metrics.most_common(30)
+                  ],
+                  'recompute_mismatch_count': len(recompute_mismatches),
+                  'recompute_mismatches_sample': recompute_mismatches[:25],
+              }
+
+          Path('l2-methodology-baseline-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-methodology-baseline-audit
+          path: l2-methodology-baseline-audit.json
+          if-no-files-found: error
+          retention-days: 7
