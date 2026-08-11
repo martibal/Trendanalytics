@@ -14,6 +14,14 @@ Default behavior:
 - out_root = data/calculated/meta
 - start date = earliest available GOLD date across supported chains (best-effort)
 
+Safety
+------
+A bounded rebuild (explicit --start later than the earliest canonical published
+META day) is automatically executed as incremental. The incremental exporter
+seeds staging from canonical published META before regenerating the requested
+window, preventing stale calculated history from rolling canonical methodology
+backward during daily finalization. Full-history rebuilds remain rebuild mode.
+
 Notes
 -----
 - This script is intentionally descriptive-only; it does not interpret markets.
@@ -93,6 +101,42 @@ def _infer_start_date(repo_root: Path) -> dt.date:
     return (dt.date.today() - dt.timedelta(days=3650))
 
 
+def _earliest_published_meta_day(repo_root: Path) -> Optional[dt.date]:
+    meta_root = repo_root / "data" / "published" / "v1" / "meta"
+    if not meta_root.exists():
+        return None
+
+    earliest: Optional[dt.date] = None
+    for chain_dir in meta_root.iterdir():
+        if not chain_dir.is_dir():
+            continue
+        for fp in chain_dir.glob("????-??-??.json"):
+            try:
+                day = _parse_date(fp.stem)
+            except ValueError:
+                continue
+            if earliest is None or day < earliest:
+                earliest = day
+    return earliest
+
+
+def _resolve_mode(*, repo_root: Path, requested_mode: str, explicit_start: bool, start: dt.date) -> str:
+    if requested_mode != "rebuild" or not explicit_start:
+        return requested_mode
+
+    earliest_published = _earliest_published_meta_day(repo_root)
+    if earliest_published is not None and start > earliest_published:
+        print(
+            "[rebuild_meta_only] bounded rebuild detected: "
+            f"start={start.isoformat()} > canonical_start={earliest_published.isoformat()}; "
+            "using incremental mode to seed staging from canonical published META",
+            flush=True,
+        )
+        return "incremental"
+
+    return requested_mode
+
+
 def _run_export_meta_history(*, repo_root: Path, out_root: Path, start: dt.date, mode: str, windows: str) -> int:
     tool = (repo_root / "pipeline" / "tools" / "export_meta_json_history.py").resolve()
     if not tool.exists():
@@ -154,7 +198,7 @@ def main() -> None:
         "--mode",
         default="rebuild",
         choices=["incremental", "rebuild"],
-        help="incremental=preserve existing day files; rebuild=overwrite history (default)",
+        help="incremental=preserve existing day files; rebuild=overwrite full history (bounded rebuilds are promoted to incremental for safety)",
     )
     ap.add_argument(
         "--windows",
@@ -167,14 +211,23 @@ def main() -> None:
     out_root = Path(args.out_root).resolve() if args.out_root else (repo_root / "data" / "calculated" / "meta")
     out_root.mkdir(parents=True, exist_ok=True)
 
-    if args.start:
+    explicit_start = bool(args.start)
+    if explicit_start:
         start = _parse_date(str(args.start))
     else:
         start = _infer_start_date(repo_root)
 
+    mode = _resolve_mode(
+        repo_root=repo_root,
+        requested_mode=str(args.mode),
+        explicit_start=explicit_start,
+        start=start,
+    )
+
     print(f"[rebuild_meta_only] root={repo_root}")
     print(f"[rebuild_meta_only] out_root={out_root}")
-    print(f"[rebuild_meta_only] mode={args.mode}")
+    print(f"[rebuild_meta_only] requested_mode={args.mode}")
+    print(f"[rebuild_meta_only] effective_mode={mode}")
     print(f"[rebuild_meta_only] start={start.isoformat()}")
     print(f"[rebuild_meta_only] windows={args.windows}")
 
@@ -182,7 +235,7 @@ def main() -> None:
         repo_root=repo_root,
         out_root=out_root,
         start=start,
-        mode=str(args.mode),
+        mode=mode,
         windows=str(args.windows),
     )
     if rc != 0:
