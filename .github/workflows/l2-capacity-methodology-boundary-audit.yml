@@ -1,0 +1,123 @@
+name: L2 Capacity Methodology Boundary Audit
+
+on:
+  push:
+    branches: [agent/l2-capacity-methodology-boundary-audit]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run methodology boundary audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          chains = ('arbitrum', 'base')
+          boundary = '2026-05-08'
+          seed = json.loads(Path('pipeline/backfill/l2-capacity-backfill-combined.json').read_text(encoding='utf-8'))
+          seed_hist = seed.get('history') or {}
+
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True, stderr=subprocess.STDOUT).strip()
+
+          history_lines = git('log', '--all', '--date=iso-strict', '--pretty=format:%H\t%ad\t%s', '--',
+                              'pipeline/tools/apply_l2_capacity.py',
+                              'pipeline/tools/apply_l2_capacity_backfill_seed.py',
+                              'pipeline/backfill/l2-capacity-backfill-combined.json').splitlines()
+
+          pickaxe = git('log', '--all', '--date=iso-strict', '--pretty=format:%H\t%ad\t%s', '-S', 'capacity_util_pct', '--',
+                        'pipeline', 'api').splitlines()
+
+          report = {
+              'boundary_hint': boundary,
+              'seed_baseline': seed.get('baseline'),
+              'seed_start': seed.get('start'),
+              'seed_end': seed.get('end'),
+              'relevant_commit_history': history_lines[:100],
+              'capacity_pickaxe_history': pickaxe[:100],
+              'chains': {},
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Do not choose a repair source until the formula/source boundary is identified.',
+                  'Published Gold and META remain immutable baseline.'
+              ],
+          }
+
+          for chain in chains:
+              gold_root = Path('data/published/v1/gold') / chain
+              meta_root = Path('data/published/v1/meta') / chain
+              seed_by_date = {str(r.get('date')): r for r in (seed_hist.get(chain) or [])}
+              days = sorted(gold_root.glob('????-??-??.json'))
+              rows = []
+              first_gold_capacity = None
+              for p in days:
+                  day = p.stem
+                  gold = json.loads(p.read_text(encoding='utf-8'))
+                  meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+                  gcap = gold.get('capacity_util_pct')
+                  srow = seed_by_date.get(day) or {}
+                  scap = srow.get('capacity_util_pct')
+                  raw = srow.get('raw_value')
+                  cap_axis = (((meta.get('regime') or {}).get('axes') or {}).get('capacity') or {})
+                  if gcap is not None and first_gold_capacity is None:
+                      first_gold_capacity = day
+                  if day >= '2026-04-25' and day <= '2026-05-20':
+                      rows.append({
+                          'date': day,
+                          'gold_capacity': gcap,
+                          'seed_capacity': scap,
+                          'seed_raw_value': raw,
+                          'published_label': (meta.get('regime') or {}).get('label'),
+                          'published_capacity_band_high': cap_axis.get('band_high'),
+                          'published_capacity_band_low': cap_axis.get('band_low'),
+                          'published_capacity_trend': cap_axis.get('trend'),
+                          'published_capacity_informative_count': cap_axis.get('informative_count'),
+                      })
+
+              overlap = []
+              for p in days:
+                  day = p.stem
+                  if day not in seed_by_date:
+                      continue
+                  g = json.loads(p.read_text(encoding='utf-8')).get('capacity_util_pct')
+                  s = seed_by_date[day].get('capacity_util_pct')
+                  if g is not None and s is not None:
+                      overlap.append((day, float(g), float(s)))
+              exact = [d for d,g,s in overlap if abs(g-s) <= 1e-12]
+              conflicts = [d for d,g,s in overlap if abs(g-s) > 1e-12]
+
+              report['chains'][chain] = {
+                  'history_days': len(days),
+                  'first_published_gold_capacity_date': first_gold_capacity,
+                  'seed_overlap_non_null_count': len(overlap),
+                  'seed_exact_match_count': len(exact),
+                  'seed_conflict_count': len(conflicts),
+                  'first_seed_conflict_date': conflicts[0] if conflicts else None,
+                  'last_seed_exact_match_date': exact[-1] if exact else None,
+                  'boundary_window': rows,
+              }
+
+          Path('l2-capacity-methodology-boundary-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: l2-capacity-methodology-boundary-audit
+          path: l2-capacity-methodology-boundary-audit.json
+          if-no-files-found: error
+          retention-days: 7
