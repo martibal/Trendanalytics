@@ -1,0 +1,174 @@
+name: L2 Capacity Source Reconstruction Audit
+on:
+  push:
+    branches:
+      - agent/l2-capacity-source-reconstruction-audit
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install pandas numpy pyarrow
+      - name: Run L2 capacity source reconstruction audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+
+          chains = ('arbitrum', 'base')
+          token = 'capacity_util_pct'
+          report = {
+              'chains': {},
+              'code_references': [],
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Do not rewrite published labels in this audit.',
+                  'Identify a deterministic source for historical capacity_util_pct before any migration.'
+              ],
+          }
+
+          # Find source-code references without relying on GitHub code search indexing.
+          for root in ('api', 'pipeline', 'scripts'):
+              rp = Path(root)
+              if not rp.exists():
+                  continue
+              for p in rp.rglob('*'):
+                  if not p.is_file() or p.suffix.lower() not in ('.py', '.json', '.yml', '.yaml', '.ts', '.tsx', '.js'):
+                      continue
+                  try:
+                      text = p.read_text(encoding='utf-8', errors='ignore')
+                  except Exception:
+                      continue
+                  if token in text:
+                      report['code_references'].append(str(p))
+
+          for chain in chains:
+              sources = []
+              published_gold = Path('data/published/v1/gold') / chain
+              published_meta = Path('data/published/v1/meta') / chain
+              mismatch_dates = []
+
+              gold_days = sorted(published_gold.glob('????-??-??.json'))
+              meta_days = sorted(published_meta.glob('????-??-??.json'))
+              if not gold_days or len(gold_days) != len(meta_days):
+                  raise SystemExit(f'{chain}: published Gold/META parity failure')
+
+              # Dates where META says capacity was informative but Gold lacks the field/value.
+              for mp in meta_days:
+                  day = mp.stem
+                  meta = json.loads(mp.read_text(encoding='utf-8'))
+                  regime = meta.get('regime') or {}
+                  cap = ((regime.get('axes') or {}).get('capacity') or {})
+                  gp = published_gold / f'{day}.json'
+                  gold = json.loads(gp.read_text(encoding='utf-8'))
+                  gold_val = gold.get(token)
+                  if int(cap.get('informative_count') or 0) > 0 and gold_val is None:
+                      mismatch_dates.append(day)
+
+              # Inspect JSON-like artifact trees for exact historical values.
+              candidate_roots = [
+                  Path('data/calculated'),
+                  Path('data'),
+                  Path('web-v1-app/.private-data'),
+              ]
+              seen_files = set()
+              for root in candidate_roots:
+                  if not root.exists():
+                      continue
+                  for p in root.rglob('*.json'):
+                      sp = str(p)
+                      if sp in seen_files or '/published/v1/meta/' in sp.replace('\\','/'):
+                          continue
+                      seen_files.add(sp)
+                      try:
+                          obj = json.loads(p.read_text(encoding='utf-8'))
+                      except Exception:
+                          continue
+                      val = obj.get(token) if isinstance(obj, dict) else None
+                      if val is not None:
+                          date = obj.get('date') or obj.get('day') or (p.stem if len(p.stem) == 10 else None)
+                          if chain in sp.lower() or (isinstance(obj, dict) and str(obj.get('chain','')).lower() == chain):
+                              sources.append({'path': sp, 'date': date, 'value': val, 'kind': 'json'})
+
+              # Inspect parquet files for a reconstructable series.
+              parquet_hits = []
+              for p in Path('data').rglob('*.parquet'):
+                  sp = str(p)
+                  if chain not in sp.lower():
+                      continue
+                  try:
+                      df = pd.read_parquet(p)
+                  except Exception:
+                      continue
+                  if token not in df.columns:
+                      continue
+                  date_col = 'date' if 'date' in df.columns else ('day' if 'day' in df.columns else None)
+                  vals = pd.to_numeric(df[token], errors='coerce')
+                  nonnull = int(vals.notna().sum())
+                  sample = []
+                  if nonnull:
+                      q = df.loc[vals.notna(), ([date_col, token] if date_col else [token])].head(10)
+                      sample = q.to_dict(orient='records')
+                  parquet_hits.append({'path': sp, 'rows': len(df), 'nonnull': nonnull, 'date_col': date_col, 'sample': sample})
+
+              # Coverage comparison on provenance-gap dates.
+              json_by_date = {}
+              for s in sources:
+                  d = s.get('date')
+                  if d in mismatch_dates:
+                      json_by_date.setdefault(d, []).append(s)
+
+              parquet_coverage = {}
+              for hit in parquet_hits:
+                  p = Path(hit['path'])
+                  try:
+                      df = pd.read_parquet(p)
+                  except Exception:
+                      continue
+                  dc = hit['date_col']
+                  if not dc:
+                      continue
+                  dts = pd.to_datetime(df[dc], errors='coerce').dt.date.astype(str)
+                  vals = pd.to_numeric(df[token], errors='coerce')
+                  for d in mismatch_dates:
+                      mask = (dts == d) & vals.notna()
+                      if mask.any():
+                          parquet_coverage.setdefault(d, []).append({
+                              'path': str(p),
+                              'values': sorted(set(float(x) for x in vals[mask].tolist()))[:10],
+                          })
+
+              report['chains'][chain] = {
+                  'scope': {'start': gold_days[0].stem, 'end': gold_days[-1].stem, 'days': len(gold_days)},
+                  'meta_informative_but_gold_missing_count': len(mismatch_dates),
+                  'meta_informative_but_gold_missing_dates': mismatch_dates,
+                  'json_source_hit_count': len(sources),
+                  'json_hits_on_gap_dates': json_by_date,
+                  'parquet_files_with_capacity': parquet_hits,
+                  'parquet_hits_on_gap_dates': parquet_coverage,
+                  'gap_dates_reconstructable_from_json_count': len(json_by_date),
+                  'gap_dates_reconstructable_from_parquet_count': len(parquet_coverage),
+              }
+
+          Path('l2-capacity-source-reconstruction-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-capacity-source-reconstruction-audit
+          path: l2-capacity-source-reconstruction-audit.json
+          if-no-files-found: error
+          retention-days: 7
