@@ -1,0 +1,124 @@
+name: Ethereum p90 Target-Day Semantic Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-p90-target-day-semantic-audit
+    paths:
+      - ".github/workflows/ethereum-p90-target-day-semantic-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas numpy
+
+      - name: Run target-day semantic audit
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          gold_root = Path('data/published/v1/gold/ethereum')
+          meta_root = Path('data/published/v1/meta/ethereum')
+          gold_paths = sorted(gold_root.glob('????-??-??.json'))
+          if len(gold_paths) != 617:
+              raise SystemExit(f'expected 617 Ethereum Gold days, got {len(gold_paths)}')
+
+          rows = []
+          for p in gold_paths:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              obj.setdefault('date', p.stem)
+              rows.append(obj)
+          df = pd.DataFrame(rows)
+          df['date'] = pd.to_datetime(df['date'], errors='coerce')
+          df = df.dropna(subset=['date']).sort_values('date').reset_index(drop=True)
+
+          dates = pd.date_range('2025-11-26', '2025-12-02', freq='D')
+          out = []
+          for dt in dates:
+              day = dt.date().isoformat()
+              idx = df.index[df['date'] == dt]
+              if len(idx) != 1:
+                  raise SystemExit(f'missing/duplicate Gold day {day}')
+              i = int(idx[0])
+              sub = df.iloc[:i+1].copy()
+              meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+              regime = meta.get('regime') or {}
+              if regime.get('ruleset_id') != 'eth_l1_v2':
+                  raise SystemExit(f'unexpected ruleset on {day}: {regime.get("ruleset_id")}')
+              confidence = (meta.get('confidence') or {}).get('confidence_score')
+              ev = engine.compute_regime(
+                  sub,
+                  chain='ethereum',
+                  profile={'type': 'eth_l1'},
+                  asof_date=day,
+                  confidence_score=confidence,
+              )
+              p90 = engine._signal_for_metric(sub, 'block_gas_utilization_p90') or {}
+              p90_consensus = bool(p90.get('informative', False)) and float(p90.get('pct_90d', 50.0)) >= 80.0 and float(p90.get('z_robust', 0.0)) >= 1.5
+
+              axes = ev.get('axes') or {}
+              out.append({
+                  'date': day,
+                  'published_label': regime.get('label'),
+                  'recomputed_label': ev.get('label'),
+                  'confidence': confidence,
+                  'demand': axes.get('demand'),
+                  'friction': axes.get('friction'),
+                  'capacity': axes.get('capacity'),
+                  'drivers': ev.get('drivers'),
+                  'p90': {
+                      'current': p90.get('current'),
+                      'pct_90d': p90.get('pct_90d'),
+                      'z_robust': p90.get('z_robust'),
+                      'momentum_7d_vs_30d': p90.get('momentum_7d_vs_30d'),
+                      'informative': p90.get('informative'),
+                      'consensus_high': p90_consensus,
+                  },
+              })
+
+          target = next(r for r in out if r['date'] == '2025-12-01')
+          report = {
+              'scope': {'start': out[0]['date'], 'end': out[-1]['date'], 'days': len(out)},
+              'target_date': '2025-12-01',
+              'question': 'Does persistent p90 capacity evidence invalidate published CHEAP semantics on the target day?',
+              'target': target,
+              'window': out,
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Published labels remain baseline.',
+                  'p90 is inspected as separate Capacity evidence; core ETH v2 axes remain unchanged.',
+              ],
+          }
+          Path('ethereum-p90-target-day-semantic-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-p90-target-day-semantic-audit
+          path: ethereum-p90-target-day-semantic-audit.json
+          if-no-files-found: error
+          retention-days: 7
