@@ -1,0 +1,128 @@
+name: Ethereum Basefee Persistence Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-basefee-persistence-audit
+    paths:
+      - .github/workflows/ethereum-basefee-persistence-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ethereum-basefee-persistence-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install pandas numpy
+      - name: Run basefee persistence audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          gold_root = Path('data/published/v1/gold/ethereum')
+          meta_root = Path('data/published/v1/meta/ethereum')
+          gold_paths = sorted(gold_root.glob('????-??-??.json'))
+          meta_paths = sorted(meta_root.glob('????-??-??.json'))
+          if len(gold_paths) != 617 or len(meta_paths) != 617:
+              raise SystemExit(f'expected 617 Ethereum Gold/META days, got gold={len(gold_paths)} meta={len(meta_paths)}')
+
+          rows = []
+          for p in gold_paths:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              obj.setdefault('date', p.stem)
+              rows.append(obj)
+          df = pd.DataFrame(rows)
+          df['date'] = pd.to_datetime(df['date'], errors='coerce')
+          df = df.dropna(subset=['date']).sort_values('date').reset_index(drop=True)
+
+          daily = []
+          rulesets = Counter()
+          for i in range(len(df)):
+              day = df.loc[i, 'date'].date().isoformat()
+              sub = df.iloc[:i+1].copy()
+              meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+              regime = meta.get('regime') or {}
+              rulesets[regime.get('ruleset_id')] += 1
+              sig = engine._signal_for_metric(sub, 'median_block_base_fee_per_gas') or {}
+              informative = bool(sig.get('informative', False))
+              pct = float(sig.get('pct_90d', 50.0))
+              z = float(sig.get('z_robust', 0.0))
+              consensus = informative and pct >= 80.0 and z >= 1.5
+              daily.append({
+                  'date': day,
+                  'published': regime.get('label'),
+                  'consensus': consensus,
+                  'pct_90d': pct,
+                  'z_robust': z,
+              })
+
+          if rulesets != Counter({'eth_l1_v2': 617}):
+              raise SystemExit(f'unexpected rulesets: {dict(rulesets)}')
+
+          streak = 0
+          streaks = []
+          for row in daily:
+              streak = streak + 1 if row['consensus'] else 0
+              streaks.append(streak)
+
+          result = {}
+          for n in (1, 2, 3, 5):
+              changes = []
+              for i, row in enumerate(daily):
+                  if row['published'] == 'CHEAP' and streaks[i] >= n:
+                      changes.append({
+                          'date': row['date'],
+                          'from': 'CHEAP',
+                          'to': 'STABLE',
+                          'streak': streaks[i],
+                          'pct_90d': row['pct_90d'],
+                          'z_robust': row['z_robust'],
+                      })
+              result[f'{n}d'] = {
+                  'change_count': len(changes),
+                  'dates': [r['date'] for r in changes],
+                  'changes': changes,
+              }
+
+          report = {
+              'scope': {'start': daily[0]['date'], 'end': daily[-1]['date'], 'days': len(daily)},
+              'baseline': 'published META regime.label',
+              'rulesets': dict(rulesets),
+              'candidate_metric': 'median_block_base_fee_per_gas',
+              'qualifier': 'informative AND pct_90d>=80 AND z_robust>=1.5',
+              'persistence': 'consecutive qualifying calendar rows ending on the candidate CHEAP day',
+              'result': result,
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Only CHEAP->STABLE veto is evaluated.',
+                  'Published labels remain the baseline.',
+              ],
+          }
+          Path('ethereum-basefee-persistence-audit.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-basefee-persistence-audit
+          path: ethereum-basefee-persistence-audit.json
+          if-no-files-found: error
+          retention-days: 7
