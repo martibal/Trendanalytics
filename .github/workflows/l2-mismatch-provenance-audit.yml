@@ -1,0 +1,143 @@
+name: L2 Mismatch Provenance Audit
+on:
+  push:
+    branches:
+      - agent/l2-mismatch-provenance-audit
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install pandas numpy
+      - name: Run L2 mismatch provenance audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from collections import Counter
+          import pandas as pd
+          import api.regime_engine as engine
+
+          chains = ('arbitrum', 'base')
+          report = {'chains': {}, 'guardrails': [
+              'Observational only; no production files modified.',
+              'Published META is treated as immutable historical baseline.',
+              'Classify provenance before changing l2_v1 or historical artifacts.'
+          ]}
+
+          for chain in chains:
+              gold_root = Path('data/published/v1/gold') / chain
+              meta_root = Path('data/published/v1/meta') / chain
+              gold_paths = sorted(gold_root.glob('????-??-??.json'))
+              meta_paths = sorted(meta_root.glob('????-??-??.json'))
+              if not gold_paths or len(gold_paths) != len(meta_paths):
+                  raise SystemExit(f'{chain}: Gold/META parity failure gold={len(gold_paths)} meta={len(meta_paths)}')
+
+              rows = []
+              for p in gold_paths:
+                  obj = json.loads(p.read_text(encoding='utf-8'))
+                  obj.setdefault('date', p.stem)
+                  rows.append(obj)
+              df = pd.DataFrame(rows)
+              df['date'] = pd.to_datetime(df['date'], errors='coerce')
+              df = df.dropna(subset=['date']).sort_values('date').reset_index(drop=True)
+
+              mismatches = []
+              transition_counts = Counter()
+              published_capacity_driver = 0
+              published_capacity_signal = 0
+              published_capacity_axis_non_normal = 0
+              confidence_versions = Counter()
+              top_level_methodologies = Counter()
+
+              for i in range(len(df)):
+                  day = df.loc[i, 'date'].date().isoformat()
+                  meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+                  regime = meta.get('regime') or {}
+                  published = regime.get('label')
+                  confidence = meta.get('confidence') or {}
+                  confidence_score = confidence.get('confidence_score')
+                  confidence_versions[confidence.get('methodology_version')] += 1
+                  top_level_methodologies[meta.get('methodology_version')] += 1
+
+                  ev = engine.compute_regime(
+                      df.iloc[:i+1].copy(),
+                      chain=chain,
+                      profile={'type':'l2'},
+                      asof_date=day,
+                      confidence_score=confidence_score,
+                  )
+                  recomputed = ev.get('label')
+                  if recomputed == published:
+                      continue
+
+                  transition_counts[f'{published}->{recomputed}'] += 1
+                  pub_drivers = regime.get('drivers') or []
+                  pub_driver_metrics = [d.get('metric') for d in pub_drivers if d.get('metric')]
+                  if 'capacity_util_pct' in pub_driver_metrics:
+                      published_capacity_driver += 1
+
+                  pub_signals = regime.get('signals') or {}
+                  if isinstance(pub_signals, dict) and 'capacity_util_pct' in pub_signals:
+                      published_capacity_signal += 1
+
+                  pub_axes = regime.get('axes') or {}
+                  pub_cap = pub_axes.get('capacity') or {}
+                  pub_cap_non_normal = (
+                      str(pub_cap.get('band_high','NORMAL')) != 'NORMAL' or
+                      str(pub_cap.get('band_low','NORMAL')) != 'NORMAL'
+                  )
+                  if pub_cap_non_normal:
+                      published_capacity_axis_non_normal += 1
+
+                  row = {
+                      'date': day,
+                      'published': published,
+                      'recomputed': recomputed,
+                      'published_ruleset': regime.get('ruleset_id'),
+                      'confidence_score': confidence_score,
+                      'confidence_methodology_version': confidence.get('methodology_version'),
+                      'top_level_methodology_version': meta.get('methodology_version'),
+                      'published_driver_metrics': pub_driver_metrics,
+                      'published_axes': pub_axes,
+                      'recomputed_axes': ev.get('axes'),
+                      'recomputed_signals': {
+                          k: v for k, v in (ev.get('signals') or {}).items()
+                          if k in ('tx_count_daily','unique_active_addresses','median_tx_fee_native','capacity_util_pct')
+                      },
+                      'gold_capacity_util_pct': rows[i].get('capacity_util_pct'),
+                  }
+                  mismatches.append(row)
+
+              report['chains'][chain] = {
+                  'scope': {'start': gold_paths[0].stem, 'end': gold_paths[-1].stem, 'days': len(gold_paths)},
+                  'mismatch_count': len(mismatches),
+                  'transition_counts': dict(transition_counts),
+                  'published_capacity_driver_on_mismatch_count': published_capacity_driver,
+                  'published_capacity_signal_on_mismatch_count': published_capacity_signal,
+                  'published_capacity_axis_non_normal_on_mismatch_count': published_capacity_axis_non_normal,
+                  'confidence_methodology_versions': {str(k): v for k, v in confidence_versions.items()},
+                  'top_level_methodology_versions': {str(k): v for k, v in top_level_methodologies.items()},
+                  'mismatches': mismatches,
+              }
+
+          Path('l2-mismatch-provenance-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-mismatch-provenance-audit
+          path: l2-mismatch-provenance-audit.json
+          if-no-files-found: error
+          retention-days: 7
