@@ -1,0 +1,164 @@
+name: L2 Snapshot Restoration Migration
+
+on:
+  push:
+    branches:
+      - fix/l2-snapshot-restoration
+    paths:
+      - ".github/workflows/l2-snapshot-restoration-migration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore-validate-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pipeline dependencies
+        run: pip install -r pipeline/requirements.txt
+
+      - name: Restore coherent L2 snapshot and keep newer current days
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=fb3b81f4e3f24e6fb271fcaaaf3a3eb298d00fcc
+          BASE_HEAD=$(git rev-parse HEAD)
+          SOURCE_END=2026-08-02
+
+          for genre in gold meta derived; do
+            for chain in arbitrum base; do
+              git checkout "$SOURCE" -- "data/published/v1/$genre/$chain"
+              git checkout "$BASE_HEAD" -- "data/published/v1/$genre/$chain/manifest.json"
+              for path in $(git ls-tree -r --name-only "$BASE_HEAD" "data/published/v1/$genre/$chain" | grep -E '/[0-9]{4}-[0-9]{2}-[0-9]{2}\.json$'); do
+                day=$(basename "$path" .json)
+                if [[ "$day" > "$SOURCE_END" ]]; then
+                  git checkout "$BASE_HEAD" -- "$path"
+                fi
+              done
+            done
+          done
+
+      - name: Rebuild latest and rolling windows from selected day files
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("data/published/v1")
+          windows = (7, 30, 90, 180, 365)
+          for genre in ("gold", "meta", "derived"):
+              for chain in ("arbitrum", "base"):
+                  d = root / genre / chain
+                  day_paths = sorted(p for p in d.glob("????-??-??.json") if len(p.stem) == 10)
+                  assert day_paths, (genre, chain)
+                  rows = [json.loads(p.read_text(encoding="utf-8")) for p in day_paths]
+                  (d / "latest.json").write_text(json.dumps(rows[-1], indent=2) + "\n", encoding="utf-8")
+                  for n in windows:
+                      (d / f"last{n}d.json").write_text(json.dumps(rows[-n:], indent=2) + "\n", encoding="utf-8")
+                  print(genre, chain, len(rows), day_paths[0].stem, day_paths[-1].stem)
+          PY
+
+      - name: Validate restored snapshot contract
+        run: |
+          python pipeline/tools/validate_published_dataset.py --published-root data/published/v1
+          python pipeline/tools/validate_meta_methodology_safety.py --root . --meta-root data/published/v1/meta
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          root = Path("data/published/v1")
+          for chain in ("arbitrum", "base"):
+              gold_root = root / "gold" / chain
+              meta_root = root / "meta" / chain
+              derived_root = root / "derived" / chain
+              days = sorted(p.stem for p in gold_root.glob("????-??-??.json"))
+              assert days == sorted(p.stem for p in meta_root.glob("????-??-??.json")), chain
+              assert days == sorted(p.stem for p in derived_root.glob("????-??-??.json")), chain
+
+              rows = []
+              metas = {}
+              capacity_non_null = 0
+              for day in days:
+                  gp = gold_root / f"{day}.json"
+                  gold = json.loads(gp.read_text(encoding="utf-8"))
+                  gold.setdefault("date", day)
+                  rows.append(gold)
+                  metas[day] = json.loads((meta_root / f"{day}.json").read_text(encoding="utf-8"))
+                  if gold.get("capacity_util_pct") is not None:
+                      capacity_non_null += 1
+
+                  derived = json.loads((derived_root / f"{day}.json").read_text(encoding="utf-8"))
+                  recorded = (((derived.get("derived") or {}).get("source") or {}).get("gold_sha256"))
+                  actual = hashlib.sha256(gp.read_bytes()).hexdigest()
+                  assert recorded == actual, (chain, day, recorded, actual)
+
+              df = pd.DataFrame(rows)
+              df["date"] = pd.to_datetime(df["date"], errors="coerce")
+              df = df.sort_values("date").reset_index(drop=True)
+              mismatches = []
+              for i in range(len(df)):
+                  day = df.loc[i, "date"].date().isoformat()
+                  meta = metas[day]
+                  published = ((meta.get("regime") or {}).get("label"))
+                  confidence = ((meta.get("confidence") or {}).get("confidence_score"))
+                  ev = engine.compute_regime(df.iloc[: i + 1].copy(), chain=chain, profile={"type": "l2"}, asof_date=day, confidence_score=confidence)
+                  if published != ev.get("label"):
+                      mismatches.append((day, published, ev.get("label")))
+              assert not mismatches, (chain, mismatches[:20], len(mismatches))
+              expected_capacity = 548 if chain == "arbitrum" else 603
+              assert capacity_non_null == expected_capacity, (chain, capacity_non_null)
+              assert len(days) == 612, (chain, len(days))
+              print(chain, "days=", len(days), "capacity_non_null=", capacity_non_null, "label_mismatches=0")
+          PY
+
+      - name: Sync canonical publication to private mirror
+        shell: pwsh
+        run: |
+          ./sync-published-data.ps1 `
+            -SourceRoot "${{ github.workspace }}/data/published/v1" `
+            -TargetRoot "${{ github.workspace }}/web-v1-app/.private-data/published/v1" `
+            -SkipGitStatus
+
+      - name: Verify canonical/private byte identity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          a = Path("data/published/v1")
+          b = Path("web-v1-app/.private-data/published/v1")
+          af = sorted(p.relative_to(a) for p in a.rglob("*") if p.is_file())
+          bf = sorted(p.relative_to(b) for p in b.rglob("*") if p.is_file())
+          assert af == bf, (len(af), len(bf))
+          for rel in af:
+              assert hashlib.sha256((a / rel).read_bytes()).digest() == hashlib.sha256((b / rel).read_bytes()).digest(), rel.as_posix()
+          print("canonical/private parity OK", len(af))
+          PY
+
+      - name: Commit validated restoration to migration branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/published/v1 web-v1-app/.private-data/published/v1
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "chore(data): restore coherent L2 capacity snapshot"
+            git push origin HEAD:fix/l2-snapshot-restoration
+          fi
