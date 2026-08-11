@@ -1,0 +1,208 @@
+name: Ethereum p90 Full-History Preflight
+
+on:
+  push:
+    branches:
+      - agent/ethereum-p90-full-history-preflight-v2
+    paths:
+      - ".github/workflows/ethereum-p90-full-history-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas numpy
+
+      - name: Run full-history published-baseline preflight
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          import pandas as pd
+          import api.regime_engine as engine
+
+          gold_root = Path("data/published/v1/gold/ethereum")
+          meta_root = Path("data/published/v1/meta/ethereum")
+          gold_paths = sorted(gold_root.glob("????-??-??.json"))
+          meta_paths = sorted(meta_root.glob("????-??-??.json"))
+
+          if len(gold_paths) != 617:
+              raise SystemExit(f"expected 617 Ethereum Gold days, got {len(gold_paths)}")
+          if len(meta_paths) != 617:
+              raise SystemExit(f"expected 617 Ethereum META days, got {len(meta_paths)}")
+
+          rows = []
+          for p in gold_paths:
+              obj = json.loads(p.read_text(encoding="utf-8"))
+              obj.setdefault("date", p.stem)
+              rows.append(obj)
+
+          df = pd.DataFrame(rows)
+          df["date"] = pd.to_datetime(df["date"], errors="coerce")
+          df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+          if len(df) != 617:
+              raise SystemExit(f"expected 617 parsed Gold rows, got {len(df)}")
+          if "block_gas_utilization_p90" not in df.columns:
+              raise SystemExit("missing block_gas_utilization_p90")
+
+          def is_high(band):
+              return band in ("HIGH", "EXTREME_HIGH")
+
+          records = []
+          missing_meta = []
+          rulesets = Counter()
+
+          for i in range(len(df)):
+              day = df.loc[i, "date"].date().isoformat()
+              sub = df.iloc[: i + 1].copy()
+              meta_path = meta_root / f"{day}.json"
+              if not meta_path.exists():
+                  missing_meta.append(day)
+                  continue
+
+              meta = json.loads(meta_path.read_text(encoding="utf-8"))
+              regime = meta.get("regime") or {}
+              published_label = regime.get("label")
+              rulesets[regime.get("ruleset_id")] += 1
+              confidence = (meta.get("confidence") or {}).get("confidence_score")
+
+              evidence = engine.compute_regime(
+                  sub,
+                  chain="ethereum",
+                  profile={"type": "eth_l1"},
+                  asof_date=day,
+                  confidence_score=confidence,
+              )
+              friction = (evidence.get("axes") or {}).get("friction") or {}
+              friction_high = (
+                  is_high(str(friction.get("band_high", "NORMAL")))
+                  and int(friction.get("informative_count", 0) or 0) > 0
+              )
+
+              p90 = engine._signal_for_metric(sub, "block_gas_utilization_p90")
+              if p90:
+                  p90_band = engine._band(
+                      float(p90.get("pct_90d", 50.0)),
+                      float(p90.get("z_robust", 0.0)),
+                      informative=bool(p90.get("informative", True)),
+                  )
+                  p90_trend = engine._trend(float(p90.get("momentum_7d_vs_30d", 0.0)))
+              else:
+                  p90_band = "NORMAL"
+                  p90_trend = "FLAT"
+
+              p90_high = is_high(p90_band) and bool((p90 or {}).get("informative", False))
+              guarded = published_label
+              reason = "published_preserved"
+
+              if published_label == "CHEAP" and p90_high:
+                  guarded = "STABLE"
+                  reason = "p90_high_vetoes_cheap"
+              elif published_label == "STABLE" and p90_high and friction_high:
+                  guarded = "CONGESTED"
+                  reason = "p90_high_plus_existing_friction_high"
+
+              records.append({
+                  "date": day,
+                  "published_label": published_label,
+                  "guarded_label": guarded,
+                  "changed": guarded != published_label,
+                  "reason": reason,
+                  "evidence_recomputed_label": evidence.get("label"),
+                  "friction_band_high": friction.get("band_high"),
+                  "friction_trend": friction.get("trend"),
+                  "friction_high": friction_high,
+                  "p90_band": p90_band,
+                  "p90_trend": p90_trend,
+                  "p90_informative": bool((p90 or {}).get("informative", False)),
+                  "p90_pct_90d": (p90 or {}).get("pct_90d"),
+                  "p90_z_robust": (p90 or {}).get("z_robust"),
+              })
+
+          if missing_meta:
+              raise SystemExit(f"missing META dates: {missing_meta}")
+          if len(records) != 617:
+              raise SystemExit(f"expected 617 compared days, got {len(records)}")
+          if rulesets != {"eth_l1_v2": 617}:
+              raise SystemExit(f"unexpected rulesets: {dict(rulesets)}")
+
+          changes = [r for r in records if r["changed"]]
+          transitions = Counter(f"{r['published_label']}->{r['guarded_label']}" for r in changes)
+          reasons = Counter(r["reason"] for r in changes)
+          bad_transitions = [
+              r for r in changes
+              if f"{r['published_label']}->{r['guarded_label']}"
+              not in ("CHEAP->STABLE", "STABLE->CONGESTED")
+          ]
+          if bad_transitions:
+              raise SystemExit(f"unexpected transitions: {bad_transitions}")
+
+          report = {
+              "scope": {
+                  "start": records[0]["date"],
+                  "end": records[-1]["date"],
+                  "days": len(records),
+              },
+              "baseline": "published META regime.label",
+              "rulesets": dict(rulesets),
+              "guard_semantics": {
+                  "cheap_veto": "published CHEAP + informative p90 HIGH/EXTREME_HIGH -> STABLE",
+                  "congestion_corroboration": "published STABLE + informative p90 HIGH/EXTREME_HIGH + recomputed existing Friction HIGH/EXTREME_HIGH -> CONGESTED",
+                  "heating_creation": False,
+                  "existing_congested_rewrite": False,
+              },
+              "result": {
+                  "published_counts": dict(Counter(r["published_label"] for r in records)),
+                  "guarded_counts": dict(Counter(r["guarded_label"] for r in records)),
+                  "change_count": len(changes),
+                  "transition_counts": dict(transitions),
+                  "reason_counts": dict(reasons),
+                  "changes": changes,
+                  "p90_informative_days": sum(1 for r in records if r["p90_informative"]),
+                  "p90_high_days": sum(1 for r in records if r["p90_band"] in ("HIGH", "EXTREME_HIGH")),
+                  "p90_high_friction_high_days": sum(1 for r in records if r["p90_band"] in ("HIGH", "EXTREME_HIGH") and r["friction_high"]),
+              },
+              "recomputed_evidence_alignment": {
+                  "mismatch_count": sum(1 for r in records if r["evidence_recomputed_label"] != r["published_label"]),
+                  "mismatch_dates": [r["date"] for r in records if r["evidence_recomputed_label"] != r["published_label"]],
+              },
+              "guardrails": [
+                  "Observational preflight only; no production files are modified.",
+                  "Published historical labels remain the baseline.",
+                  "Recomputed output is used only for Friction evidence.",
+                  "The p90 signal is evaluated separately from the core Capacity axis.",
+                  "Only CHEAP->STABLE and STABLE->CONGESTED transitions are allowed.",
+              ],
+          }
+
+          Path("ethereum-p90-full-history-preflight.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload preflight report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-p90-full-history-preflight
+          path: ethereum-p90-full-history-preflight.json
+          if-no-files-found: error
+          retention-days: 7
