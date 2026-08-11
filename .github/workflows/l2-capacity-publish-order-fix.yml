@@ -1,0 +1,124 @@
+name: L2 Capacity Publish Order Fix
+
+on:
+  push:
+    branches:
+      - fix/l2-capacity-publish-order
+    paths:
+      - ".github/workflows/l2-capacity-publish-order-fix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-validate-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch publish order deterministically
+        shell: pwsh
+        run: |
+          $full = Get-Content -LiteralPath "pipeline/tools/full_pipeline.ps1" -Raw
+          $daily = Get-Content -LiteralPath "run-daily-pipeline.ps1" -Raw
+
+          $declNeedle = "  `$PY_PUBLISH = Join-Path `$PIPELINE_ROOT 'tools\publish_artifacts.py'"
+          if (($full.Split($declNeedle).Count - 1) -ne 1) {
+            throw "Expected exactly one publish tool declaration marker"
+          }
+          $declReplacement = @"
+  `$PY_L2_CAPACITY = Join-Path `$PIPELINE_ROOT 'tools\apply_l2_capacity.py'
+$declNeedle
+"@
+          $full = $full.Replace($declNeedle, $declReplacement.TrimEnd("`r","`n"))
+
+          $syncInvocation = "    & `$PY -u `$PY_SYNC_GOLD"
+          $syncIndex = $full.IndexOf($syncInvocation)
+          if ($syncIndex -lt 0) {
+            throw "Could not find GOLD JSON sync invocation"
+          }
+          if ($full.IndexOf($syncInvocation, $syncIndex + 1) -ge 0) {
+            throw "Expected exactly one GOLD JSON sync invocation"
+          }
+
+          $capacityBlock = @"
+    if (Test-Path `$PY_L2_CAPACITY) {
+      Write-Log 'STEP 4A: Apply chain-specific L2 capacity before GOLD JSON export/publish'
+      & `$PY -u `$PY_L2_CAPACITY --gold-root `$GOLD_PARQUET_ROOT --raw-root `$RAW_ROOT --published-root `$PUBLISHED_ROOT --chains 'arbitrum,base'
+      if (`$LASTEXITCODE -ne 0) {
+        throw "apply_l2_capacity.py failed rc=`$LASTEXITCODE"
+      }
+    }
+
+"@
+          $full = $full.Insert($syncIndex, $capacityBlock)
+
+          $lateCall = "    Invoke-L2CapacityIfAvailable -RepoRoot `$RootDir`"
+          if (($daily.Split($lateCall).Count - 1) -ne 1) {
+            throw "Expected exactly one late L2 capacity invocation in run-daily-pipeline.ps1"
+          }
+          $daily = $daily.Replace($lateCall + "`r`n", "")
+          $daily = $daily.Replace($lateCall + "`n", "")
+          if ($daily.Contains($lateCall)) {
+            throw "Late L2 capacity invocation still present"
+          }
+
+          Set-Content -LiteralPath "pipeline/tools/full_pipeline.ps1" -Value $full -NoNewline
+          Set-Content -LiteralPath "run-daily-pipeline.ps1" -Value $daily -NoNewline
+
+      - name: Validate ordering contract
+        shell: pwsh
+        run: |
+          $full = Get-Content -LiteralPath "pipeline/tools/full_pipeline.ps1" -Raw
+          $daily = Get-Content -LiteralPath "run-daily-pipeline.ps1" -Raw
+
+          $capDecl = $full.IndexOf("`$PY_L2_CAPACITY = Join-Path `$PIPELINE_ROOT 'tools\apply_l2_capacity.py'")
+          $capRun = $full.IndexOf("& `$PY -u `$PY_L2_CAPACITY --gold-root `$GOLD_PARQUET_ROOT")
+          $goldSync = $full.IndexOf("& `$PY -u `$PY_SYNC_GOLD")
+          $publish = $full.IndexOf("& `$PY -u `$PY_PUBLISH")
+
+          if ($capDecl -lt 0 -or $capRun -lt 0 -or $goldSync -lt 0 -or $publish -lt 0) {
+            throw "Missing one or more required pipeline markers"
+          }
+          if (-not ($capRun -lt $goldSync -and $goldSync -lt $publish)) {
+            throw "Invalid ordering: expected L2 capacity < GOLD JSON sync < publish"
+          }
+          if ($daily.Contains("Invoke-L2CapacityIfAvailable -RepoRoot `$RootDir")) {
+            throw "Late duplicate L2 invocation remains in run-daily-pipeline.ps1"
+          }
+
+          Write-Host "Ordering OK: L2 capacity -> GOLD JSON sync -> publish"
+
+      - name: Validate PowerShell syntax
+        shell: pwsh
+        run: |
+          $files = @("pipeline/tools/full_pipeline.ps1", "run-daily-pipeline.ps1")
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Host $_.Message }
+              throw "PowerShell parse failed: $file"
+            }
+          }
+          Write-Host "PowerShell syntax OK"
+
+      - name: Remove temporary workflow and commit fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/l2-capacity-publish-order-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pipeline/tools/full_pipeline.ps1 run-daily-pipeline.ps1 .github/workflows/l2-capacity-publish-order-fix.yml
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m "fix(pipeline): apply L2 capacity before publication"
+          git push origin HEAD:fix/l2-capacity-publish-order
