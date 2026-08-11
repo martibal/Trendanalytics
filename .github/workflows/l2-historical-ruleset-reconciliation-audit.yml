@@ -1,0 +1,137 @@
+name: L2 Historical Ruleset Reconciliation Audit
+
+on:
+  push:
+    branches: [agent/l2-historical-ruleset-reconciliation-audit]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run ruleset reconciliation audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          from collections import Counter
+          from pathlib import Path
+
+          refs = {
+              'pre_methodology': '50a9491ce0201399aabe2764a01e29c39db57798^',
+              'methodology_change': '50a9491ce0201399aabe2764a01e29c39db57798',
+              'confidence_v2': '60c3af8111b8d742c272bf276c7de91c4e8ba6c2',
+              'canonical_backfill': 'fb3b81f4e3f24e6fb271fcaaaf3a3eb298d00fcc',
+              'current': 'HEAD',
+          }
+
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True, stderr=subprocess.STDOUT).strip()
+
+          def show(ref, path):
+              try:
+                  return git('show', f'{ref}:{path}')
+              except subprocess.CalledProcessError:
+                  return None
+
+          report = {
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Published labels are treated as historical evidence at each commit.',
+                  'No historical labels are rewritten in this audit.',
+              ],
+              'refs': {},
+              'engine_diffs': {},
+          }
+
+          for name, ref in refs.items():
+              entry = {'resolved_sha': git('rev-parse', ref), 'chains': {}, 'engine_capacity_lines': []}
+              engine = show(ref, 'api/regime_engine.py') or ''
+              entry['engine_capacity_lines'] = [
+                  line for line in engine.splitlines()
+                  if any(k in line for k in ('capacity_metrics', 'capacity_util_pct', 'avg_block_time_sec', 'CONGESTED', 'CHEAP'))
+              ][:120]
+
+              for chain in ('arbitrum', 'base'):
+                  labels = Counter()
+                  rulesets = Counter()
+                  capacity_in_gold = 0
+                  capacity_in_meta_driver = 0
+                  dates = []
+                  try:
+                      files = git('ls-tree', '-r', '--name-only', ref, f'data/published/v1/meta/{chain}').splitlines()
+                  except subprocess.CalledProcessError:
+                      files = []
+                  for path in files:
+                      if not path.endswith('.json') or Path(path).name in {'latest.json','manifest.json','last7d.json','last30d.json','last90d.json','last180d.json','last365d.json'}:
+                          continue
+                      txt = show(ref, path)
+                      if not txt:
+                          continue
+                      try: obj = json.loads(txt)
+                      except Exception: continue
+                      regime = obj.get('regime') or {}
+                      labels[regime.get('label')] += 1
+                      rulesets[regime.get('ruleset_id')] += 1
+                      dates.append(Path(path).stem)
+                      for d in (regime.get('drivers') or []):
+                          if d.get('metric') == 'capacity_util_pct':
+                              capacity_in_meta_driver += 1
+                              break
+
+                  try:
+                      gfiles = git('ls-tree', '-r', '--name-only', ref, f'data/published/v1/gold/{chain}').splitlines()
+                  except subprocess.CalledProcessError:
+                      gfiles = []
+                  for path in gfiles:
+                      if not path.endswith('.json') or len(Path(path).stem) != 10:
+                          continue
+                      txt = show(ref, path)
+                      if not txt: continue
+                      try: obj = json.loads(txt)
+                      except Exception: continue
+                      if obj.get('capacity_util_pct') is not None:
+                          capacity_in_gold += 1
+
+                  entry['chains'][chain] = {
+                      'meta_days': len(dates),
+                      'meta_start': min(dates) if dates else None,
+                      'meta_end': max(dates) if dates else None,
+                      'label_counts': dict(labels),
+                      'ruleset_counts': dict(rulesets),
+                      'gold_capacity_days': capacity_in_gold,
+                      'meta_capacity_driver_days': capacity_in_meta_driver,
+                  }
+              report['refs'][name] = entry
+
+          ordered = ['pre_methodology','methodology_change','confidence_v2','canonical_backfill','current']
+          for a, b in zip(ordered, ordered[1:]):
+              try:
+                  diff = git('diff', refs[a], refs[b], '--', 'api/regime_engine.py')
+              except subprocess.CalledProcessError:
+                  diff = ''
+              report['engine_diffs'][f'{a}->{b}'] = diff.splitlines()[:240]
+
+          Path('l2-historical-ruleset-reconciliation-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-historical-ruleset-reconciliation-audit
+          path: l2-historical-ruleset-reconciliation-audit.json
+          if-no-files-found: error
+          retention-days: 7
