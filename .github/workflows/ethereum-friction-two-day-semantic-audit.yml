@@ -1,0 +1,151 @@
+name: Ethereum Friction Two-Day Semantic Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-friction-two-day-semantic-audit
+    paths:
+      - .github/workflows/ethereum-friction-two-day-semantic-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ethereum-friction-two-day-semantic-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas numpy
+
+      - name: Run two-day semantic audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          target_dates = {'2026-04-28', '2026-04-30'}
+          window_start = '2026-04-26'
+          window_end = '2026-05-02'
+
+          gold_root = Path('data/published/v1/gold/ethereum')
+          meta_root = Path('data/published/v1/meta/ethereum')
+          gold_paths = sorted(gold_root.glob('????-??-??.json'))
+          if len(gold_paths) != 617:
+              raise SystemExit(f'expected 617 Ethereum Gold days, got {len(gold_paths)}')
+
+          rows = []
+          for p in gold_paths:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              obj.setdefault('date', p.stem)
+              rows.append(obj)
+          df = pd.DataFrame(rows)
+          df['date'] = pd.to_datetime(df['date'], errors='coerce')
+          df = df.dropna(subset=['date']).sort_values('date').reset_index(drop=True)
+
+          report_rows = []
+          for i in range(len(df)):
+              day = df.loc[i, 'date'].date().isoformat()
+              if day < window_start or day > window_end:
+                  continue
+              meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+              regime = meta.get('regime') or {}
+              if regime.get('ruleset_id') != 'eth_l1_v2':
+                  raise SystemExit(f'unexpected ruleset on {day}: {regime.get("ruleset_id")}')
+              confidence = (meta.get('confidence') or {}).get('confidence_score')
+              ev = engine.compute_regime(
+                  df.iloc[:i+1].copy(),
+                  chain='ethereum',
+                  profile={'type': 'eth_l1'},
+                  asof_date=day,
+                  confidence_score=confidence,
+              )
+              friction = ((ev.get('axes') or {}).get('friction') or {})
+              capacity = ((ev.get('axes') or {}).get('capacity') or {})
+              demand = ((ev.get('axes') or {}).get('demand') or {})
+              sigs = {}
+              for metric, s in (ev.get('signals') or {}).items():
+                  if s.get('axis') == 'friction':
+                      sigs[metric] = {
+                          'current': s.get('current'),
+                          'pct_90d': s.get('pct_90d'),
+                          'z_robust': s.get('z_robust'),
+                          'momentum_7d_vs_30d': s.get('momentum_7d_vs_30d'),
+                          'informative': s.get('informative'),
+                      }
+              if day in target_dates and set(sigs) != {'median_tx_fee_native', 'failed_tx_rate'}:
+                  raise SystemExit(f'missing core friction signals on target day {day}: {sorted(sigs)}')
+
+              scorecard = meta.get('scorecard') or {}
+              dims = scorecard.get('dimensions') or {}
+              report_rows.append({
+                  'date': day,
+                  'target': day in target_dates,
+                  'published_label': regime.get('label'),
+                  'recomputed_label': ev.get('label'),
+                  'confidence': confidence,
+                  'friction_axis': friction,
+                  'capacity_axis': capacity,
+                  'demand_axis': demand,
+                  'friction_signals': sigs,
+                  'drivers': regime.get('drivers'),
+                  'scorecard_friction': dims.get('friction'),
+                  'scorecard_capacity': dims.get('capacity'),
+                  'scorecard_status': scorecard.get('status'),
+              })
+
+          if [r['date'] for r in report_rows] != ['2026-04-26','2026-04-27','2026-04-28','2026-04-29','2026-04-30','2026-05-01','2026-05-02']:
+              raise SystemExit(f'unexpected audit window: {[r["date"] for r in report_rows]}')
+
+          target_rows = [r for r in report_rows if r['target']]
+          for r in target_rows:
+              fee = r['friction_signals']['median_tx_fee_native']
+              fail = r['friction_signals']['failed_tx_rate']
+              if not (float(fee['pct_90d']) >= 80 and float(fee['z_robust']) >= 1.5):
+                  raise SystemExit(f'{r["date"]}: fee side is not strong-high')
+              if not (float(fail['pct_90d']) <= 20 and float(fail['z_robust']) <= -1.5):
+                  raise SystemExit(f'{r["date"]}: failed-tx side is not strong-low')
+
+          report = {
+              'scope': {'start': window_start, 'end': window_end, 'days': len(report_rows)},
+              'baseline': 'published META regime.label',
+              'target_dates': sorted(target_dates),
+              'question': 'Are the two strong bilateral Friction-conflict CHEAP days semantically better classified as CHEAP or STABLE?',
+              'rows': report_rows,
+              'counterfactual': {
+                  'rule': 'Only 2026-04-28 and 2026-04-30 change CHEAP->STABLE; all other published labels are frozen.',
+                  'changes': [{'date': d, 'from': 'CHEAP', 'to': 'STABLE'} for d in sorted(target_dates)],
+              },
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Published labels remain baseline.',
+                  'Only the two strong-bilateral dates are considered for a label veto.',
+                  'Target days must expose both existing core Friction signals and satisfy strict two-sided pct+z evidence.',
+              ],
+          }
+          Path('ethereum-friction-two-day-semantic-audit.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-friction-two-day-semantic-audit
+          path: ethereum-friction-two-day-semantic-audit.json
+          if-no-files-found: error
+          retention-days: 7
