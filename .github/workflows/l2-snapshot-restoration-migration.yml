@@ -105,7 +105,8 @@ jobs:
 
                   derived = json.loads((derived_root / f"{day}.json").read_text(encoding="utf-8"))
                   recorded = (((derived.get("derived") or {}).get("source") or {}).get("gold_sha256"))
-                  actual = hashlib.sha256(gp.read_bytes()).hexdigest()
+                  canonical = json.dumps(gold, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+                  actual = hashlib.sha256(canonical).hexdigest()
                   assert recorded == actual, (chain, day, recorded, actual)
 
               df = pd.DataFrame(rows)
