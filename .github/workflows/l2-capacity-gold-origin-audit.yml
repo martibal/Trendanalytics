@@ -1,0 +1,117 @@
+name: L2 Capacity Gold Origin Audit
+
+on:
+  push:
+    branches: [agent/l2-capacity-gold-origin-audit]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run Gold origin audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True, stderr=subprocess.STDOUT).strip()
+
+          report = {
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Find the first tracked introduction of capacity_util_pct in published L2 Gold.',
+                  'Do not infer a repair formula from later backfill artifacts.',
+              ],
+              'chains': {},
+          }
+
+          for chain in ('arbitrum', 'base'):
+              root = f'data/published/v1/gold/{chain}'
+              # Pickaxe all commits that add/remove the literal field inside tracked published Gold.
+              raw = git('log', '--all', '--reverse', '--date=iso-strict',
+                        '--pretty=format:%H\t%ad\t%s', '-S', 'capacity_util_pct', '--', root)
+              commits = [line for line in raw.splitlines() if line.strip()]
+              details = []
+              for line in commits[:20]:
+                  sha, date, subject = line.split('\t', 2)
+                  parent = None
+                  try:
+                      parent = git('rev-parse', f'{sha}^')
+                  except subprocess.CalledProcessError:
+                      pass
+                  changed = git('diff-tree', '--no-commit-id', '--name-only', '-r', sha, '--', root).splitlines()
+                  added_samples = []
+                  for path in changed:
+                      if not path.endswith('.json') or Path(path).name in {'latest.json','manifest.json','last7d.json','last30d.json','last90d.json','last180d.json','last365d.json'}:
+                          continue
+                      try:
+                          obj = json.loads(git('show', f'{sha}:{path}'))
+                      except Exception:
+                          continue
+                      if isinstance(obj, dict) and obj.get('capacity_util_pct') is not None:
+                          added_samples.append({
+                              'path': path,
+                              'date': Path(path).stem,
+                              'capacity_util_pct': obj.get('capacity_util_pct'),
+                              'arbitrum_l1_gas_used_daily': obj.get('arbitrum_l1_gas_used_daily'),
+                              'base_l1_gas_used_daily': obj.get('base_l1_gas_used_daily'),
+                              'base_blob_gas_used_daily': obj.get('base_blob_gas_used_daily'),
+                          })
+                  details.append({
+                      'sha': sha,
+                      'date': date,
+                      'subject': subject,
+                      'parent': parent,
+                      'changed_gold_files_count': len(changed),
+                      'capacity_samples': sorted(added_samples, key=lambda r: r['date'])[:10],
+                  })
+
+              # Also identify first current published date containing the field.
+              current_days = []
+              for path in sorted(Path(root).glob('????-??-??.json')):
+                  try:
+                      obj = json.loads(path.read_text(encoding='utf-8'))
+                  except Exception:
+                      continue
+                  if isinstance(obj, dict) and obj.get('capacity_util_pct') is not None:
+                      current_days.append(path.stem)
+
+              report['chains'][chain] = {
+                  'pickaxe_commits': commits[:20],
+                  'commit_details': details,
+                  'first_current_published_capacity_date': current_days[0] if current_days else None,
+                  'current_non_null_capacity_days': len(current_days),
+              }
+
+          # Source-code introduction history, independent of published Gold commits.
+          source_raw = git('log', '--all', '--reverse', '--date=iso-strict',
+                           '--pretty=format:%H\t%ad\t%s', '-S', 'capacity_util_pct', '--', 'pipeline', 'api')
+          report['source_code_pickaxe'] = [line for line in source_raw.splitlines() if line.strip()][:50]
+
+          Path('l2-capacity-gold-origin-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-capacity-gold-origin-audit
+          path: l2-capacity-gold-origin-audit.json
+          if-no-files-found: error
+          retention-days: 7
