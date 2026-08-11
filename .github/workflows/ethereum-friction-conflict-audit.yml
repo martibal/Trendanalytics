@@ -1,0 +1,208 @@
+name: Ethereum Friction Conflict Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-friction-conflict-audit
+    paths:
+      - .github/workflows/ethereum-friction-conflict-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ethereum-friction-conflict-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas numpy
+
+      - name: Run friction conflict audit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          gold_root = Path('data/published/v1/gold/ethereum')
+          meta_root = Path('data/published/v1/meta/ethereum')
+          gold_paths = sorted(gold_root.glob('????-??-??.json'))
+          meta_paths = sorted(meta_root.glob('????-??-??.json'))
+          if len(gold_paths) != 617 or len(meta_paths) != 617:
+              raise SystemExit(f'expected 617 Ethereum Gold/META days, got gold={len(gold_paths)} meta={len(meta_paths)}')
+
+          rows = []
+          for p in gold_paths:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              obj.setdefault('date', p.stem)
+              rows.append(obj)
+          df = pd.DataFrame(rows)
+          df['date'] = pd.to_datetime(df['date'], errors='coerce')
+          df = df.dropna(subset=['date']).sort_values('date').reset_index(drop=True)
+
+          rulesets = Counter()
+          conflict_days = []
+          conflict_cheap_days = []
+          proposed_changes = []
+          published_counts = Counter()
+          proposed_counts = Counter()
+
+          for i in range(len(df)):
+              day = df.loc[i, 'date'].date().isoformat()
+              sub = df.iloc[:i+1].copy()
+              meta = json.loads((meta_root / f'{day}.json').read_text(encoding='utf-8'))
+              regime = meta.get('regime') or {}
+              published = regime.get('label')
+              rulesets[regime.get('ruleset_id')] += 1
+              published_counts[published] += 1
+              confidence = (meta.get('confidence') or {}).get('confidence_score')
+
+              ev = engine.compute_regime(
+                  sub,
+                  chain='ethereum',
+                  profile={'type': 'eth_l1'},
+                  asof_date=day,
+                  confidence_score=confidence,
+              )
+              axes = ev.get('axes') or {}
+              friction = axes.get('friction') or {}
+              capacity = axes.get('capacity') or {}
+              demand = axes.get('demand') or {}
+
+              friction_high = str(friction.get('band_high', 'NORMAL')) in ('HIGH', 'EXTREME_HIGH')
+              friction_low = str(friction.get('band_low', 'NORMAL')) in ('LOW', 'EXTREME_LOW')
+              capacity_high = str(capacity.get('band_high', 'NORMAL')) in ('HIGH', 'EXTREME_HIGH')
+              capacity_low = str(capacity.get('band_low', 'NORMAL')) in ('LOW', 'EXTREME_LOW')
+              capacity_extreme = str(capacity.get('band_high', 'NORMAL')) == 'EXTREME_HIGH'
+              demand_high = str(demand.get('band_high', 'NORMAL')) in ('HIGH', 'EXTREME_HIGH')
+              calldata = next((s for s in (demand.get('signals') or []) if s.get('metric') == 'nonempty_calldata_share'), None)
+              calldata_heating = bool(calldata and bool(calldata.get('informative', True)) and calldata.get('trend') == 'HEATING')
+
+              conflict = friction_high and friction_low
+              if conflict:
+                  sigs = []
+                  for s in friction.get('signals') or []:
+                      sigs.append({
+                          'metric': s.get('metric'),
+                          'band': s.get('band'),
+                          'pct_90d': s.get('pct_90d'),
+                          'z_robust': s.get('z_robust'),
+                          'trend': s.get('trend'),
+                          'momentum_7d_vs_30d': s.get('momentum_7d_vs_30d'),
+                          'informative': s.get('informative'),
+                      })
+                  conflict_days.append({
+                      'date': day,
+                      'published_label': published,
+                      'recomputed_label': ev.get('label'),
+                      'confidence': confidence,
+                      'friction': {
+                          'band_high': friction.get('band_high'),
+                          'band_low': friction.get('band_low'),
+                          'trend': friction.get('trend'),
+                          'signals': sigs,
+                      },
+                      'capacity': {
+                          'band_high': capacity.get('band_high'),
+                          'band_low': capacity.get('band_low'),
+                          'trend': capacity.get('trend'),
+                      },
+                      'demand': {
+                          'band_high': demand.get('band_high'),
+                          'band_low': demand.get('band_low'),
+                          'trend': demand.get('trend'),
+                      },
+                  })
+                  if published == 'CHEAP':
+                      conflict_cheap_days.append(day)
+
+              # Counterfactual: identical ETH v2 precedence, except CHEAP is disallowed
+              # when Friction contains simultaneous high- and low-side evidence.
+              if confidence is not None and float(confidence) < 0.40:
+                  proposed = 'UNKNOWN/DEGRADED'
+              elif (friction_high and capacity_high) or (capacity_extreme and capacity.get('trend') == 'HEATING'):
+                  proposed = 'CONGESTED'
+              elif friction_low and not friction_high and (capacity_low or not capacity_high):
+                  proposed = 'CHEAP'
+              elif demand_high and demand.get('trend') == 'HEATING':
+                  proposed = 'HEATING'
+              elif demand_high and calldata_heating:
+                  proposed = 'HEATING'
+              else:
+                  proposed = 'STABLE'
+
+              proposed_counts[proposed] += 1
+              if proposed != published:
+                  proposed_changes.append({
+                      'date': day,
+                      'from': published,
+                      'to': proposed,
+                      'friction_high': friction_high,
+                      'friction_low': friction_low,
+                      'capacity_high': capacity_high,
+                      'demand_high': demand_high,
+                      'friction_trend': friction.get('trend'),
+                  })
+
+          if rulesets != Counter({'eth_l1_v2': 617}):
+              raise SystemExit(f'unexpected rulesets: {dict(rulesets)}')
+
+          report = {
+              'scope': {
+                  'start': df.iloc[0]['date'].date().isoformat(),
+                  'end': df.iloc[-1]['date'].date().isoformat(),
+                  'days': len(df),
+              },
+              'baseline': 'published META regime.label',
+              'rulesets': dict(rulesets),
+              'question': 'How often are ETH Friction high and low simultaneously, and what happens if CHEAP requires low Friction without conflicting high Friction?',
+              'conflict_definition': 'friction.band_high in HIGH/EXTREME_HIGH AND friction.band_low in LOW/EXTREME_LOW',
+              'conflict_day_count': len(conflict_days),
+              'conflict_label_counts': dict(Counter(r['published_label'] for r in conflict_days)),
+              'conflict_cheap_count': len(conflict_cheap_days),
+              'conflict_cheap_dates': conflict_cheap_days,
+              'conflict_days': conflict_days,
+              'counterfactual_rule': 'CHEAP requires friction_low AND NOT friction_high; all other ETH v2 precedence unchanged',
+              'published_counts': dict(published_counts),
+              'counterfactual_counts': dict(proposed_counts),
+              'change_count': len(proposed_changes),
+              'transition_counts': dict(Counter(f"{r['from']}->{r['to']}" for r in proposed_changes)),
+              'changes': proposed_changes,
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Published labels remain baseline.',
+                  'No new metrics are introduced.',
+                  'Only the CHEAP conflict predicate is changed in the counterfactual.',
+              ],
+          }
+
+          Path('ethereum-friction-conflict-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-friction-conflict-audit
+          path: ethereum-friction-conflict-audit.json
+          if-no-files-found: error
+          retention-days: 7
