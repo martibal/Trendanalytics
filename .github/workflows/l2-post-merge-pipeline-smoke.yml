@@ -1,0 +1,127 @@
+name: L2 Post-Merge Pipeline Smoke
+
+on:
+  push:
+    branches:
+      - agent/l2-post-merge-pipeline-smoke
+    paths:
+      - ".github/workflows/l2-post-merge-pipeline-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 180
+    env:
+      CSS_PYTHON: python
+      CSS_SYNC_WEB: "0"
+      CSS_RAW_LOOKBACK_DAYS: "90"
+      CSS_JSON_FINALIZER_LOOKBACK_DAYS: "90"
+      CSS_CLEANUP_EPHEMERAL_RAW: "1"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+    steps:
+      - name: Checkout exact post-merge snapshot
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          clean: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web-v1-app/package-lock.json
+
+      - name: Install Python dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r .\pipeline\requirements.txt
+
+      - name: Install web dependencies
+        shell: pwsh
+        working-directory: .\web-v1-app
+        run: npm ci
+
+      - name: Generate Prisma client
+        shell: pwsh
+        working-directory: .\web-v1-app
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma generate --schema .\prisma\schema.prisma
+
+      - name: Run production pipeline entrypoint without remote push
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File .\run-daily-pipeline.ps1 -SkipPush
+
+      - name: Validate methodology safety
+        shell: pwsh
+        run: |
+          python pipeline/tools/validate_meta_methodology_safety.py --root .
+          python pipeline/tools/validate_meta_methodology_safety.py --root . --meta-root data/published/v1/meta
+
+      - name: Verify restored L2 history survived pipeline
+        shell: pwsh
+        run: |
+          @'
+          import json
+          from pathlib import Path
+          import pandas as pd
+          import api.regime_engine as engine
+
+          root = Path("data/published/v1")
+          cutoff = "2026-08-02"
+          expected = {"arbitrum": 548, "base": 603}
+
+          for chain in ("arbitrum", "base"):
+              gold_root = root / "gold" / chain
+              meta_root = root / "meta" / chain
+              days = sorted(p.stem for p in gold_root.glob("????-??-??.json"))
+              hist_days = [d for d in days if d <= cutoff]
+              rows = []
+              metas = {}
+              capacity_hist = 0
+
+              for day in days:
+                  gold = json.loads((gold_root / f"{day}.json").read_text(encoding="utf-8"))
+                  gold.setdefault("date", day)
+                  rows.append(gold)
+                  metas[day] = json.loads((meta_root / f"{day}.json").read_text(encoding="utf-8"))
+                  if day <= cutoff and gold.get("capacity_util_pct") is not None:
+                      capacity_hist += 1
+
+              assert capacity_hist == expected[chain], (chain, capacity_hist, expected[chain])
+
+              df = pd.DataFrame(rows)
+              df["date"] = pd.to_datetime(df["date"], errors="coerce")
+              df = df.sort_values("date").reset_index(drop=True)
+              mismatches = []
+              for i in range(len(df)):
+                  day = df.loc[i, "date"].date().isoformat()
+                  if day > cutoff:
+                      break
+                  meta = metas[day]
+                  published = ((meta.get("regime") or {}).get("label"))
+                  confidence = ((meta.get("confidence") or {}).get("confidence_score"))
+                  ev = engine.compute_regime(df.iloc[: i + 1].copy(), chain=chain, profile={"type": "l2"}, asof_date=day, confidence_score=confidence)
+                  if published != ev.get("label"):
+                      mismatches.append((day, published, ev.get("label")))
+
+              assert not mismatches, (chain, mismatches[:20], len(mismatches))
+              print(chain, "historical_capacity_non_null=", capacity_hist, "historical_label_mismatches=0", "latest=", days[-1])
+          '@ | python -
+
+      - name: Run audit gates
+        shell: pwsh
+        working-directory: .\web-v1-app
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npm run check:audit-gates:no-build
