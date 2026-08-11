@@ -1,0 +1,136 @@
+name: Ethereum p90 Transition Shape Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-p90-transition-shape-audit
+    paths:
+      - ".github/workflows/ethereum-p90-transition-shape-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run transition-shape audit
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          meta_root = Path('data/published/v1/meta/ethereum')
+          paths = sorted(meta_root.glob('????-??-??.json'))
+          rows = []
+          for p in paths:
+              obj = json.loads(p.read_text(encoding='utf-8'))
+              regime = obj.get('regime') or {}
+              rows.append({'date': p.stem, 'label': regime.get('label'), 'ruleset': regime.get('ruleset_id')})
+
+          if len(rows) != 617:
+              raise SystemExit(f'expected 617 Ethereum META days, got {len(rows)}')
+          if any(r['ruleset'] != 'eth_l1_v2' for r in rows):
+              raise SystemExit('unexpected Ethereum ruleset in published history')
+
+          target = '2025-12-01'
+          idx = next((i for i, r in enumerate(rows) if r['date'] == target), None)
+          if idx is None:
+              raise SystemExit(f'missing target date {target}')
+          if rows[idx]['label'] != 'CHEAP':
+              raise SystemExit(f'expected published CHEAP on {target}, got {rows[idx]["label"]}')
+
+          def count_transitions(labels):
+              return sum(1 for i in range(1, len(labels)) if labels[i] != labels[i-1])
+
+          def run_bounds(labels, center):
+              label = labels[center]
+              lo = center
+              hi = center
+              while lo > 0 and labels[lo-1] == label:
+                  lo -= 1
+              while hi + 1 < len(labels) and labels[hi+1] == label:
+                  hi += 1
+              return lo, hi, label
+
+          published = [r['label'] for r in rows]
+          candidate = list(published)
+          candidate[idx] = 'STABLE'
+
+          pub_lo, pub_hi, pub_label = run_bounds(published, idx)
+          cand_lo, cand_hi, cand_label = run_bounds(candidate, idx)
+
+          window_lo = max(0, idx - 14)
+          window_hi = min(len(rows), idx + 15)
+          pub_window = published[window_lo:window_hi]
+          cand_window = candidate[window_lo:window_hi]
+
+          report = {
+              'target_date': target,
+              'candidate_semantics': '5d persistent p90 consensus veto: CHEAP -> STABLE',
+              'published_target_label': published[idx],
+              'candidate_target_label': candidate[idx],
+              'published_run': {
+                  'label': pub_label,
+                  'start': rows[pub_lo]['date'],
+                  'end': rows[pub_hi]['date'],
+                  'length': pub_hi - pub_lo + 1,
+              },
+              'candidate_run_at_target': {
+                  'label': cand_label,
+                  'start': rows[cand_lo]['date'],
+                  'end': rows[cand_hi]['date'],
+                  'length': cand_hi - cand_lo + 1,
+              },
+              'global_transition_count': {
+                  'published': count_transitions(published),
+                  'candidate': count_transitions(candidate),
+                  'delta': count_transitions(candidate) - count_transitions(published),
+              },
+              'local_29d_transition_count': {
+                  'published': count_transitions(pub_window),
+                  'candidate': count_transitions(cand_window),
+                  'delta': count_transitions(cand_window) - count_transitions(pub_window),
+              },
+              'local_window': [
+                  {
+                      'date': rows[i]['date'],
+                      'published': published[i],
+                      'candidate': candidate[i],
+                      'is_target': i == idx,
+                  }
+                  for i in range(window_lo, window_hi)
+              ],
+              'creates_singleton_island': (cand_hi - cand_lo + 1) == 1,
+              'guardrails': [
+                  'Observational only; no production files modified.',
+                  'Only the single 5d-persistence candidate is changed.',
+                  'Published history remains the baseline.',
+              ],
+          }
+
+          Path('ethereum-p90-transition-shape-audit.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-p90-transition-shape-audit
+          path: ethereum-p90-transition-shape-audit.json
+          if-no-files-found: error
+          retention-days: 7
