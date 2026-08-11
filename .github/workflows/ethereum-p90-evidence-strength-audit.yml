@@ -1,0 +1,156 @@
+name: Ethereum p90 Evidence Strength Audit
+
+on:
+  push:
+    branches:
+      - agent/ethereum-p90-evidence-strength-audit
+    paths:
+      - ".github/workflows/ethereum-p90-evidence-strength-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas numpy
+
+      - name: Run p90 evidence-strength audit
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          import pandas as pd
+          import api.regime_engine as engine
+
+          gold_root = Path("data/published/v1/gold/ethereum")
+          meta_root = Path("data/published/v1/meta/ethereum")
+          gold_paths = sorted(gold_root.glob("????-??-??.json"))
+          meta_paths = sorted(meta_root.glob("????-??-??.json"))
+          if len(gold_paths) != 617 or len(meta_paths) != 617:
+              raise SystemExit(f"expected 617 Ethereum Gold/META days, got gold={len(gold_paths)} meta={len(meta_paths)}")
+
+          rows = []
+          for p in gold_paths:
+              obj = json.loads(p.read_text(encoding="utf-8"))
+              obj.setdefault("date", p.stem)
+              rows.append(obj)
+          df = pd.DataFrame(rows)
+          df["date"] = pd.to_datetime(df["date"], errors="coerce")
+          df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+          if len(df) != 617:
+              raise SystemExit(f"expected 617 parsed Gold rows, got {len(df)}")
+
+          variants = {
+              "or_band": lambda pct, z: pct >= 80.0 or z >= 1.5,
+              "z_only": lambda pct, z: z >= 1.5,
+              "consensus": lambda pct, z: pct >= 80.0 and z >= 1.5,
+          }
+          changes = {name: [] for name in variants}
+          qualifying_days = Counter()
+          rulesets = Counter()
+
+          for i in range(len(df)):
+              day = df.loc[i, "date"].date().isoformat()
+              sub = df.iloc[: i + 1].copy()
+              meta = json.loads((meta_root / f"{day}.json").read_text(encoding="utf-8"))
+              regime = meta.get("regime") or {}
+              published = regime.get("label")
+              rulesets[regime.get("ruleset_id")] += 1
+              confidence = (meta.get("confidence") or {}).get("confidence_score")
+
+              evidence = engine.compute_regime(
+                  sub,
+                  chain="ethereum",
+                  profile={"type": "eth_l1"},
+                  asof_date=day,
+                  confidence_score=confidence,
+              )
+              friction = (evidence.get("axes") or {}).get("friction") or {}
+              friction_high = (
+                  str(friction.get("band_high", "NORMAL")) in ("HIGH", "EXTREME_HIGH")
+                  and int(friction.get("informative_count", 0) or 0) > 0
+              )
+
+              p90 = engine._signal_for_metric(sub, "block_gas_utilization_p90") or {}
+              informative = bool(p90.get("informative", False))
+              pct = float(p90.get("pct_90d", 50.0))
+              z = float(p90.get("z_robust", 0.0))
+
+              for name, qualifies_fn in variants.items():
+                  qualifies = informative and qualifies_fn(pct, z)
+                  if qualifies:
+                      qualifying_days[name] += 1
+                  guarded = published
+                  reason = None
+                  if published == "CHEAP" and qualifies:
+                      guarded = "STABLE"
+                      reason = "p90_vetoes_cheap"
+                  elif published == "STABLE" and qualifies and friction_high:
+                      guarded = "CONGESTED"
+                      reason = "p90_plus_friction"
+                  if guarded != published:
+                      changes[name].append({
+                          "date": day,
+                          "from": published,
+                          "to": guarded,
+                          "reason": reason,
+                          "pct_90d": pct,
+                          "z_robust": z,
+                          "friction_high": friction_high,
+                      })
+
+          if rulesets != Counter({"eth_l1_v2": 617}):
+              raise SystemExit(f"unexpected rulesets: {dict(rulesets)}")
+
+          result = {}
+          for name in variants:
+              rows_changed = changes[name]
+              result[name] = {
+                  "qualifying_days": qualifying_days[name],
+                  "change_count": len(rows_changed),
+                  "transition_counts": dict(Counter(f"{r['from']}->{r['to']}" for r in rows_changed)),
+                  "changes": rows_changed,
+              }
+
+          report = {
+              "scope": {"start": df.iloc[0]["date"].date().isoformat(), "end": df.iloc[-1]["date"].date().isoformat(), "days": len(df)},
+              "baseline": "published META regime.label",
+              "rulesets": dict(rulesets),
+              "thresholds": {
+                  "or_band": "pct_90d>=80 OR z_robust>=1.5",
+                  "z_only": "z_robust>=1.5",
+                  "consensus": "pct_90d>=80 AND z_robust>=1.5",
+              },
+              "result": result,
+              "guardrails": [
+                  "Observational only; no production files modified.",
+                  "Only CHEAP->STABLE and STABLE->CONGESTED are evaluated.",
+                  "Published labels remain baseline.",
+              ],
+          }
+          Path("ethereum-p90-evidence-strength-audit.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-p90-evidence-strength-audit
+          path: ethereum-p90-evidence-strength-audit.json
+          if-no-files-found: error
+          retention-days: 7
