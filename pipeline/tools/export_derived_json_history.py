@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -39,9 +40,26 @@ def _ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
 
+def _strict_json_value(obj: Any) -> Any:
+    """Normalize non-finite floats to JSON null without changing finite values."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, list):
+        return [_strict_json_value(item) for item in obj]
+    if isinstance(obj, tuple):
+        return [_strict_json_value(item) for item in obj]
+    if isinstance(obj, dict):
+        return {str(key): _strict_json_value(value) for key, value in obj.items()}
+    return obj
+
+
 def _write_json(path: Path, obj: Any) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+    strict_obj = _strict_json_value(obj)
+    tmp.write_text(
+        json.dumps(strict_obj, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False),
+        encoding="utf-8",
+    )
     tmp.replace(path)
 
 
@@ -51,7 +69,7 @@ def _read_json(path: Path) -> Any:
 
 def _canonical_json_bytes(obj: Any) -> bytes:
     return json.dumps(
-        obj,
+        _strict_json_value(obj),
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
@@ -331,7 +349,7 @@ def main() -> int:
         )
 
     print(f"[DERIVED] Done. Total changed day-files written: {total}")
-    return 0
+    return total and 0 or 0
 
 
 if __name__ == "__main__":
