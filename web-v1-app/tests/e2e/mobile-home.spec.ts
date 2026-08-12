@@ -45,4 +45,31 @@ test.describe("mobile homepage regression", () => {
     await closeButton.click();
     await expect(modalBackdrop).toHaveCount(0);
   });
+
+  test("switches artifact and pricing grids exactly at the 339px boundary", async ({ page }) => {
+    await page.setViewportSize({ width: 340, height: 844 });
+    await page.goto("http://localhost:3000/mobile");
+
+    const artifactGrid = page.locator(".ua3-artifact-grid");
+    const planGrid = page.locator(".ua3-plan-grid");
+
+    await expect(artifactGrid).toBeVisible();
+    await expect(planGrid).toBeVisible();
+
+    for (const grid of [artifactGrid, planGrid]) {
+      const columns = await grid.evaluate((element) =>
+        window.getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean)
+      );
+      expect(columns).toHaveLength(2);
+    }
+
+    await page.setViewportSize({ width: 339, height: 844 });
+
+    for (const grid of [artifactGrid, planGrid]) {
+      const columns = await grid.evaluate((element) =>
+        window.getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean)
+      );
+      expect(columns).toHaveLength(1);
+    }
+  });
 });
