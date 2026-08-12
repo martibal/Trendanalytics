@@ -4,7 +4,7 @@ test.describe("mobile homepage regression", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("keeps compact mobile grids and JSON modal usable", async ({ page }) => {
-    await page.goto("/mobile");
+    await page.goto("http://localhost:3000/mobile");
 
     const chainGrid = page.locator(".ua3-chain-grid");
     const artifactGrid = page.locator(".ua3-artifact-grid");
