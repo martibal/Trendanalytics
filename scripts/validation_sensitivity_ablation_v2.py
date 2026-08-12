@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import scripts.validation_sensitivity_ablation as audit
 
@@ -18,6 +17,8 @@ def load_rows_with_pre_reconciliation_baseline():
         sanity = regime.get("sanity") or {}
         if bool(sanity.get("adjusted")) and sanity.get("from_label"):
             row["stored_candidate"] = sanity.get("from_label")
+        else:
+            row["stored_candidate"] = regime.get("label")
     return rows
 
 
