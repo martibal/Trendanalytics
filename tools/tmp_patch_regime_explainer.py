@@ -75,14 +75,14 @@ if css_anchor not in s:
     raise SystemExit('css anchor not found')
 s = s.replace(css_anchor, css_add, 1)
 
-resp_anchor = '@media (max-width: 1100px) {'
+resp_anchor = '@media (max-width: 1120px) {'
 if resp_anchor not in s:
     raise SystemExit('responsive anchor not found')
-s = s.replace(resp_anchor, resp_anchor + '\n.ua3-regime-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }\n.ua3-regime-head { grid-template-columns: 1fr; gap: 18px; align-items: start; }', 1)
+s = s.replace(resp_anchor, resp_anchor + '\n  .ua3-regime-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }\n  .ua3-regime-head { grid-template-columns: 1fr; gap: 18px; align-items: start; }', 1)
 
-mobile_anchor = '@media (max-width: 680px) {'
+mobile_anchor = '@media (max-width: 767px) {'
 if mobile_anchor not in s:
     raise SystemExit('mobile anchor not found')
-s = s.replace(mobile_anchor, mobile_anchor + '\n.ua3-regime-grid { grid-template-columns: 1fr; }\n.ua3-regime-card { padding: 20px; }', 1)
+s = s.replace(mobile_anchor, mobile_anchor + '\n  .ua3-regime-grid { grid-template-columns: 1fr; }\n  .ua3-regime-card { padding: 20px; }', 1)
 
 p.write_text(s, encoding='utf-8')
