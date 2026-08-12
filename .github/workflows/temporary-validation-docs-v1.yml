@@ -1,0 +1,48 @@
+name: Temporary validation docs v1
+
+on:
+  push:
+    branches:
+      - docs/validation-methodology-v1
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/validation-methodology-v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web-v1-app/package-lock.json
+      - name: Apply targeted documentation patch
+        run: python scripts/apply_validation_methodology_docs_v1.py
+      - name: Install web dependencies
+        working-directory: web-v1-app
+        run: npm ci
+      - name: Lint
+        working-directory: web-v1-app
+        run: npm run lint
+      - name: Typecheck
+        working-directory: web-v1-app
+        run: npm run typecheck
+      - name: Production build
+        working-directory: web-v1-app
+        run: npm run build -- --webpack
+      - name: Commit validated documentation changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web-v1-app/src/app/methodology/page.tsx web-v1-app/src/app/methodology/reference/page.tsx web-v1-app/src/app/validation/page.tsx
+          if git diff --cached --quiet; then
+            echo "No documentation changes to commit."
+            exit 0
+          fi
+          git commit -m "docs: align methodology and validation evidence"
+          git push origin HEAD:docs/validation-methodology-v1
