@@ -212,7 +212,7 @@ export default function MethodologyReferencePage() {
                 </p>
                 <Callout title="Important distinction: raw scorecard evidence vs display score">
                   <p>
-                    Confidence v2 uses raw scorecard/regime evidence to evaluate label confidence. The
+                    Confidence v3 uses raw scorecard/regime evidence to evaluate label confidence. The
                     public score displayed on pages is intentionally pulled toward 50 when confidence is
                     lower. This avoids using an already confidence-degraded display score to compute
                     confidence again.
