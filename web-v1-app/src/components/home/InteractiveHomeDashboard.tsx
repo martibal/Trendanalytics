@@ -68,7 +68,7 @@ type InfoId = "regime" | "confidence" | "demand" | "friction" | "capacity" | "da
 
 const info: Record<InfoId, { title: string; body: string }> = {
   regime: { title: "Regime / status", body: "The regime is the daily network-state label for a chain. It is produced from network activity, friction and capacity evidence. It is not a price view." },
-  confidence: { title: "Confidence", body: "Headline reliability for the published row. It combines data quality with how clearly the row supports the published label." },
+  confidence: { title: "Confidence", body: "A combined evidence-strength score. It blends data quality with how clearly the observed evidence supports the published label. It is not a probability that the label is correct." },
   demand: { title: "Demand", body: "Demand describes how strong network activity looked compared with that network&apos;s own recent baseline." },
   friction: { title: "Friction", body: "Friction describes how difficult or costly the network was to use that day, using fee and failure evidence." },
   capacity: { title: "Capacity", body: "Capacity describes whether the network appeared to have usable room relative to current activity." },
@@ -239,7 +239,7 @@ function ConfidenceGauge({ chain, activeInfo, setActiveInfo }: { chain: HomeChai
           <InfoButton id="confidence" activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
         </div>
       </div>
-      <div className="ua3-confidence-text"><p className="ua3-label">Headline reliability</p><p>Use confidence to decide how much weight to place on the published row.</p></div>
+      <div className="ua3-confidence-text"><p className="ua3-label">Evidence strength</p><p>Use confidence to decide how much weight to place on the row. It is not the probability that the label is correct.</p></div>
     </div>
   );
 }
@@ -373,6 +373,38 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
+      <section className="ua3-section ua3-confidence-explainer" aria-labelledby="confidence-explainer-title">
+        <div className="ua3-wrap">
+          <div className="ua3-confidence-explainer-head">
+            <div>
+              <p className="ua3-label ua3-step-label">How to read confidence</p>
+              <h2 id="confidence-explainer-title" className="ua3-step-title">Confidence is evidence strength — not probability.</h2>
+            </div>
+            <p className="ua3-body-small ua3-confidence-explainer-intro">A displayed confidence of 74% does not mean there is a 74% chance the regime label is correct. It means the combined confidence score is 0.74 under the published methodology.</p>
+          </div>
+          <div className="ua3-confidence-explainer-grid">
+            <article className="ua3-card ua3-confidence-explainer-card">
+              <p className="ua3-label">01 · Data quality</p>
+              <h3>Is the evidence complete and fresh enough?</h3>
+              <p className="ua3-body-small">Data quality measures the reliability of the observation surface: required metric coverage, recent coverage, history, density and freshness relative to the chain&apos;s publication-lag policy.</p>
+            </article>
+            <article className="ua3-card ua3-confidence-explainer-card">
+              <p className="ua3-label">02 · Label confidence</p>
+              <h3>How clearly does the evidence support this label?</h3>
+              <p className="ua3-body-small">Label confidence measures separation and support inside the regime rules — including rule margin, driver strength, trend, coherence and label-specific evidence.</p>
+            </article>
+            <article className="ua3-card ua3-confidence-explainer-card ua3-confidence-formula-card">
+              <p className="ua3-label">03 · Headline confidence</p>
+              <h3><code>sqrt(data quality × label confidence)</code></h3>
+              <p className="ua3-body-small">The geometric mean prevents one strong component from fully hiding a weak one. If the combined score falls below 0.40, Urd Atlas withholds the stronger regime claim and publishes <strong>UNKNOWN/DEGRADED</strong>.</p>
+            </article>
+          </div>
+          <div className="ua3-confidence-warning"><strong>Read 74% as:</strong> “the data are sufficiently reliable and the evidence supports this label clearly under the defined methodology” — not “74% probability that this is the true regime.” <Link href="/methodology/reference">See the exact confidence methodology →</Link></div>
+        </div>
+      </section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
       <section id="today-status" className="ua3-section ua3-status" aria-labelledby="status-title"><div className="ua3-wrap"><div className="ua3-section-head"><div><p className="ua3-label ua3-step-label">Published network state</p><h2 id="status-title" className="ua3-step-title">Today&apos;s state — four chains, updated {lastRun}.</h2></div><p className="ua3-body-small ua3-help-copy">Tap any term marked with ? to see a plain-language explanation.</p></div><div className="ua3-chain-grid">{snapshots.map((chain) => { const active = chain.id === selectedChainId; return <button key={chain.id} data-chain={chain.id} type="button" onClick={() => setSelectedChainId(chain.id)} className={active ? "ua3-card ua3-chain-card ua3-chain-card-active" : "ua3-card ua3-chain-card"} style={toneStyle(chain.regime)}><div className="ua3-chain-top"><div><p className="ua3-label">{chain.ticker}</p><h3>{chain.name}</h3></div><StatusBadge label={chain.regime} /></div><div className="ua3-chain-bottom"><div><p className="ua3-data-medium">{chain.confidence}</p><p className="ua3-body-small">confidence</p></div><Sparkline /></div></button>; })}</div><div className="ua3-detail-panel"><div className="ua3-card ua3-detail-summary"><div className="ua3-detail-head"><div><p className="ua3-label">{selectedChain.ticker} · {selectedChain.asOf} · {selectedChain.lag}</p><h3>{selectedChain.name}</h3></div><StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><p className="ua3-body-small ua3-one-liner">{selectedChain.oneLiner}</p><ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-status-metrics"><div className="ua3-secondary-grid"><SecondaryMetric id="demand" label="Demand" value={selectedChain.demand} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="friction" label="Friction" value={selectedChain.friction} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="capacity" label="Capacity" value={selectedChain.capacity} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-tertiary-grid"><TertiaryMetric id="dataQuality" label="Data quality" value={pct(selectedChain.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="labelConfidence" label="Label confidence" value={pct(selectedChain.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="dataLag" label="Data lag" value={selectedChain.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div></div></div></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
@@ -440,6 +472,17 @@ const ua3Styles = `
 .ua3-regime-axis-note { margin-top: 24px; padding: 16px 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
 .ua3-regime-axis-note strong { color: var(--text-primary); }
 .ua3-regime-axis-note a { color: var(--accent-action); text-decoration: none; }
+.ua3-confidence-explainer { background: var(--bg-base); }
+.ua3-confidence-explainer-head { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); gap: 48px; align-items: end; }
+.ua3-confidence-explainer-intro { margin: 0; max-width: 580px; }
+.ua3-confidence-explainer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 36px; }
+.ua3-confidence-explainer-card { padding: 24px; }
+.ua3-confidence-explainer-card h3 { margin-top: 18px; }
+.ua3-confidence-formula-card { border-color: color-mix(in srgb, var(--accent-action) 55%, var(--border-subtle)); background: linear-gradient(rgba(16,224,160,.05), rgba(16,224,160,.05)), var(--bg-elevated-1); }
+.ua3-confidence-formula-card code { color: #7DD3FC; font-family: var(--mono); font-size: .72em; line-height: 1.5; }
+.ua3-confidence-warning { margin-top: 24px; padding: 16px 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
+.ua3-confidence-warning strong { color: var(--text-primary); }
+.ua3-confidence-warning a { color: var(--accent-action); text-decoration: none; }
 .ua3-files { background: linear-gradient(rgba(76, 110, 245, 0.04), rgba(76, 110, 245, 0.04)), var(--bg-base); }
 .ua3-pricing { background: linear-gradient(rgba(245, 247, 248, 0.02), rgba(245, 247, 248, 0.02)), var(--bg-base); }
 .ua3-transition { height: 1px; width: 100%; background: linear-gradient(to bottom, transparent 0%, var(--accent-depth-line) 50%, transparent 100%); opacity: 0.4; }
@@ -537,6 +580,8 @@ const ua3Styles = `
 .ua3-modal-head h2 { margin: 6px 0 0; font-size: 24px; }
 .ua3-modal-actions { display: flex; gap: 10px; }
 @media (max-width: 1120px) {
+  .ua3-confidence-explainer-grid { grid-template-columns: 1fr; }
+  .ua3-confidence-explainer-head { grid-template-columns: 1fr; gap: 18px; align-items: start; }
   .ua3-regime-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ua3-regime-head { grid-template-columns: 1fr; gap: 18px; align-items: start; }
   .ua3-hero .ua3-wrap { width: min(1000px, calc(100% - 48px)); }
