@@ -96,6 +96,13 @@ const gettingStarted = [
   { number: "03", title: "A row you can use immediately", body: "Join the daily state on date + chain, segment analysis by regime, filter on confidence, or use Briefs as reporting context.", cta: "See code example →", href: "/analyst-kit", icon: "code" },
 ] as const;
 
+const regimeExplainers: Array<{ label: Exclude<HomeLabel, "UNKNOWN/DEGRADED">; plain: string; evidence: string }> = [
+  { label: "STABLE", plain: "No unusual network condition dominates the evidence.", evidence: "Demand, Friction and Capacity do not combine strongly enough to trigger another regime." },
+  { label: "HEATING", plain: "Network activity is unusually elevated and still strengthening.", evidence: "High Demand plus a heating trend; Ethereum can also use its defined calldata corroboration path." },
+  { label: "CONGESTED", plain: "The network is under material usage or capacity pressure.", evidence: "Typically high Friction together with high Capacity pressure; Ethereum/L2 also allow an extreme-capacity heating path." },
+  { label: "CHEAP", plain: "Using the network is unusually inexpensive without contradictory capacity pressure.", evidence: "Low Friction while Capacity is not simultaneously high enough to veto the classification." },
+];
+
 function clampPercent(value: number | null) {
   if (value == null || !Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(value * 100)));
@@ -339,6 +346,33 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
+      <section className="ua3-section ua3-regimes" aria-labelledby="regime-explainer-title">
+        <div className="ua3-wrap">
+          <div className="ua3-regime-head">
+            <div>
+              <p className="ua3-label ua3-step-label">How to read the label</p>
+              <h2 id="regime-explainer-title" className="ua3-step-title">Four labels. One question: what kind of network day was it?</h2>
+            </div>
+            <p className="ua3-body-small ua3-regime-intro">Each label is relative to that chain&apos;s own recent history. The same absolute fee or activity level can therefore mean something different on Bitcoin, Ethereum, Arbitrum and Base.</p>
+          </div>
+          <div className="ua3-regime-grid">
+            {regimeExplainers.map((item) => (
+              <article key={item.label} className="ua3-card ua3-regime-card" style={toneStyle(item.label)}>
+                <div className="ua3-regime-card-head"><StatusBadge label={item.label} /><span className="ua3-regime-question">Network state</span></div>
+                <h3>{item.plain}</h3>
+                <p className="ua3-body-small">{item.evidence}</p>
+              </article>
+            ))}
+          </div>
+          <div className="ua3-regime-axis-note">
+            <strong>Demand</strong> = activity · <strong>Friction</strong> = cost/failure burden · <strong>Capacity</strong> = pressure on usable network room.
+            <Link href="/methodology/reference"> See the exact chain-specific rules →</Link>
+          </div>
+        </div>
+      </section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
       <section id="today-status" className="ua3-section ua3-status" aria-labelledby="status-title"><div className="ua3-wrap"><div className="ua3-section-head"><div><p className="ua3-label ua3-step-label">Published network state</p><h2 id="status-title" className="ua3-step-title">Today&apos;s state — four chains, updated {lastRun}.</h2></div><p className="ua3-body-small ua3-help-copy">Tap any term marked with ? to see a plain-language explanation.</p></div><div className="ua3-chain-grid">{snapshots.map((chain) => { const active = chain.id === selectedChainId; return <button key={chain.id} data-chain={chain.id} type="button" onClick={() => setSelectedChainId(chain.id)} className={active ? "ua3-card ua3-chain-card ua3-chain-card-active" : "ua3-card ua3-chain-card"} style={toneStyle(chain.regime)}><div className="ua3-chain-top"><div><p className="ua3-label">{chain.ticker}</p><h3>{chain.name}</h3></div><StatusBadge label={chain.regime} /></div><div className="ua3-chain-bottom"><div><p className="ua3-data-medium">{chain.confidence}</p><p className="ua3-body-small">confidence</p></div><Sparkline /></div></button>; })}</div><div className="ua3-detail-panel"><div className="ua3-card ua3-detail-summary"><div className="ua3-detail-head"><div><p className="ua3-label">{selectedChain.ticker} · {selectedChain.asOf} · {selectedChain.lag}</p><h3>{selectedChain.name}</h3></div><StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><p className="ua3-body-small ua3-one-liner">{selectedChain.oneLiner}</p><ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-status-metrics"><div className="ua3-secondary-grid"><SecondaryMetric id="demand" label="Demand" value={selectedChain.demand} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="friction" label="Friction" value={selectedChain.friction} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="capacity" label="Capacity" value={selectedChain.capacity} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-tertiary-grid"><TertiaryMetric id="dataQuality" label="Data quality" value={pct(selectedChain.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="labelConfidence" label="Label confidence" value={pct(selectedChain.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="dataLag" label="Data lag" value={selectedChain.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div></div></div></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
@@ -394,6 +428,18 @@ const ua3Styles = `
 .ua3-hero { padding: 80px 0; min-height: auto; display: block; background: radial-gradient(circle at 78% 42%, var(--accent-depth-glow), transparent 44%), var(--bg-base); }
 .ua3-start { background: linear-gradient(rgba(16, 224, 160, 0.03), rgba(16, 224, 160, 0.03)), var(--bg-base); }
 .ua3-status { background: var(--bg-base); }
+.ua3-regimes { background: linear-gradient(rgba(16, 224, 160, 0.025), rgba(16, 224, 160, 0.025)), var(--bg-base); }
+.ua3-regime-head { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr); gap: 48px; align-items: end; }
+.ua3-regime-intro { margin: 0; max-width: 560px; }
+.ua3-regime-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 36px; }
+.ua3-regime-card { position: relative; overflow: hidden; padding: 24px; border-top: 3px solid var(--status-color); }
+.ua3-regime-card::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(145deg, rgba(255,255,255,.025), transparent 45%); }
+.ua3-regime-card-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+.ua3-regime-question { color: var(--text-tertiary); font-family: var(--mono); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; }
+.ua3-regime-card h3, .ua3-regime-card p { position: relative; }
+.ua3-regime-axis-note { margin-top: 24px; padding: 16px 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+.ua3-regime-axis-note strong { color: var(--text-primary); }
+.ua3-regime-axis-note a { color: var(--accent-action); text-decoration: none; }
 .ua3-files { background: linear-gradient(rgba(76, 110, 245, 0.04), rgba(76, 110, 245, 0.04)), var(--bg-base); }
 .ua3-pricing { background: linear-gradient(rgba(245, 247, 248, 0.02), rgba(245, 247, 248, 0.02)), var(--bg-base); }
 .ua3-transition { height: 1px; width: 100%; background: linear-gradient(to bottom, transparent 0%, var(--accent-depth-line) 50%, transparent 100%); opacity: 0.4; }
@@ -491,6 +537,8 @@ const ua3Styles = `
 .ua3-modal-head h2 { margin: 6px 0 0; font-size: 24px; }
 .ua3-modal-actions { display: flex; gap: 10px; }
 @media (max-width: 1120px) {
+  .ua3-regime-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ua3-regime-head { grid-template-columns: 1fr; gap: 18px; align-items: start; }
   .ua3-hero .ua3-wrap { width: min(1000px, calc(100% - 48px)); }
   .ua3-hero-grid { grid-template-columns: 1fr; gap: 44px; }
   .ua3-hero-glow { justify-content: flex-start; min-height: auto; }
@@ -498,6 +546,8 @@ const ua3Styles = `
   .ua3-detail-panel, .ua3-files-grid, .ua3-preview-panel { grid-template-columns: 1fr; }
 }
 @media (max-width: 767px) {
+  .ua3-regime-grid { grid-template-columns: 1fr; }
+  .ua3-regime-card { padding: 20px; }
   .ua3-wrap, .ua3-hero .ua3-wrap { width: calc(100% - 32px); }
   .ua3-section { padding: 64px 0; }
   .ua3-hero { padding: 64px 0; }
