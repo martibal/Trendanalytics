@@ -19,6 +19,8 @@ type MetaDriver = {
   contribution?: number | string;
 };
 
+type MetaScore = number | { score?: number };
+
 type MetaRow = {
   chain?: string;
   date?: string;
@@ -34,11 +36,17 @@ type MetaRow = {
     demand_score?: number;
     friction_score?: number;
     capacity_score?: number;
+    determinism_hash?: string;
   };
   scorecard?: {
-    demand?: number | { score?: number };
-    friction?: number | { score?: number };
-    capacity?: number | { score?: number };
+    demand?: MetaScore;
+    friction?: MetaScore;
+    capacity?: MetaScore;
+    dimensions?: {
+      demand?: MetaScore;
+      friction?: MetaScore;
+      capacity?: MetaScore;
+    };
   };
   confidence?: {
     confidence_score?: number;
@@ -175,11 +183,20 @@ export async function buildRegimeCalendarRows(chain: ChainId): Promise<AnalystKi
     data_quality_score: numberOrNull(row.confidence?.data_quality_score),
     label_confidence_score: numberOrNull(row.confidence?.label_confidence_score),
     freshness_lag_days: numberOrNull(row.confidence?.lag_days_vs_utc_today),
-    demand_score: numberOrNull(row.regime?.demand_score) ?? scoreValue(row.scorecard?.demand),
-    friction_score: numberOrNull(row.regime?.friction_score) ?? scoreValue(row.scorecard?.friction),
-    capacity_score: numberOrNull(row.regime?.capacity_score) ?? scoreValue(row.scorecard?.capacity),
+    demand_score:
+      numberOrNull(row.regime?.demand_score)
+      ?? scoreValue(row.scorecard?.dimensions?.demand)
+      ?? scoreValue(row.scorecard?.demand),
+    friction_score:
+      numberOrNull(row.regime?.friction_score)
+      ?? scoreValue(row.scorecard?.dimensions?.friction)
+      ?? scoreValue(row.scorecard?.friction),
+    capacity_score:
+      numberOrNull(row.regime?.capacity_score)
+      ?? scoreValue(row.scorecard?.dimensions?.capacity)
+      ?? scoreValue(row.scorecard?.capacity),
     methodology_version: row.methodology_version ?? "",
-    determinism_hash: row.determinism_hash ?? "",
+    determinism_hash: row.regime?.determinism_hash ?? row.determinism_hash ?? "",
     one_liner: row.status?.one_liner ?? "",
     drivers: driversText(row),
   }));
@@ -276,6 +293,7 @@ export function buildFeatureSchema(): JsonRecord {
     fields: [
       { name: "observation_date", type: "date", use: "Date the network state describes." },
       { name: "chain", type: "string", use: "Canonical chain id: bitcoin, ethereum, arbitrum or base." },
+      { name: "chain_label", type: "string", use: "Display label for the chain, such as BTC or ETH." },
       { name: "regime", type: "category", use: "Human-readable network-state label." },
       { name: "confidence_score", type: "float", use: "Quality/evidence gate; not a probability of an external outcome." },
       { name: "data_quality_score", type: "float", use: "Data availability and pipeline quality component when published." },
@@ -365,6 +383,7 @@ export function buildStarterNotebook(): JsonRecord {
         outputs: [],
         source: [
           "metric = 'daily_active_users'  # change this to your metric\n",
+          "# 0.40 is the publication gate; 0.70 below is an optional stricter analyst filter.\n",
           "summary = (\n",
           "    df[df['confidence_score'] >= 0.70]\n",
           "    .groupby('regime')\n",
