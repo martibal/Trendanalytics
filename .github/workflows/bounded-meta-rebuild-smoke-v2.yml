@@ -1,0 +1,106 @@
+name: Bounded META Rebuild Smoke V2
+
+on:
+  push:
+    branches:
+      - fix/bounded-meta-rebuild-preserve-canonical-v2
+    paths:
+      - ".github/workflows/bounded-meta-rebuild-smoke-v2.yml"
+      - "pipeline/tools/rebuild_meta_only.py"
+      - "pipeline/tools/test_bounded_meta_rebuild_mode.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pipeline dependencies
+        run: pip install -r pipeline/requirements.txt
+
+      - name: Run bounded execution-plan regression
+        run: python pipeline/tools/test_bounded_meta_rebuild_mode.py
+
+      - name: Snapshot canonical pre-start META semantics
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          start = "2026-05-13"
+          root = Path("data/published/v1/meta")
+          out = {}
+          for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+              chain = chain_dir.name
+              out[chain] = {}
+              for path in sorted(chain_dir.glob("????-??-??.json")):
+                  if path.stem >= start:
+                      continue
+                  obj = json.loads(path.read_text(encoding="utf-8"))
+                  canonical = json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+                  out[chain][path.stem] = hashlib.sha256(canonical).hexdigest()
+          Path("prestart-meta-hashes.json").write_text(json.dumps(out, sort_keys=True), encoding="utf-8")
+          print({chain: len(days) for chain, days in out.items()})
+          PY
+
+      - name: Run bounded META rebuild only
+        run: python pipeline/tools/rebuild_meta_only.py --root . --mode rebuild --start 2026-05-13 --windows 7,30,90,180,365
+
+      - name: Publish META only in smoke workspace
+        run: python pipeline/tools/publish_meta_only.py --root . --windows 7,30,90,180,365
+
+      - name: Verify pre-start META remained semantically identical
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          before = json.loads(Path("prestart-meta-hashes.json").read_text(encoding="utf-8"))
+          root = Path("data/published/v1/meta")
+          mismatches = []
+          for chain, days in before.items():
+              for day, expected in days.items():
+                  path = root / chain / f"{day}.json"
+                  obj = json.loads(path.read_text(encoding="utf-8"))
+                  canonical = json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+                  actual = hashlib.sha256(canonical).hexdigest()
+                  if actual != expected:
+                      mismatches.append((chain, day, expected, actual))
+          assert not mismatches, (mismatches[:20], len(mismatches))
+          print("pre-start canonical META semantics preserved")
+          PY
+
+      - name: Validate methodology safety after bounded publish
+        run: python pipeline/tools/validate_meta_methodology_safety.py --root . --meta-root data/published/v1/meta
+
+      - name: Verify Ethereum remains fully eth_l1_v2
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          paths = sorted(Path("data/published/v1/meta/ethereum").glob("????-??-??.json"))
+          bad = []
+          for path in paths:
+              obj = json.loads(path.read_text(encoding="utf-8"))
+              ruleset = ((obj.get("regime") or {}).get("ruleset_id"))
+              if ruleset != "eth_l1_v2":
+                  bad.append((path.stem, ruleset))
+          assert paths, "missing Ethereum META"
+          assert not bad, (bad[:20], len(bad))
+          print("ethereum eth_l1_v2 days", len(paths), "bad=0")
+          PY
