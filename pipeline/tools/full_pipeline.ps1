@@ -234,6 +234,7 @@ try {
   $PY_EXPORT_DERIVED = Join-Path $PIPELINE_ROOT 'tools\export_derived_json_history.py'
   $PY_EXPORT_META = Join-Path $PIPELINE_ROOT 'tools\export_meta_json_history.py'
   $PY_SYNC_GOLD = Join-Path $PIPELINE_ROOT 'tools\sync_gold_json_history.py'
+  $PY_L2_CAPACITY = Join-Path $PIPELINE_ROOT 'tools\apply_l2_capacity.py'
   $PY_PUBLISH = Join-Path $PIPELINE_ROOT 'tools\publish_artifacts.py'
   $PY_VALIDATE_PUBLISHED = Join-Path $PIPELINE_ROOT 'tools\validate_published_dataset.py'
   $PY_DOWNLOAD_RAW = Join-Path $PIPELINE_ROOT 'tools\download_up_to_date_minimal.py'
@@ -475,6 +476,14 @@ try {
     }
 
     Write-Log 'STEP 4: Sync GOLD json history + windows'
+
+    if (Test-Path $PY_L2_CAPACITY) {
+      Write-Log 'STEP 4A: Apply chain-specific L2 capacity before GOLD JSON export/publish'
+      & $PY -u $PY_L2_CAPACITY --gold-root $GOLD_PARQUET_ROOT --raw-root $RAW_ROOT --published-root $PUBLISHED_ROOT --chains 'arbitrum,base'
+      if ($LASTEXITCODE -ne 0) {
+        throw "apply_l2_capacity.py failed rc=$LASTEXITCODE"
+      }
+    }
 
     & $PY -u $PY_SYNC_GOLD --repo-root $MAIN_ROOT --gold-root $GOLD_PARQUET_ROOT --out-root $GOLD_JSON_ROOT --chains $activeChainsCsv --mode $syncModeGold --windows $windowsCsv
     if ($LASTEXITCODE -ne 0) {
