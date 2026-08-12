@@ -85,6 +85,7 @@ export default function GettingStartedPage() {
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">Join example</p>
           <h2 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">Attach Urd Atlas to your own daily table.</h2>
           <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-400">The example reads Ethereum&apos;s public regime calendar directly from Urd Atlas, so only your own daily table needs to exist locally. Change the chain in the URL when you want to test BTC, ARB or BASE.</p>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-400">Urd Atlas uses 0.40 as the publication confidence gate. The 0.70 filter below is intentionally stricter and is only an example of a downstream analyst choosing to work with higher-confidence rows.</p>
           <pre className="mt-8 overflow-auto rounded-[2rem] border border-white/10 bg-black/55 p-6 font-mono text-xs leading-6 text-zinc-100"><code>{`import pandas as pd
 
 urd = pd.read_csv(
@@ -99,6 +100,7 @@ joined = my_data.merge(
     how="left",
 )
 
+# Optional downstream filter; stricter than the Urd Atlas publication gate of 0.40.
 usable = joined[joined["confidence_score"] >= 0.70]`}</code></pre>
         </div>
       </section>
