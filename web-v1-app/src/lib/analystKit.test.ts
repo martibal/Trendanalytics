@@ -39,7 +39,7 @@ describe("lib/analystKit", () => {
     expect(mod.isAnalystKitChain("solana")).toBe(false);
   });
 
-  it("builds sorted regime calendar rows from the deepest available published window", async () => {
+  it("builds sorted regime calendar rows from the current published Meta shape", async () => {
     readStorageObjectMock.mockImplementation(async (path: string) => {
       if (path.endsWith("last365d.json")) return null;
       if (path.endsWith("last180d.json")) {
@@ -54,17 +54,19 @@ describe("lib/analystKit", () => {
               lag_days_vs_utc_today: 1,
             },
             regime: {
+              determinism_hash: "abc123",
               drivers: [
                 { metric: "tx_count_daily", direction: "up", value: 123, contribution: 0.4 },
               ],
             },
             scorecard: {
-              demand: { score: 73 },
-              friction: 41,
-              capacity: { score: 58 },
+              dimensions: {
+                demand: { score: 73 },
+                friction: { score: 41 },
+                capacity: { score: 58 },
+              },
             },
-            methodology_version: "v2.0",
-            determinism_hash: "abc123",
+            methodology_version: "1.1",
           },
           {
             date: "2026-07-02",
@@ -76,12 +78,12 @@ describe("lib/analystKit", () => {
               lag_days_vs_utc_today: 1,
             },
             regime: {
+              determinism_hash: "def456",
               demand_score: 51,
               friction_score: 34,
               capacity_score: 49,
             },
-            methodology_version: "v2.0",
-            determinism_hash: "def456",
+            methodology_version: "1.1",
           },
         ]);
       }
@@ -108,6 +110,7 @@ describe("lib/analystKit", () => {
         demand_score: 51,
         friction_score: 34,
         capacity_score: 49,
+        determinism_hash: "def456",
       }),
       expect.objectContaining({
         observation_date: "2026-07-03",
@@ -118,9 +121,37 @@ describe("lib/analystKit", () => {
         demand_score: 73,
         friction_score: 41,
         capacity_score: 58,
+        methodology_version: "1.1",
+        determinism_hash: "abc123",
         drivers: "tx_count_daily up=123 contribution=0.4",
       }),
     ]);
+  });
+
+  it("keeps legacy scorecard and determinism fields as fallbacks", async () => {
+    readStorageObjectMock.mockResolvedValue(storageObject([
+      {
+        date: "2026-07-03",
+        status: { label: "HEATING" },
+        confidence: { confidence_score: 0.84 },
+        scorecard: {
+          demand: { score: 73 },
+          friction: 41,
+          capacity: { score: 58 },
+        },
+        determinism_hash: "legacy123",
+      },
+    ]));
+
+    const mod = await import("@/lib/analystKit");
+    const rows = await mod.buildRegimeCalendarRows("ethereum");
+
+    expect(rows[0]).toEqual(expect.objectContaining({
+      demand_score: 73,
+      friction_score: 41,
+      capacity_score: 58,
+      determinism_hash: "legacy123",
+    }));
   });
 
   it("falls back to latest.json when no window files are available", async () => {
@@ -164,7 +195,7 @@ describe("lib/analystKit", () => {
         demand_score: 73,
         friction_score: 41,
         capacity_score: 58,
-        methodology_version: "v2.0",
+        methodology_version: "1.1",
         determinism_hash: "abc123",
         one_liner: "Demand rose, fees stayed controlled.",
         drivers: "tx_count_daily up=123; active_addresses up=456",
@@ -202,7 +233,7 @@ describe("lib/analystKit", () => {
     expect(summary).toContain("Published drivers: active addresses up.");
   });
 
-  it("returns a machine-readable schema and notebook", async () => {
+  it("returns a machine-readable schema and notebook aligned with the CSV contract", async () => {
     const mod = await import("@/lib/analystKit");
     const schema = mod.buildFeatureSchema();
     const notebook = mod.buildStarterNotebook();
@@ -212,10 +243,16 @@ describe("lib/analystKit", () => {
       primary_key: ["chain", "observation_date"],
     }));
     expect(Array.isArray(schema.fields)).toBe(true);
+    expect(schema.fields).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "chain_label" }),
+      expect.objectContaining({ name: "demand_score" }),
+      expect.objectContaining({ name: "determinism_hash" }),
+    ]));
     expect(schema.safe_uses).toContain("reporting context");
     expect(schema.unsafe_uses).toContain("automated decision without human review");
 
     expect(notebook).toEqual(expect.objectContaining({ nbformat: 4, nbformat_minor: 5 }));
     expect(Array.isArray(notebook.cells)).toBe(true);
+    expect(JSON.stringify(notebook)).toContain("0.40 is the publication gate");
   });
 });
