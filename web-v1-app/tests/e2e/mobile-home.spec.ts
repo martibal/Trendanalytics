@@ -21,14 +21,22 @@ test.describe("mobile homepage regression", () => {
       expect(columns).toHaveLength(2);
     }
 
-    await page.getByRole("button", { name: /view complete json/i }).click();
+    const openJson = page.getByRole("button", { name: /view complete json/i });
+    await expect(openJson).toBeVisible();
+    await expect(openJson).toBeEnabled();
+    await openJson.click();
 
-    const dialog = page.getByRole("dialog", { name: /complete json preview/i });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("button", { name: /copy to clipboard/i })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: /^close$/i })).toBeVisible();
+    const modalBackdrop = page.locator('.ua3-modal-backdrop[role="dialog"]');
+    await expect(modalBackdrop).toBeVisible({ timeout: 10000 });
+    await expect(modalBackdrop).toHaveAttribute("aria-label", "Complete JSON preview");
 
-    await dialog.getByRole("button", { name: /^close$/i }).click();
-    await expect(dialog).toHaveCount(0);
+    await expect(
+      modalBackdrop.getByRole("button", { name: /copy to clipboard/i })
+    ).toBeVisible();
+    const closeButton = modalBackdrop.getByRole("button", { name: /^close$/i });
+    await expect(closeButton).toBeVisible();
+
+    await closeButton.click();
+    await expect(modalBackdrop).toHaveCount(0);
   });
 });
