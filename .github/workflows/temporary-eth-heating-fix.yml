@@ -6,74 +6,27 @@ on:
       - agent/align-ethereum-heating-reconciliation
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch:
+  build-fix:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/align-ethereum-heating-reconciliation
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Apply targeted reconciliation fix and regression test
-        shell: bash
-        run: |
-          if [ -f tests/test_eth_heating_reconciliation.py ]; then
-            echo "Patch already present; no edit needed."
-            exit 0
-          fi
-          python - <<'PY'
-          from pathlib import Path
-
-          p = Path('api/regime_engine.py')
-          text = p.read_text(encoding='utf-8')
-          old = '''    if label == "HEATING":
-        ok = bool(high(d) and heating(d))
-        return ok, details, "regime axes require informative demand high with HEATING trend."
-'''
-          new = '''    if label == "HEATING":
-        core_demand_support = bool(high(d) and heating(d))
-        calldata = ((regime.get("signals") or {}).get("nonempty_calldata_share") or {})
-        eth_calldata_support = bool(
-            str(regime.get("ruleset_id") or "") == "eth_l1_v2"
-            and high(d)
-            and bool(calldata.get("informative", False))
-            and str(calldata.get("trend") or "") == "HEATING"
-        )
-        ok = bool(core_demand_support or eth_calldata_support)
-        return ok, details, "regime axes require core demand HEATING support or the ETH v2 supplemental calldata HEATING rule."
-'''
-          if old not in text:
-              raise SystemExit('Expected HEATING reconciliation block not found; refusing broad edit.')
-          p.write_text(text.replace(old, new, 1), encoding='utf-8')
-
-          t = Path('tests')
-          t.mkdir(exist_ok=True)
-          (t / '__init__.py').touch()
-          (t / 'test_eth_heating_reconciliation.py').write_text('''import unittest\n\nfrom api.regime_engine import _regime_axis_support\n\n\nclass EthereumHeatingReconciliationTests(unittest.TestCase):\n    def test_eth_v2_calldata_heating_is_valid_support(self):\n        regime = {\n            "ruleset_id": "eth_l1_v2",\n            "axes": {\n                "demand": {"band_high": "HIGH", "band_low": "NORMAL", "trend": "COOLING", "informative_count": 2},\n                "friction": {"band_high": "NORMAL", "band_low": "NORMAL", "trend": "FLAT", "informative_count": 2},\n                "capacity": {"band_high": "NORMAL", "band_low": "NORMAL", "trend": "FLAT", "informative_count": 1},\n            },\n            "signals": {\n                "nonempty_calldata_share": {"informative": True, "trend": "HEATING"}\n            },\n        }\n        ok, _, _ = _regime_axis_support(regime, "HEATING")\n        self.assertTrue(ok)\n\n    def test_non_eth_profile_does_not_gain_calldata_exception(self):\n        regime = {\n            "ruleset_id": "l2_v1",\n            "axes": {\n                "demand": {"band_high": "HIGH", "band_low": "NORMAL", "trend": "COOLING", "informative_count": 2},\n                "friction": {"band_high": "NORMAL", "band_low": "NORMAL", "trend": "FLAT", "informative_count": 1},\n                "capacity": {"band_high": "NORMAL", "band_low": "NORMAL", "trend": "FLAT", "informative_count": 1},\n            },\n            "signals": {\n                "nonempty_calldata_share": {"informative": True, "trend": "HEATING"}\n            },\n        }\n        ok, _, _ = _regime_axis_support(regime, "HEATING")\n        self.assertFalse(ok)\n\n    def test_core_demand_heating_still_works(self):\n        regime = {\n            "ruleset_id": "eth_l1_v2",\n            "axes": {\n                "demand": {"band_high": "HIGH", "band_low": "NORMAL", "trend": "HEATING", "informative_count": 2},\n                "friction": {"band_high": "NORMAL", "band_low": "NORMAL", "trend": "FLAT", "informative_count": 2},\n                "capacity": {"band_high": "NORMAL", "band_low": "NORMAL", "trend": "FLAT", "informative_count": 1},\n            },\n            "signals": {},\n        }\n        ok, _, _ = _regime_axis_support(regime, "HEATING")\n        self.assertTrue(ok)\n\n\nif __name__ == "__main__":\n    unittest.main()\n''', encoding='utf-8')
-          PY
-      - name: Install Python dependencies
+      - name: Apply targeted fix in workspace
+        run: python scripts/apply_eth_heating_reconciliation_fix.py
+      - name: Install dependencies
         run: python -m pip install pandas numpy
-      - name: Run focused regression tests
-        run: |
-          if [ -f tests/test_eth_heating_reconciliation.py ]; then
-            python -m unittest tests.test_eth_heating_reconciliation -v
-          else
-            echo "Regression test file missing" >&2
-            exit 1
-          fi
-      - name: Commit targeted fix if changed
-        shell: bash
-        run: |
-          if git diff --quiet && [ -z "$(git status --porcelain --untracked-files=normal tests 2>/dev/null)" ]; then
-            echo "No changes to commit."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add api/regime_engine.py tests/__init__.py tests/test_eth_heating_reconciliation.py
-          git commit -m "fix: align ethereum heating reconciliation"
-          git push origin HEAD:agent/align-ethereum-heating-reconciliation
+      - name: Run focused regression test
+        run: PYTHONPATH=. python generated-tests/test_eth_heating_reconciliation.py
+      - name: Upload corrected files
+        uses: actions/upload-artifact@v4
+        with:
+          name: eth-heating-reconciliation-fix
+          path: |
+            api/regime_engine.py
+            generated-tests/test_eth_heating_reconciliation.py
+          retention-days: 1
