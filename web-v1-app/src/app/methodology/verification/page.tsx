@@ -14,6 +14,28 @@ export default async function MethodologyVerificationPage() {
       />
       <MethodologyContent>
         <MethodologyNav />
+
+        <Callout title="Machine-readable Validation Report v1">
+          <p>
+            The dated validation findings are also published as a stable JSON verification artifact. It records
+            the audit scope, current rulesets, confidence methodology, baseline reproduction, threshold sensitivity,
+            single-signal ablation results, validation boundary, and governance statements used by the public
+            Validation page.
+          </p>
+          <p>
+            <a
+              href="/verification/validation-v1.json"
+              className="font-semibold text-[#0d2447] underline decoration-[#9db8d4] underline-offset-4 hover:text-blue-800"
+            >
+              Open validation-v1.json
+            </a>
+          </p>
+          <p>
+            This is a dated audit artifact, not a live daily metric. Future methodology revisions should publish
+            a new version rather than silently rewriting the meaning of this record.
+          </p>
+        </Callout>
+
       <ShortFullContent
         pageKey="methodology-verification"
         summary={<>This page tells you how much of the published output you can verify yourself in practice.</>}
