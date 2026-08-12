@@ -14,6 +14,13 @@ type MetaDriver = {
   metric?: string;
   name?: string;
   label?: string;
+  axis?: string;
+  trend?: string;
+  current?: number | string;
+  z_robust?: number | string;
+  pct_90d?: number | string;
+  momentum_7d_vs_30d?: number | string;
+  informative?: boolean;
   direction?: string;
   value?: number | string;
   contribution?: number | string;
@@ -135,8 +142,26 @@ function rowDate(row: MetaRow): string {
   return row.date ?? row.updated_through ?? row.regime?.asof_date ?? "";
 }
 
+function driverField(name: string, value: unknown): string {
+  return value == null || value === "" ? "" : `${name}=${String(value)}`;
+}
+
 function driverText(driver: MetaDriver): string {
   const label = driver.metric ?? driver.name ?? driver.label ?? "driver";
+  const currentShape = [
+    driverField("axis", driver.axis),
+    driverField("trend", driver.trend),
+    driverField("current", driver.current),
+    driverField("z_robust", driver.z_robust),
+    driverField("pct_90d", driver.pct_90d),
+    driverField("momentum_7d_vs_30d", driver.momentum_7d_vs_30d),
+    driver.informative == null ? "" : driverField("informative", driver.informative),
+  ].filter(Boolean);
+
+  if (currentShape.length > 0) {
+    return `${label} ${currentShape.join(" ")}`.trim();
+  }
+
   const direction = driver.direction ? ` ${driver.direction}` : "";
   const value = driver.value == null ? "" : `=${driver.value}`;
   const contribution = driver.contribution == null ? "" : ` contribution=${driver.contribution}`;
@@ -305,7 +330,7 @@ export function buildFeatureSchema(): JsonRecord {
       { name: "methodology_version", type: "string", use: "Methodology identifier for reproducibility." },
       { name: "determinism_hash", type: "string", use: "Hash anchor for deterministic artifact verification when published." },
       { name: "one_liner", type: "string", use: "Short descriptive summary for reports and dashboards." },
-      { name: "drivers", type: "string", use: "Semicolon-separated driver summary for human review." },
+      { name: "drivers", type: "string", use: "Semicolon-separated current driver evidence (metric plus available axis/trend/value diagnostics) for human review." },
     ],
     safe_uses: [
       "reporting context",
