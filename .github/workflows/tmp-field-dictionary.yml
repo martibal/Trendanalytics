@@ -1,0 +1,67 @@
+name: Temporary field dictionary patch
+
+on:
+  push:
+    branches:
+      - docs/field-dictionary-v2
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/field-dictionary-v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply patch
+        run: python tools/tmp_patch_field_dictionary.py
+      - name: Validate documentation alignment
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s = Path('web-v1-app/src/app/methodology/fields/page.tsx').read_text(encoding='utf-8')
+          required = [
+            'What exactly do I receive?',
+            'Key Derived fields',
+            'confidence_v3_l2_capacity_required',
+            'capacity_util_pct',
+            'base_l1_gas_used_daily',
+            'arbitrum_l1_gas_used_daily',
+            'Supplemental regime evidence',
+            'it is not the old fee/value ratio',
+            'Why useful:',
+            'Applies to:',
+          ]
+          missing = [x for x in required if x not in s]
+          if missing:
+              raise SystemExit(f'missing expected field dictionary copy: {missing}')
+          forbidden = [
+            'Confidence v2',
+            'confidence_v2_profile_evidence',
+            'median_tx_fee_native / median_tx_value_native',
+            'It does not yet drive the public regime label, scorecard, or confidence calculation\n        while historical behaviour is being validated.',
+          ]
+          found = [x for x in forbidden if x in s]
+          if found:
+              raise SystemExit(f'obsolete field dictionary copy remains: {found}')
+          PY
+      - name: Install and verify web app
+        working-directory: web-v1-app
+        run: |
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm run build -- --webpack
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web-v1-app/src/app/methodology/fields/page.tsx
+          git commit -m "docs: make field dictionary buyer-readable"
+          git push origin HEAD:docs/field-dictionary-v2
