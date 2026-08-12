@@ -1,0 +1,146 @@
+name: Temporary homepage sales-pitch patch
+
+on:
+  push:
+    branches:
+      - docs/home-regime-sales-pitch
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/home-regime-sales-pitch
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Patch homepage sales copy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('web-v1-app/src/components/home/InteractiveHomeDashboard.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          old_getting = '''const gettingStarted = [
+  { number: "01", title: "Choose a subscription", body: "Pick one chain ($49/mo) or all four ($149/mo). No lock-in period.", cta: "See pricing →", href: "#pricing", icon: "card" },
+  { number: "02", title: "Connect the JSON via API", body: "Authenticate with your API key and pull daily updated files — Meta, Gold, Derived and Briefs — straight into your own pipeline.", cta: "Open API docs →", href: "/api-docs", icon: "plug" },
+  { number: "03", title: "Build your own output", body: "Join on date + chain against your own data, or use Briefs directly in a report. No classification model to build yourself.", cta: "See code example →", href: "/analyst-kit", icon: "code" },
+] as const;'''
+          new_getting = '''const gettingStarted = [
+  { number: "01", title: "A network regime, not a market regime", body: "STABLE, HEATING, CONGESTED and CHEAP describe observable network conditions. They do not describe price direction, investor risk or a trading view.", cta: "Read methodology →", href: "/methodology/reference", icon: "card" },
+  { number: "02", title: "Evidence underneath the label", body: "Demand, Friction and Capacity summarize the network state, while confidence, drivers and Gold measurements show the evidence behind it.", cta: "See validation →", href: "/validation", icon: "plug" },
+  { number: "03", title: "A row you can use immediately", body: "Join the daily state on date + chain, segment analysis by regime, filter on confidence, or use Briefs as reporting context.", cta: "See code example →", href: "/analyst-kit", icon: "code" },
+] as const;'''
+          if old_getting not in s:
+              raise SystemExit('gettingStarted block not found')
+          s = s.replace(old_getting, new_getting, 1)
+
+          start = s.index('function HeroValueStrip() {')
+          end = s.index('\nfunction InfoButton', start)
+          new_strip = '''function HeroValueStrip() {
+  return (
+    <div className="ua3-value-wrap">
+      <p className="ua3-value-title">What can you use the regime for?</p>
+      <div className="ua3-value-strip" aria-label="Practical uses">
+        <div className="ua3-value-column">
+          <h2>Put network context beside your own metrics.</h2>
+          <p>Join <FieldCode>regime</FieldCode> and <FieldCode>confidence_score</FieldCode> on date + chain. If one of your own metrics changes sharply, check whether it coincided with an unusual network state before you assume the cause sits inside your own system.</p>
+        </div>
+        <div className="ua3-value-column">
+          <h2>Segment analysis by the kind of network day.</h2>
+          <p>Compare your own observations across <FieldCode>STABLE</FieldCode>, <FieldCode>HEATING</FieldCode>, <FieldCode>CONGESTED</FieldCode> and <FieldCode>CHEAP</FieldCode> periods instead of treating every blockchain day as equivalent.</p>
+        </div>
+        <div className="ua3-value-column">
+          <h2>Explain what accompanied a network change.</h2>
+          <p>Use Briefs, drivers and the underlying measurements to summarize the network conditions that accompanied a fee, activity or capacity change — without turning that evidence into a causal or predictive claim.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+'''
+          s = s[:start] + new_strip + s[end:]
+
+          replacements = {
+            '<p className="ua3-category">DAILY REFERENCE DATA</p>': '<p className="ua3-category">DAILY NETWORK-STATE CLASSIFICATION</p>',
+            '<h1 id="hero-title" className="ua3-display">Urd Atlas is a daily network-state report for the Bitcoin, Ethereum, Arbitrum and Base networks.</h1>': '<h1 id="hero-title" className="ua3-display">One daily network regime for Bitcoin, Ethereum, Arbitrum and Base — with the evidence underneath.</h1>',
+            '<p className="ua3-body ua3-hero-copy">Built for analysts and data teams that need to explain why a number changed, not predict what it becomes.</p>': '<p className="ua3-body ua3-hero-copy">Urd Atlas classifies how the network behaved relative to its own recent history: STABLE, HEATING, CONGESTED or CHEAP. It is a network regime, not a market regime.</p>',
+            '<a href="#today-status" className="ua3-button ua3-button-primary">See today&apos;s status →</a>': '<a href="#today-status" className="ua3-button ua3-button-primary">See today&apos;s network state →</a>',
+            '<section className="ua3-section ua3-start" aria-labelledby="start-title"><div className="ua3-wrap"><h2 id="start-title" className="ua3-step-title">Get started.</h2>': '<section className="ua3-section ua3-start" aria-labelledby="start-title"><div className="ua3-wrap"><h2 id="start-title" className="ua3-step-title">What you are buying.</h2>',
+            '<p className="ua3-label ua3-step-label">Step 3</p>': '<p className="ua3-label ua3-step-label">Published network state</p>',
+            '<p className="ua3-label ua3-step-label">Step 4</p>': '<p className="ua3-label ua3-step-label">Delivered evidence</p>',
+            '<p className="ua3-label ua3-step-label">Step 5</p>': '<p className="ua3-label ua3-step-label">Plans</p>',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'replacement target not found: {old[:80]}')
+              s = s.replace(old, new, 1)
+
+          pricing_marker = '''      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title">'''
+          if pricing_marker not in s:
+              raise SystemExit('pricing marker not found')
+          build_buy = '''      <section className="ua3-section ua3-start" aria-labelledby="build-buy-title">
+        <div className="ua3-wrap">
+          <p className="ua3-label ua3-step-label">Build or buy</p>
+          <h2 id="build-buy-title" className="ua3-step-title">You could build this yourself. The question is whether you should.</h2>
+          <p className="ua3-body">The alternative to Urd Atlas is not raw data alone. It is the ingestion, normalization, chain-specific feature work, historical baselines, classification rules, confidence logic and ongoing maintenance needed to turn that raw data into a dependable daily state row.</p>
+          <div className="ua3-start-grid" style={{ marginTop: 32 }}>
+            <article className="ua3-card ua3-step-card">
+              <p className="ua3-step-number">01</p>
+              <div className="ua3-step-heading"><LucideIcon name="plug" /><h3>Build and maintain the data layer</h3></div>
+              <p className="ua3-body-small">Source four different chains, handle schema differences, aggregate daily measurements, validate freshness and keep the pipeline running when source data changes.</p>
+            </article>
+            <article className="ua3-card ua3-step-card">
+              <p className="ua3-step-number">02</p>
+              <div className="ua3-step-heading"><LucideIcon name="code" /><h3>Define and validate the methodology</h3></div>
+              <p className="ua3-body-small">Choose chain-aware proxies, historical baselines, regime thresholds, confidence gates and validation tests — then version the method when it changes.</p>
+            </article>
+            <article className="ua3-card ua3-step-card">
+              <p className="ua3-step-number">03</p>
+              <div className="ua3-step-heading"><LucideIcon name="card" /><h3>Or connect the finished layer</h3></div>
+              <p className="ua3-body-small">Basic is $49/month for one chain. Pro is $149/month for all four. If recreating and maintaining the same layer costs more than a small amount of analyst or engineering time, buying is cheaper.</p>
+              <Link href="#pricing" className="ua3-button ua3-button-quiet">Compare plans →</Link>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
+'''
+          s = s.replace(pricing_marker, build_buy + pricing_marker, 1)
+
+          boundary = '<div className="ua3-compliance-row" aria-label="Product boundary"><span className="ua3-compliance-pill">No price data</span><span className="ua3-compliance-pill">No forecasts</span><span className="ua3-compliance-pill">No recommendations</span></div>'
+          if boundary not in s:
+              raise SystemExit('boundary row not found')
+          new_boundary = boundary + '\n            <p className="ua3-body-small">Transparent rules, chain-aware methodology and empirical robustness checks. <Link href="/validation">See the validation evidence →</Link></p>'
+          s = s.replace(boundary, new_boundary, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Validate targeted copy
+        run: |
+          grep -q "One daily network regime" web-v1-app/src/components/home/InteractiveHomeDashboard.tsx
+          grep -q "You could build this yourself" web-v1-app/src/components/home/InteractiveHomeDashboard.tsx
+          ! grep -q "the spike is explained by the chain" web-v1-app/src/components/home/InteractiveHomeDashboard.tsx
+          ! grep -q "It already says why" web-v1-app/src/components/home/InteractiveHomeDashboard.tsx
+      - name: Install and verify web app
+        working-directory: web-v1-app
+        run: |
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm run build -- --webpack
+      - name: Commit homepage patch and remove temporary workflow
+        run: |
+          rm .github/workflows/tmp-home-sales-pitch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web-v1-app/src/components/home/InteractiveHomeDashboard.tsx .github/workflows/tmp-home-sales-pitch.yml
+          git commit -m "feat: clarify network-regime sales pitch"
+          git push origin HEAD:docs/home-regime-sales-pitch
