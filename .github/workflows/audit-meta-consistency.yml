@@ -19,9 +19,13 @@ jobs:
           python-version: '3.12'
       - name: Run consistency audit
         run: python scripts/audit_published_meta_consistency.py
-      - name: Upload audit report
+      - name: Run churn breakdown
+        run: python scripts/audit_meta_churn_breakdown.py
+      - name: Upload audit reports
         uses: actions/upload-artifact@v4
         with:
           name: meta-consistency-audit
-          path: audit-meta-consistency.json
+          path: |
+            audit-meta-consistency.json
+            audit-meta-churn.json
           retention-days: 7
