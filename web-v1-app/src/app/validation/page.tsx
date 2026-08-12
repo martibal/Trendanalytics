@@ -13,7 +13,7 @@ export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Validation | Urd Atlas",
-  description: "Published validation diagnostics for Urd Atlas network-state features, class balance, transitions and confidence coverage.",
+  description: "Empirical validation and published diagnostics for Urd Atlas network-state classification: internal consistency, threshold robustness, signal ablation, class balance, transitions and confidence coverage.",
 };
 
 type WindowId = "last365d" | "last180d" | "last90d" | "last30d" | "last7d";
@@ -224,19 +224,80 @@ export default async function ValidationPage() {
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Validation</p>
           <h1 className="mt-5 text-5xl font-medium tracking-[-0.05em] sm:text-6xl">Evidence before trust.</h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-muted-foreground">
-            Urd Atlas should not ask technical customers to believe in regimes. This page shows whether the published network-state layer has enough variation, confidence coverage and transition structure to be useful in analysis.
+            Urd Atlas should not ask technical customers to trust a black box. This page separates dated methodology validation from live published-data diagnostics: whether the classification rules are internally coherent and robust, and whether the current data windows have enough variation, confidence coverage and transition structure for analysis.
           </p>
         </div>
         <div className="rounded-3xl border border-border bg-card/60 p-6">
-          <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">What this page proves</p>
-          <p className="mt-4 text-2xl font-medium tracking-tight">Descriptive data quality, not future outcomes.</p>
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">Validation boundary</p>
+          <p className="mt-4 text-2xl font-medium tracking-tight">Internally tested. Not a claim of external ground truth.</p>
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            These diagnostics support buyer due diligence: class balance, confidence gating, run stability and point-in-time discipline. They are not automated instructions or future-state guarantees.
+            Network-state labels are explicitly defined descriptive categories. Validation tests reproducibility, internal rule consistency, threshold robustness and signal dependence. It does not claim a hidden objective regime truth, calibrated label probability, forecast or recommendation.
           </p>
         </div>
       </section>
 
-      <section className="mt-12 grid gap-4 md:grid-cols-3">
+      <section className="mt-12 rounded-[2rem] border border-border bg-card/60 p-6 lg:p-8">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Validation Report v1 · 12 August 2026</p>
+            <h2 className="mt-3 text-3xl font-medium tracking-tight">The current classifier has been tested for internal consistency and robustness.</h2>
+            <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">
+              The historical consistency audit covers all dated Meta rows available at the audit date. Sensitivity and ablation results are scoped to the current active rulesets so older methodology versions are not incorrectly judged by today&apos;s rules.
+            </p>
+          </div>
+          <Link href="/methodology/reference" className="inline-flex w-fit items-center justify-center rounded-full border border-border px-5 py-3 text-sm font-medium">
+            Read methodology
+          </Link>
+        </div>
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-2xl border border-border bg-background/55 p-5">
+            <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">Historical consistency</p>
+            <p className="mt-3 text-3xl font-medium tracking-tight">2,464</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Published chain-days audited across Bitcoin, Ethereum, Arbitrum and Base.</p>
+          </article>
+          <article className="rounded-2xl border border-border bg-background/55 p-5">
+            <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">Hard rule violations</p>
+            <p className="mt-3 text-3xl font-medium tracking-tight">0</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">No audited label-rule, confidence-range or candidate-signature consistency failures.</p>
+          </article>
+          <article className="rounded-2xl border border-border bg-background/55 p-5">
+            <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">Baseline reproduction</p>
+            <p className="mt-3 text-3xl font-medium tracking-tight">2,100 / 2,100</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Current-ruleset candidate labels exactly reproduced before counterfactual tests.</p>
+          </article>
+          <article className="rounded-2xl border border-border bg-background/55 p-5">
+            <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">±5% threshold test</p>
+            <p className="mt-3 text-3xl font-medium tracking-tight">96.5–97.6%</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Candidate labels unchanged when key threshold families were moved together by ±5%.</p>
+          </article>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <article className="rounded-2xl border border-border bg-background/55 p-5">
+            <h3 className="font-medium tracking-tight">Threshold sensitivity</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Combined ±10% perturbations changed 6.57–8.10% of current-ruleset candidate labels. Percentile boundaries were the most influential threshold family; robust z-score and momentum changes had materially smaller marginal effects.
+            </p>
+          </article>
+          <article className="rounded-2xl border border-border bg-background/55 p-5">
+            <h3 className="font-medium tracking-tight">Signal ablation</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Removing individual signals changed labels in semantically expected ways: fee removal primarily reduced low-friction or congestion classifications, while primary capacity proxies had the strongest effect on capacity-sensitive regimes. This tests structural dependence, not predictive accuracy.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="mt-12">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Live published-data diagnostics</p>
+          <h2 className="mt-3 text-3xl font-medium tracking-tight">What does the currently published window look like?</h2>
+          <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">These numbers are calculated from the best currently available published Meta window and can change as new rows are published. They are separate from the dated Validation Report v1 results above.</p>
+        </div>
+      </section>
+
+      <section className="mt-6 grid gap-4 md:grid-cols-3">
         <article className="rounded-3xl border border-border bg-card/55 p-6">
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">Rows inspected</p>
           <p className="mt-3 text-4xl font-medium tracking-tight">{totalObservations(rows).toLocaleString("en-US")}</p>
