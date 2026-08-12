@@ -91,9 +91,9 @@ const plans: Array<{ id: "free" | CheckoutPlan; name: string; price: string; sum
 ];
 
 const gettingStarted = [
-  { number: "01", title: "Choose a subscription", body: "Pick one chain ($49/mo) or all four ($149/mo). No lock-in period.", cta: "See pricing →", href: "#pricing", icon: "card" },
-  { number: "02", title: "Connect the JSON via API", body: "Authenticate with your API key and pull daily updated files — Meta, Gold, Derived and Briefs — straight into your own pipeline.", cta: "Open API docs →", href: "/api-docs", icon: "plug" },
-  { number: "03", title: "Build your own output", body: "Join on date + chain against your own data, or use Briefs directly in a report. No classification model to build yourself.", cta: "See code example →", href: "/analyst-kit", icon: "code" },
+  { number: "01", title: "A network regime, not a market regime", body: "STABLE, HEATING, CONGESTED and CHEAP describe observable network conditions. They do not describe price direction, investor risk or a trading view.", cta: "Read methodology →", href: "/methodology/reference", icon: "card" },
+  { number: "02", title: "Evidence underneath the label", body: "Demand, Friction and Capacity summarize the network state, while confidence, drivers and Gold measurements show the evidence behind it.", cta: "See validation →", href: "/validation", icon: "plug" },
+  { number: "03", title: "A row you can use immediately", body: "Join the daily state on date + chain, segment analysis by regime, filter on confidence, or use Briefs as reporting context.", cta: "See code example →", href: "/analyst-kit", icon: "code" },
 ] as const;
 
 function clampPercent(value: number | null) {
@@ -167,19 +167,19 @@ function FieldCode({ children }: { children: string }) {
 function HeroValueStrip() {
   return (
     <div className="ua3-value-wrap">
-      <p className="ua3-value-title">What is Urd Atlas used for?</p>
-      <div className="ua3-value-strip" aria-label="What you get">
+      <p className="ua3-value-title">What can you use the regime for?</p>
+      <div className="ua3-value-strip" aria-label="Practical uses">
         <div className="ua3-value-column">
-          <h2>Your model&apos;s error rate doubled on Tuesday.</h2>
-          <p>Join <FieldCode>regime</FieldCode> and <FieldCode>confidence_score</FieldCode> from Meta on that date. If Ethereum was CONGESTED with confidence above 70%, the spike is explained by the chain — not your model. If it wasn&apos;t, keep debugging your own code.</p>
+          <h2>Put network context beside your own metrics.</h2>
+          <p>Join <FieldCode>regime</FieldCode> and <FieldCode>confidence_score</FieldCode> on date + chain. If one of your own metrics changes sharply, check whether it coincided with an unusual network state before you assume the cause sits inside your own system.</p>
         </div>
         <div className="ua3-value-column">
-          <h2>You need one sentence for a report explaining why gas fees jumped.</h2>
-          <p>Copy the <FieldCode>one_liner</FieldCode> field from Briefs for that date and chain. It already says why — e.g. &quot;Demand-led heating: elevated transaction count.&quot; Nothing to write.</p>
+          <h2>Segment analysis by the kind of network day.</h2>
+          <p>Compare your own observations across <FieldCode>STABLE</FieldCode>, <FieldCode>HEATING</FieldCode>, <FieldCode>CONGESTED</FieldCode> and <FieldCode>CHEAP</FieldCode> periods instead of treating every blockchain day as equivalent.</p>
         </div>
         <div className="ua3-value-column">
-          <h2>You want to show chain status on an internal dashboard, but have no engineer free to build it.</h2>
-          <p>Open Explorer, pick a chain, read today&apos;s label and confidence. No API key, no code, no CSV to parse.</p>
+          <h2>Explain what accompanied a network change.</h2>
+          <p>Use Briefs, drivers and the underlying measurements to summarize the network conditions that accompanied a fee, activity or capacity change — without turning that evidence into a causal or predictive claim.</p>
         </div>
       </div>
     </div>
@@ -319,12 +319,13 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
       <section className="ua3-section ua3-hero" aria-labelledby="hero-title">
         <div className="ua3-wrap ua3-hero-grid">
           <div className="ua3-hero-left">
-            <p className="ua3-category">DAILY REFERENCE DATA</p>
-            <h1 id="hero-title" className="ua3-display">Urd Atlas is a daily network-state report for the Bitcoin, Ethereum, Arbitrum and Base networks.</h1>
-            <p className="ua3-body ua3-hero-copy">Built for analysts and data teams that need to explain why a number changed, not predict what it becomes.</p>
+            <p className="ua3-category">DAILY NETWORK-STATE CLASSIFICATION</p>
+            <h1 id="hero-title" className="ua3-display">One daily network regime for Bitcoin, Ethereum, Arbitrum and Base — with the evidence underneath.</h1>
+            <p className="ua3-body ua3-hero-copy">Urd Atlas classifies how the network behaved relative to its own recent history: STABLE, HEATING, CONGESTED or CHEAP. It is a network regime, not a market regime.</p>
             <HeroValueStrip />
             <div className="ua3-compliance-row" aria-label="Product boundary"><span className="ua3-compliance-pill">No price data</span><span className="ua3-compliance-pill">No forecasts</span><span className="ua3-compliance-pill">No recommendations</span></div>
-            <a href="#today-status" className="ua3-button ua3-button-primary">See today&apos;s status →</a>
+            <p className="ua3-body-small">Transparent rules, chain-aware methodology and empirical robustness checks. <Link href="/validation">See the validation evidence →</Link></p>
+            <a href="#today-status" className="ua3-button ua3-button-primary">See today&apos;s network state →</a>
           </div>
           <div className="ua3-hero-glow" aria-label="Hero network-state row preview">
             {heroPanelSnapshot ? <HeroNetworkStatePanel snapshot={heroPanelSnapshot} /> : null}
@@ -334,19 +335,47 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      <section className="ua3-section ua3-start" aria-labelledby="start-title"><div className="ua3-wrap"><h2 id="start-title" className="ua3-step-title">Get started.</h2><div className="ua3-start-grid">{gettingStarted.map((step) => <article key={step.number} className="ua3-card ua3-step-card"><p className="ua3-step-number">{step.number}</p><div className="ua3-step-heading"><LucideIcon name={step.icon} /><h3>{step.title}</h3></div><p className="ua3-body-small">{step.body}</p><Link href={step.href} className="ua3-button ua3-button-quiet">{step.cta}</Link></article>)}</div></div></section>
+      <section className="ua3-section ua3-start" aria-labelledby="start-title"><div className="ua3-wrap"><h2 id="start-title" className="ua3-step-title">What you are buying.</h2><div className="ua3-start-grid">{gettingStarted.map((step) => <article key={step.number} className="ua3-card ua3-step-card"><p className="ua3-step-number">{step.number}</p><div className="ua3-step-heading"><LucideIcon name={step.icon} /><h3>{step.title}</h3></div><p className="ua3-body-small">{step.body}</p><Link href={step.href} className="ua3-button ua3-button-quiet">{step.cta}</Link></article>)}</div></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      <section id="today-status" className="ua3-section ua3-status" aria-labelledby="status-title"><div className="ua3-wrap"><div className="ua3-section-head"><div><p className="ua3-label ua3-step-label">Step 3</p><h2 id="status-title" className="ua3-step-title">Today&apos;s state — four chains, updated {lastRun}.</h2></div><p className="ua3-body-small ua3-help-copy">Tap any term marked with ? to see a plain-language explanation.</p></div><div className="ua3-chain-grid">{snapshots.map((chain) => { const active = chain.id === selectedChainId; return <button key={chain.id} data-chain={chain.id} type="button" onClick={() => setSelectedChainId(chain.id)} className={active ? "ua3-card ua3-chain-card ua3-chain-card-active" : "ua3-card ua3-chain-card"} style={toneStyle(chain.regime)}><div className="ua3-chain-top"><div><p className="ua3-label">{chain.ticker}</p><h3>{chain.name}</h3></div><StatusBadge label={chain.regime} /></div><div className="ua3-chain-bottom"><div><p className="ua3-data-medium">{chain.confidence}</p><p className="ua3-body-small">confidence</p></div><Sparkline /></div></button>; })}</div><div className="ua3-detail-panel"><div className="ua3-card ua3-detail-summary"><div className="ua3-detail-head"><div><p className="ua3-label">{selectedChain.ticker} · {selectedChain.asOf} · {selectedChain.lag}</p><h3>{selectedChain.name}</h3></div><StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><p className="ua3-body-small ua3-one-liner">{selectedChain.oneLiner}</p><ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-status-metrics"><div className="ua3-secondary-grid"><SecondaryMetric id="demand" label="Demand" value={selectedChain.demand} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="friction" label="Friction" value={selectedChain.friction} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="capacity" label="Capacity" value={selectedChain.capacity} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-tertiary-grid"><TertiaryMetric id="dataQuality" label="Data quality" value={pct(selectedChain.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="labelConfidence" label="Label confidence" value={pct(selectedChain.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="dataLag" label="Data lag" value={selectedChain.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div></div></div></div></section>
+      <section id="today-status" className="ua3-section ua3-status" aria-labelledby="status-title"><div className="ua3-wrap"><div className="ua3-section-head"><div><p className="ua3-label ua3-step-label">Published network state</p><h2 id="status-title" className="ua3-step-title">Today&apos;s state — four chains, updated {lastRun}.</h2></div><p className="ua3-body-small ua3-help-copy">Tap any term marked with ? to see a plain-language explanation.</p></div><div className="ua3-chain-grid">{snapshots.map((chain) => { const active = chain.id === selectedChainId; return <button key={chain.id} data-chain={chain.id} type="button" onClick={() => setSelectedChainId(chain.id)} className={active ? "ua3-card ua3-chain-card ua3-chain-card-active" : "ua3-card ua3-chain-card"} style={toneStyle(chain.regime)}><div className="ua3-chain-top"><div><p className="ua3-label">{chain.ticker}</p><h3>{chain.name}</h3></div><StatusBadge label={chain.regime} /></div><div className="ua3-chain-bottom"><div><p className="ua3-data-medium">{chain.confidence}</p><p className="ua3-body-small">confidence</p></div><Sparkline /></div></button>; })}</div><div className="ua3-detail-panel"><div className="ua3-card ua3-detail-summary"><div className="ua3-detail-head"><div><p className="ua3-label">{selectedChain.ticker} · {selectedChain.asOf} · {selectedChain.lag}</p><h3>{selectedChain.name}</h3></div><StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><p className="ua3-body-small ua3-one-liner">{selectedChain.oneLiner}</p><ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-status-metrics"><div className="ua3-secondary-grid"><SecondaryMetric id="demand" label="Demand" value={selectedChain.demand} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="friction" label="Friction" value={selectedChain.friction} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="capacity" label="Capacity" value={selectedChain.capacity} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-tertiary-grid"><TertiaryMetric id="dataQuality" label="Data quality" value={pct(selectedChain.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="labelConfidence" label="Label confidence" value={pct(selectedChain.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="dataLag" label="Data lag" value={selectedChain.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div></div></div></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      <section className="ua3-section ua3-files" aria-labelledby="files-title"><div className="ua3-wrap ua3-files-grid"><div><p className="ua3-label ua3-step-label">Step 4</p><h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2><p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p></div><div className="ua3-artifact-grid">{artifactCards.map((artifact) => <button key={artifact.name} type="button" onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}><span className="ua3-artifact-icon">{artifact.icon}</span><h3>{artifact.name}</h3><p className="ua3-body-small">{artifact.what}</p><p className="ua3-card-note">{artifact.use}</p></button>)}</div></div><div className="ua3-wrap ua3-preview-panel"><div><p className="ua3-label">Example preview</p><div className="ua3-toggle-row" aria-label="Confidence example selector">{(["high", "low"] as const).map((kind) => <button key={kind} type="button" onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>{kind} confidence</button>)}</div><p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p></div><div><JsonBlock payload={preview} prismReady={prismReady} /><button type="button" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>View complete JSON →</button></div></div></section>
+      <section className="ua3-section ua3-files" aria-labelledby="files-title"><div className="ua3-wrap ua3-files-grid"><div><p className="ua3-label ua3-step-label">Delivered evidence</p><h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2><p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p></div><div className="ua3-artifact-grid">{artifactCards.map((artifact) => <button key={artifact.name} type="button" onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}><span className="ua3-artifact-icon">{artifact.icon}</span><h3>{artifact.name}</h3><p className="ua3-body-small">{artifact.what}</p><p className="ua3-card-note">{artifact.use}</p></button>)}</div></div><div className="ua3-wrap ua3-preview-panel"><div><p className="ua3-label">Example preview</p><div className="ua3-toggle-row" aria-label="Confidence example selector">{(["high", "low"] as const).map((kind) => <button key={kind} type="button" onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>{kind} confidence</button>)}</div><p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p></div><div><JsonBlock payload={preview} prismReady={prismReady} /><button type="button" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>View complete JSON →</button></div></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title"><div className="ua3-wrap"><p className="ua3-label ua3-step-label">Step 5</p><h2 id="pricing-title" className="ua3-step-title">Pricing.</h2><div className="ua3-plan-grid">{plans.map((plan) => <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}><div className="ua3-plan-head"><h3>{plan.name}</h3>{plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}</div><p className="ua3-plan-price">{plan.price}</p><p className="ua3-body-small">{plan.summary}</p>{plan.id === "free" ? <Link href="/analyst-kit" className="ua3-button ua3-button-quiet ua3-button-full">{plan.cta}</Link> : <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>}</article>)}</div><p className="ua3-card-note ua3-pricing-note">Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p></div></section>
+      <section className="ua3-section ua3-start" aria-labelledby="build-buy-title">
+        <div className="ua3-wrap">
+          <p className="ua3-label ua3-step-label">Build or buy</p>
+          <h2 id="build-buy-title" className="ua3-step-title">You could build this yourself. The question is whether you should.</h2>
+          <p className="ua3-body">The alternative to Urd Atlas is not raw data alone. It is the ingestion, normalization, chain-specific feature work, historical baselines, classification rules, confidence logic and ongoing maintenance needed to turn that raw data into a dependable daily state row.</p>
+          <div className="ua3-start-grid" style={{ marginTop: 32 }}>
+            <article className="ua3-card ua3-step-card">
+              <p className="ua3-step-number">01</p>
+              <div className="ua3-step-heading"><LucideIcon name="plug" /><h3>Build and maintain the data layer</h3></div>
+              <p className="ua3-body-small">Source four different chains, handle schema differences, aggregate daily measurements, validate freshness and keep the pipeline running when source data changes.</p>
+            </article>
+            <article className="ua3-card ua3-step-card">
+              <p className="ua3-step-number">02</p>
+              <div className="ua3-step-heading"><LucideIcon name="code" /><h3>Define and validate the methodology</h3></div>
+              <p className="ua3-body-small">Choose chain-aware proxies, historical baselines, regime thresholds, confidence gates and validation tests — then version the method when it changes.</p>
+            </article>
+            <article className="ua3-card ua3-step-card">
+              <p className="ua3-step-number">03</p>
+              <div className="ua3-step-heading"><LucideIcon name="card" /><h3>Or connect the finished layer</h3></div>
+              <p className="ua3-body-small">Basic is $49/month for one chain. Pro is $149/month for all four. If recreating and maintaining the same layer costs more than a small amount of analyst or engineering time, buying is cheaper.</p>
+              <Link href="#pricing" className="ua3-button ua3-button-quiet">Compare plans →</Link>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title"><div className="ua3-wrap"><p className="ua3-label ua3-step-label">Plans</p><h2 id="pricing-title" className="ua3-step-title">Pricing.</h2><div className="ua3-plan-grid">{plans.map((plan) => <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}><div className="ua3-plan-head"><h3>{plan.name}</h3>{plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}</div><p className="ua3-plan-price">{plan.price}</p><p className="ua3-body-small">{plan.summary}</p>{plan.id === "free" ? <Link href="/analyst-kit" className="ua3-button ua3-button-quiet ua3-button-full">{plan.cta}</Link> : <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>}</article>)}</div><p className="ua3-card-note ua3-pricing-note">Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
 
