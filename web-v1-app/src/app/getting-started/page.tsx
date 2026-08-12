@@ -49,7 +49,7 @@ export default function GettingStartedPage() {
           <article className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
             <p className="font-mono text-xs text-cyan-200">01</p>
             <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">Start free.</h2>
-            <p className="mt-4 text-sm leading-7 text-zinc-400">Open the Analyst Kit and download a sample CSV. You do not need an account to inspect the public sample.</p>
+            <p className="mt-4 text-sm leading-7 text-zinc-400">Open the Analyst Kit and use a public regime-calendar CSV endpoint directly. You do not need an account or a manual download for the first test.</p>
             <Link href="/analyst-kit" className="mt-6 inline-flex rounded-full border border-cyan-300/35 bg-cyan-300/12 px-5 py-3 font-mono text-xs uppercase tracking-[0.12em] text-white">Open Analyst Kit →</Link>
           </article>
           <article className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
@@ -84,10 +84,12 @@ export default function GettingStartedPage() {
         <div className="mx-auto max-w-6xl px-6 py-16 lg:px-8">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">Join example</p>
           <h2 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">Attach Urd Atlas to your own daily table.</h2>
-          <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-400">The join key is intentionally simple: one date and one chain value. The output keeps your own metric and adds the published network-state context.</p>
+          <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-400">The example reads Ethereum&apos;s public regime calendar directly from Urd Atlas, so only your own daily table needs to exist locally. Change the chain in the URL when you want to test BTC, ARB or BASE.</p>
           <pre className="mt-8 overflow-auto rounded-[2rem] border border-white/10 bg-black/55 p-6 font-mono text-xs leading-6 text-zinc-100"><code>{`import pandas as pd
 
-urd = pd.read_csv("urd_atlas_regime_calendar.csv")
+urd = pd.read_csv(
+    "https://urdatlas.com/api/v1/analyst-kit/ethereum/regime-calendar"
+)
 my_data = pd.read_csv("my_daily_metrics.csv")
 
 joined = my_data.merge(
