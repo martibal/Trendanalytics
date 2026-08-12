@@ -27,7 +27,7 @@ export default function MethodologyReferencePage() {
           summary={
             <>
               This page defines what Urd Atlas publishes, how to read regime and confidence, and
-              where public methodology stops. The active Meta confidence method is Confidence v2.
+              where public methodology stops. The active Meta confidence method is Confidence v3.
             </>
           }
           bullets={[
@@ -36,8 +36,8 @@ export default function MethodologyReferencePage() {
               Meta is the analytical regime layer, and Briefs are the readable JSON summary layer.
             </>,
             <>
-              Confidence v2 uses profile-aware data quality and label-specific evidence scoring while
-              retaining the public composite formula and 0.40 publish gate.
+              Confidence v3 uses profile-aware data quality and label-specific evidence scoring, requires
+              the current L2 capacity-utilization evidence, and retains the public composite formula and 0.40 publish gate.
             </>,
             <>
               Regime labels are descriptive interpretations of chain-relative conditions, not forecasts
@@ -145,7 +145,7 @@ export default function MethodologyReferencePage() {
                 </p>
               </Section>
 
-              <Section title="Confidence v2 methodology" id="confidence">
+              <Section title="Confidence v3 methodology" id="confidence">
                 <p>
                   Confidence answers a narrow evidence-quality question: how well-supported is the
                   current published analytical state by the relevant data and by the evidence for the
@@ -160,10 +160,12 @@ export default function MethodologyReferencePage() {
                 <p>
                   The current public confidence gate remains <InlineCode>0.40</InlineCode>. Below that
                   threshold, the product publishes <InlineCode>UNKNOWN/DEGRADED</InlineCode> rather than
-                  presenting a normal-confidence regime label.
+                  presenting a normal-confidence regime label. Current Meta rows identify the confidence method
+                  as <InlineCode>confidence_v3_l2_capacity_required</InlineCode>. The score is a structured
+                  reliability measure, not a calibrated probability that the label is correct.
                 </p>
                 <SimpleTable
-                  headers={["Component", "What it measures", "Confidence v2 behavior"]}
+                  headers={["Component", "What it measures", "Confidence v3 behavior"]}
                   rows={[
                     [
                       <InlineCode key="dq">data_quality_score</InlineCode>,
@@ -210,7 +212,7 @@ export default function MethodologyReferencePage() {
                 </p>
                 <Callout title="Important distinction: raw scorecard evidence vs display score">
                   <p>
-                    Confidence v2 uses raw scorecard/regime evidence to evaluate label confidence. The
+                    Confidence v3 uses raw scorecard/regime evidence to evaluate label confidence. The
                     public score displayed on pages is intentionally pulled toward 50 when confidence is
                     lower. This avoids using an already confidence-degraded display score to compute
                     confidence again.
@@ -228,20 +230,16 @@ export default function MethodologyReferencePage() {
                 </Callout>
                 <Callout title="BTC capacity note">
                   <p>
-                    For Bitcoin, <InlineCode>gas_utilization_pct</InlineCode> is not published. The capacity
-                    axis therefore relies entirely on <InlineCode>blocktime_instability</InlineCode>, computed
-                    as the rolling mean of <InlineCode>{`|avg_block_time_sec − rolling_median_30| / rolling_median_30`}</InlineCode>.
+                    Bitcoin does not use EVM gas semantics. The current BTC Capacity score combines direct
+                    <InlineCode>block_weight_utilization_pct</InlineCode> with a lower-weight
+                    <InlineCode>blocktime_instability</InlineCode> component. Block weight measures blockspace
+                    occupancy; block-time instability measures unusual variation around Bitcoin&apos;s own recent cadence.
                   </p>
                   <p>
-                    This instability index measures deviation from the chain&apos;s own recent block-time norm in
-                    both directions. A period of consistently fast block production and a period of consistently
-                    slow block production will both produce low instability and therefore a low capacity score.
-                    A high capacity score on Bitcoin means block timing is unusually erratic relative to recent
-                    history — not that blocks are slow.
-                  </p>
-                  <p>
-                    Consumers using BTC capacity scores should interpret them as a block-time volatility signal,
-                    not a congestion-in-the-traditional-sense signal.
+                    High blockspace use can therefore register as capacity pressure and can veto a CHEAP classification,
+                    while <InlineCode>CONGESTED</InlineCode> still requires simultaneous Friction pressure.
+                    The instability component should be read as supporting cadence evidence, not as a directional
+                    claim that slower blocks alone equal congestion.
                   </p>
                 </Callout>
               </Section>
@@ -305,12 +303,15 @@ export default function MethodologyReferencePage() {
                 </p>
                 <ul className="list-disc pl-5">
                   <li>
-                    <InlineCode>fee_burden_proxy</InlineCode> inside friction is a ratio of median fee to median
-                    transferred value, not a native fee field.
+                    The current scorecard Friction components use <InlineCode>median_tx_fee_native</InlineCode>
+                    directly; Ethereum additionally uses <InlineCode>failed_tx_rate</InlineCode>. The L2 scorecard
+                    does not use a value-normalized fee ratio because the current L2 value field does not support
+                    that interpretation.
                   </li>
                   <li>
-                    For BTC, <InlineCode>blocktime_instability</InlineCode> is the only capacity component. It is
-                    an instability proxy around the recent block-time norm, not a directional slow-block-only measure.
+                    For BTC, Capacity combines <InlineCode>block_weight_utilization_pct</InlineCode> and
+                    <InlineCode>blocktime_instability</InlineCode>. The latter is an instability proxy around the
+                    recent block-time norm, not a directional slow-block-only measure.
                   </li>
                 </ul>
                 <p>

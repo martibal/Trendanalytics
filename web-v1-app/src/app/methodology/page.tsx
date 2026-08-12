@@ -31,19 +31,20 @@ export default function MethodologyOverviewPage() {
         <Callout title="Read these first">
           <p>
             First time here? Start with <MethodologyLink href="/methodology/reference">Public Methodology Reference</MethodologyLink>{" "}
-            to understand what the reference data means, then read <MethodologyLink href="/methodology/verification">Verification &amp; Evidence</MethodologyLink>{" "}
-            to see how published labels can be checked. Use <MethodologyLink href="/methodology/fields">Field Dictionary</MethodologyLink>{" "}
-            as the lookup layer when you need exact field definitions.
+            to understand what the reference data means, then read <MethodologyLink href="/validation">Validation</MethodologyLink>{" "}
+            for the empirical consistency and robustness evidence. Use <MethodologyLink href="/methodology/verification">Verification &amp; Evidence</MethodologyLink>{" "}
+            to inspect the published evidence path and <MethodologyLink href="/methodology/fields">Field Dictionary</MethodologyLink>{" "}
+            when you need exact field definitions.
           </p>
         </Callout>
 
-        <Callout title="Current methodology note: Confidence v2">
+        <Callout title="Current methodology note: Confidence v3">
           <p>
-            Meta rows now use <InlineCode>confidence_v2_profile_evidence</InlineCode>. Confidence still
-            uses <InlineCode>sqrt(data_quality_score × label_confidence_score)</InlineCode>, but data
-            quality is profile-aware and label confidence is label-specific. The 2026-05-18 retroactive
-            rebuild regenerated Meta and Briefs JSON so historical rows reflect the current confidence
-            and status-explanation contract.
+            Current Meta rows use <InlineCode>confidence_v3_l2_capacity_required</InlineCode>. Confidence
+            retains <InlineCode>sqrt(data_quality_score × label_confidence_score)</InlineCode> and the
+            <InlineCode>0.40</InlineCode> publish gate. Data quality is chain-profile-aware; current L2
+            confidence explicitly requires the published capacity-utilization evidence used by the L2 ruleset.
+            Confidence is a reliability score for the published row, not a calibrated probability that a label is true.
           </p>
         </Callout>
 
@@ -96,7 +97,8 @@ export default function MethodologyOverviewPage() {
                   headers={["Page", "Purpose"]}
                   rows={[
                     [<MethodologyLink key="ref" href="/methodology/reference">Reference</MethodologyLink>, <>Canonical public methodology and interpretation rules.</>],
-                    [<MethodologyLink key="fields" href="/methodology/fields">Field Dictionary</MethodologyLink>, <>Field-level definitions and warnings, including Confidence v2 fields.</>],
+                    [<MethodologyLink key="fields" href="/methodology/fields">Field Dictionary</MethodologyLink>, <>Field-level definitions and warnings, including current Confidence v3 fields.</>],
+                    [<MethodologyLink key="validation" href="/validation">Validation</MethodologyLink>, <>Empirical internal-consistency, robustness, and live diagnostic evidence.</>],
                     [<MethodologyLink key="ver" href="/methodology/verification">Verification</MethodologyLink>, <>Worked examples and evidence path.</>],
                     [<MethodologyLink key="fresh" href="/methodology/freshness">Freshness</MethodologyLink>, <>Publication lag and freshness policy.</>],
                     [<MethodologyLink key="bound" href="/methodology/boundaries">Boundaries</MethodologyLink>, <>What the public methodology discloses and does not disclose.</>],
