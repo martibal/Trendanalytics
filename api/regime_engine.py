@@ -778,8 +778,16 @@ def _regime_axis_support(regime: Dict[str, Any], label: str) -> Tuple[bool, Dict
         ok = bool(low(f) and not high(c))
         return ok, details, "regime axes require informative low friction and no high capacity pressure."
     if label == "HEATING":
-        ok = bool(high(d) and heating(d))
-        return ok, details, "regime axes require informative demand high with HEATING trend."
+        core_demand_support = bool(high(d) and heating(d))
+        calldata = ((regime.get("signals") or {}).get("nonempty_calldata_share") or {})
+        eth_calldata_support = bool(
+            str(regime.get("ruleset_id") or "") == "eth_l1_v2"
+            and high(d)
+            and bool(calldata.get("informative", False))
+            and str(calldata.get("trend") or "") == "HEATING"
+        )
+        ok = bool(core_demand_support or eth_calldata_support)
+        return ok, details, "regime axes require core demand HEATING support or the ETH v2 supplemental calldata HEATING rule."
     return True, details, "ok"
 
 
