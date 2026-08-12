@@ -256,51 +256,9 @@ const GOLD_FIELDS: FieldEntry[] = [
       </>
     ),
   },
-  {
-    field: "capacity_util_pct",
-    meaning: "Public L2 capacity-utilization observation used by the L2 methodology when available.",
-    notes: (
-      <>
-        Arbitrum/Base-only Capacity field for the current <FieldCode>l2_v1</FieldCode> profile. It is
-        the canonical L2 Capacity input for regime classification, scorecard construction and
-        Confidence v3 data-quality coverage. A null value means that observation is unavailable for
-        the row; consumers should not reinterpret null as zero or spare capacity.
-      </>
-    ),
-  },
-  {
-    field: "arbitrum_l1_gas_used_daily",
-    meaning: "Daily L1 gas footprint associated with the Arbitrum data surface.",
-    notes: "Arbitrum-only delivered observational field. It is useful for L1-footprint context but is not a current public Demand/Friction/Capacity driver or required confidence input.",
-  },
-  {
-    field: "base_l1_gas_used_daily",
-    meaning: "Daily L1 gas footprint associated with the Base data surface.",
-    notes: "Base-only delivered observational field. It is useful for L1-footprint context but is not a current public Demand/Friction/Capacity driver or required confidence input.",
-  },
-];
 
-const DERIVED_FIELDS: FieldEntry[] = [
-  {
-    field: "derived.metrics.<metric>__ma7",
-    meaning: "Seven-day rolling mean of a published numeric Gold metric included by the Derived producer.",
-    notes: "Computed from final published Gold rows with min_periods=1 over available finite values. Use it for short-window smoothing without rebuilding the transformation yourself.",
-  },
-  {
-    field: "derived.metrics.<metric>__ma30",
-    meaning: "Thirty-day rolling mean of the same published Gold metric.",
-    notes: "Provides slower context for comparisons with the 7-day series. The exact included metric set is recorded in derived.source.metric_columns.",
-  },
-  {
-    field: "derived.source.gold_sha256",
-    meaning: "SHA-256 link to the Gold input state used by the Derived artifact.",
-    notes: "Use it for provenance and reproducibility when a downstream analysis depends on a particular Derived row.",
-  },
-  {
-    field: "derived.source.metric_columns",
-    meaning: "Explicit list of Gold metrics included in that Derived build.",
-    notes: "This is the authoritative row-level answer to which Gold measurements received MA7/MA30 features; do not assume every numeric-looking observational field is included.",
-  },
+
+
 ];
 
 const META_FIELDS: FieldEntry[] = [
@@ -392,6 +350,54 @@ const META_FIELDS: FieldEntry[] = [
     field: "regime.determinism_hash",
     meaning: "Canonical public integrity anchor for named regime rows.",
     notes: "Used for public row traceability when a non-gated label is published.",
+  },
+];
+
+const CHAIN_EXTENSION_FIELDS: FieldEntry[] = [
+  {
+    field: "capacity_util_pct",
+    meaning: "Public L2 capacity-utilization observation used by the L2 methodology when available.",
+    notes: (
+      <>
+        Arbitrum/Base-only Capacity field for the current <FieldCode>l2_v1</FieldCode> profile. It is
+        the canonical L2 Capacity input for regime classification, scorecard construction and
+        Confidence v3 data-quality coverage. A null value means that observation is unavailable for
+        the row; consumers should not reinterpret null as zero or spare capacity.
+      </>
+    ),
+  },
+  {
+    field: "arbitrum_l1_gas_used_daily",
+    meaning: "Daily L1 gas footprint associated with the Arbitrum data surface.",
+    notes: "Arbitrum-only delivered observational field. It is useful for L1-footprint context but is not a current public Demand/Friction/Capacity driver or required confidence input.",
+  },
+  {
+    field: "base_l1_gas_used_daily",
+    meaning: "Daily L1 gas footprint associated with the Base data surface.",
+    notes: "Base-only delivered observational field. It is useful for L1-footprint context but is not a current public Demand/Friction/Capacity driver or required confidence input.",
+  },
+];
+
+const DERIVED_FIELDS: FieldEntry[] = [
+  {
+    field: "derived.metrics.<metric>__ma7",
+    meaning: "Seven-day rolling mean of a published numeric Gold metric included by the Derived producer.",
+    notes: "Computed from final published Gold rows with min_periods=1 over available finite values. Use it for short-window smoothing without rebuilding the transformation yourself.",
+  },
+  {
+    field: "derived.metrics.<metric>__ma30",
+    meaning: "Thirty-day rolling mean of the same published Gold metric.",
+    notes: "Provides slower context for comparisons with the 7-day series. The exact included metric set is recorded in derived.source.metric_columns.",
+  },
+  {
+    field: "derived.source.gold_sha256",
+    meaning: "SHA-256 link to the Gold input state used by the Derived artifact.",
+    notes: "Use it for provenance and reproducibility when a downstream analysis depends on a particular Derived row.",
+  },
+  {
+    field: "derived.source.metric_columns",
+    meaning: "Explicit list of Gold metrics included in that Derived build.",
+    notes: "This is the authoritative row-level answer to which Gold measurements received MA7/MA30 features; do not assume every numeric-looking observational field is included.",
   },
 ];
 
@@ -707,6 +713,11 @@ export default function MethodologyFieldsPage() {
               <Section title="Key Gold fields">
                 <p>Gold is the normalized daily observation layer. Null means unavailable/not applicable for that row; it must not be reinterpreted as zero.</p>
                 <FieldGrid entries={GOLD_FIELDS} />
+              </Section>
+
+              <Section title="Chain-specific delivered extension fields">
+                <p>These fields can appear in published Gold artifacts but are produced outside the canonical <FieldCode>CANON_COLS</FieldCode> aggregation surface. They are documented separately so the distinction remains explicit and auditable.</p>
+                <FieldGrid entries={CHAIN_EXTENSION_FIELDS} />
               </Section>
 
               <Section title="Key Derived fields">
