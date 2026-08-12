@@ -1,0 +1,54 @@
+name: Mobile Home E2E
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "web-v1-app/src/components/home/**"
+      - "web-v1-app/src/app/mobile/**"
+      - "web-v1-app/src/app/mobile-*.css"
+      - "web-v1-app/src/app/globals.css"
+      - "web-v1-app/tests/e2e/mobile-home.spec.ts"
+      - "web-v1-app/playwright.config.ts"
+      - ".github/workflows/mobile-home-e2e.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "web-v1-app/src/components/home/**"
+      - "web-v1-app/src/app/mobile/**"
+      - "web-v1-app/src/app/mobile-*.css"
+      - "web-v1-app/src/app/globals.css"
+      - "web-v1-app/tests/e2e/mobile-home.spec.ts"
+      - "web-v1-app/playwright.config.ts"
+      - ".github/workflows/mobile-home-e2e.yml"
+  workflow_dispatch:
+
+jobs:
+  mobile-home-e2e:
+    name: Mobile homepage regression
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-v1-app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web-v1-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run mobile homepage regression
+        run: npx playwright test tests/e2e/mobile-home.spec.ts --project=chromium
