@@ -84,7 +84,7 @@ export default function GettingStartedPage() {
         <div className="mx-auto max-w-6xl px-6 py-16 lg:px-8">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">Join example</p>
           <h2 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">Attach Urd Atlas to your own daily table.</h2>
-          <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-400">The example reads Ethereum's public regime calendar directly from Urd Atlas, so only your own daily table needs to exist locally. Change the chain in the URL when you want to test BTC, ARB or BASE.</p>
+          <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-400">The example reads Ethereum&apos;s public regime calendar directly from Urd Atlas, so only your own daily table needs to exist locally. Change the chain in the URL when you want to test BTC, ARB or BASE.</p>
           <pre className="mt-8 overflow-auto rounded-[2rem] border border-white/10 bg-black/55 p-6 font-mono text-xs leading-6 text-zinc-100"><code>{`import pandas as pd
 
 urd = pd.read_csv(
