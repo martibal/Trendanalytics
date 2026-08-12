@@ -349,7 +349,7 @@ def main() -> int:
         )
 
     print(f"[DERIVED] Done. Total changed day-files written: {total}")
-    return total and 0 or 0
+    return 0
 
 
 if __name__ == "__main__":
