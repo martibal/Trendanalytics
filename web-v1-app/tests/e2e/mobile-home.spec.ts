@@ -21,6 +21,12 @@ test.describe("mobile homepage regression", () => {
       expect(columns).toHaveLength(2);
     }
 
+    const chainCards = chainGrid.locator(".ua3-chain-card");
+    await expect(chainCards).toHaveCount(4);
+    for (const chainId of ["bitcoin", "ethereum", "arbitrum", "base"]) {
+      await expect(chainGrid.locator(`.ua3-chain-card[data-chain="${chainId}"]`)).toHaveCount(1);
+    }
+
     const openJson = page.getByRole("button", { name: /view complete json/i });
     await expect(openJson).toBeVisible();
     await expect(openJson).toBeEnabled();
