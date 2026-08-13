@@ -270,9 +270,7 @@ function labelSentence(label: AnalystKitLabel): string {
 
 function confidenceLanguage(score: number | null): string {
   if (score == null) return "no published confidence score";
-  if (score >= 0.7) return `high confidence (${score.toFixed(3)})`;
-  if (score >= 0.4) return `caution confidence (${score.toFixed(3)})`;
-  return `low confidence (${score.toFixed(3)})`;
+  return `published confidence score ${score.toFixed(3)}`;
 }
 
 export async function buildWeeklySummaryText(chain: ChainId): Promise<string> {
