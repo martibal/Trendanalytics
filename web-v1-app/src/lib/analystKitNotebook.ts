@@ -60,10 +60,11 @@ export function buildRunnableStarterNotebook(): JsonRecord {
         "df.tail()\n",
       ]),
       markdownCell([
-        "## Gate by confidence, then summarize by network state\n",
-        "Confidence is a quality gate. It is not a probability of any external outcome.\n",
+        "## Choose a confidence filter, then summarize by network state\n",
+        "Urd Atlas uses 0.40 as the publication confidence gate. The 0.70 filter below is an intentionally stricter analyst-selected example, not the Urd Atlas publication gate. Confidence is evidence strength, not a probability of an external outcome.\n",
       ]),
       codeCell([
+        "# Optional downstream filter: stricter than the 0.40 publication gate.\n",
         "usable = df[df['confidence_score'] >= 0.70].copy()\n",
         "\n",
         "summary = (\n",
