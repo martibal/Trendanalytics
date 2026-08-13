@@ -24,15 +24,15 @@ function normalizePlan(value: SearchParamsValue): CheckoutPlan | null {
 }
 
 function planLabel(plan: CheckoutPlan): string {
-  return plan === "basic" ? "Single Chain" : "Full Access";
+  return plan === "basic" ? "Basic" : "Pro";
 }
 
 function planDescription(plan: CheckoutPlan): string {
   if (plan === "basic") {
-    return "Continue to Stripe Checkout to select one chain and start the Single Chain subscription.";
+    return "Continue to Stripe Checkout to select one chain and start the Basic subscription.";
   }
 
-  return "Continue to Stripe Checkout to start the Full Access subscription.";
+  return "Continue to Stripe Checkout to start the Pro subscription.";
 }
 
 export default async function CheckoutStartPage({
