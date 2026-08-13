@@ -58,7 +58,7 @@ describe("app/dashboard/page", () => {
         allowedChains: ["bitcoin", "ethereum", "arbitrum", "base"],
       },
       apiKeys: [],
-      tierLabel: "Research",
+      tierLabel: "Pro",
       entitledChainLabel: "All chains",
       historyDepthLabel: "Full available history",
     });
@@ -192,7 +192,7 @@ describe("app/dashboard/page", () => {
         allowedChains: ["ethereum"],
       },
       apiKeys: [],
-      tierLabel: "Single Chain",
+      tierLabel: "Basic",
       entitledChainLabel: "ethereum",
       historyDepthLabel: "90 days",
     });
