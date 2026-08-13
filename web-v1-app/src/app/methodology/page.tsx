@@ -98,7 +98,7 @@ export default function MethodologyOverviewPage() {
                   rows={[
                     [<MethodologyLink key="ref" href="/methodology/reference">Reference</MethodologyLink>, <>Canonical public methodology and interpretation rules.</>],
                     [<MethodologyLink key="fields" href="/methodology/fields">Field Dictionary</MethodologyLink>, <>Field-level definitions and warnings, including current Confidence v3 fields.</>],
-                    [<MethodologyLink key="validation" href="/validation">Validation</MethodologyLink>, <>Empirical internal-consistency, robustness, and live diagnostic evidence.</>],
+                    [<MethodologyLink key="validation" href="/validation">Validation</MethodologyLink>, <>Empirical internal-consistency, robustness, and current diagnostic evidence.</>],
                     [<MethodologyLink key="ver" href="/methodology/verification">Verification</MethodologyLink>, <>Worked examples and evidence path.</>],
                     [<MethodologyLink key="fresh" href="/methodology/freshness">Freshness</MethodologyLink>, <>Publication lag and freshness policy.</>],
                     [<MethodologyLink key="bound" href="/methodology/boundaries">Boundaries</MethodologyLink>, <>What the public methodology discloses and does not disclose.</>],
