@@ -318,7 +318,7 @@ export function buildFeatureSchema(): JsonRecord {
       { name: "chain", type: "string", use: "Canonical chain id: bitcoin, ethereum, arbitrum or base." },
       { name: "chain_label", type: "string", use: "Display label for the chain, such as BTC or ETH." },
       { name: "regime", type: "category", use: "Human-readable network-state label." },
-      { name: "confidence_score", type: "float", use: "Quality/evidence gate; not a probability of an external outcome." },
+      { name: "confidence_score", type: "float", use: "Combined quality/evidence score; 0.40 is the publication gate, and the score is not a probability of an external outcome." },
       { name: "data_quality_score", type: "float", use: "Data availability and pipeline quality component when published." },
       { name: "label_confidence_score", type: "float", use: "Evidence strength for the chosen label when published." },
       { name: "freshness_lag_days", type: "integer", use: "Lag versus UTC today when published." },
