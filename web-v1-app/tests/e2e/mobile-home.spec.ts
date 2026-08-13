@@ -34,7 +34,11 @@ test.describe("mobile homepage regression", () => {
 
     const planCards = planGrid.locator(".ua3-plan-card");
     await expect(planCards).toHaveCount(3);
-    await expect(planCards.first()).toContainText("Basic");
+    const freeBox = await planCards.nth(0).boundingBox();
+    const basicBox = await planCards.nth(1).boundingBox();
+    expect(freeBox).not.toBeNull();
+    expect(basicBox).not.toBeNull();
+    expect(basicBox!.y).toBeLessThan(freeBox!.y);
 
     const openJson = page.getByRole("button", { name: /view complete json/i });
     await expect(openJson).toBeVisible();
