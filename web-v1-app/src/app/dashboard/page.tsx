@@ -486,14 +486,14 @@ function cx(...classes: Array<string | false | null | undefined>) {
 function capabilityRows() {
   return [
     {
-      tier: "Single Chain",
+      tier: "Basic",
       chains: "1 entitled chain",
       windows: "latest, 7d, 30d, 90d",
       history: "90 days",
       custom: "No",
     },
     {
-      tier: "Research",
+      tier: "Pro",
       chains: "All 4 chains",
       windows: "latest, 7d, 30d, 90d, 180d, 365d",
       history: "365 days",
@@ -536,10 +536,10 @@ function dashboardEndpointReferenceNote(params: {
   }
 
   if (params.tier === "pro") {
-    return "Examples are generated from this account's active Research entitlement: all supported chains and delivery windows up to 365d.";
+    return "Examples are generated from this account's active Pro entitlement: all supported chains and delivery windows up to 365d.";
   }
 
-  return "Examples are generated from this account's active Single Chain entitlement: the selected chain and delivery windows up to 90d.";
+  return "Examples are generated from this account's active Basic entitlement: the selected chain and delivery windows up to 90d.";
 }
 
 function dashboardEndpointExamples(params: {
@@ -575,7 +575,7 @@ function dashboardEndpointExamples(params: {
     examples.push({
       label: "180-day Meta",
       path: `/api/v1/files/meta/${primaryChain}/180d/latest.json`,
-      detail: "Research-only 180-day Meta window for the current entitlement.",
+      detail: "Pro-only 180-day Meta window for the current entitlement.",
     });
   }
 
@@ -583,7 +583,7 @@ function dashboardEndpointExamples(params: {
     examples.push({
       label: "365-day Gold",
       path: `/api/v1/files/gold/${primaryChain}/365d/latest.json`,
-      detail: "Research-only 365-day Gold window for the current entitlement.",
+      detail: "Pro-only 365-day Gold window for the current entitlement.",
     });
   }
 
@@ -594,7 +594,7 @@ function dashboardEndpointExamples(params: {
       examples.push({
         label: "Second chain latest",
         path: `/api/v1/files/meta/${secondaryChain}/latest.json`,
-        detail: "Research keys can use the same API key across all supported chains.",
+        detail: "Pro keys can use the same API key across all supported chains.",
       });
     }
   }
@@ -1043,7 +1043,7 @@ export default async function DashboardPage() {
           <DataRow
             label="Entitled chain"
             value={entitledChain}
-            detail="Single Chain accounts are scoped to one chain; Research accounts cover all four chains."
+            detail="Basic accounts are scoped to one chain; Pro accounts cover all four chains."
             token={<Token tone={accountView.snapshot.allowedChains.length > 0 ? "ok" : "quiet"}>{accountView.entitledChainLabel}</Token>}
           />
           <DataRow
@@ -1309,4 +1309,3 @@ export default async function DashboardPage() {
     </main>
   );
 }
-
