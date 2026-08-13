@@ -53,25 +53,18 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
           </div>
         </div>
 
-        <div className="ua3-hero-panel-offer" aria-label="Subscription options">
-          <p className="ua3-hero-panel-offer-label">START WITH ONE CHAIN</p>
+        <div className="ua3-hero-panel-offer" aria-label="How to evaluate Urd Atlas">
+          <p className="ua3-hero-panel-offer-label">INSPECT BEFORE YOU BUY</p>
           <div className="ua3-hero-panel-price-row">
             <strong>$49</strong>
             <span>/ month</span>
           </div>
-          <p className="ua3-hero-panel-offer-copy">Basic includes authenticated daily delivery for one selected chain. Pro covers all four for $149/month.</p>
-          <form action="/api/v1/checkout?plan=basic" method="post" className="ua3-hero-panel-form">
-            <button type="submit" className="ua3-hero-panel-primary">Start Basic — $49/mo</button>
-          </form>
+          <p className="ua3-hero-panel-offer-copy">Basic starts at $49/month for one selected chain. Inspect the free sample first, then decide whether authenticated daily delivery belongs in your workflow.</p>
+          <a href="/analyst-kit" className="ua3-hero-panel-primary">Inspect free sample</a>
           <div className="ua3-hero-panel-secondary-actions">
-            <a href="#pricing">Compare plans</a>
-            <a href="/analyst-kit">Inspect free sample</a>
+            <a href="#today-status">See today&apos;s published state →</a>
           </div>
         </div>
-
-        <a className="ua3-hero-panel-methodology-link" href="/methodology">
-          Review methodology and validation →
-        </a>
       </aside>
       <style>{styles}</style>
     </>
@@ -87,10 +80,10 @@ const styles = `
 .ua3 > section[aria-labelledby="start-title"] { order: 20; }
 .ua3 > #today-status { order: 30; }
 .ua3 > .ua3-files { order: 40; }
-.ua3 > #pricing { order: 50; }
-.ua3 > .ua3-regimes { order: 60; }
-.ua3 > .ua3-confidence-explainer { order: 70; }
-.ua3 > section[aria-labelledby="build-buy-title"] { order: 80; }
+.ua3 > section[aria-labelledby="build-buy-title"] { order: 50; }
+.ua3 > #pricing { order: 60; }
+.ua3 > .ua3-regimes { order: 70; }
+.ua3 > .ua3-confidence-explainer { order: 80; }
 .ua3 > .ua3-transition { display: none; }
 .ua3 > .ua3-section:not(.ua3-hero) {
   border-top: 1px solid var(--accent-depth-line);
@@ -171,11 +164,12 @@ const styles = `
   font-size: 13px;
   line-height: 1.55;
 }
-.ua3-hero-panel-form {
-  margin: 18px 0 0;
-}
 .ua3-hero-panel-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
+  margin-top: 18px;
   border: 1px solid var(--accent-action);
   border-radius: 999px;
   background: var(--accent-action);
@@ -187,6 +181,7 @@ const styles = `
   line-height: 1.4;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  text-decoration: none;
   cursor: pointer;
   transition: transform .2s ease, background-color .2s ease, border-color .2s ease;
 }
@@ -201,21 +196,14 @@ const styles = `
   gap: 10px 16px;
   margin-top: 14px;
 }
-.ua3-hero-panel-secondary-actions a,
-.ua3-hero-panel-methodology-link {
+.ua3-hero-panel-secondary-actions a {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.5;
   text-decoration: none;
 }
-.ua3-hero-panel-secondary-actions a:hover,
-.ua3-hero-panel-methodology-link:hover {
+.ua3-hero-panel-secondary-actions a:hover {
   color: var(--accent-action);
-}
-.ua3-hero-panel-methodology-link {
-  display: inline-flex;
-  margin-top: 18px;
-  color: var(--text-tertiary);
 }
 @media (max-width: 767px) {
   .ua3-hero-network-panel {
