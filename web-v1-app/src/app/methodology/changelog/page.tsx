@@ -71,9 +71,9 @@ export default async function MethodologyChangelogPage() {
                     [
                       "2026-08-13",
                       "historical textual correction",
-                      "meta/<chain>/<date>.json ? aggregated Meta windows",
+                      "meta/<chain>/<date>.json · aggregated Meta windows",
                       "No",
-                      "Yes ? status.one_liner text only",
+                      "Yes — status.one_liner text only",
                       "Yes, if affected Meta JSON was cached before this correction",
                       <>
                         Corrected a grammatical fallback defect in previously published{" "}
