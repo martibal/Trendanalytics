@@ -420,7 +420,6 @@ export function buildStarterNotebook(): JsonRecord {
       {
         cell_type: "markdown",
         metadata: {},
-        outputs: [],
         source: [
           "## Interpretation rule\n",
           "Urd Atlas is descriptive network-state context. Treat this as a segmentation and diagnostic layer, not an automated instruction or future-state guarantee.\n",
