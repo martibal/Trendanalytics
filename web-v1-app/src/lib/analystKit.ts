@@ -1,5 +1,6 @@
 import { getChainConfig, type ChainId } from "@/config/chains";
 import { readStorageObject } from "@/lib/storage";
+import { buildRunnableStarterNotebook } from "@/lib/analystKitNotebook";
 
 export type AnalystKitLabel =
   | "STABLE"
@@ -348,97 +349,5 @@ export function buildFeatureSchema(): JsonRecord {
 }
 
 export function buildStarterNotebook(): JsonRecord {
-  return {
-    cells: [
-      {
-        cell_type: "markdown",
-        metadata: {},
-        source: [
-          "# Urd Atlas Analyst Kit starter notebook\n",
-          "\n",
-          "Load a public Urd Atlas regime calendar CSV, merge it with your own daily metrics, and summarize your metric by blockchain network state.\n",
-        ],
-      },
-      {
-        cell_type: "code",
-        execution_count: null,
-        metadata: {},
-        outputs: [],
-        source: [
-          "import pandas as pd\n",
-          "\n",
-          "chain = 'ethereum'  # bitcoin, ethereum, arbitrum, base\n",
-          "urd_url = f'https://urdatlas.com/api/v1/analyst-kit/{chain}/regime-calendar'\n",
-          "urd = pd.read_csv(urd_url)\n",
-          "urd.tail()\n",
-        ],
-      },
-      {
-        cell_type: "markdown",
-        metadata: {},
-        source: [
-          "## Merge with your own data\n",
-          "Your file should have at least `date`, `chain`, and one metric column.\n",
-        ],
-      },
-      {
-        cell_type: "code",
-        execution_count: null,
-        metadata: {},
-        outputs: [],
-        source: [
-          "my_data = pd.read_csv('my_protocol_metrics.csv')\n",
-          "\n",
-          "df = my_data.merge(\n",
-          "    urd[['observation_date', 'chain', 'regime', 'confidence_score']],\n",
-          "    left_on=['date', 'chain'],\n",
-          "    right_on=['observation_date', 'chain'],\n",
-          "    how='left',\n",
-          ")\n",
-          "\n",
-          "df.head()\n",
-        ],
-      },
-      {
-        cell_type: "code",
-        execution_count: null,
-        metadata: {},
-        outputs: [],
-        source: [
-          "metric = 'daily_active_users'  # change this to your metric\n",
-          "# 0.40 is the publication gate; 0.70 below is an optional stricter analyst filter.\n",
-          "summary = (\n",
-          "    df[df['confidence_score'] >= 0.70]\n",
-          "    .groupby('regime')\n",
-          "    .agg(days=('date', 'count'), average_metric=(metric, 'mean'), median_metric=(metric, 'median'))\n",
-          "    .sort_values('days', ascending=False)\n",
-          ")\n",
-          "\n",
-          "summary\n",
-        ],
-      },
-      {
-        cell_type: "markdown",
-        metadata: {},
-        source: [
-          "## Interpretation rule\n",
-          "Urd Atlas is descriptive network-state context. Treat this as a segmentation and diagnostic layer, not an automated instruction or future-state guarantee.\n",
-        ],
-      },
-    ],
-    metadata: {
-      kernelspec: {
-        display_name: "Python 3",
-        language: "python",
-        name: "python3",
-      },
-      language_info: {
-        name: "python",
-        pycodemirror_mode: { name: "ipython", version: 3 },
-        version: "3.x",
-      },
-    },
-    nbformat: 4,
-    nbformat_minor: 5,
-  };
+  return buildRunnableStarterNotebook();
 }

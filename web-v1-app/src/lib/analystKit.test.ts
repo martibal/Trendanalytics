@@ -256,6 +256,6 @@ describe("lib/analystKit", () => {
 
     expect(notebook).toEqual(expect.objectContaining({ nbformat: 4, nbformat_minor: 5 }));
     expect(Array.isArray(notebook.cells)).toBe(true);
-    expect(JSON.stringify(notebook)).toContain("0.40 is the publication gate");
+    expect(JSON.stringify(notebook)).toContain("0.40 as the publication confidence gate");
   });
 });
