@@ -53,8 +53,24 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
           </div>
         </div>
 
-        <a className="ua3-hero-panel-link" href="/methodology">
-          See the full methodology →
+        <div className="ua3-hero-panel-offer" aria-label="Subscription options">
+          <p className="ua3-hero-panel-offer-label">START WITH ONE CHAIN</p>
+          <div className="ua3-hero-panel-price-row">
+            <strong>$49</strong>
+            <span>/ month</span>
+          </div>
+          <p className="ua3-hero-panel-offer-copy">Basic includes authenticated daily delivery for one selected chain. Pro covers all four for $149/month.</p>
+          <form action="/api/v1/checkout?plan=basic" method="post" className="ua3-hero-panel-form">
+            <button type="submit" className="ua3-hero-panel-primary">Start Basic — $49/mo</button>
+          </form>
+          <div className="ua3-hero-panel-secondary-actions">
+            <a href="#pricing">Compare plans</a>
+            <a href="/analyst-kit">Inspect free sample</a>
+          </div>
+        </div>
+
+        <a className="ua3-hero-panel-methodology-link" href="/methodology">
+          Review methodology and validation →
         </a>
       </aside>
       <style>{styles}</style>
@@ -74,7 +90,8 @@ const styles = `
   padding: 28px 28px 24px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
 }
-.ua3-hero-panel-label {
+.ua3-hero-panel-label,
+.ua3-hero-panel-offer-label {
   margin: 0;
   color: var(--text-tertiary);
   font-family: var(--mono);
@@ -107,13 +124,82 @@ const styles = `
   font-size: 13px;
   line-height: 1.5;
 }
-.ua3-hero-panel-link {
-  display: inline-flex;
-  margin-top: 16px;
+.ua3-hero-panel-offer {
+  margin-top: 12px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border-emphasis);
+}
+.ua3-hero-panel-offer-label {
   color: var(--accent-action);
+}
+.ua3-hero-panel-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 10px;
+}
+.ua3-hero-panel-price-row strong {
+  color: var(--text-primary);
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.ua3-hero-panel-price-row span {
+  color: var(--text-tertiary);
   font-size: 13px;
+}
+.ua3-hero-panel-offer-copy {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.ua3-hero-panel-form {
+  margin: 18px 0 0;
+}
+.ua3-hero-panel-primary {
+  width: 100%;
+  border: 1px solid var(--accent-action);
+  border-radius: 999px;
+  background: var(--accent-action);
+  color: var(--accent-action-text);
+  padding: 12px 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform .2s ease, background-color .2s ease, border-color .2s ease;
+}
+.ua3-hero-panel-primary:hover {
+  transform: translateY(-1px);
+  background: var(--accent-action-hover);
+  border-color: var(--accent-action-hover);
+}
+.ua3-hero-panel-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 14px;
+}
+.ua3-hero-panel-secondary-actions a,
+.ua3-hero-panel-methodology-link {
+  color: var(--text-secondary);
+  font-size: 12px;
   line-height: 1.5;
   text-decoration: none;
+}
+.ua3-hero-panel-secondary-actions a:hover,
+.ua3-hero-panel-methodology-link:hover {
+  color: var(--accent-action);
+}
+.ua3-hero-panel-methodology-link {
+  display: inline-flex;
+  margin-top: 18px;
+  color: var(--text-tertiary);
 }
 @media (max-width: 767px) {
   .ua3-hero-network-panel {
