@@ -85,9 +85,9 @@ const artifactCards: Array<{ name: Artifact; icon: string; what: string; use: st
 ];
 
 const plans: Array<{ id: "free" | CheckoutPlan; name: string; price: string; summary: string; cta: string; recommended?: boolean }> = [
-  { id: "free", name: "Free", price: "$0", summary: "Inspect the public CSV and examples before paying.", cta: "Open free kit" },
-  { id: "basic", name: "Basic", price: "$49/mo", summary: "Authenticated daily delivery for one selected chain.", cta: "Start Basic", recommended: true },
-  { id: "pro", name: "Pro", price: "$149/mo", summary: "Authenticated daily delivery for all four chains.", cta: "Start Pro" },
+  { id: "free", name: "Free", price: "$0", summary: "Best for evaluating the format: inspect the public CSV and examples before paying. No authenticated daily delivery.", cta: "Open free kit" },
+  { id: "basic", name: "Basic", price: "$49/mo", summary: "Best starting point for most analysts: authenticated daily delivery for one selected chain.", cta: "Start Basic", recommended: true },
+  { id: "pro", name: "Pro", price: "$149/mo", summary: "Best for multi-chain workflows: authenticated daily delivery for Bitcoin, Ethereum, Arbitrum and Base.", cta: "Start Pro" },
 ];
 
 const gettingStarted = [
@@ -441,7 +441,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title"><div className="ua3-wrap"><p className="ua3-label ua3-step-label">Plans</p><h2 id="pricing-title" className="ua3-step-title">Pricing.</h2><div className="ua3-plan-grid">{plans.map((plan) => <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}><div className="ua3-plan-head"><h3>{plan.name}</h3>{plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}</div><p className="ua3-plan-price">{plan.price}</p><p className="ua3-body-small">{plan.summary}</p>{plan.id === "free" ? <Link href="/analyst-kit" className="ua3-button ua3-button-quiet ua3-button-full">{plan.cta}</Link> : <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>}</article>)}</div><p className="ua3-card-note ua3-pricing-note">Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p></div></section>
+      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title"><div className="ua3-wrap"><p className="ua3-label ua3-step-label">Plans</p><h2 id="pricing-title" className="ua3-step-title">Choose the plan that matches your workflow.</h2><p className="ua3-body">Use Free to inspect the format. Start with Basic if one chain covers your workflow. Choose Pro when you need the same daily reference layer across all four chains.</p><div className="ua3-plan-grid">{plans.map((plan) => <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}><div className="ua3-plan-head"><h3>{plan.name}</h3>{plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}</div><p className="ua3-plan-price">{plan.price}</p><p className="ua3-body-small">{plan.summary}</p>{plan.id === "free" ? <Link href="/analyst-kit" className="ua3-button ua3-button-quiet ua3-button-full">{plan.cta}</Link> : <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>}</article>)}</div><p className="ua3-card-note ua3-pricing-note">Start with the smallest plan that fits the number of chains you actually use. Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
 
