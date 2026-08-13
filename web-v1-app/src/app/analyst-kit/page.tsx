@@ -88,7 +88,7 @@ const previewRows = [
 ] as const;
 
 const activationExample = [
-  { label: "Question", value: "Did app activity change because the app improved, or because Ethereum was HEATING?" },
+  { label: "Question", value: "Did app activity look different on days when Ethereum was HEATING versus other published network states?" },
   { label: "Data needed", value: "Your daily metric plus one Urd Atlas regime calendar CSV." },
   { label: "Join", value: "Match on date and chain. Published rows meet the 0.40 gate; apply a stricter downstream confidence filter only if your analysis needs one." },
   { label: "Output", value: "The same metric summarized by network state." },
@@ -135,7 +135,7 @@ export default function AnalystKitPage() {
             Use Urd Atlas before you have a pipeline.
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-muted-foreground">
-            Find out whether your metric changed because your project changed, or because the whole chain was in a different network state.
+            Compare your metric across published network states to see whether the pattern changes when you segment by chain conditions.
           </p>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-muted-foreground">
             Everything on this page is public and free to inspect. Start with one CSV calendar, join it to one of your daily metrics, and check whether the regime column makes the change easier to explain.
