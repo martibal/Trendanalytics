@@ -174,19 +174,19 @@ function FieldCode({ children }: { children: string }) {
 function HeroValueStrip() {
   return (
     <div className="ua3-value-wrap">
-      <p className="ua3-value-title">What can you use the regime for?</p>
+      <p className="ua3-value-title">A regime column for the data you already have.</p>
       <div className="ua3-value-strip" aria-label="Practical uses">
         <div className="ua3-value-column">
-          <h2>Put network context beside your own metrics.</h2>
-          <p>Join <FieldCode>regime</FieldCode> and <FieldCode>confidence_score</FieldCode> on date + chain. If one of your own metrics changes sharply, check whether it coincided with an unusual network state before you assume the cause sits inside your own system.</p>
+          <h2>Join on date + chain.</h2>
+          <p>Add <FieldCode>regime</FieldCode> and <FieldCode>confidence_score</FieldCode> beside your existing blockchain metrics without rebuilding the classification layer.</p>
         </div>
         <div className="ua3-value-column">
-          <h2>Segment analysis by the kind of network day.</h2>
-          <p>Compare your own observations across <FieldCode>STABLE</FieldCode>, <FieldCode>HEATING</FieldCode>, <FieldCode>CONGESTED</FieldCode> and <FieldCode>CHEAP</FieldCode> periods instead of treating every blockchain day as equivalent.</p>
+          <h2>Segment by network state.</h2>
+          <p>Compare the same KPI across <FieldCode>STABLE</FieldCode>, <FieldCode>HEATING</FieldCode>, <FieldCode>CONGESTED</FieldCode> and <FieldCode>CHEAP</FieldCode> days.</p>
         </div>
         <div className="ua3-value-column">
-          <h2>Explain what accompanied a network change.</h2>
-          <p>Use Briefs, drivers and the underlying measurements to summarize the network conditions that accompanied a fee, activity or capacity change — without turning that evidence into a causal or predictive claim.</p>
+          <h2>Keep the evidence attached.</h2>
+          <p>Use confidence, drivers and underlying measurements when you need to explain what accompanied a network change.</p>
         </div>
       </div>
     </div>
@@ -327,12 +327,12 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
         <div className="ua3-wrap ua3-hero-grid">
           <div className="ua3-hero-left">
             <p className="ua3-category">DAILY NETWORK-STATE CLASSIFICATION</p>
-            <h1 id="hero-title" className="ua3-display">One daily network regime for Bitcoin, Ethereum, Arbitrum and Base — with the evidence underneath.</h1>
-            <p className="ua3-body ua3-hero-copy">Urd Atlas classifies how the network behaved relative to its own recent history: STABLE, HEATING, CONGESTED or CHEAP. It is a network regime, not a market regime.</p>
+            <h1 id="hero-title" className="ua3-display">Add a daily network-regime column to the blockchain data you already use.</h1>
+            <p className="ua3-body ua3-hero-copy">Urd Atlas delivers one versioned daily row per chain — regime, confidence and evidence — so analysts can segment, filter and explain network conditions without building and maintaining the classification layer themselves.</p>
             <HeroValueStrip />
             <div className="ua3-compliance-row" aria-label="Product boundary"><span className="ua3-compliance-pill">No price data</span><span className="ua3-compliance-pill">No forecasts</span><span className="ua3-compliance-pill">No recommendations</span></div>
-            <p className="ua3-body-small">Transparent rules, chain-aware methodology and empirical robustness checks. <Link href="/validation">See the validation evidence →</Link></p>
-            <a href="#today-status" className="ua3-button ua3-button-primary">See today&apos;s network state →</a>
+            <p className="ua3-body-small">Bitcoin, Ethereum, Arbitrum and Base. Deterministic, chain-aware and versioned. <Link href="/validation">See the validation evidence →</Link></p>
+            <a href="#pricing" className="ua3-button ua3-button-primary">View plans and pricing →</a>
           </div>
           <div className="ua3-hero-glow" aria-label="Hero network-state row preview">
             {heroPanelSnapshot ? <HeroNetworkStatePanel snapshot={heroPanelSnapshot} /> : null}
