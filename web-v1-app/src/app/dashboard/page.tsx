@@ -445,7 +445,7 @@ async function buildDashboardUsageSummary(params: {
       ? `${todayEvents.length} recorded today / ${quotaLimit} daily allowance`
       : "No active delivery quota",
     dailyQuotaDetail: active
-      ? `Remaining today: ${quotaRemaining}. Per-request response headers remain the source of truth for live quota state.`
+      ? `Remaining today: ${quotaRemaining}. Per-request response headers remain the source of truth for current quota state.`
       : "Daily quota applies after an active paid entitlement is linked to this account.",
     dailyQuotaToken: active ? `${quotaRemaining} left` : "inactive",
     dailyQuotaTone: !active ? "quiet" : quotaRemaining > 0 ? "ok" : "danger",
