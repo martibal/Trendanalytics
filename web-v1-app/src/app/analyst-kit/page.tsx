@@ -73,7 +73,7 @@ const previewRows = [
   {
     field: "confidence_score",
     example: "0.842",
-    use: "Quality gate before summarizing.",
+    use: "Combined confidence score; 0.40 is the publication gate, not an outcome probability.",
   },
   {
     field: "demand_score",
@@ -82,7 +82,7 @@ const previewRows = [
   },
   {
     field: "methodology_version",
-    example: "v2.0",
+    example: "1.1",
     use: "Reproducibility context.",
   },
 ] as const;
@@ -90,7 +90,7 @@ const previewRows = [
 const activationExample = [
   { label: "Question", value: "Did app activity change because the app improved, or because Ethereum was HEATING?" },
   { label: "Data needed", value: "Your daily metric plus one Urd Atlas regime calendar CSV." },
-  { label: "Join", value: "Match on date and chain, then filter to rows with acceptable confidence." },
+  { label: "Join", value: "Match on date and chain. Published rows meet the 0.40 gate; apply a stricter downstream confidence filter only if your analysis needs one." },
   { label: "Output", value: "The same metric summarized by network state." },
 ] as const;
 
@@ -111,6 +111,7 @@ df = my_data.merge(
     how="left",
 )
 
+# 0.40 is the publication gate; 0.70 below is an optional stricter analyst filter.
 summary = (
     df[df["confidence_score"] >= 0.70]
     .groupby("regime")
@@ -157,14 +158,14 @@ export default function AnalystKitPage() {
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Your first test</p>
             <h2 className="mt-3 text-3xl font-medium tracking-tight">Open one CSV, join one metric, summarize by regime.</h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-              The first useful test is intentionally small: pick one chain, copy the regime calendar URL, join it to a daily metric you already track, then compare that metric across high-confidence regime rows.
+              The first useful test is intentionally small: pick one chain, copy the regime calendar URL, join it to a daily metric you already track, then compare that metric across published regime rows. Use a stricter confidence filter only when your analysis calls for one.
             </p>
           </div>
           <div className="grid gap-2 text-sm leading-6 text-muted-foreground sm:grid-cols-2 lg:min-w-[420px]">
             <div><strong className="text-foreground">1.</strong> Pick a chain.</div>
             <div><strong className="text-foreground">2.</strong> Open or copy the CSV.</div>
             <div><strong className="text-foreground">3.</strong> Join on date and chain.</div>
-            <div><strong className="text-foreground">4.</strong> Gate by confidence.</div>
+            <div><strong className="text-foreground">4.</strong> Choose a confidence filter.</div>
           </div>
         </div>
 
