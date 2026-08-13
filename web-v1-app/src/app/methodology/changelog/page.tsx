@@ -69,6 +69,20 @@ export default async function MethodologyChangelogPage() {
                   ]}
                   rows={[
                     [
+                      "2026-08-13",
+                      "historical textual correction",
+                      "meta/<chain>/<date>.json ? aggregated Meta windows",
+                      "No",
+                      "Yes ? status.one_liner text only",
+                      "Yes, if affected Meta JSON was cached before this correction",
+                      <>
+                        Corrected a grammatical fallback defect in previously published{" "}
+                        <InlineCode>status.one_liner</InlineCode> text. The correction affected
+                        descriptive text only; no regime classifications, axis values, confidence
+                        scores, scorecard values, drivers, or underlying metrics were changed.
+                      </>,
+                    ],
+                    [
                       "2026-07-05",
                       "docs-only contract coverage fix",
                       "methodology/fields · methodology/changelog · audit gates",
