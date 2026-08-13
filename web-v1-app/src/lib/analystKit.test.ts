@@ -228,6 +228,9 @@ describe("lib/analystKit", () => {
     const summary = await mod.buildWeeklySummaryText("ethereum");
 
     expect(summary).toContain("Ethereum was classified as HEATING for 2026-07-02");
+    expect(summary).toContain("published confidence score 0.830");
+    expect(summary).not.toContain("high confidence");
+    expect(summary).not.toContain("caution confidence");
     expect(summary).toContain("The latest row changed from STABLE to HEATING.");
     expect(summary).toContain("not an automated instruction or future-state guarantee");
     expect(summary).toContain("Published drivers: active addresses up.");
