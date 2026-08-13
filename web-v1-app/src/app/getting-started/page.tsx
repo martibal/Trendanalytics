@@ -9,17 +9,17 @@ const fileCards = [
   {
     name: "Meta",
     use: "Use the regime and confidence score as the daily state row you join to your own table.",
-    example: `urd[["observation_date", "chain", "regime", "confidence_score"]]`,
+    example: `meta["status"]["label"], meta["confidence"]["confidence_score"]`,
   },
   {
     name: "Gold",
     use: "Use the measured chain activity behind the label when you want to inspect the evidence yourself.",
-    example: `gold[["date", "chain", "metrics"]]`,
+    example: `gold["date"], gold["chain"], gold["tx_count_daily"]`,
   },
   {
     name: "Derived",
     use: "Use pre-computed rolling windows when you do not want to rebuild feature engineering.",
-    example: `derived.filter(regex="ma7|ma30|chain|date")`,
+    example: `derived["derived"]["metrics"]["tx_count_daily__ma7"]`,
   },
   {
     name: "Briefs",
@@ -69,6 +69,7 @@ export default function GettingStartedPage() {
       <section className="mx-auto max-w-6xl px-6 py-16 lg:px-8">
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-emerald-200">The four files</p>
         <h2 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">Pick the layer that matches your workflow.</h2>
+        <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-400">The examples below use the raw published JSON shapes. The Analyst Kit regime-calendar endpoint is a separate flattened CSV contract designed for direct date-and-chain joins.</p>
         <div className="mt-8 grid gap-5 md:grid-cols-2">
           {fileCards.map((file) => (
             <article key={file.name} className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
