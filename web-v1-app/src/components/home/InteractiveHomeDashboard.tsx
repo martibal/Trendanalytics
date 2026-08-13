@@ -91,9 +91,9 @@ const plans: Array<{ id: "free" | CheckoutPlan; name: string; price: string; sum
 ];
 
 const gettingStarted = [
-  { number: "01", title: "A network regime, not a market regime", body: "STABLE, HEATING, CONGESTED and CHEAP describe observable network conditions. They do not describe price direction, investor risk or a trading view.", cta: "Read methodology →", href: "/methodology/reference", icon: "card" },
-  { number: "02", title: "Evidence underneath the label", body: "Demand, Friction and Capacity summarize the network state, while confidence, drivers and Gold measurements show the evidence behind it.", cta: "See validation →", href: "/validation", icon: "plug" },
-  { number: "03", title: "A row you can use immediately", body: "Join the daily state on date + chain, segment analysis by regime, filter on confidence, or use Briefs as reporting context.", cta: "See code example →", href: "/analyst-kit", icon: "code" },
+  { number: "01", title: "Skip the classification build.", body: "Use a finished daily network-state layer instead of spending analyst and engineering time on ingestion, baselines, chain-specific rules, confidence logic and ongoing maintenance.", cta: "See what is delivered →", href: "#today-status", icon: "plug" },
+  { number: "02", title: "Add one row to the data you already use.", body: "Regime, confidence and evidence arrive on the same date + chain key, so you can join the row into existing analysis, dashboards and reporting without changing your core workflow.", cta: "Inspect the free sample →", href: "/analyst-kit", icon: "code" },
+  { number: "03", title: "Keep every classification explainable.", body: "Confidence, drivers, underlying measurements and methodology version stay attached to the published state, giving you an auditable reference layer instead of an opaque label.", cta: "Review methodology →", href: "/methodology/reference", icon: "card" },
 ] as const;
 
 const regimeExplainers: Array<{ label: Exclude<HomeLabel, "UNKNOWN/DEGRADED">; plain: string; evidence: string }> = [
