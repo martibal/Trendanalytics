@@ -422,7 +422,7 @@ def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[st
         "blocktime_instability": "block-time instability",
     }
 
-    def _driver_metrics(axis_name: str, *, low_side: bool = False, high_side: bool = False, max_items: int = 2) -> str:
+    def _driver_metrics(axis_name: str, *, low_side: bool = False, high_side: bool = False, max_items: int = 2) -> Optional[str]:
         raw_drivers = (regime or {}).get("drivers") if isinstance(regime, dict) else []
         drivers = raw_drivers if isinstance(raw_drivers, list) else []
         chosen = []
@@ -442,7 +442,7 @@ def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[st
         chosen.sort(reverse=True)
         names = [metric_labels.get(m, m.replace("_", " ")) for _score, m in chosen[:max_items]]
         if not names:
-            return "published regime-axis evidence"
+            return None
         return " and ".join(names)
 
     def _scorecard_text() -> str:
@@ -462,22 +462,28 @@ def _status_from_regime_and_scorecard(regime: Dict[str, Any], scorecard: Dict[st
             f_phrase = _axis_band_phrase("friction")
             c_phrase = _axis_band_phrase("capacity")
             if "elevated" in f_phrase:
-                parts.append(f"elevated friction from {_driver_metrics('friction', high_side=True)}")
+                friction_drivers = _driver_metrics("friction", high_side=True)
+                parts.append(f"elevated friction from {friction_drivers}" if friction_drivers else "elevated friction")
             if "elevated" in c_phrase or "heating" in c_phrase:
-                parts.append(f"capacity pressure from {_driver_metrics('capacity', high_side=True)}")
+                capacity_drivers = _driver_metrics("capacity", high_side=True)
+                parts.append(f"capacity pressure from {capacity_drivers}" if capacity_drivers else "capacity pressure")
             if not parts:
                 parts.append("informative friction/capacity pressure")
             return "Congested regime: regime-axis evidence shows " + " and ".join(parts) + "."
         if lab == "CHEAP":
+            friction_drivers = _driver_metrics("friction", low_side=True)
+            driver_clause = f" from {friction_drivers}" if friction_drivers else ""
             return (
-                "Lower-friction regime: regime-axis evidence shows low friction from "
-                + _driver_metrics("friction", low_side=True)
+                "Lower-friction regime: regime-axis evidence shows low friction"
+                + driver_clause
                 + ", with no high capacity pressure."
             )
         if lab == "HEATING":
+            demand_drivers = _driver_metrics("demand", high_side=True)
+            driver_clause = f" from {demand_drivers}" if demand_drivers else ""
             return (
-                "Demand-led heating: regime-axis evidence shows elevated demand with a heating trend from "
-                + _driver_metrics("demand", high_side=True)
+                "Demand-led heating: regime-axis evidence shows elevated demand with a heating trend"
+                + driver_clause
                 + "."
             )
         if lab == "STABLE":
