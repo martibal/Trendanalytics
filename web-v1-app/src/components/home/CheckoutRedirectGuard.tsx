@@ -15,6 +15,10 @@ function planFromAction(action: string): "basic" | "pro" | null {
   }
 }
 
+function getOpenJsonModal(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('.ua3-modal[role="dialog"][aria-modal="true"]');
+}
+
 function modalFocusableElements(modal: HTMLElement): HTMLElement[] {
   return Array.from(
     modal.querySelectorAll<HTMLElement>(
@@ -25,6 +29,8 @@ function modalFocusableElements(modal: HTMLElement): HTMLElement[] {
 
 export default function CheckoutRedirectGuard() {
   useEffect(() => {
+    document.documentElement.dataset.modalFocusGuard = "ready";
+
     function handleSubmit(event: SubmitEvent) {
       const target = event.target;
       if (!(target instanceof HTMLFormElement)) return;
@@ -36,10 +42,10 @@ export default function CheckoutRedirectGuard() {
       window.location.assign(`/checkout/start?plan=${plan}`);
     }
 
-    function containModalFocus(event: KeyboardEvent) {
+    function containModalTab(event: KeyboardEvent) {
       if (event.key !== "Tab") return;
 
-      const modal = document.querySelector<HTMLElement>('.ua3-modal[role="dialog"][aria-modal="true"]');
+      const modal = getOpenJsonModal();
       if (!modal) return;
 
       const focusable = modalFocusableElements(modal);
@@ -62,11 +68,23 @@ export default function CheckoutRedirectGuard() {
       }
     }
 
+    function containModalFocus(event: FocusEvent) {
+      const modal = getOpenJsonModal();
+      const target = event.target;
+      if (!modal || !(target instanceof Node) || modal.contains(target)) return;
+
+      const focusable = modalFocusableElements(modal);
+      (focusable[0] ?? modal).focus();
+    }
+
     document.addEventListener("submit", handleSubmit, true);
-    document.addEventListener("keydown", containModalFocus, true);
+    window.addEventListener("keydown", containModalTab, true);
+    document.addEventListener("focusin", containModalFocus, true);
     return () => {
       document.removeEventListener("submit", handleSubmit, true);
-      document.removeEventListener("keydown", containModalFocus, true);
+      window.removeEventListener("keydown", containModalTab, true);
+      document.removeEventListener("focusin", containModalFocus, true);
+      delete document.documentElement.dataset.modalFocusGuard;
     };
   }, []);
 
