@@ -99,18 +99,18 @@ test.describe("mobile homepage regression", () => {
     await expect(openJson).toBeFocused();
   });
 
-  test("shows visible keyboard focus on hero links", async ({ page }) => {
+  test("keeps hero links accessible and free sample CTA pointed directly at the ZIP endpoint", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
 
     await expect(page.getByRole("group", { name: "Dataset summary" })).toBeVisible();
     await expect(page.getByRole("group", { name: "How to evaluate Urd Atlas" })).toBeVisible();
 
-    const heroLinks = [
-      page.getByRole("link", { name: "Download free sample pack" }),
-      page.getByRole("link", { name: /see today's published state/i }),
-    ];
+    const sampleLink = page.getByRole("link", { name: "Download free sample pack" });
+    const stateLink = page.getByRole("link", { name: /see today's published state/i });
 
-    for (const link of heroLinks) {
+    await expect(sampleLink).toHaveAttribute("href", "/api/v1/sample-pack");
+
+    for (const link of [sampleLink, stateLink]) {
       await expect(link).toHaveClass(/ua-home-focus/);
       await link.focus();
       await expect(link).toBeFocused();
