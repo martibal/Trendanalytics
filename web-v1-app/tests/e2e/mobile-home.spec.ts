@@ -95,6 +95,23 @@ test.describe("mobile homepage regression", () => {
     await expect(openJson).toBeFocused();
   });
 
+  test("disables hero CTA motion when reduced motion is requested", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("http://localhost:3000/mobile");
+
+    const heroCta = page.locator(".ua3-hero-panel-primary");
+    await expect(heroCta).toBeVisible();
+
+    const transitionDurations = await heroCta.evaluate((element) =>
+      window.getComputedStyle(element).transitionDuration.split(",").map((value) => Number.parseFloat(value))
+    );
+    expect(transitionDurations.every((duration) => duration === 0)).toBeTruthy();
+
+    await heroCta.hover();
+    const transform = await heroCta.evaluate((element) => window.getComputedStyle(element).transform);
+    expect(transform).toBe("none");
+  });
+
   test("keeps artifact grid compact below 340px while pricing stays single-column", async ({ page }) => {
     await page.setViewportSize({ width: 340, height: 844 });
     await page.goto("http://localhost:3000/mobile");
