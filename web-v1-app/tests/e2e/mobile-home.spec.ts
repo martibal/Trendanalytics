@@ -14,6 +14,10 @@ test.describe("mobile homepage regression", () => {
     await expect(artifactGrid).toBeVisible();
     await expect(planGrid).toBeVisible();
 
+    await expect(page.getByRole("group", { name: "Chain selector" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Artifact selector" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Confidence example selector" })).toBeVisible();
+
     for (const grid of [chainGrid, artifactGrid]) {
       const columns = await grid.evaluate((element) =>
         window.getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean)
