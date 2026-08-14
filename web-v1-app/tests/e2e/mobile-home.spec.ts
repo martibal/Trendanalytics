@@ -43,20 +43,23 @@ test.describe("mobile homepage regression", () => {
     const openJson = page.getByRole("button", { name: /view complete json/i });
     await expect(openJson).toBeVisible();
     await expect(openJson).toBeEnabled();
+    await expect(openJson).toHaveAttribute("aria-haspopup", "dialog");
     await openJson.click();
 
-    const modalBackdrop = page.locator('.ua3-modal-backdrop[role="dialog"]');
-    await expect(modalBackdrop).toBeVisible({ timeout: 10000 });
-    await expect(modalBackdrop).toHaveAttribute("aria-label", "Complete JSON preview");
+    const dialog = page.getByRole("dialog", { name: "Meta latest.json" });
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toHaveAttribute("aria-modal", "true");
+    await expect(dialog).toHaveAttribute("aria-labelledby", "json-modal-title");
 
     await expect(
-      modalBackdrop.getByRole("button", { name: /copy to clipboard/i })
+      dialog.getByRole("button", { name: /copy to clipboard/i })
     ).toBeVisible();
-    const closeButton = modalBackdrop.getByRole("button", { name: /^close$/i });
+    const closeButton = dialog.getByRole("button", { name: /^close$/i });
     await expect(closeButton).toBeVisible();
+    await expect(closeButton).toBeFocused();
 
     await closeButton.click();
-    await expect(modalBackdrop).toHaveCount(0);
+    await expect(dialog).toHaveCount(0);
   });
 
   test("keeps artifact grid compact below 340px while pricing stays single-column", async ({ page }) => {
