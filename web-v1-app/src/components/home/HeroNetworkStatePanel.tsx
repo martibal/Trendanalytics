@@ -36,7 +36,7 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
       <aside className="ua3-hero-network-panel" data-panel-kind="dataset-glance" aria-label="Dataset at a glance">
         <p className="ua3-hero-panel-label">DATASET AT A GLANCE</p>
 
-        <div className="ua3-hero-panel-lines" aria-label="Dataset summary">
+        <div className="ua3-hero-panel-lines" role="group" aria-label="Dataset summary">
           <div className="ua3-hero-panel-line">
             <h2>{formatRows(snapshot.consecutiveRows)}</h2>
             <p>{sinceLine(snapshot.firstPublishedLabel)}</p>
@@ -53,7 +53,7 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
           </div>
         </div>
 
-        <div className="ua3-hero-panel-offer" aria-label="How to evaluate Urd Atlas">
+        <div className="ua3-hero-panel-offer" role="group" aria-label="How to evaluate Urd Atlas">
           <p className="ua3-hero-panel-offer-label">INSPECT BEFORE YOU BUY</p>
           <div className="ua3-hero-panel-price-row">
             <strong>$49</strong>
