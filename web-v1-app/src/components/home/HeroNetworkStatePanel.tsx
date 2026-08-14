@@ -195,10 +195,10 @@ const styles = `
 }
 @media (prefers-reduced-motion: reduce) {
   .ua3-hero-panel-primary {
-    transition: none;
+    transition: none !important;
   }
   .ua3-hero-panel-primary:hover {
-    transform: none;
+    transform: none !important;
   }
 }
 @media (max-width: 767px) {
