@@ -174,19 +174,19 @@ function FieldCode({ children }: { children: string }) {
 function HeroValueStrip() {
   return (
     <div className="ua3-value-wrap">
-      <p className="ua3-value-title">A regime column for the data you already have.</p>
+      <p className="ua3-value-title">When a KPI moves, ask whether the network moved with it.</p>
       <div className="ua3-value-strip" aria-label="Practical uses">
         <div className="ua3-value-column">
-          <h2>Join on date + chain.</h2>
-          <p>Add <FieldCode>regime</FieldCode> and <FieldCode>confidence_score</FieldCode> beside your existing blockchain metrics without rebuilding the classification layer.</p>
+          <h2>Your model&apos;s error rate doubled on Tuesday.</h2>
+          <p>Before changing the model, check whether the chain itself moved into a different operating state.</p>
         </div>
         <div className="ua3-value-column">
-          <h2>Segment by network state.</h2>
-          <p>Compare the same KPI across <FieldCode>STABLE</FieldCode>, <FieldCode>HEATING</FieldCode>, <FieldCode>CONGESTED</FieldCode> and <FieldCode>CHEAP</FieldCode> days.</p>
+          <h2>Join the network context to that date.</h2>
+          <p>Add <FieldCode>regime</FieldCode> and <FieldCode>confidence_score</FieldCode> on date + chain to see whether Tuesday was <FieldCode>STABLE</FieldCode>, <FieldCode>HEATING</FieldCode>, <FieldCode>CONGESTED</FieldCode> or <FieldCode>CHEAP</FieldCode>.</p>
         </div>
         <div className="ua3-value-column">
-          <h2>Keep the evidence attached.</h2>
-          <p>Use confidence, drivers and underlying measurements when you need to explain what accompanied a network change.</p>
+          <h2>Separate a regime shift from noise.</h2>
+          <p>Keep confidence, drivers and underlying measurements attached so the change can be investigated and explained instead of guessed at.</p>
         </div>
       </div>
     </div>
