@@ -193,6 +193,14 @@ const styles = `
 .ua3-hero-panel-secondary-actions a:hover {
   color: var(--accent-action);
 }
+@media (prefers-reduced-motion: reduce) {
+  .ua3-hero-panel-primary {
+    transition: none !important;
+  }
+  .ua3-hero-panel-primary:hover {
+    transform: none !important;
+  }
+}
 @media (max-width: 767px) {
   .ua3-hero-network-panel {
     width: 100%;
