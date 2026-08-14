@@ -62,6 +62,7 @@ function mapToMobilePath(pathname: string): string | null {
   if (pathname === "/glossary" || pathname === "/faq")     return "/mobile/wiki";
   if (pathname === "/plans")                               return "/mobile/plans";
   if (pathname === "/dashboard")                           return "/mobile/dashboard";
+  if (pathname === "/analyst-kit")                         return null;
   if (pathname === "/api-docs" ||
       pathname.startsWith("/api-docs/"))                   return "/mobile/api-docs";
 
