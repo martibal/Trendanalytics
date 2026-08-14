@@ -99,6 +99,23 @@ test.describe("mobile homepage regression", () => {
     await expect(openJson).toBeFocused();
   });
 
+  test("keeps the free sample CTA on Analyst Kit for mobile user agents", async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      userAgent:
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+    });
+    const page = await context.newPage();
+
+    await page.goto("http://localhost:3000/mobile");
+    await page.getByRole("link", { name: "Inspect free sample" }).click();
+
+    await expect(page).toHaveURL(/\/analyst-kit$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Use Urd Atlas before you have a pipeline." })).toBeVisible();
+
+    await context.close();
+  });
+
   test("shows visible keyboard focus on hero links", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
 
