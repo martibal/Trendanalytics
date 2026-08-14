@@ -106,7 +106,7 @@ test.describe("mobile homepage regression", () => {
     await expect(page.getByRole("group", { name: "How to evaluate Urd Atlas" })).toBeVisible();
 
     const heroLinks = [
-      page.getByRole("link", { name: "Inspect free sample" }),
+      page.getByRole("link", { name: "Download free sample pack" }),
       page.getByRole("link", { name: /see today's published state/i }),
     ];
 
