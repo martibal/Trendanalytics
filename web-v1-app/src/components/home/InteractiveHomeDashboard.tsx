@@ -69,7 +69,7 @@ type InfoId = "regime" | "confidence" | "demand" | "friction" | "capacity" | "da
 const info: Record<InfoId, { title: string; body: string }> = {
   regime: { title: "Regime / status", body: "The regime is the daily network-state label for a chain. It is produced from network activity, friction and capacity evidence. It is not a price view." },
   confidence: { title: "Confidence", body: "A combined evidence-strength score. It blends data quality with how clearly the observed evidence supports the published label. It is not a probability that the label is correct." },
-  demand: { title: "Demand", body: "Demand describes how strong network activity looked compared with that network&apos;s own recent baseline." },
+  demand: { title: "Demand", body: "Demand describes how strong network activity looked compared with that network's own recent baseline." },
   friction: { title: "Friction", body: "Friction describes how difficult or costly the network was to use that day, using fee and failure evidence." },
   capacity: { title: "Capacity", body: "Capacity describes whether the network appeared to have usable room relative to current activity." },
   dataQuality: { title: "Data quality", body: "Completeness and freshness context for the raw evidence behind the row." },
