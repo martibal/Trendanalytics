@@ -73,13 +73,15 @@ export default async function MethodologyChangelogPage() {
                       "historical textual correction",
                       "meta/<chain>/<date>.json · aggregated Meta windows",
                       "No",
-                      "Yes — status.one_liner text only",
+                      "Yes — status.one_liner and status.explanation_support.status_note text only",
                       "Yes, if affected Meta JSON was cached before this correction",
                       <>
                         Corrected a grammatical fallback defect in previously published{" "}
-                        <InlineCode>status.one_liner</InlineCode> text. The correction affected
-                        descriptive text only; no regime classifications, axis values, confidence
-                        scores, scorecard values, drivers, or underlying metrics were changed.
+                        <InlineCode>status.one_liner</InlineCode> and{" "}
+                        <InlineCode>status.explanation_support.status_note</InlineCode> text. The
+                        correction affected descriptive text only; no regime classifications, axis
+                        values, confidence scores, scorecard values, drivers, or underlying metrics
+                        were changed.
                       </>,
                     ],
                     [
