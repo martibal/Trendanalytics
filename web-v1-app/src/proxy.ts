@@ -45,6 +45,7 @@ function mapToMobilePath(pathname: string): string | null {
   if (pathname.startsWith("/__clerk"))  return null;
   if (pathname.startsWith("/sign-in"))  return null;
   if (pathname.startsWith("/sign-up"))  return null;
+  if (pathname === "/analyst-kit" || pathname.startsWith("/analyst-kit/")) return null;
 
   if (pathname === "/") return "/mobile";
 
