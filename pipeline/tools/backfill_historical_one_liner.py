@@ -6,21 +6,29 @@ from pathlib import Path
 
 BUGGY_DRIVER_CLAUSE = b" from published regime-axis evidence"
 TARGET_KEYS = (b'"one_liner"', b'"status_note"')
-
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ROOTS = (
-    Path("data/published/v1/meta"),
-    Path("web-v1-app/.private-data/published/v1/meta"),
-    Path("web-v1-app/public/data/published/v1/meta"),
+    REPO_ROOT / "data/published/v1/meta",
+    REPO_ROOT / "web-v1-app/.private-data/published/v1/meta",
 )
+
+
+def _resolve_root(value: str) -> Path:
+    path = Path(value)
+    return path.resolve() if path.is_absolute() else (REPO_ROOT / path).resolve()
+
+
+def _validate_roots(roots: list[Path]) -> None:
+    missing = [root for root in roots if not root.exists() or not root.is_dir()]
+    if missing:
+        formatted = "\n".join(f"  - {root}" for root in missing)
+        raise SystemExit(f"Missing required Meta root(s):\n{formatted}")
 
 
 def _iter_json_files(roots: list[Path]):
     seen: set[Path] = set()
 
     for root in roots:
-        if not root.exists():
-            continue
-
         for path in sorted(root.rglob("*.json")):
             resolved = path.resolve()
 
@@ -39,10 +47,7 @@ def _correct_file(path: Path, *, check_only: bool) -> int:
     changed = 0
 
     for line in lines:
-        if (
-            BUGGY_DRIVER_CLAUSE in line
-            and any(key in line for key in TARGET_KEYS)
-        ):
+        if BUGGY_DRIVER_CLAUSE in line and any(key in line for key in TARGET_KEYS):
             changed += line.count(BUGGY_DRIVER_CLAUSE)
 
             if not check_only:
@@ -68,7 +73,10 @@ def main() -> int:
         "--root",
         action="append",
         dest="roots",
-        help="Meta root to scan; repeatable.",
+        help=(
+            "Meta root to scan; repeatable. Relative paths are resolved from "
+            "the repository root."
+        ),
     )
 
     parser.add_argument(
@@ -83,10 +91,11 @@ def main() -> int:
     args = parser.parse_args()
 
     roots = (
-        [Path(value) for value in args.roots]
+        [_resolve_root(value) for value in args.roots]
         if args.roots
         else list(DEFAULT_ROOTS)
     )
+    _validate_roots(roots)
 
     files_scanned = 0
     files_changed = 0
@@ -111,7 +120,7 @@ def main() -> int:
             )
 
         print(
-            f"OK: scanned {files_scanned} JSON files; "
+            f"OK: scanned {files_scanned} JSON files across {len(roots)} root(s); "
             "no buggy one_liner or status_note fields remain."
         )
         return 0
