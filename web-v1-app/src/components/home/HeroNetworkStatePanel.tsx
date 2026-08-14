@@ -72,18 +72,6 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
 }
 
 const styles = `
-.ua3 {
-  display: flex;
-  flex-direction: column;
-}
-.ua3 > .ua3-hero { order: 10; }
-.ua3 > section[aria-labelledby="start-title"] { order: 20; }
-.ua3 > #today-status { order: 30; }
-.ua3 > .ua3-files { order: 40; }
-.ua3 > section[aria-labelledby="build-buy-title"] { order: 50; }
-.ua3 > #pricing { order: 60; }
-.ua3 > .ua3-regimes { order: 70; }
-.ua3 > .ua3-confidence-explainer { order: 80; }
 .ua3 > .ua3-transition { display: none; }
 .ua3 > .ua3-section:not(.ua3-hero) {
   border-top: 1px solid var(--accent-depth-line);
