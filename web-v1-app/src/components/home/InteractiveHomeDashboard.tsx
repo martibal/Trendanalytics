@@ -195,12 +195,42 @@ function HeroValueStrip() {
 
 function InfoButton({ id, activeInfo, setActiveInfo }: { id: InfoId; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
   const open = activeInfo === id;
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  const popoverId = `ua3-info-${id}`;
+
+  const closeAndRestoreFocus = useCallback(() => {
+    setActiveInfo(null);
+    window.setTimeout(() => triggerRef.current?.focus(), 0);
+  }, [setActiveInfo]);
+
+  useEffect(() => {
+    if (!open) return;
+    window.setTimeout(() => closeRef.current?.focus(), 0);
+  }, [open]);
+
   return (
-    <span className="ua3-info">
-      <button type="button" aria-label={`Explain ${info[id].title}`} aria-expanded={open} onClick={(event) => { event.stopPropagation(); setActiveInfo(open ? null : id); }} className="ua3-info-button">?</button>
+    <span
+      className="ua3-info"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || !open) return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeAndRestoreFocus();
+      }}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={`Explain ${info[id].title}`}
+        aria-expanded={open}
+        aria-controls={popoverId}
+        onClick={(event) => { event.stopPropagation(); if (open) closeAndRestoreFocus(); else setActiveInfo(id); }}
+        className="ua3-info-button"
+      >?</button>
       {open ? (
-        <span className="ua3-info-popover" role="dialog" aria-label={info[id].title}>
-          <button type="button" aria-label="Close explanation" className="ua3-info-close" onClick={(event) => { event.stopPropagation(); setActiveInfo(null); }}>×</button>
+        <span id={popoverId} className="ua3-info-popover" role="dialog" aria-label={info[id].title}>
+          <button ref={closeRef} type="button" aria-label="Close explanation" className="ua3-info-close" onClick={(event) => { event.stopPropagation(); closeAndRestoreFocus(); }}>×</button>
           <span className="ua3-info-title">{info[id].title}</span>
           <span className="ua3-info-body">{info[id].body}</span>
         </span>
