@@ -2,6 +2,8 @@
  * @jest-environment node
  */
 
+export {};
+
 const mockReadStorageObject = jest.fn();
 
 jest.mock("@/lib/storage", () => ({
