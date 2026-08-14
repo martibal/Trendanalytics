@@ -297,8 +297,15 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
       const target = event.target;
       if (target instanceof Element && !target.closest(".ua3-info")) setActiveInfo(null);
     }
+    function closeInfoOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setActiveInfo(null);
+    }
     document.addEventListener("pointerdown", closeOnOutsidePointer);
-    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeInfoOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeInfoOnEscape);
+    };
   }, [activeInfo]);
 
   useEffect(() => {
@@ -349,7 +356,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      <section className="ua3-section ua3-files" aria-labelledby="files-title"><div className="ua3-wrap ua3-files-grid"><div><p className="ua3-label ua3-step-label">Delivered evidence</p><h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2><p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p></div><div className="ua3-artifact-grid">{artifactCards.map((artifact) => <button key={artifact.name} type="button" aria-pressed={selectedArtifact === artifact.name} onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}><span className="ua3-artifact-icon">{artifact.icon}</span><h3>{artifact.name}</h3><p className="ua3-body-small">{artifact.what}</p><p className="ua3-card-note">{artifact.use}</p></button>)}</div></div><div className="ua3-wrap ua3-preview-panel"><div><p className="ua3-label">Example preview</p><div className="ua3-toggle-row" aria-label="Confidence example selector">{(["high", "low"] as const).map((kind) => <button key={kind} type="button" aria-pressed={exampleKind === kind} onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>{kind} confidence</button>)}</div><p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p></div><div><JsonBlock payload={preview} prismReady={prismReady} /><button type="button" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>View complete JSON →</button></div></div></section>
+      <section className="ua3-section ua3-files" aria-labelledby="files-title"><div className="ua3-wrap ua3-files-grid"><div><p className="ua3-label ua3-step-label">Delivered evidence</p><h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2><p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p></div><div className="ua3-artifact-grid">{artifactCards.map((artifact) => <button key={artifact.name} type="button" aria-pressed={selectedArtifact === artifact.name} onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}><span className="ua3-artifact-icon">{artifact.icon}</span><h3>{artifact.name}</h3><p className="ua3-body-small">{artifact.what}</p><p className="ua3-card-note">{artifact.use}</p></button>)}</div></div><div className="ua3-wrap ua3-preview-panel"><div><p className="ua3-label">Example preview</p><div className="ua3-toggle-row" aria-label="Confidence example selector">{(["high", "low"] as const).map((kind) => <button key={kind} type="button" aria-pressed={exampleKind === kind} onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>{kind} confidence</button>)}</div><p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p></div><div><JsonBlock payload={preview} prismReady={prismReady} /><button type="button" aria-haspopup="dialog" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>View complete JSON →</button></div></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
 
@@ -444,7 +451,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      {modalOpen ? <div className="ua3-modal-backdrop" role="dialog" aria-modal="true" aria-label="Complete JSON preview" onClick={() => setModalOpen(false)}><div className="ua3-modal" onClick={(event) => event.stopPropagation()}><div className="ua3-modal-head"><div><p className="ua3-label">Complete JSON</p><h2>{selectedArtifact} latest.json</h2></div><div className="ua3-modal-actions"><button type="button" className="ua3-button ua3-button-quiet" onClick={copyModalJson}>{copied ? "Copied" : "Copy to clipboard"}</button><button type="button" className="ua3-button ua3-button-primary" onClick={() => setModalOpen(false)}>Close</button></div></div><JsonBlock payload={completeJson} prismReady={prismReady} complete /></div></div> : null}
+      {modalOpen ? <div className="ua3-modal-backdrop" onClick={() => setModalOpen(false)}><div className="ua3-modal" role="dialog" aria-modal="true" aria-labelledby="json-modal-title" onClick={(event) => event.stopPropagation()}><div className="ua3-modal-head"><div><p className="ua3-label">Complete JSON</p><h2 id="json-modal-title">{selectedArtifact} latest.json</h2></div><div className="ua3-modal-actions"><button type="button" className="ua3-button ua3-button-quiet" onClick={copyModalJson}>{copied ? "Copied" : "Copy to clipboard"}</button><button type="button" autoFocus className="ua3-button ua3-button-primary" onClick={() => setModalOpen(false)}>Close</button></div></div><JsonBlock payload={completeJson} prismReady={prismReady} complete /></div></div> : null}
 
       <style>{ua3Styles}</style>
     </main>
