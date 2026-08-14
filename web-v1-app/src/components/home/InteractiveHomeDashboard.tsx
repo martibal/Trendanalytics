@@ -345,6 +345,46 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
+      <section id="today-status" className="ua3-section ua3-status" aria-labelledby="status-title"><div className="ua3-wrap"><div className="ua3-section-head"><div><p className="ua3-label ua3-step-label">Published network state</p><h2 id="status-title" className="ua3-step-title">Today&apos;s state — four chains, updated {lastRun}.</h2></div><p className="ua3-body-small ua3-help-copy">Select any term marked with ? to see a plain-language explanation.</p></div><div className="ua3-chain-grid">{snapshots.map((chain) => { const active = chain.id === selectedChainId; return <button key={chain.id} data-chain={chain.id} type="button" aria-pressed={active} onClick={() => setSelectedChainId(chain.id)} className={active ? "ua3-card ua3-chain-card ua3-chain-card-active" : "ua3-card ua3-chain-card"} style={toneStyle(chain.regime)}><div className="ua3-chain-top"><div><p className="ua3-label">{chain.ticker}</p><h3>{chain.name}</h3></div><StatusBadge label={chain.regime} /></div><div className="ua3-chain-bottom"><div><p className="ua3-data-medium">{chain.confidence}</p><p className="ua3-body-small">confidence</p></div><Sparkline /></div></button>; })}</div><div className="ua3-detail-panel"><div className="ua3-card ua3-detail-summary"><div className="ua3-detail-head"><div><p className="ua3-label">{selectedChain.ticker} · {selectedChain.asOf} · {selectedChain.lag}</p><h3>{selectedChain.name}</h3></div><StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><p className="ua3-body-small ua3-one-liner">{selectedChain.oneLiner}</p><ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-status-metrics"><div className="ua3-secondary-grid"><SecondaryMetric id="demand" label="Demand" value={selectedChain.demand} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="friction" label="Friction" value={selectedChain.friction} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="capacity" label="Capacity" value={selectedChain.capacity} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-tertiary-grid"><TertiaryMetric id="dataQuality" label="Data quality" value={pct(selectedChain.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="labelConfidence" label="Label confidence" value={pct(selectedChain.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="dataLag" label="Data lag" value={selectedChain.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div></div></div></div></section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section className="ua3-section ua3-files" aria-labelledby="files-title"><div className="ua3-wrap ua3-files-grid"><div><p className="ua3-label ua3-step-label">Delivered evidence</p><h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2><p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p></div><div className="ua3-artifact-grid">{artifactCards.map((artifact) => <button key={artifact.name} type="button" aria-pressed={selectedArtifact === artifact.name} onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}><span className="ua3-artifact-icon">{artifact.icon}</span><h3>{artifact.name}</h3><p className="ua3-body-small">{artifact.what}</p><p className="ua3-card-note">{artifact.use}</p></button>)}</div></div><div className="ua3-wrap ua3-preview-panel"><div><p className="ua3-label">Example preview</p><div className="ua3-toggle-row" aria-label="Confidence example selector">{(["high", "low"] as const).map((kind) => <button key={kind} type="button" aria-pressed={exampleKind === kind} onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>{kind} confidence</button>)}</div><p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p></div><div><JsonBlock payload={preview} prismReady={prismReady} /><button type="button" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>View complete JSON →</button></div></div></section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section className="ua3-section ua3-start" aria-labelledby="build-buy-title">
+        <div className="ua3-wrap">
+          <p className="ua3-label ua3-step-label">Build or buy</p>
+          <h2 id="build-buy-title" className="ua3-step-title">You could build this yourself. The question is whether you should.</h2>
+          <p className="ua3-body">The alternative to Urd Atlas is not raw data alone. It is the ingestion, normalization, chain-specific feature work, historical baselines, classification rules, confidence logic and ongoing maintenance needed to turn that raw data into a dependable daily state row.</p>
+          <div className="ua3-start-grid" style={{ marginTop: 32 }}>
+            <article className="ua3-card ua3-step-card">
+              <p className="ua3-step-number">01</p>
+              <div className="ua3-step-heading"><LucideIcon name="plug" /><h3>Build and maintain the data layer</h3></div>
+              <p className="ua3-body-small">Source four different chains, handle schema differences, aggregate daily measurements, validate freshness and keep the pipeline running when source data changes.</p>
+            </article>
+            <article className="ua3-card ua3-step-card">
+              <p className="ua3-step-number">02</p>
+              <div className="ua3-step-heading"><LucideIcon name="code" /><h3>Define and validate the methodology</h3></div>
+              <p className="ua3-body-small">Choose chain-aware proxies, historical baselines, regime thresholds, confidence gates and validation tests — then version the method when it changes.</p>
+            </article>
+            <article className="ua3-card ua3-step-card">
+              <p className="ua3-step-number">03</p>
+              <div className="ua3-step-heading"><LucideIcon name="card" /><h3>Or connect the finished layer</h3></div>
+              <p className="ua3-body-small">Basic is $49/month for one chain. Pro is $149/month for all four. Compare that subscription cost with the analyst and engineering time required to recreate, validate and maintain the same layer.</p>
+              <Link href="#pricing" className="ua3-button ua3-button-quiet">Compare plans →</Link>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
+      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title"><div className="ua3-wrap"><p className="ua3-label ua3-step-label">Plans</p><h2 id="pricing-title" className="ua3-step-title">Choose the plan that matches your workflow.</h2><p className="ua3-body">Use Free to inspect the format. Start with Basic if one chain covers your workflow. Choose Pro when you need the same daily reference layer across all four chains.</p><div className="ua3-plan-grid">{plans.map((plan) => <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}><div className="ua3-plan-head"><h3>{plan.name}</h3>{plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}</div><p className="ua3-plan-price">{plan.price}</p><p className="ua3-body-small">{plan.summary}</p>{plan.id === "free" ? <Link href="/analyst-kit" className="ua3-button ua3-button-quiet ua3-button-full">{plan.cta}</Link> : <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>}</article>)}</div><p className="ua3-card-note ua3-pricing-note">Start with the smallest plan that fits the number of chains you actually use. Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p></div></section>
+
+      <div className="ua3-transition" aria-hidden="true" />
+
       <section className="ua3-section ua3-regimes" aria-labelledby="regime-explainer-title">
         <div className="ua3-wrap">
           <div className="ua3-regime-head">
@@ -401,46 +441,6 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
           <div className="ua3-confidence-warning"><strong>Read 74% as:</strong> “the data are sufficiently reliable and the evidence supports this label clearly under the defined methodology” — not “74% probability that this is the true regime.” <Link href="/methodology/reference">See the exact confidence methodology →</Link></div>
         </div>
       </section>
-
-      <div className="ua3-transition" aria-hidden="true" />
-
-      <section id="today-status" className="ua3-section ua3-status" aria-labelledby="status-title"><div className="ua3-wrap"><div className="ua3-section-head"><div><p className="ua3-label ua3-step-label">Published network state</p><h2 id="status-title" className="ua3-step-title">Today&apos;s state — four chains, updated {lastRun}.</h2></div><p className="ua3-body-small ua3-help-copy">Select any term marked with ? to see a plain-language explanation.</p></div><div className="ua3-chain-grid">{snapshots.map((chain) => { const active = chain.id === selectedChainId; return <button key={chain.id} data-chain={chain.id} type="button" onClick={() => setSelectedChainId(chain.id)} className={active ? "ua3-card ua3-chain-card ua3-chain-card-active" : "ua3-card ua3-chain-card"} style={toneStyle(chain.regime)}><div className="ua3-chain-top"><div><p className="ua3-label">{chain.ticker}</p><h3>{chain.name}</h3></div><StatusBadge label={chain.regime} /></div><div className="ua3-chain-bottom"><div><p className="ua3-data-medium">{chain.confidence}</p><p className="ua3-body-small">confidence</p></div><Sparkline /></div></button>; })}</div><div className="ua3-detail-panel"><div className="ua3-card ua3-detail-summary"><div className="ua3-detail-head"><div><p className="ua3-label">{selectedChain.ticker} · {selectedChain.asOf} · {selectedChain.lag}</p><h3>{selectedChain.name}</h3></div><StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><p className="ua3-body-small ua3-one-liner">{selectedChain.oneLiner}</p><ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-status-metrics"><div className="ua3-secondary-grid"><SecondaryMetric id="demand" label="Demand" value={selectedChain.demand} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="friction" label="Friction" value={selectedChain.friction} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="capacity" label="Capacity" value={selectedChain.capacity} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-tertiary-grid"><TertiaryMetric id="dataQuality" label="Data quality" value={pct(selectedChain.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="labelConfidence" label="Label confidence" value={pct(selectedChain.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="dataLag" label="Data lag" value={selectedChain.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div></div></div></div></section>
-
-      <div className="ua3-transition" aria-hidden="true" />
-
-      <section className="ua3-section ua3-files" aria-labelledby="files-title"><div className="ua3-wrap ua3-files-grid"><div><p className="ua3-label ua3-step-label">Delivered evidence</p><h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2><p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p></div><div className="ua3-artifact-grid">{artifactCards.map((artifact) => <button key={artifact.name} type="button" onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}><span className="ua3-artifact-icon">{artifact.icon}</span><h3>{artifact.name}</h3><p className="ua3-body-small">{artifact.what}</p><p className="ua3-card-note">{artifact.use}</p></button>)}</div></div><div className="ua3-wrap ua3-preview-panel"><div><p className="ua3-label">Example preview</p><div className="ua3-toggle-row" aria-label="Confidence example selector">{(["high", "low"] as const).map((kind) => <button key={kind} type="button" onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>{kind} confidence</button>)}</div><p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p></div><div><JsonBlock payload={preview} prismReady={prismReady} /><button type="button" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>View complete JSON →</button></div></div></section>
-
-      <div className="ua3-transition" aria-hidden="true" />
-
-      <section className="ua3-section ua3-start" aria-labelledby="build-buy-title">
-        <div className="ua3-wrap">
-          <p className="ua3-label ua3-step-label">Build or buy</p>
-          <h2 id="build-buy-title" className="ua3-step-title">You could build this yourself. The question is whether you should.</h2>
-          <p className="ua3-body">The alternative to Urd Atlas is not raw data alone. It is the ingestion, normalization, chain-specific feature work, historical baselines, classification rules, confidence logic and ongoing maintenance needed to turn that raw data into a dependable daily state row.</p>
-          <div className="ua3-start-grid" style={{ marginTop: 32 }}>
-            <article className="ua3-card ua3-step-card">
-              <p className="ua3-step-number">01</p>
-              <div className="ua3-step-heading"><LucideIcon name="plug" /><h3>Build and maintain the data layer</h3></div>
-              <p className="ua3-body-small">Source four different chains, handle schema differences, aggregate daily measurements, validate freshness and keep the pipeline running when source data changes.</p>
-            </article>
-            <article className="ua3-card ua3-step-card">
-              <p className="ua3-step-number">02</p>
-              <div className="ua3-step-heading"><LucideIcon name="code" /><h3>Define and validate the methodology</h3></div>
-              <p className="ua3-body-small">Choose chain-aware proxies, historical baselines, regime thresholds, confidence gates and validation tests — then version the method when it changes.</p>
-            </article>
-            <article className="ua3-card ua3-step-card">
-              <p className="ua3-step-number">03</p>
-              <div className="ua3-step-heading"><LucideIcon name="card" /><h3>Or connect the finished layer</h3></div>
-              <p className="ua3-body-small">Basic is $49/month for one chain. Pro is $149/month for all four. If recreating and maintaining the same layer costs more than a small amount of analyst or engineering time, buying is cheaper.</p>
-              <Link href="#pricing" className="ua3-button ua3-button-quiet">Compare plans →</Link>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <div className="ua3-transition" aria-hidden="true" />
-
-      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title"><div className="ua3-wrap"><p className="ua3-label ua3-step-label">Plans</p><h2 id="pricing-title" className="ua3-step-title">Choose the plan that matches your workflow.</h2><p className="ua3-body">Use Free to inspect the format. Start with Basic if one chain covers your workflow. Choose Pro when you need the same daily reference layer across all four chains.</p><div className="ua3-plan-grid">{plans.map((plan) => <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}><div className="ua3-plan-head"><h3>{plan.name}</h3>{plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}</div><p className="ua3-plan-price">{plan.price}</p><p className="ua3-body-small">{plan.summary}</p>{plan.id === "free" ? <Link href="/analyst-kit" className="ua3-button ua3-button-quiet ua3-button-full">{plan.cta}</Link> : <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>}</article>)}</div><p className="ua3-card-note ua3-pricing-note">Start with the smallest plan that fits the number of chains you actually use. Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
 
