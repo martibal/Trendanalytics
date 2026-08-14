@@ -74,6 +74,26 @@ test.describe("mobile homepage regression", () => {
     await expect(openJson).toBeFocused();
   });
 
+  test("restores focus to info triggers after keyboard dismissal", async ({ page }) => {
+    await page.goto("http://localhost:3000/mobile");
+
+    const demandTrigger = page.getByRole("button", { name: "Explain Demand" });
+    await expect(demandTrigger).toBeVisible();
+    await demandTrigger.click();
+
+    const demandDialog = page.getByRole("dialog", { name: "Demand" });
+    await expect(demandDialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(demandDialog).toHaveCount(0);
+    await expect(demandTrigger).toBeFocused();
+
+    await demandTrigger.click();
+    await expect(demandDialog).toBeVisible();
+    await demandDialog.getByRole("button", { name: "Close explanation" }).click();
+    await expect(demandDialog).toHaveCount(0);
+    await expect(demandTrigger).toBeFocused();
+  });
+
   test("keeps artifact grid compact below 340px while pricing stays single-column", async ({ page }) => {
     await page.setViewportSize({ width: 340, height: 844 });
     await page.goto("http://localhost:3000/mobile");
