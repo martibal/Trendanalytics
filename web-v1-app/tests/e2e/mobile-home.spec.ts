@@ -99,6 +99,23 @@ test.describe("mobile homepage regression", () => {
     await expect(openJson).toBeFocused();
   });
 
+  test("shows visible keyboard focus on hero links", async ({ page }) => {
+    await page.goto("http://localhost:3000/mobile");
+
+    const heroLinks = [
+      page.getByRole("link", { name: "Inspect free sample" }),
+      page.getByRole("link", { name: /see today's published state/i }),
+    ];
+
+    for (const link of heroLinks) {
+      await expect(link).toHaveClass(/ua-home-focus/);
+      await link.focus();
+      await expect(link).toBeFocused();
+      const outlineWidth = await link.evaluate((element) => window.getComputedStyle(element).outlineWidth);
+      expect(outlineWidth).toBe("2px");
+    }
+  });
+
   test("disables hero CTA motion when reduced motion is requested", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("http://localhost:3000/mobile");
