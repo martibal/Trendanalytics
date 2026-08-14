@@ -38,17 +38,17 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
 
         <div className="ua3-hero-panel-lines" role="group" aria-label="Dataset summary">
           <div className="ua3-hero-panel-line">
-            <h2>{formatRows(snapshot.consecutiveRows)}</h2>
+            <p className="ua3-hero-panel-stat">{formatRows(snapshot.consecutiveRows)}</p>
             <p>{sinceLine(snapshot.firstPublishedLabel)}</p>
           </div>
 
           <div className="ua3-hero-panel-line">
-            <h2>4 chains covered</h2>
+            <p className="ua3-hero-panel-stat">4 chains covered</p>
             <p>Bitcoin · Ethereum · Arbitrum · Base</p>
           </div>
 
           <div className="ua3-hero-panel-line">
-            <h2>Deterministic, versioned</h2>
+            <p className="ua3-hero-panel-stat">Deterministic, versioned</p>
             <p>{methodologyLine(snapshot.methodologyVersionLabel)}</p>
           </div>
         </div>
@@ -107,7 +107,7 @@ const styles = `
 .ua3-hero-panel-line + .ua3-hero-panel-line {
   border-top: 1px solid var(--border-subtle);
 }
-.ua3-hero-panel-line h2 {
+.ua3-hero-panel-stat {
   margin: 0;
   color: var(--text-primary);
   font-size: 22px;
@@ -115,7 +115,7 @@ const styles = `
   line-height: 1.3;
   letter-spacing: -0.02em;
 }
-.ua3-hero-panel-line p {
+.ua3-hero-panel-line > p:not(.ua3-hero-panel-stat) {
   margin: 4px 0 0;
   color: var(--text-tertiary);
   font-size: 13px;
