@@ -51,15 +51,27 @@ test.describe("mobile homepage regression", () => {
     await expect(dialog).toHaveAttribute("aria-modal", "true");
     await expect(dialog).toHaveAttribute("aria-labelledby", "json-modal-title");
 
-    await expect(
-      dialog.getByRole("button", { name: /copy to clipboard/i })
-    ).toBeVisible();
+    const copyButton = dialog.getByRole("button", { name: /copy to clipboard/i });
     const closeButton = dialog.getByRole("button", { name: /^close$/i });
+    const jsonScroller = dialog.locator("pre.ua3-json-complete");
+    await expect(copyButton).toBeVisible();
     await expect(closeButton).toBeVisible();
+    await expect(jsonScroller).toBeVisible();
     await expect(closeButton).toBeFocused();
 
-    await closeButton.click();
+    await page.keyboard.press("Tab");
+    await expect(jsonScroller).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(copyButton).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+    await expect(jsonScroller).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(closeButton).toBeFocused();
+
+    await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
+    await expect(openJson).toBeFocused();
   });
 
   test("keeps artifact grid compact below 340px while pricing stays single-column", async ({ page }) => {

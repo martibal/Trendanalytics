@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Script from "next/script";
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import HeroNetworkStatePanel, { type HeroPanelSnapshot } from "./HeroNetworkStatePanel";
 
@@ -283,6 +283,8 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
   const [modalOpen, setModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [prismReady, setPrismReady] = useState(false);
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const modalTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const selectedChain = snapshots.find((snapshot) => snapshot.id === selectedChainId) ?? snapshots[0];
   const selectedExample = exampleKind === "high" ? examples.high : examples.low;
@@ -290,6 +292,10 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
   const completeJson = useMemo(() => (selectedChain ? selectedChain.artifacts[selectedArtifact] : null), [selectedArtifact, selectedChain]);
   const ethereumSnapshot = snapshots.find((snapshot) => snapshot.id === "ethereum") ?? snapshots[1] ?? selectedChain;
   const heroPanelSnapshot = heroSnapshot ?? (ethereumSnapshot ? toHeroPanelSnapshot(ethereumSnapshot) : null);
+  const closeModal = useCallback(() => {
+    setModalOpen(false);
+    window.setTimeout(() => modalTriggerRef.current?.focus(), 0);
+  }, []);
 
   useEffect(() => {
     if (!activeInfo) return;
@@ -310,10 +316,36 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
   useEffect(() => {
     if (!modalOpen) return;
-    function closeOnEscape(event: KeyboardEvent) { if (event.key === "Escape") setModalOpen(false); }
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [modalOpen]);
+    const modal = modalRef.current;
+    function handleModalKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeModal();
+        return;
+      }
+      if (event.key !== "Tab" || !modal) return;
+      const focusable = Array.from(modal.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )).filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
+      if (focusable.length === 0) {
+        event.preventDefault();
+        modal.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !modal.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !modal.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", handleModalKeyDown);
+    return () => document.removeEventListener("keydown", handleModalKeyDown);
+  }, [modalOpen, closeModal]);
 
   async function copyModalJson() {
     try {
@@ -356,7 +388,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      <section className="ua3-section ua3-files" aria-labelledby="files-title"><div className="ua3-wrap ua3-files-grid"><div><p className="ua3-label ua3-step-label">Delivered evidence</p><h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2><p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p></div><div className="ua3-artifact-grid">{artifactCards.map((artifact) => <button key={artifact.name} type="button" aria-pressed={selectedArtifact === artifact.name} onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}><span className="ua3-artifact-icon">{artifact.icon}</span><h3>{artifact.name}</h3><p className="ua3-body-small">{artifact.what}</p><p className="ua3-card-note">{artifact.use}</p></button>)}</div></div><div className="ua3-wrap ua3-preview-panel"><div><p className="ua3-label">Example preview</p><div className="ua3-toggle-row" aria-label="Confidence example selector">{(["high", "low"] as const).map((kind) => <button key={kind} type="button" aria-pressed={exampleKind === kind} onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>{kind} confidence</button>)}</div><p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p></div><div><JsonBlock payload={preview} prismReady={prismReady} /><button type="button" aria-haspopup="dialog" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>View complete JSON →</button></div></div></section>
+      <section className="ua3-section ua3-files" aria-labelledby="files-title"><div className="ua3-wrap ua3-files-grid"><div><p className="ua3-label ua3-step-label">Delivered evidence</p><h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2><p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p></div><div className="ua3-artifact-grid">{artifactCards.map((artifact) => <button key={artifact.name} type="button" aria-pressed={selectedArtifact === artifact.name} onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}><span className="ua3-artifact-icon">{artifact.icon}</span><h3>{artifact.name}</h3><p className="ua3-body-small">{artifact.what}</p><p className="ua3-card-note">{artifact.use}</p></button>)}</div></div><div className="ua3-wrap ua3-preview-panel"><div><p className="ua3-label">Example preview</p><div className="ua3-toggle-row" aria-label="Confidence example selector">{(["high", "low"] as const).map((kind) => <button key={kind} type="button" aria-pressed={exampleKind === kind} onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>{kind} confidence</button>)}</div><p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p></div><div><JsonBlock payload={preview} prismReady={prismReady} /><button ref={modalTriggerRef} type="button" aria-haspopup="dialog" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>View complete JSON →</button></div></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
 
@@ -451,7 +483,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      {modalOpen ? <div className="ua3-modal-backdrop" onClick={() => setModalOpen(false)}><div className="ua3-modal" role="dialog" aria-modal="true" aria-labelledby="json-modal-title" onClick={(event) => event.stopPropagation()}><div className="ua3-modal-head"><div><p className="ua3-label">Complete JSON</p><h2 id="json-modal-title">{selectedArtifact} latest.json</h2></div><div className="ua3-modal-actions"><button type="button" className="ua3-button ua3-button-quiet" onClick={copyModalJson}>{copied ? "Copied" : "Copy to clipboard"}</button><button type="button" autoFocus className="ua3-button ua3-button-primary" onClick={() => setModalOpen(false)}>Close</button></div></div><JsonBlock payload={completeJson} prismReady={prismReady} complete /></div></div> : null}
+      {modalOpen ? <div className="ua3-modal-backdrop" onClick={closeModal}><div ref={modalRef} tabIndex={-1} className="ua3-modal" role="dialog" aria-modal="true" aria-labelledby="json-modal-title" onClick={(event) => event.stopPropagation()}><div className="ua3-modal-head"><div><p className="ua3-label">Complete JSON</p><h2 id="json-modal-title">{selectedArtifact} latest.json</h2></div><div className="ua3-modal-actions"><button type="button" className="ua3-button ua3-button-quiet" onClick={copyModalJson}>{copied ? "Copied" : "Copy to clipboard"}</button><button type="button" autoFocus className="ua3-button ua3-button-primary" onClick={closeModal}>Close</button></div></div><JsonBlock payload={completeJson} prismReady={prismReady} complete /></div></div> : null}
 
       <style>{ua3Styles}</style>
     </main>
