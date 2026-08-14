@@ -332,7 +332,6 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
             <HeroValueStrip />
             <div className="ua3-compliance-row" aria-label="Product boundary"><span className="ua3-compliance-pill">No price data</span><span className="ua3-compliance-pill">No forecasts</span><span className="ua3-compliance-pill">No recommendations</span></div>
             <p className="ua3-body-small">Bitcoin, Ethereum, Arbitrum and Base. Deterministic, chain-aware and versioned. <Link href="/validation">See the validation evidence →</Link></p>
-            <a href="#pricing" className="ua3-button ua3-button-primary">View plans and pricing →</a>
           </div>
           <div className="ua3-hero-glow" aria-label="Hero network-state row preview">
             {heroPanelSnapshot ? <HeroNetworkStatePanel snapshot={heroPanelSnapshot} /> : null}
