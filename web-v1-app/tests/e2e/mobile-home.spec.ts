@@ -6,8 +6,6 @@ test.describe("mobile homepage regression", () => {
   test("keeps compact mobile grids and JSON modal usable", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
 
-    await expect(page.locator("html")).toHaveAttribute("data-modal-focus-guard", "ready");
-
     const chainGrid = page.locator(".ua3-chain-grid");
     const artifactGrid = page.locator(".ua3-artifact-grid");
     const planGrid = page.locator(".ua3-plan-grid");
@@ -54,19 +52,20 @@ test.describe("mobile homepage regression", () => {
     await expect(dialog).toHaveAttribute("aria-labelledby", "json-modal-title");
 
     const copyButton = dialog.getByRole("button", { name: /copy to clipboard/i });
-    await expect(copyButton).toBeVisible();
     const closeButton = dialog.getByRole("button", { name: /^close$/i });
+    const jsonScroller = dialog.locator("pre.ua3-json-complete");
+    await expect(copyButton).toBeVisible();
     await expect(closeButton).toBeVisible();
+    await expect(jsonScroller).toBeVisible();
     await expect(closeButton).toBeFocused();
 
     await page.keyboard.press("Tab");
-    console.log("modal focus diagnostics", await page.locator("html").evaluate((element) => ({
-      event: element.getAttribute("data-modal-focus-debug"),
-      result: element.getAttribute("data-modal-focus-debug-result"),
-      focusin: element.getAttribute("data-modal-focus-debug-focusin"),
-      active: document.activeElement instanceof HTMLElement ? `${document.activeElement.tagName.toLowerCase()}:${document.activeElement.textContent?.trim().replace(/\s+/g, " ").slice(0, 40) ?? ""}` : "none",
-    })));
+    await expect(jsonScroller).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(copyButton).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+    await expect(jsonScroller).toBeFocused();
     await page.keyboard.press("Shift+Tab");
     await expect(closeButton).toBeFocused();
 
