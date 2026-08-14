@@ -63,10 +63,10 @@ export default function CheckoutRedirectGuard() {
     }
 
     document.addEventListener("submit", handleSubmit, true);
-    document.addEventListener("keydown", containModalFocus);
+    document.addEventListener("keydown", containModalFocus, true);
     return () => {
       document.removeEventListener("submit", handleSubmit, true);
-      document.removeEventListener("keydown", containModalFocus);
+      document.removeEventListener("keydown", containModalFocus, true);
     };
   }, []);
 
