@@ -169,3 +169,19 @@ test.describe("mobile homepage regression", () => {
     expect(planColumnsAt339).toHaveLength(1);
   });
 });
+
+test.describe("mobile analyst kit routing", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    userAgent: "Mozilla/5.0 (Linux; Android 16; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+  });
+
+  test("opens the free analyst kit instead of redirecting home", async ({ page }) => {
+    await page.goto("http://localhost:3000/mobile");
+
+    await page.getByRole("link", { name: "Inspect free sample" }).click();
+
+    await expect(page).toHaveURL(/\/analyst-kit$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Use Urd Atlas before you have a pipeline." })).toBeVisible();
+  });
+});
