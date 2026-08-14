@@ -60,6 +60,12 @@ test.describe("mobile homepage regression", () => {
     await expect(closeButton).toBeFocused();
 
     await page.keyboard.press("Tab");
+    console.log("modal focus diagnostics", await page.locator("html").evaluate((element) => ({
+      event: element.getAttribute("data-modal-focus-debug"),
+      result: element.getAttribute("data-modal-focus-debug-result"),
+      focusin: element.getAttribute("data-modal-focus-debug-focusin"),
+      active: document.activeElement instanceof HTMLElement ? `${document.activeElement.tagName.toLowerCase()}:${document.activeElement.textContent?.trim().replace(/\s+/g, " ").slice(0, 40) ?? ""}` : "none",
+    })));
     await expect(copyButton).toBeFocused();
     await page.keyboard.press("Shift+Tab");
     await expect(closeButton).toBeFocused();
