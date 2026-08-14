@@ -6,6 +6,8 @@ test.describe("mobile homepage regression", () => {
   test("keeps compact mobile grids and JSON modal usable", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
 
+    await expect(page.locator("html")).toHaveAttribute("data-modal-focus-guard", "ready");
+
     const chainGrid = page.locator(".ua3-chain-grid");
     const artifactGrid = page.locator(".ua3-artifact-grid");
     const planGrid = page.locator(".ua3-plan-grid");
