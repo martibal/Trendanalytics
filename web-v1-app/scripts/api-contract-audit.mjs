@@ -161,6 +161,18 @@ const ENDPOINT_INVENTORY = [
     authRequirement: "none",
   },
   {
+    path: "/api/v1/sample-pack",
+    methods: ["GET"],
+    classification: "public sample download endpoint",
+    launchStatus: "stable",
+    stability: "stable",
+    intendedUser: "website visitors and technical evaluators",
+    primaryUseCase: "Download one ZIP containing eight CSV sample files across Gold, Derived, Meta, and Briefs with higher- and lower-confidence examples.",
+    dataReturned: "ZIP archive containing eight CSV sample files.",
+    artifactSource: "published Ethereum Gold, Derived, Meta, and Briefs artifacts converted to CSV at request time",
+    authRequirement: "none",
+  },
+  {
     path: "/api/v1/units",
     methods: ["GET"],
     classification: "public metadata endpoint",
