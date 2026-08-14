@@ -57,6 +57,13 @@ jobs:
       - name: Run status text regression tests
         run: cd .. && python -m unittest api.test_status_text
 
+      - name: Verify historical status text corpus
+        run: |
+          cd ..
+          python pipeline/tools/backfill_historical_one_liner.py --check \
+            --root data/published/v1/meta \
+            --root web-v1-app/.private-data/published/v1/meta
+
       - name: Run lint
         run: npm run lint
 
