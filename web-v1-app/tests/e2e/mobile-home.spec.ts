@@ -40,6 +40,27 @@ test.describe("mobile homepage regression", () => {
     expect(basicBox).not.toBeNull();
     expect(basicBox!.y).toBeLessThan(freeBox!.y);
 
+    const demandHelp = page.getByRole("button", { name: "Explain Demand" });
+    await demandHelp.focus();
+    await page.keyboard.press("Enter");
+    await expect(demandHelp).toHaveAttribute("aria-expanded", "true");
+    await expect(demandHelp).toHaveAttribute("aria-controls", "ua3-info-demand");
+
+    const demandDialog = page.getByRole("dialog", { name: "Demand" });
+    const closeDemand = demandDialog.getByRole("button", { name: "Close explanation" });
+    await expect(demandDialog).toBeVisible();
+    await expect(closeDemand).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(demandDialog).toHaveCount(0);
+    await expect(demandHelp).toBeFocused();
+
+    await page.keyboard.press("Enter");
+    await expect(closeDemand).toBeFocused();
+    await closeDemand.click();
+    await expect(demandDialog).toHaveCount(0);
+    await expect(demandHelp).toBeFocused();
+
     const openJson = page.getByRole("button", { name: /view complete json/i });
     await expect(openJson).toBeVisible();
     await expect(openJson).toBeEnabled();
