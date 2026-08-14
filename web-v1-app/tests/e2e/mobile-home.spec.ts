@@ -102,6 +102,9 @@ test.describe("mobile homepage regression", () => {
   test("shows visible keyboard focus on hero links", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
 
+    await expect(page.getByRole("group", { name: "Dataset summary" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "How to evaluate Urd Atlas" })).toBeVisible();
+
     const heroLinks = [
       page.getByRole("link", { name: "Inspect free sample" }),
       page.getByRole("link", { name: /see today's published state/i }),
