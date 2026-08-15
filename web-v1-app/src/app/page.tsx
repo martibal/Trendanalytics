@@ -239,12 +239,13 @@ async function getMetaRows(chainId: string): Promise<MetaLatest[]> {
   return latest ? [latest] : [];
 }
 
-function toExample(kind: "high" | "low", row: MetaLatest, chain: (typeof CHAINS)[number]): HomeConfidenceExample {
+function toExample(kind: "high" | "low", row: MetaLatest, chain: (typeof CHAINS)[number], fullPayload: unknown): HomeConfidenceExample {
   return {
     kind,
     chain: chain.id,
     chainLabel: chain.name,
     date: formatDate(rawDate(row)),
+    sourceDate: rawDate(row),
     regime: normalizeLabel(row.status?.label ?? row.regime?.label),
     confidenceScore: numberOrNull(row.confidence?.confidence_score),
     dataQualityScore: numberOrNull(row.confidence?.data_quality_score),
@@ -254,6 +255,7 @@ function toExample(kind: "high" | "low", row: MetaLatest, chain: (typeof CHAINS)
     capacityScore: score(row, "capacity"),
     dataLag: chain.lag,
     oneLiner: row.status?.one_liner ?? `${chain.name} published ${normalizeLabel(row.status?.label ?? row.regime?.label)} for ${formatDate(rawDate(row))}.`,
+    fullPayload,
   };
 }
 
@@ -269,7 +271,14 @@ async function getConfidenceExamples(): Promise<{ high: HomeConfidenceExample | 
   if (allRows.length === 0) return { high: null, low: null };
   const high = [...allRows].sort((a, b) => b.confidence - a.confidence)[0];
   const low = [...allRows].sort((a, b) => a.confidence - b.confidence)[0];
-  return { high: high ? toExample("high", high.row, high.chain) : null, low: low ? toExample("low", low.row, low.chain) : null };
+  const [highPayload, lowPayload] = await Promise.all([
+    high ? readJson<unknown>(`data/published/v1/meta/${high.chain.id}/${rawDate(high.row)}.json`) : Promise.resolve(null),
+    low ? readJson<unknown>(`data/published/v1/meta/${low.chain.id}/${rawDate(low.row)}.json`) : Promise.resolve(null),
+  ]);
+  return {
+    high: high ? toExample("high", high.row, high.chain, highPayload ?? high.row) : null,
+    low: low ? toExample("low", low.row, low.chain, lowPayload ?? low.row) : null,
+  };
 }
 
 async function getLastRun(): Promise<string> {
