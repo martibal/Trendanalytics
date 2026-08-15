@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import ExplanationLevelToggle, { type ExplanationLevel } from "@/components/ExplanationLevelToggle";
 import { cx, urd } from "@/components/site/UrdDesignSystem";
 import { qaCategories, qaEntries, type QaCategory, type QaEntry } from "@/lib/qa";
+import { subscriptionHistoryQa } from "@/lib/subscriptionHistoryQa";
 
 type ActiveCategory = QaCategory | "All";
+const allQaEntries = [...qaEntries, subscriptionHistoryQa];
 
 function matchesEntry(entry: QaEntry, query: string) {
   if (!query) return true;
@@ -23,14 +25,14 @@ export default function QaPageClient() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return qaEntries.filter((entry) => {
+    return allQaEntries.filter((entry) => {
       const categoryOk = category === "All" || entry.category === category;
       return categoryOk && matchesEntry(entry, q);
     });
   }, [query, category]);
 
   const activeEntry = useMemo(
-    () => qaEntries.find((entry) => entry.id === openId) ?? null,
+    () => allQaEntries.find((entry) => entry.id === openId) ?? null,
     [openId],
   );
 
