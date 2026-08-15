@@ -13,7 +13,7 @@ export default function FaqPage() {
         summary="This page answers the practical and technical questions users are likely to ask about on-chain reference data, noise, regime change, confidence, baselines, JSON delivery, and traceability."
       >
         <div className="flex flex-wrap gap-3 text-sm text-slate-300">
-          <span>{qaEntries.length} answers</span>
+          <span>{qaEntries.length + 1} answers</span>
           <span>·</span>
           <span>{qaCategories.length} categories</span>
           <span>·</span>
