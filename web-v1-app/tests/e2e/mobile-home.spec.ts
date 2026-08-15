@@ -107,10 +107,11 @@ test.describe("mobile homepage regression", () => {
   test("keeps hero links accessible and free sample CTA pointed directly at the ZIP endpoint", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
 
-    await expect(page.getByRole("group", { name: "Dataset summary" })).toBeVisible();
+    const datasetSummary = page.getByRole("group", { name: "Dataset summary" });
+    await expect(datasetSummary).toBeVisible();
     await expect(page.getByRole("group", { name: "How to evaluate Urd Atlas" })).toBeVisible();
 
-    const sampleLink = page.getByRole("link", { name: "Download free sample pack" });
+    const sampleLink = datasetSummary.getByRole("link", { name: "Download free sample pack" });
     const stateLink = page.getByRole("link", { name: /see today's published state/i });
 
     await expect(sampleLink).toHaveAttribute("href", "/api/v1/sample-pack");
