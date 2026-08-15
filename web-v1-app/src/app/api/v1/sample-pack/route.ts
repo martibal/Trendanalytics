@@ -23,7 +23,7 @@ type ZipEntry = {
   data: Uint8Array;
 };
 
-const DATE_RANGE = { start: "2026-07-03", end: "2026-07-16" } as const;
+const DATE_RANGE = { start: "2026-07-04", end: "2026-07-17" } as const;
 const RANGE_CHAINS: readonly SampleChain[] = ["ethereum", "arbitrum"] as const;
 
 const SAMPLES: readonly SampleDefinition[] = [
@@ -42,7 +42,7 @@ const QUICKSTART = `from pathlib import Path
 import pandas as pd
 
 folder = Path(__file__).resolve().parent
-files = sorted(folder.glob("*_2026-07-03_to_2026-07-16_meta.csv"))
+files = sorted(folder.glob("*_2026-07-04_to_2026-07-17_meta.csv"))
 meta = pd.concat([pd.read_csv(path) for path in files], ignore_index=True)
 
 customer = meta[["date", "chain"]].copy()
