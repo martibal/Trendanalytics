@@ -75,7 +75,7 @@ describe("GET /api/v1/sample-pack", () => {
     const names = files.map((file) => file.name);
     const expectedPeriodFiles = ["ethereum", "arbitrum"].flatMap((chain) =>
       ["meta", "gold", "derived", "briefs"].map(
-        (artifact) => `${chain}_2026-07-03_to_2026-07-16_${artifact}.csv`,
+        (artifact) => `${chain}_2026-07-04_to_2026-07-17_${artifact}.csv`,
       ),
     );
     const expectedPointFiles = ["high_confidence_2026-07-01", "low_confidence_2026-05-22"].flatMap(
@@ -100,8 +100,8 @@ describe("GET /api/v1/sample-pack", () => {
         "import pandas as pd",
         "from pathlib import Path",
         "p = Path('.')",
-        "eth = pd.read_csv(p / 'ethereum_2026-07-03_to_2026-07-16_meta.csv')",
-        "arb = pd.read_csv(p / 'arbitrum_2026-07-03_to_2026-07-16_meta.csv')",
+        "eth = pd.read_csv(p / 'ethereum_2026-07-04_to_2026-07-17_meta.csv')",
+        "arb = pd.read_csv(p / 'arbitrum_2026-07-04_to_2026-07-17_meta.csv')",
         "assert len(eth) == 14, len(eth)",
         "assert len(arb) == 14, len(arb)",
         "assert eth['status.label'].nunique() >= 2, eth['status.label'].tolist()",
