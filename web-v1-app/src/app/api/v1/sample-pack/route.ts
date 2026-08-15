@@ -62,7 +62,7 @@ joined["network_bucket"] = joined["status.label"].where(
 joined.loc[joined["status.label"].isin(["HEATING", "CONGESTED"]), "network_bucket"] = "HEATING/CONGESTED"
 
 summary = pd.crosstab(joined["high_customer_metric"], joined["network_bucket"], normalize="index")
-print("Share of days by network-state bucket, conditional on synthetic customer metric:\n")
+print("Share of days by network-state bucket, conditional on synthetic customer metric:\\n")
 print((summary * 100).round(1).astype(str) + "%")
 `;
 
