@@ -76,9 +76,9 @@ function parseFilePathSegments(segments: string[]): ParsedFilePath | null {
   }
 
   if (genreRaw === "briefs") {
-    // Briefs are published under briefs/chains/<chain>/<artifact>.json.
-    // Site-level and cross-chain brief bundles remain outside this per-chain
-    // subscriber entitlement route.
+    // Briefs are published under briefs/chains/<chain>/latest.json.
+    // Site-level and cross-chain brief bundles remain public data artifacts
+    // and are not routed through the per-chain subscriber entitlement gate.
     if (segments.length !== 4 || segments[1] !== "chains") {
       return null;
     }
@@ -149,10 +149,22 @@ function publicFileErrorDetail(
     return detail ?? null;
   }
 
-  if (status === 404 || code === "not_found") return "not_found";
-  if (status === 403 || code === "forbidden") return "forbidden";
-  if (status === 401 || code === "unauthenticated") return "unauthenticated";
-  if (status === 429 || code === "rate_limited") return "rate_limited";
+  if (status === 404 || code === "not_found") {
+    return "not_found";
+  }
+
+  if (status === 403 || code === "forbidden") {
+    return "forbidden";
+  }
+
+  if (status === 401 || code === "unauthenticated") {
+    return "unauthenticated";
+  }
+
+  if (status === 429 || code === "rate_limited") {
+    return "rate_limited";
+  }
+
   return "server_error";
 }
 
@@ -361,45 +373,15 @@ export async function GET(request: Request, context: RouteContext) {
     genre = parsedPath.genre;
     chain = parsedPath.chain;
 
-    const url = new URL(request.url);
+    const inferredWindow = inferWindowFromTail(parsedPath.windowTail);
+    window = inferredWindow ?? (parsedPath.fullHistoryArtifact ? "full_history" : null);
 
-    if (parsedPath.fullHistoryArtifact) {
-      window = "full_history";
-
-      if (!canAccessFullHistory(authResult.entitlement)) {
+    if (!inferredWindow) {
+      if (!parsedPath.fullHistoryArtifact) {
         await logApiEvent({
           requestId,
           eventType: "entitlement_forbidden",
-          path: url.pathname,
-          method: request.method,
-          statusCode: 403,
-          startedAtMs,
-          accountId,
-          keyId,
-          detail: "full_history_requires_pro",
-          chain,
-          genre,
-          window,
-        });
-
-        return jsonError(
-          requestId,
-          403,
-          "forbidden",
-          "Request exceeds entitlement scope.",
-          "full_history_requires_pro",
-          Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
-        );
-      }
-    } else {
-      const inferredWindow = inferWindowFromTail(parsedPath.windowTail);
-      window = inferredWindow;
-
-      if (!inferredWindow) {
-        await logApiEvent({
-          requestId,
-          eventType: "entitlement_forbidden",
-          path: url.pathname,
+          path: new URL(request.url).pathname,
           method: request.method,
           statusCode: 403,
           startedAtMs,
@@ -419,43 +401,78 @@ export async function GET(request: Request, context: RouteContext) {
           Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
         );
       }
+    }
 
-      const startDate = url.searchParams.get("start");
-      const endDate = url.searchParams.get("end");
+    const url = new URL(request.url);
+    const startDate = url.searchParams.get("start");
+    const endDate = url.searchParams.get("end");
 
-      const decision = evaluateFileEntitlement(authResult.entitlement, {
-        genre: parsedPath.genre,
-        chain: parsedPath.chain,
-        window: inferredWindow,
-        startDate,
-        endDate,
-      });
-
-      if (!decision.ok) {
-        await logApiEvent({
-          requestId,
-          eventType: "entitlement_forbidden",
-          path: url.pathname,
-          method: request.method,
-          statusCode: 403,
-          startedAtMs,
-          accountId,
-          keyId,
-          detail: decision.code,
-          chain,
-          genre,
-          window,
+    const decision = inferredWindow
+      ? evaluateFileEntitlement(authResult.entitlement, {
+          genre: parsedPath.genre,
+          chain: parsedPath.chain,
+          window: inferredWindow,
+          startDate,
+          endDate,
+        })
+      : evaluateFileEntitlement(authResult.entitlement, {
+          genre: parsedPath.genre,
+          chain: parsedPath.chain,
+          window: "latest",
+          startDate: null,
+          endDate: null,
         });
 
-        return jsonError(
-          requestId,
-          403,
-          "forbidden",
-          "Request exceeds entitlement scope.",
-          decision.code,
-          Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
-        );
-      }
+    if (!decision.ok) {
+      await logApiEvent({
+        requestId,
+        eventType: "entitlement_forbidden",
+        path: url.pathname,
+        method: request.method,
+        statusCode: 403,
+        startedAtMs,
+        accountId,
+        keyId,
+        detail: decision.code,
+        chain,
+        genre,
+        window,
+      });
+
+      return jsonError(
+        requestId,
+        403,
+        "forbidden",
+        "Request exceeds entitlement scope.",
+        decision.code,
+        Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
+      );
+    }
+
+    if (parsedPath.fullHistoryArtifact && !canAccessFullHistory(authResult.entitlement)) {
+      await logApiEvent({
+        requestId,
+        eventType: "entitlement_forbidden",
+        path: url.pathname,
+        method: request.method,
+        statusCode: 403,
+        startedAtMs,
+        accountId,
+        keyId,
+        detail: "full_history_requires_pro",
+        chain,
+        genre,
+        window,
+      });
+
+      return jsonError(
+        requestId,
+        403,
+        "forbidden",
+        "Request exceeds entitlement scope.",
+        "full_history_requires_pro",
+        Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
+      );
     }
 
     const storagePath = buildStoragePath(parsedPath.storageSegments);
@@ -496,7 +513,7 @@ export async function GET(request: Request, context: RouteContext) {
         "Content-Length": String(file.contentLength),
         "Cache-Control": "private, no-store",
         "X-Entitlement-Tier": authResult.entitlement.tier,
-        "X-Entitlement-Window": window ?? "unknown",
+        "X-Entitlement-Window": inferredWindow ?? "full_history",
         ...(file.etag ? { ETag: file.etag } : {}),
         ...(file.lastModified ? { "Last-Modified": file.lastModified } : {}),
       },
