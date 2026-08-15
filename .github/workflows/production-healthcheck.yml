@@ -14,6 +14,7 @@ on:
   workflow_run:
     workflows:
       - Daily Pipeline Publish
+      - CI
     types:
       - completed
 
@@ -43,15 +44,20 @@ jobs:
       URD_HEALTHCHECK_BASE_URL: https://www.urdatlas.com
       URD_HEALTHCHECK_TIMEOUT_MS: "15000"
       URD_HEALTHCHECK_DEPLOY_WAIT_SECONDS: "180"
+      URD_HEALTHCHECK_PRO_API_KEY: ${{ secrets.URD_HEALTHCHECK_PRO_API_KEY }}
+      URD_HEALTHCHECK_BASIC_API_KEY: ${{ secrets.URD_HEALTHCHECK_BASIC_API_KEY }}
+      URD_HEALTHCHECK_BASIC_CHAIN: ${{ secrets.URD_HEALTHCHECK_BASIC_CHAIN }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Wait for production deploy propagation
         if: github.event_name == 'workflow_run'
         run: |
-          echo "Daily Pipeline Publish completed successfully."
+          echo "${{ github.event.workflow_run.name }} completed successfully on main."
           echo "Waiting ${URD_HEALTHCHECK_DEPLOY_WAIT_SECONDS}s before checking production so the Vercel deploy hook can propagate."
           sleep "${URD_HEALTHCHECK_DEPLOY_WAIT_SECONDS}"
 
@@ -67,6 +73,9 @@ jobs:
 
       - name: Run production healthcheck
         run: npm run check:production-health
+
+      - name: Verify subscriber history contract
+        run: node scripts/production-subscriber-history-check.mjs
 
       - name: Simulate failure issue alert
         if: github.event_name == 'workflow_dispatch' && inputs.simulate_failure == 'true'
@@ -93,13 +102,13 @@ jobs:
 
             const trigger =
               context.eventName === "workflow_run"
-                ? "Daily Pipeline Publish completed successfully"
+                ? `${context.payload.workflow_run?.name || "Upstream workflow"} completed successfully`
                 : "Manual workflow dispatch";
 
             const body = [
               simulated
                 ? "Manual failure simulation was requested to verify the production healthcheck alert path."
-                : "The post-publish production healthcheck failed.",
+                : "The post-deploy production healthcheck failed.",
               "",
               `- UTC: ${now}`,
               `- Workflow: ${context.workflow}`,
