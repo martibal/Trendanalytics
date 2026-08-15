@@ -46,7 +46,9 @@ const ANALYST_KIT_ENDPOINTS = [
 ];
 
 const AUTH_ENDPOINTS = [
-  ["GET", "/api/v1/files/[genre]/[chain]/[window]/latest.json", "Authenticated delivery for subscriber artifacts."],
+  ["GET", "/api/v1/files/[genre]/[chain]/[window]/latest.json", "Authenticated delivery for subscriber bundle windows."],
+  ["GET", "/api/v1/files/[genre]/[chain]/manifest.json", "Pro: discover the complete published archive for Gold, Derived and Meta."],
+  ["GET", "/api/v1/files/[genre]/[chain]/YYYY-MM-DD.json", "Pro: fetch an original published day file from the full archive."],
   ["POST", "/api/v1/keys", "Create a new API key from the dashboard."],
   ["DELETE", "/api/v1/keys", "Revoke an API key."],
   ["POST", "/api/v1/checkout", "Checkout endpoint for starting a subscription purchase."],
@@ -88,10 +90,11 @@ export default async function ApiDocsPage() {
       <PageHero
         eyebrow="API documentation"
         title="API Docs"
-        summary="Start with public reference endpoints, run one Analyst Kit join, then integrate authenticated artifact delivery when the workflow is proven."
+        summary="Start with public reference endpoints, run one Analyst Kit join, then integrate authenticated artifact delivery and historical access when the workflow is proven."
       >
         <div className="flex flex-wrap gap-2 text-sm">
           <UrdButtonLink href="/api-docs/getting-started">Getting started</UrdButtonLink>
+          <UrdButtonLink href="/api-docs/history">History access</UrdButtonLink>
           <UrdButtonLink href="/api-docs/schema">Schema reference</UrdButtonLink>
           <UrdButtonLink href="/api-docs/samples">Public sample pack</UrdButtonLink>
           <UrdButtonLink href="/api-docs/workflows">Common workflows</UrdButtonLink>
@@ -115,6 +118,7 @@ export default async function ApiDocsPage() {
           <>Start with <strong>Status</strong> and <strong>Summary</strong> if you want to inspect published context.</>,
           <>Use <strong>Analyst Kit</strong> to run the first CSV join before building an integration.</>,
           <>Use <strong>Subscriber files</strong> when you need entitled JSON artifacts for production ingestion.</>,
+          <>Basic includes 90 days on one selected chain; Pro includes the full published history across all four chains.</>,
           <>Use <strong>Schema reference</strong> and <strong>Samples</strong> before wiring parsing logic.</>,
         ]}
         whyItMatters={<>A technical buyer should know which endpoint to try first, which endpoints require a key, and how to move from evaluation to production ingestion without guessing.</>}
@@ -159,7 +163,7 @@ PY`}</CodeBlock>
           <div className="mt-4 grid gap-4 lg:grid-cols-3 text-sm leading-7 text-[var(--urd-text-body)]">
             <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">1. Run one public join</div><p className="mt-2">Use <Link href="/analyst-kit" className="underline">Analyst Kit</Link> to join one chain calendar to one metric you already trust.</p></div>
             <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">2. Inspect sample artifacts</div><p className="mt-2">Use the <Link href="/api-docs/samples" className="underline">public sample pack</Link>, <Link href="/methodology/reference" className="underline">reference</Link>, and <Link href="/methodology/provenance" className="underline">provenance page</Link>.</p></div>
-            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">3. See operational expectations</div><p className="mt-2">Read the <Link href="/service" className="underline">service expectations and revision policy</Link> before subscribing.</p></div>
+            <div className="rounded-xl border bg-[var(--urd-raised)] p-4"><div className="font-semibold text-[var(--urd-text-strong)]">3. Check subscriber history</div><p className="mt-2"><Link href="/api-docs/history" className="underline">History access</Link> documents the 90-day Basic entitlement and Pro full archive before you subscribe.</p></div>
           </div>
         </section>
 
@@ -171,10 +175,12 @@ PY`}</CodeBlock>
 
         <section className="rounded-3xl border border-[var(--urd-border-soft)] bg-[var(--urd-panel)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_14px_34px_rgba(15,47,91,0.08)]">
           <h2 className="text-xl font-semibold text-[var(--urd-text-strong)]">Subscriber file path</h2>
-          <p className="mt-4 text-sm leading-7 text-[var(--urd-text-body)]">The authenticated file route is intentionally regular: choose genre, chain and window, then request latest.json. This keeps warehouse loaders and scheduled jobs simple.</p>
+          <p className="mt-4 text-sm leading-7 text-[var(--urd-text-body)]">The authenticated file route supports regular bundle windows for simple scheduled ingestion. Pro can additionally use the manifest and original day-file paths for the complete published archive.</p>
           <div className="mt-4 rounded-2xl border bg-[var(--urd-raised)] p-4 text-sm leading-7 text-[var(--urd-text-body)]">
-            <div>Template: <InlineCode>/api/v1/files/[genre]/[chain]/[window]/latest.json</InlineCode></div>
-            <div className="mt-2">Example: <InlineCode>/api/v1/files/meta/ethereum/90d/latest.json</InlineCode></div>
+            <div>Bundle template: <InlineCode>/api/v1/files/[genre]/[chain]/[window]/latest.json</InlineCode></div>
+            <div className="mt-2">Basic example: <InlineCode>/api/v1/files/meta/ethereum/90d/latest.json</InlineCode></div>
+            <div className="mt-2">Pro archive manifest: <InlineCode>/api/v1/files/meta/ethereum/manifest.json</InlineCode></div>
+            <div className="mt-2">Pro day file: <InlineCode>/api/v1/files/meta/ethereum/YYYY-MM-DD.json</InlineCode></div>
             <div className="mt-2">Chains: <InlineCode>bitcoin</InlineCode>, <InlineCode>ethereum</InlineCode>, <InlineCode>arbitrum</InlineCode>, <InlineCode>base</InlineCode></div>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
