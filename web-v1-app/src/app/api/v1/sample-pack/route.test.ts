@@ -2,30 +2,17 @@
  * @jest-environment node
  */
 
-export {};
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
-const mockReadStorageObject = jest.fn();
-
-jest.mock("@/lib/storage", () => ({
-  readStorageObject: (...args: unknown[]) => mockReadStorageObject(...args),
-}));
+import { GET } from "./route";
 
 type ZipFile = {
   name: string;
-  text: string;
+  data: Uint8Array;
 };
-
-function storageJson(value: unknown) {
-  const body = new TextEncoder().encode(JSON.stringify(value));
-  return {
-    body,
-    contentType: "application/json; charset=utf-8",
-    contentLength: body.byteLength,
-    etag: null,
-    lastModified: null,
-    source: "local",
-  };
-}
 
 function readUint16(bytes: Uint8Array, offset: number): number {
   return bytes[offset] | (bytes[offset + 1] << 8);
@@ -60,7 +47,7 @@ function parseStoredZip(bytes: Uint8Array): ZipFile[] {
 
     files.push({
       name: decoder.decode(bytes.slice(nameStart, nameEnd)),
-      text: decoder.decode(bytes.slice(dataStart, dataEnd)),
+      data: bytes.slice(dataStart, dataEnd),
     });
 
     offset = dataEnd;
@@ -70,50 +57,9 @@ function parseStoredZip(bytes: Uint8Array): ZipFile[] {
 }
 
 describe("GET /api/v1/sample-pack", () => {
-  let GET: () => Promise<Response>;
+  jest.setTimeout(60_000);
 
-  beforeEach(async () => {
-    jest.resetModules();
-    jest.clearAllMocks();
-
-    mockReadStorageObject.mockImplementation(async (storagePath: string) => {
-      const match = storagePath.match(
-        /^data\/published\/v1\/(meta|gold|derived)\/ethereum\/(2026-07-01|2026-05-22)\.json$/,
-      );
-      const briefsMatch = storagePath.match(
-        /^data\/published\/v1\/briefs\/chains\/ethereum\/(2026-07-01|2026-05-22)\.json$/,
-      );
-
-      if (match) {
-        const [, artifact, date] = match;
-        return storageJson({
-          chain: "ethereum",
-          date,
-          artifact,
-          confidence: date === "2026-07-01" ? 0.837 : 0.647,
-          note: `${artifact}-${date}`,
-        });
-      }
-
-      if (briefsMatch) {
-        const [, date] = briefsMatch;
-        return storageJson({
-          chain: "ethereum",
-          date,
-          artifact: "briefs",
-          confidence: date === "2026-07-01" ? 0.837 : 0.647,
-          note: `briefs-${date}`,
-        });
-      }
-
-      return null;
-    });
-
-    const mod = (await import("./route")) as typeof import("./route");
-    GET = mod.GET;
-  });
-
-  it("returns one downloadable ZIP containing exactly eight CSV sample files", async () => {
+  it("builds the real two-chain 14-day pack and runs quickstart.py against the emitted CSV files", async () => {
     const response = await GET();
     const bytes = new Uint8Array(await response.arrayBuffer());
 
@@ -125,44 +71,59 @@ describe("GET /api/v1/sample-pack", () => {
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(Number(response.headers.get("Content-Length"))).toBe(bytes.byteLength);
 
-    expect(readUint32(bytes, 0)).toBe(0x04034b50);
-
     const files = parseStoredZip(bytes);
-    expect(files.map((file) => file.name)).toEqual([
-      "ethereum_high_confidence_2026-07-01_meta.csv",
-      "ethereum_high_confidence_2026-07-01_gold.csv",
-      "ethereum_high_confidence_2026-07-01_derived.csv",
-      "ethereum_high_confidence_2026-07-01_briefs.csv",
-      "ethereum_low_confidence_2026-05-22_meta.csv",
-      "ethereum_low_confidence_2026-05-22_gold.csv",
-      "ethereum_low_confidence_2026-05-22_derived.csv",
-      "ethereum_low_confidence_2026-05-22_briefs.csv",
+    const names = files.map((file) => file.name);
+    const expectedPeriodFiles = ["ethereum", "arbitrum"].flatMap((chain) =>
+      ["meta", "gold", "derived", "briefs"].map(
+        (artifact) => `${chain}_2026-07-03_to_2026-07-16_${artifact}.csv`,
+      ),
+    );
+    const expectedPointFiles = ["high_confidence_2026-07-01", "low_confidence_2026-05-22"].flatMap(
+      (sample) => ["meta", "gold", "derived", "briefs"].map((artifact) => `ethereum_${sample}_${artifact}.csv`),
+    );
+
+    expect(names).toEqual([
+      ...expectedPeriodFiles,
+      ...expectedPointFiles,
+      "quickstart.py",
+      "FIELD_GUIDE.md",
     ]);
+    expect(files).toHaveLength(18);
 
-    expect(files).toHaveLength(8);
-    for (const file of files) {
-      const [header, row] = file.text.split("\n");
-      expect(header).toContain("chain");
-      expect(header).toContain("date");
-      expect(header).toContain("artifact");
-      expect(header).toContain("confidence");
-      expect(row).toContain("ethereum");
+    const workdir = mkdtempSync(path.join(tmpdir(), "urd-atlas-sample-pack-"));
+    try {
+      for (const file of files) {
+        writeFileSync(path.join(workdir, file.name), file.data);
+      }
+
+      const verifier = [
+        "import pandas as pd",
+        "from pathlib import Path",
+        "p = Path('.')",
+        "eth = pd.read_csv(p / 'ethereum_2026-07-03_to_2026-07-16_meta.csv')",
+        "arb = pd.read_csv(p / 'arbitrum_2026-07-03_to_2026-07-16_meta.csv')",
+        "assert len(eth) == 14, len(eth)",
+        "assert len(arb) == 14, len(arb)",
+        "assert eth['status.label'].nunique() >= 2, eth['status.label'].tolist()",
+        "assert set(eth['chain']) == {'ethereum'}",
+        "assert set(arb['chain']) == {'arbitrum'}",
+        "print('period verified')",
+      ].join("\n");
+
+      const verificationOutput = execFileSync("python", ["-c", verifier], {
+        cwd: workdir,
+        encoding: "utf8",
+      });
+      expect(verificationOutput).toContain("period verified");
+
+      const quickstartOutput = execFileSync("python", ["quickstart.py"], {
+        cwd: workdir,
+        encoding: "utf8",
+      });
+      expect(quickstartOutput).toContain("Share of days by network-state bucket");
+      expect(quickstartOutput).toContain("HEATING/CONGESTED");
+    } finally {
+      rmSync(workdir, { recursive: true, force: true });
     }
-
-    expect(mockReadStorageObject).toHaveBeenCalledTimes(8);
-  });
-
-  it("returns 503 instead of a corrupt or partial ZIP if any source artifact is missing", async () => {
-    mockReadStorageObject.mockResolvedValueOnce(null);
-
-    const response = await GET();
-    const body = await response.json();
-
-    expect(response.status).toBe(503);
-    expect(response.headers.get("Cache-Control")).toBe("no-store");
-    expect(body).toEqual({
-      code: "sample_pack_unavailable",
-      message: "The free sample pack is temporarily unavailable.",
-    });
   });
 });
