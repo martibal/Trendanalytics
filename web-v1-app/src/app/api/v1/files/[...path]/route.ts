@@ -98,7 +98,7 @@ function parseFilePathSegments(segments: string[]): ParsedFilePath | null {
     return {
       genre: genreRaw,
       chain: chainRaw,
-      windowTail,
+      windowTail: segments.slice(3),
       storageSegments: segments,
       fullHistoryArtifact,
     };
