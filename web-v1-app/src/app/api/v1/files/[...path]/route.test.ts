@@ -113,6 +113,27 @@ describe("GET /api/v1/files/[...path]", () => {
     };
   }
 
+  function mockSuccessfulRateLimit() {
+    rateLimitMocks.enforceAccountRateLimit.mockResolvedValue({
+      success: true,
+      limit: 1000,
+      remaining: 999,
+      reset: 123456,
+    });
+  }
+
+  function mockStorageJson(body = '{"ok":true}') {
+    const bodyBytes = new TextEncoder().encode(body);
+    storageMocks.readStorageObject.mockResolvedValue({
+      body: bodyBytes,
+      contentType: "application/json; charset=utf-8",
+      contentLength: bodyBytes.byteLength,
+      etag: '"etag123"',
+      lastModified: "2026-03-19T20:00:00.000Z",
+      source: "local",
+    });
+  }
+
   it("returns auth failure with X-Request-Id and logs auth_failed", async () => {
     authMocks.validateRequestApiKey.mockResolvedValue({
       ok: false,
@@ -151,12 +172,8 @@ describe("GET /api/v1/files/[...path]", () => {
       accountId: "acct_1",
       keyId: "key_1",
       keyPrefix: "ta_live",
-      record: {
-        lastUsedAt: null,
-      },
-      entitlement: {
-        tier: "basic",
-      },
+      record: { lastUsedAt: null },
+      entitlement: { tier: "basic" },
     });
 
     rateLimitMocks.enforceAccountRateLimit.mockResolvedValue({
@@ -201,20 +218,11 @@ describe("GET /api/v1/files/[...path]", () => {
       accountId: "acct_1",
       keyId: "key_1",
       keyPrefix: "ta_live",
-      record: {
-        lastUsedAt: null,
-      },
-      entitlement: {
-        tier: "pro",
-      },
+      record: { lastUsedAt: null },
+      entitlement: { tier: "pro" },
     });
 
-    rateLimitMocks.enforceAccountRateLimit.mockResolvedValue({
-      success: true,
-      limit: 1000,
-      remaining: 999,
-      reset: 123456,
-    });
+    mockSuccessfulRateLimit();
 
     entitlementMocks.evaluateFileEntitlement.mockReturnValue({
       ok: false,
@@ -254,35 +262,13 @@ describe("GET /api/v1/files/[...path]", () => {
       accountId: "acct_1",
       keyId: "key_1",
       keyPrefix: "ta_live",
-      record: {
-        lastUsedAt: null,
-      },
-      entitlement: {
-        tier: "pro",
-      },
+      record: { lastUsedAt: null },
+      entitlement: { tier: "pro" },
     });
 
-    rateLimitMocks.enforceAccountRateLimit.mockResolvedValue({
-      success: true,
-      limit: 1000,
-      remaining: 999,
-      reset: 123456,
-    });
-
-    entitlementMocks.evaluateFileEntitlement.mockReturnValue({
-      ok: true,
-    });
-
-    const bodyBytes = new TextEncoder().encode('{"ok":true}');
-
-    storageMocks.readStorageObject.mockResolvedValue({
-      body: bodyBytes,
-      contentType: "application/json; charset=utf-8",
-      contentLength: bodyBytes.byteLength,
-      etag: '"etag123"',
-      lastModified: "2026-03-19T20:00:00.000Z",
-      source: "local",
-    });
+    mockSuccessfulRateLimit();
+    entitlementMocks.evaluateFileEntitlement.mockReturnValue({ ok: true });
+    mockStorageJson();
 
     const response = await GET(
       makeRequest("http://localhost:3000/api/v1/files/meta/bitcoin/latest.json"),
@@ -318,31 +304,108 @@ describe("GET /api/v1/files/[...path]", () => {
     );
   });
 
+  it("lets Pro with historyUnlocked read the full-history manifest", async () => {
+    authMocks.validateRequestApiKey.mockResolvedValue({
+      ok: true,
+      accountId: "acct_pro",
+      keyId: "key_pro",
+      keyPrefix: "ta_live",
+      record: { lastUsedAt: null },
+      entitlement: {
+        tier: "pro",
+        status: "active",
+        entitledChain: null,
+        historyUnlocked: true,
+      },
+    });
+
+    mockSuccessfulRateLimit();
+    mockStorageJson('{"available_days":["2024-12-01","2026-08-14"]}');
+
+    const response = await GET(
+      makeRequest("http://localhost:3000/api/v1/files/meta/ethereum/manifest.json"),
+      makeContext(["meta", "ethereum", "manifest.json"])
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-Entitlement-Window")).toBe("full_history");
+    expect(storageMocks.readStorageObject).toHaveBeenCalledWith(
+      "data/published/v1/meta/ethereum/manifest.json"
+    );
+    expect(entitlementMocks.evaluateFileEntitlement).not.toHaveBeenCalled();
+  });
+
+  it("lets Pro with historyUnlocked read any published historical day file", async () => {
+    authMocks.validateRequestApiKey.mockResolvedValue({
+      ok: true,
+      accountId: "acct_pro",
+      keyId: "key_pro",
+      keyPrefix: "ta_live",
+      record: { lastUsedAt: null },
+      entitlement: {
+        tier: "pro",
+        status: "active",
+        entitledChain: null,
+        historyUnlocked: true,
+      },
+    });
+
+    mockSuccessfulRateLimit();
+    mockStorageJson('{"date":"2024-12-01"}');
+
+    const response = await GET(
+      makeRequest("http://localhost:3000/api/v1/files/meta/bitcoin/2024-12-01.json"),
+      makeContext(["meta", "bitcoin", "2024-12-01.json"])
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-Entitlement-Window")).toBe("full_history");
+    expect(storageMocks.readStorageObject).toHaveBeenCalledWith(
+      "data/published/v1/meta/bitcoin/2024-12-01.json"
+    );
+  });
+
+  it("keeps Basic subscribers out of manifest and day-file full-history routes", async () => {
+    authMocks.validateRequestApiKey.mockResolvedValue({
+      ok: true,
+      accountId: "acct_basic",
+      keyId: "key_basic",
+      keyPrefix: "ta_live",
+      record: { lastUsedAt: null },
+      entitlement: {
+        tier: "basic",
+        status: "active",
+        entitledChain: "ethereum",
+        historyUnlocked: false,
+      },
+    });
+
+    mockSuccessfulRateLimit();
+
+    const response = await GET(
+      makeRequest("http://localhost:3000/api/v1/files/meta/ethereum/manifest.json"),
+      makeContext(["meta", "ethereum", "manifest.json"])
+    );
+
+    const body = await response.json();
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("forbidden");
+    expect(body.detail).toBe("full_history_requires_pro");
+    expect(storageMocks.readStorageObject).not.toHaveBeenCalled();
+  });
+
   it("returns 500 and logs server_error when storage throws", async () => {
     authMocks.validateRequestApiKey.mockResolvedValue({
       ok: true,
       accountId: "acct_1",
       keyId: "key_1",
       keyPrefix: "ta_live",
-      record: {
-        lastUsedAt: null,
-      },
-      entitlement: {
-        tier: "pro",
-      },
+      record: { lastUsedAt: null },
+      entitlement: { tier: "pro" },
     });
 
-    rateLimitMocks.enforceAccountRateLimit.mockResolvedValue({
-      success: true,
-      limit: 1000,
-      remaining: 999,
-      reset: 123456,
-    });
-
-    entitlementMocks.evaluateFileEntitlement.mockReturnValue({
-      ok: true,
-    });
-
+    mockSuccessfulRateLimit();
+    entitlementMocks.evaluateFileEntitlement.mockReturnValue({ ok: true });
     storageMocks.readStorageObject.mockRejectedValue(new Error("storage exploded"));
 
     const response = await GET(
