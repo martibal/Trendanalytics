@@ -4,16 +4,18 @@ import { readStorageObject } from "@/lib/storage";
 
 type JsonRecord = Record<string, unknown>;
 type SampleBand = "high_confidence" | "low_confidence";
+type SampleChain = "ethereum" | "arbitrum";
 type ArtifactName = "meta" | "gold" | "derived" | "briefs";
 
 type SampleDefinition = {
+  chain: SampleChain;
   band: SampleBand;
   date: string;
 };
 
 type ArtifactDefinition = {
   name: ArtifactName;
-  path: (date: string) => string;
+  path: (chain: SampleChain, date: string) => string;
 };
 
 type ZipEntry = {
@@ -21,19 +23,73 @@ type ZipEntry = {
   data: Uint8Array;
 };
 
-const CHAIN = "ethereum";
+const DATE_RANGE = { start: "2026-07-03", end: "2026-07-16" } as const;
+const RANGE_CHAINS: readonly SampleChain[] = ["ethereum", "arbitrum"] as const;
 
 const SAMPLES: readonly SampleDefinition[] = [
-  { band: "high_confidence", date: "2026-07-01" },
-  { band: "low_confidence", date: "2026-05-22" },
+  { chain: "ethereum", band: "high_confidence", date: "2026-07-01" },
+  { chain: "ethereum", band: "low_confidence", date: "2026-05-22" },
 ] as const;
 
 const ARTIFACTS: readonly ArtifactDefinition[] = [
-  { name: "meta", path: (date) => `data/published/v1/meta/${CHAIN}/${date}.json` },
-  { name: "gold", path: (date) => `data/published/v1/gold/${CHAIN}/${date}.json` },
-  { name: "derived", path: (date) => `data/published/v1/derived/${CHAIN}/${date}.json` },
-  { name: "briefs", path: (date) => `data/published/v1/briefs/chains/${CHAIN}/${date}.json` },
+  { name: "meta", path: (chain, date) => `data/published/v1/meta/${chain}/${date}.json` },
+  { name: "gold", path: (chain, date) => `data/published/v1/gold/${chain}/${date}.json` },
+  { name: "derived", path: (chain, date) => `data/published/v1/derived/${chain}/${date}.json` },
+  { name: "briefs", path: (chain, date) => `data/published/v1/briefs/chains/${chain}/${date}.json` },
 ] as const;
+
+const QUICKSTART = `from pathlib import Path
+import pandas as pd
+
+folder = Path(__file__).resolve().parent
+files = sorted(folder.glob("*_2026-07-03_to_2026-07-16_meta.csv"))
+meta = pd.concat([pd.read_csv(path) for path in files], ignore_index=True)
+
+customer = meta[["date", "chain"]].copy()
+# Replace this with your own metric — this is a synthetic example
+customer["customer_model_error"] = [0.08 + (i % 7) * 0.035 for i in range(len(customer))]
+
+joined = customer.merge(
+    meta[["date", "chain", "status.label"]],
+    on=["date", "chain"],
+    how="left",
+    validate="one_to_one",
+)
+joined["high_customer_metric"] = joined["customer_model_error"] >= joined["customer_model_error"].median()
+joined["network_bucket"] = joined["status.label"].where(
+    joined["status.label"].isin(["HEATING", "CONGESTED"]), "STABLE/CHEAP"
+)
+joined.loc[joined["status.label"].isin(["HEATING", "CONGESTED"]), "network_bucket"] = "HEATING/CONGESTED"
+
+summary = pd.crosstab(joined["high_customer_metric"], joined["network_bucket"], normalize="index")
+print("Share of days by network-state bucket, conditional on synthetic customer metric:\n")
+print((summary * 100).round(1).astype(str) + "%")
+`;
+
+const FIELD_GUIDE = `# Urd Atlas sample pack — Meta field guide
+
+This file mirrors the full published Meta record — the same object Urd Atlas serves via the API. Most workflows only need a handful of these fields.
+
+| Field | Meaning |
+| --- | --- |
+| \`chain\` | Canonical chain identifier used as part of the join key. |
+| \`date\` | Observation date used as part of the join key. |
+| \`status.label\` | Published network-state label for the day. |
+| \`status.one_liner\` | Short evidence-based description of the published state. |
+| \`confidence.confidence_score\` | Combined evidence-strength score used for the published row. |
+| \`confidence.data_quality_score\` | Data completeness, density, history and freshness component. |
+| \`confidence.label_confidence_score\` | Strength and separation of evidence supporting the candidate label. |
+| \`regime.drivers\` | JSON-encoded list of the strongest informative evidence behind the regime. |
+| \`regime.axes\` | Demand, friction and capacity evidence bands/trends used by the regime engine. |
+| \`regime.determinism_hash\` | Hash anchor for reproducing and checking the deterministic classification. |
+| \`scorecard.dimensions\` | Scored demand, friction and capacity dimensions for the day. |
+| \`publish_confidence.eligible\` | Whether the row cleared the publication confidence gate. |
+| \`methodology_version\` | Methodology version attached to the published record. |
+| \`publish_lag_days_policy\` | Canonical publication-lag policy for the chain. |
+| \`profile.id\` | Chain-specific evidence profile used by the methodology. |
+
+Full field reference: https://urdatlas.com/methodology/fields
+`;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -107,6 +163,17 @@ function jsonToCsv(value: unknown): string {
     headers.map(csvCell).join(","),
     ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(",")),
   ].join("\n");
+}
+
+function datesInclusive(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(`${start}T00:00:00Z`);
+  const last = new Date(`${end}T00:00:00Z`);
+  while (cursor <= last) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
 }
 
 function writeUint16(target: Uint8Array, offset: number, value: number): void {
@@ -228,17 +295,32 @@ export async function GET() {
   try {
     const encoder = new TextEncoder();
     const entries: ZipEntry[] = [];
+    const periodDates = datesInclusive(DATE_RANGE.start, DATE_RANGE.end);
 
-    for (const sample of SAMPLES) {
+    if (periodDates.length !== 14) throw new Error("Sample DATE_RANGE must contain exactly 14 days");
+
+    for (const chain of RANGE_CHAINS) {
       for (const artifact of ARTIFACTS) {
-        const payload = await readJson(artifact.path(sample.date));
-        const csv = jsonToCsv(payload);
+        const payloads = await Promise.all(periodDates.map((date) => readJson(artifact.path(chain, date))));
         entries.push({
-          name: `${CHAIN}_${sample.band}_${sample.date}_${artifact.name}.csv`,
-          data: encoder.encode(csv),
+          name: `${chain}_${DATE_RANGE.start}_to_${DATE_RANGE.end}_${artifact.name}.csv`,
+          data: encoder.encode(jsonToCsv(payloads)),
         });
       }
     }
+
+    for (const sample of SAMPLES) {
+      for (const artifact of ARTIFACTS) {
+        const payload = await readJson(artifact.path(sample.chain, sample.date));
+        entries.push({
+          name: `${sample.chain}_${sample.band}_${sample.date}_${artifact.name}.csv`,
+          data: encoder.encode(jsonToCsv(payload)),
+        });
+      }
+    }
+
+    entries.push({ name: "quickstart.py", data: encoder.encode(QUICKSTART) });
+    entries.push({ name: "FIELD_GUIDE.md", data: encoder.encode(FIELD_GUIDE) });
 
     const zip = buildZip(entries);
     const body = zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.byteLength) as ArrayBuffer;
