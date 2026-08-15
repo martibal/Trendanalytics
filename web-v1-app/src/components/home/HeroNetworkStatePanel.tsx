@@ -59,7 +59,7 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
             <strong>$49</strong>
             <span>/ month</span>
           </div>
-          <p className="ua3-hero-panel-offer-copy">Basic starts at $49/month for one selected chain. Download the free sample pack first: 8 Ethereum CSV files covering Meta, Gold, Derived and Briefs at high and lower confidence.</p>
+          <p className="ua3-hero-panel-offer-copy">Basic starts at $49/month for one selected chain. Download the free sample pack first: a real 14-day Ethereum + Arbitrum history across Meta, Gold, Derived and Briefs, plus high/lower-confidence examples and a runnable join quickstart.</p>
           <a href="/api/v1/sample-pack" className="ua3-hero-panel-primary ua-home-focus" download>Download free sample pack</a>
           <div className="ua3-hero-panel-secondary-actions">
             <a href="#today-status" className="ua-home-focus">See today&apos;s published state →</a>
