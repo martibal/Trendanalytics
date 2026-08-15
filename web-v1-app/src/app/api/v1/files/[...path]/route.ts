@@ -27,6 +27,7 @@ type RouteContext = {
 
 const ALLOWED_GENRES: FileGenre[] = ["gold", "meta", "derived", "briefs"];
 const ALLOWED_CHAINS: ChainId[] = ["bitcoin", "ethereum", "arbitrum", "base"];
+const PUBLISHED_DAY_FILE = /^\d{4}-\d{2}-\d{2}\.json$/;
 
 function isFileGenre(value: string): value is FileGenre {
   return ALLOWED_GENRES.includes(value as FileGenre);
@@ -36,11 +37,19 @@ function isChainId(value: string): value is ChainId {
   return ALLOWED_CHAINS.includes(value as ChainId);
 }
 
+function isFullHistoryTail(tail: string[]): boolean {
+  return (
+    tail.length === 1 &&
+    (tail[0] === "manifest.json" || PUBLISHED_DAY_FILE.test(tail[0]))
+  );
+}
+
 type ParsedFilePath = {
   genre: FileGenre;
   chain: ChainId;
   windowTail: string[];
   storageSegments: string[];
+  fullHistoryArtifact: boolean;
 };
 
 function storageTailFromWindowTail(tail: string[]): string[] | null {
@@ -67,9 +76,9 @@ function parseFilePathSegments(segments: string[]): ParsedFilePath | null {
   }
 
   if (genreRaw === "briefs") {
-    // Briefs are published under briefs/chains/<chain>/latest.json.
-    // Site-level and cross-chain brief bundles remain public data artifacts
-    // and are not routed through the per-chain subscriber entitlement gate.
+    // Briefs are published under briefs/chains/<chain>/<artifact>.json.
+    // Site-level and cross-chain brief bundles remain outside this per-chain
+    // subscriber entitlement route.
     if (segments.length !== 4 || segments[1] !== "chains") {
       return null;
     }
@@ -79,11 +88,19 @@ function parseFilePathSegments(segments: string[]): ParsedFilePath | null {
       return null;
     }
 
+    const windowTail = segments.slice(3);
+    const fullHistoryArtifact = isFullHistoryTail(windowTail);
+
+    if (!fullHistoryArtifact && windowTail[0] !== "latest.json") {
+      return null;
+    }
+
     return {
       genre: genreRaw,
       chain: chainRaw,
-      windowTail: segments.slice(3),
+      windowTail,
       storageSegments: segments,
+      fullHistoryArtifact,
     };
   }
 
@@ -97,15 +114,22 @@ function parseFilePathSegments(segments: string[]): ParsedFilePath | null {
   }
 
   const windowTail = segments.slice(2);
+  const fullHistoryArtifact = isFullHistoryTail(windowTail);
   const storageTail = storageTailFromWindowTail(windowTail);
+
+  if (!fullHistoryArtifact && !storageTail) {
+    return null;
+  }
 
   return {
     genre: genreRaw,
     chain: chainRaw,
     windowTail,
     storageSegments: storageTail ? [genreRaw, chainRaw, ...storageTail] : segments,
+    fullHistoryArtifact,
   };
 }
+
 function withRequestId(
   requestId: string,
   extraHeaders?: Record<string, string>
@@ -125,24 +149,13 @@ function publicFileErrorDetail(
     return detail ?? null;
   }
 
-  if (status === 404 || code === "not_found") {
-    return "not_found";
-  }
-
-  if (status === 403 || code === "forbidden") {
-    return "forbidden";
-  }
-
-  if (status === 401 || code === "unauthenticated") {
-    return "unauthenticated";
-  }
-
-  if (status === 429 || code === "rate_limited") {
-    return "rate_limited";
-  }
-
+  if (status === 404 || code === "not_found") return "not_found";
+  if (status === 403 || code === "forbidden") return "forbidden";
+  if (status === 401 || code === "unauthenticated") return "unauthenticated";
+  if (status === 429 || code === "rate_limited") return "rate_limited";
   return "server_error";
 }
+
 function jsonError(
   requestId: string,
   status: number,
@@ -196,6 +209,13 @@ function inferWindowFromTail(tail: string[]): WindowToken | null {
 
 function buildStoragePath(storageSegments: string[]): string {
   return path.posix.join("data", "published", "v1", ...storageSegments);
+}
+
+function canAccessFullHistory(entitlement: {
+  tier: string;
+  historyUnlocked?: boolean;
+}): boolean {
+  return entitlement.tier === "pro" && entitlement.historyUnlocked === true;
 }
 
 export async function GET(request: Request, context: RouteContext) {
@@ -341,70 +361,101 @@ export async function GET(request: Request, context: RouteContext) {
     genre = parsedPath.genre;
     chain = parsedPath.chain;
 
-    const inferredWindow = inferWindowFromTail(parsedPath.windowTail);
-    window = inferredWindow;
-
-    if (!inferredWindow) {
-      await logApiEvent({
-        requestId,
-        eventType: "entitlement_forbidden",
-        path: new URL(request.url).pathname,
-        method: request.method,
-        statusCode: 403,
-        startedAtMs,
-        accountId,
-        keyId,
-        detail: "window_could_not_be_inferred",
-        chain,
-        genre,
-      });
-
-      return jsonError(
-        requestId,
-        403,
-        "forbidden",
-        "Request exceeds entitlement scope.",
-        "window_could_not_be_inferred",
-        Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
-      );
-    }
-
     const url = new URL(request.url);
-    const startDate = url.searchParams.get("start");
-    const endDate = url.searchParams.get("end");
 
-    const decision = evaluateFileEntitlement(authResult.entitlement, {
-      genre: parsedPath.genre,
-      chain: parsedPath.chain,
-      window: inferredWindow,
-      startDate,
-      endDate,
-    });
+    if (parsedPath.fullHistoryArtifact) {
+      window = "full_history";
 
-    if (!decision.ok) {
-      await logApiEvent({
-        requestId,
-        eventType: "entitlement_forbidden",
-        path: url.pathname,
-        method: request.method,
-        statusCode: 403,
-        startedAtMs,
-        accountId,
-        keyId,
-        detail: decision.code,
-        chain,
-        genre,
-        window,
+      if (!canAccessFullHistory(authResult.entitlement)) {
+        await logApiEvent({
+          requestId,
+          eventType: "entitlement_forbidden",
+          path: url.pathname,
+          method: request.method,
+          statusCode: 403,
+          startedAtMs,
+          accountId,
+          keyId,
+          detail: "full_history_requires_pro",
+          chain,
+          genre,
+          window,
+        });
+
+        return jsonError(
+          requestId,
+          403,
+          "forbidden",
+          "Request exceeds entitlement scope.",
+          "full_history_requires_pro",
+          Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
+        );
+      }
+    } else {
+      const inferredWindow = inferWindowFromTail(parsedPath.windowTail);
+      window = inferredWindow;
+
+      if (!inferredWindow) {
+        await logApiEvent({
+          requestId,
+          eventType: "entitlement_forbidden",
+          path: url.pathname,
+          method: request.method,
+          statusCode: 403,
+          startedAtMs,
+          accountId,
+          keyId,
+          detail: "window_could_not_be_inferred",
+          chain,
+          genre,
+        });
+
+        return jsonError(
+          requestId,
+          403,
+          "forbidden",
+          "Request exceeds entitlement scope.",
+          "window_could_not_be_inferred",
+          Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
+        );
+      }
+
+      const startDate = url.searchParams.get("start");
+      const endDate = url.searchParams.get("end");
+
+      const decision = evaluateFileEntitlement(authResult.entitlement, {
+        genre: parsedPath.genre,
+        chain: parsedPath.chain,
+        window: inferredWindow,
+        startDate,
+        endDate,
       });
 
-      return jsonError(
-        requestId,
-        403,
-        "forbidden",
-        "Request exceeds entitlement scope.",
-        decision.code,
-        Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
-      );
+      if (!decision.ok) {
+        await logApiEvent({
+          requestId,
+          eventType: "entitlement_forbidden",
+          path: url.pathname,
+          method: request.method,
+          statusCode: 403,
+          startedAtMs,
+          accountId,
+          keyId,
+          detail: decision.code,
+          chain,
+          genre,
+          window,
+        });
+
+        return jsonError(
+          requestId,
+          403,
+          "forbidden",
+          "Request exceeds entitlement scope.",
+          decision.code,
+          Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
+        );
+      }
     }
 
     const storagePath = buildStoragePath(parsedPath.storageSegments);
@@ -435,7 +486,6 @@ export async function GET(request: Request, context: RouteContext) {
       window,
     });
 
-
     await touchPersistedApiKeyLastUsedAt(authResult.keyId, authResult.record.lastUsedAt);
 
     return new NextResponse(file.body, {
@@ -446,7 +496,7 @@ export async function GET(request: Request, context: RouteContext) {
         "Content-Length": String(file.contentLength),
         "Cache-Control": "private, no-store",
         "X-Entitlement-Tier": authResult.entitlement.tier,
-        "X-Entitlement-Window": inferredWindow,
+        "X-Entitlement-Window": window ?? "unknown",
         ...(file.etag ? { ETag: file.etag } : {}),
         ...(file.lastModified ? { "Last-Modified": file.lastModified } : {}),
       },
