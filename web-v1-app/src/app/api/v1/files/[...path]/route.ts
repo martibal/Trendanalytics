@@ -404,75 +404,70 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const url = new URL(request.url);
-    const startDate = url.searchParams.get("start");
-    const endDate = url.searchParams.get("end");
 
-    const decision = inferredWindow
-      ? evaluateFileEntitlement(authResult.entitlement, {
-          genre: parsedPath.genre,
-          chain: parsedPath.chain,
-          window: inferredWindow,
-          startDate,
-          endDate,
-        })
-      : evaluateFileEntitlement(authResult.entitlement, {
-          genre: parsedPath.genre,
-          chain: parsedPath.chain,
-          window: "latest",
-          startDate: null,
-          endDate: null,
+    if (parsedPath.fullHistoryArtifact) {
+      if (!canAccessFullHistory(authResult.entitlement)) {
+        await logApiEvent({
+          requestId,
+          eventType: "entitlement_forbidden",
+          path: url.pathname,
+          method: request.method,
+          statusCode: 403,
+          startedAtMs,
+          accountId,
+          keyId,
+          detail: "full_history_requires_pro",
+          chain,
+          genre,
+          window,
         });
 
-    if (!decision.ok) {
-      await logApiEvent({
-        requestId,
-        eventType: "entitlement_forbidden",
-        path: url.pathname,
-        method: request.method,
-        statusCode: 403,
-        startedAtMs,
-        accountId,
-        keyId,
-        detail: decision.code,
-        chain,
-        genre,
-        window,
+        return jsonError(
+          requestId,
+          403,
+          "forbidden",
+          "Request exceeds entitlement scope.",
+          "full_history_requires_pro",
+          Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
+        );
+      }
+    } else {
+      const startDate = url.searchParams.get("start");
+      const endDate = url.searchParams.get("end");
+
+      const decision = evaluateFileEntitlement(authResult.entitlement, {
+        genre: parsedPath.genre,
+        chain: parsedPath.chain,
+        window: inferredWindow,
+        startDate,
+        endDate,
       });
 
-      return jsonError(
-        requestId,
-        403,
-        "forbidden",
-        "Request exceeds entitlement scope.",
-        decision.code,
-        Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
-      );
-    }
+      if (!decision.ok) {
+        await logApiEvent({
+          requestId,
+          eventType: "entitlement_forbidden",
+          path: url.pathname,
+          method: request.method,
+          statusCode: 403,
+          startedAtMs,
+          accountId,
+          keyId,
+          detail: decision.code,
+          chain,
+          genre,
+          window,
+        });
 
-    if (parsedPath.fullHistoryArtifact && !canAccessFullHistory(authResult.entitlement)) {
-      await logApiEvent({
-        requestId,
-        eventType: "entitlement_forbidden",
-        path: url.pathname,
-        method: request.method,
-        statusCode: 403,
-        startedAtMs,
-        accountId,
-        keyId,
-        detail: "full_history_requires_pro",
-        chain,
-        genre,
-        window,
-      });
-
-      return jsonError(
-        requestId,
-        403,
-        "forbidden",
-        "Request exceeds entitlement scope.",
-        "full_history_requires_pro",
-        Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
-      );
+        return jsonError(
+          requestId,
+          403,
+          "forbidden",
+          "Request exceeds entitlement scope.",
+          decision.code,
+          Object.keys(rateLimitHeaders).length > 0 ? rateLimitHeaders : undefined
+        );
+      }
     }
 
     const storagePath = buildStoragePath(parsedPath.storageSegments);
