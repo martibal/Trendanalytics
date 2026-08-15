@@ -438,7 +438,7 @@ export async function GET(request: Request, context: RouteContext) {
       const decision = evaluateFileEntitlement(authResult.entitlement, {
         genre: parsedPath.genre,
         chain: parsedPath.chain,
-        window: inferredWindow,
+        window: inferredWindow as WindowToken,
         startDate,
         endDate,
       });
