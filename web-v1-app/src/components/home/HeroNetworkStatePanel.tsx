@@ -59,7 +59,8 @@ export default function HeroNetworkStatePanel({ snapshot }: { snapshot: HeroPane
             <strong>$49</strong>
             <span>/ month</span>
           </div>
-          <p className="ua3-hero-panel-offer-copy">Basic starts at $49/month for one selected chain. Download the free sample pack first: a real 14-day Ethereum + Arbitrum history across Meta, Gold, Derived and Briefs, plus high/lower-confidence examples and a runnable join quickstart.</p>
+          <p className="ua3-hero-panel-offer-copy">Basic starts at $49/month for one selected chain — with 90 days of history available immediately on subscribe (Pro includes the full published history across all four chains). Download the free sample pack first: a real 14-day Ethereum + Arbitrum history across Meta, Gold, Derived and Briefs, plus high/lower-confidence examples and a runnable join quickstart.</p>
+          <p className="ua3-hero-panel-history-pitch">Enough to test the join. Subscribe for enough history to trust the pattern.</p>
           <a href="/api/v1/sample-pack" className="ua3-hero-panel-primary ua-home-focus" download>Download free sample pack</a>
           <div className="ua3-hero-panel-secondary-actions">
             <a href="#today-status" className="ua-home-focus">See today&apos;s published state →</a>
@@ -151,6 +152,13 @@ const styles = `
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.55;
+}
+.ua3-hero-panel-history-pitch {
+  margin: 10px 0 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
 }
 .ua3-hero-panel-primary {
   display: flex;
