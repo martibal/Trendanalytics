@@ -88,8 +88,8 @@ const artifactCards: Array<{ name: Artifact; icon: string; what: string; use: st
 
 const plans: Array<{ id: "free" | CheckoutPlan; name: string; price: string; summary: string; cta: string; recommended?: boolean }> = [
   { id: "free", name: "Free", price: "$0", summary: "Best for evaluating the format: inspect the public CSV and examples before paying. No authenticated daily delivery.", cta: "Download free sample pack" },
-  { id: "basic", name: "Basic", price: "$49/mo", summary: "Best starting point for most analysts: authenticated daily delivery for one selected chain.", cta: "Start Basic", recommended: true },
-  { id: "pro", name: "Pro", price: "$149/mo", summary: "Best for multi-chain workflows: authenticated daily delivery for Bitcoin, Ethereum, Arbitrum and Base.", cta: "Start Pro" },
+  { id: "basic", name: "Basic", price: "$49/mo", summary: "Best starting point for most analysts: authenticated daily delivery for one selected chain, with 90 days of history available immediately on subscribe.", cta: "Start Basic", recommended: true },
+  { id: "pro", name: "Pro", price: "$149/mo", summary: "Best for multi-chain workflows: authenticated daily delivery for Bitcoin, Ethereum, Arbitrum and Base, with the full published history available immediately across all four chains.", cta: "Start Pro" },
 ];
 
 const gettingStarted = [
