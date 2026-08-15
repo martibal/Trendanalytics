@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test.describe("mobile homepage regression", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("keeps compact mobile grids and JSON modal usable", async ({ page }) => {
+  test("keeps compact mobile grids and full JSON tree usable", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
 
     const chainGrid = page.locator(".ua3-chain-grid");
@@ -71,28 +71,33 @@ test.describe("mobile homepage regression", () => {
     await expect(openJson).toHaveAttribute("aria-haspopup", "dialog");
     await openJson.click();
 
-    const dialog = page.getByRole("dialog", { name: "Meta latest.json" });
+    const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: 10000 });
     await expect(dialog).toHaveAttribute("aria-modal", "true");
     await expect(dialog).toHaveAttribute("aria-labelledby", "json-modal-title");
+    await expect(dialog.getByText("This is the full published file — the compact preview above shows the most commonly used fields.")).toBeVisible();
 
     const copyButton = dialog.getByRole("button", { name: /copy to clipboard/i });
     const closeButton = dialog.getByRole("button", { name: /^close$/i });
-    const jsonScroller = dialog.locator("pre.ua3-json-complete");
+    const tree = dialog.getByLabel("Full published JSON tree");
     await expect(copyButton).toBeVisible();
     await expect(closeButton).toBeVisible();
-    await expect(jsonScroller).toBeVisible();
+    await expect(tree).toBeVisible();
     await expect(closeButton).toBeFocused();
 
-    await page.keyboard.press("Tab");
-    await expect(jsonScroller).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(copyButton).toBeFocused();
+    const summaries = tree.locator("summary");
+    expect(await summaries.count()).toBeGreaterThanOrEqual(8);
+    const confidenceSummary = summaries.filter({ hasText: "confidence" }).first();
+    await expect(confidenceSummary).toBeVisible();
 
-    await page.keyboard.press("Shift+Tab");
-    await expect(jsonScroller).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(summaries.first()).toBeFocused();
     await page.keyboard.press("Shift+Tab");
     await expect(closeButton).toBeFocused();
+
+    await confidenceSummary.click();
+    const confidenceNode = confidenceSummary.locator("xpath=..");
+    await expect(confidenceNode.locator("pre.ua3-json-complete")).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
