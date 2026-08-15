@@ -17,9 +17,9 @@ const INTEGRATION_STEPS = [
   },
   {
     n: "02",
-    title: "Request the latest file",
-    body: "Every layer has a latest.json path. Paid API access uses the same artifact model the website reads.",
-    code: "GET /api/v1/files/meta/ethereum/latest.json\nX-API-Key: YOUR_KEY",
+    title: "Bootstrap the history you need",
+    body: "Basic can start with a 90-day bundle on the selected chain. Pro can enumerate the full published archive through manifest.json and then request the original dated files.",
+    code: "GET /api/v1/files/meta/ethereum/90d/latest.json\n\n# Pro full-history archive\nGET /api/v1/files/meta/ethereum/manifest.json\nGET /api/v1/files/meta/ethereum/2024-12-01.json\nX-API-Key: YOUR_KEY",
   },
   {
     n: "03",
@@ -30,7 +30,7 @@ const INTEGRATION_STEPS = [
   {
     n: "04",
     title: "Join by chain and date",
-    body: "Your downstream data can join Urd Atlas artifacts by chain + UTC date. Briefs can be read directly without building a pipeline.",
+    body: "Your downstream data can join Urd Atlas artifacts by chain + UTC date. observation_date identifies the day the network state describes; it does not prove the row was available on that date, so do not treat the current archive as point-in-time data for historical decision simulation.",
     code: null,
   },
 ] as const;
@@ -64,9 +64,11 @@ const JSON_LAYERS = [
 
 const ENDPOINTS = [
   ["Latest Meta", "GET", "/api/v1/files/meta/{chain}/latest.json"],
-  ["Latest Gold", "GET", "/api/v1/files/gold/{chain}/latest.json"],
-  ["Latest Derived", "GET", "/api/v1/files/derived/{chain}/latest.json"],
-  ["Latest Brief", "GET", "/api/v1/files/briefs/chains/{chain}/latest.json"],
+  ["90-day Meta bundle", "GET", "/api/v1/files/meta/{chain}/90d/latest.json"],
+  ["Pro archive manifest", "GET", "/api/v1/files/meta/{chain}/manifest.json"],
+  ["Pro dated Meta file", "GET", "/api/v1/files/meta/{chain}/YYYY-MM-DD.json"],
+  ["Pro Briefs manifest", "GET", "/api/v1/files/briefs/chains/{chain}/manifest.json"],
+  ["Pro dated Brief", "GET", "/api/v1/files/briefs/chains/{chain}/YYYY-MM-DD.json"],
 ] as const;
 
 export default function MobileApiDocsPage() {
@@ -78,7 +80,7 @@ export default function MobileApiDocsPage() {
       subtitle={
         <>
           This page keeps mobile users inside the mobile surface while explaining the
-          same file contract used by desktop docs and subscribers.
+          same file and history contract used by desktop docs and subscribers.
         </>
       }
       backHref="/mobile"
@@ -95,6 +97,40 @@ export default function MobileApiDocsPage() {
             </code>
           </div>
         </MobileCard>
+      </MobileSection>
+
+      <MobileSection eyebrow="History access" title="History is available immediately on subscribe.">
+        <div className="space-y-3">
+          <MobileCard tone="blue">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[15px] font-black text-white">Basic</div>
+                <p className="mt-2 text-[12px] leading-6 text-[#d7e8fb]">
+                  $49/month. One selected chain with 90 days of history available immediately, plus authenticated daily delivery going forward.
+                </p>
+              </div>
+              <MobilePill tone="gold">90 days</MobilePill>
+            </div>
+          </MobileCard>
+
+          <MobileCard tone="blue">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[15px] font-black text-white">Pro</div>
+                <p className="mt-2 text-[12px] leading-6 text-[#d7e8fb]">
+                  $149/month. Bitcoin, Ethereum, Arbitrum and Base with the full published history available immediately across all four chains. The archive starts on 1 December 2024 and grows with each published day.
+                </p>
+              </div>
+              <MobilePill tone="gold">Full history</MobilePill>
+            </div>
+          </MobileCard>
+
+          <MobileCard>
+            <p className="text-[12px] leading-6 text-[#cfe0f4]">
+              Pro also includes fixed convenience bundles through <code className="font-mono text-[#f5d386]">365d</code>. That is the largest single bundle route, not the Pro history limit. Full-history access uses each artifact&apos;s <code className="font-mono text-[#f5d386]">manifest.json</code> to enumerate published dates and then the corresponding dated files.
+            </p>
+          </MobileCard>
+        </div>
       </MobileSection>
 
       <MobileSection eyebrow="Getting started" title="A mobile-first integration path.">
@@ -162,6 +198,7 @@ export default function MobileApiDocsPage() {
 
       <MobileSection eyebrow="Read next" title="Stay in the mobile docs.">
         <div className="grid gap-2">
+          <MobilePrimaryLink href="/api-docs/history">Open full history documentation</MobilePrimaryLink>
           <MobilePrimaryLink href="/mobile/methodology">Open methodology</MobilePrimaryLink>
           <Link href="/mobile/wiki" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/14 bg-white/[0.075] px-4 text-[13px] font-black text-white">
             Open term wiki
