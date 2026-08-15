@@ -46,6 +46,7 @@ export type HomeConfidenceExample = {
   chain: string;
   chainLabel: string;
   date: string;
+  sourceDate: string;
   regime: HomeLabel;
   confidenceScore: number | null;
   dataQualityScore: number | null;
@@ -55,6 +56,7 @@ export type HomeConfidenceExample = {
   capacityScore: number | null;
   dataLag: string;
   oneLiner: string;
+  fullPayload: JsonPayload;
 };
 
 type Props = {
@@ -85,14 +87,14 @@ const artifactCards: Array<{ name: Artifact; icon: string; what: string; use: st
 ];
 
 const plans: Array<{ id: "free" | CheckoutPlan; name: string; price: string; summary: string; cta: string; recommended?: boolean }> = [
-  { id: "free", name: "Free", price: "$0", summary: "Best for evaluating the format: inspect the public CSV and examples before paying. No authenticated daily delivery.", cta: "Open free kit" },
+  { id: "free", name: "Free", price: "$0", summary: "Best for evaluating the format: inspect the public CSV and examples before paying. No authenticated daily delivery.", cta: "Download free sample pack" },
   { id: "basic", name: "Basic", price: "$49/mo", summary: "Best starting point for most analysts: authenticated daily delivery for one selected chain.", cta: "Start Basic", recommended: true },
   { id: "pro", name: "Pro", price: "$149/mo", summary: "Best for multi-chain workflows: authenticated daily delivery for Bitcoin, Ethereum, Arbitrum and Base.", cta: "Start Pro" },
 ];
 
 const gettingStarted = [
   { number: "01", title: "Skip the classification build.", body: "Use a finished daily network-state layer instead of spending analyst and engineering time on ingestion, baselines, chain-specific rules, confidence logic and ongoing maintenance.", cta: "See what is delivered →", href: "#today-status", icon: "plug" },
-  { number: "02", title: "Add one row to the data you already use.", body: "Regime, confidence and evidence arrive on the same date + chain key, so you can join the row into existing analysis, dashboards and reporting without changing your core workflow.", cta: "Inspect the free sample →", href: "/analyst-kit", icon: "code" },
+  { number: "02", title: "Add one row to the data you already use.", body: "Regime, confidence and evidence arrive on the same date + chain key, so you can join the row into existing analysis, dashboards and reporting without changing your core workflow.", cta: "Download free sample pack →", href: "/api/v1/sample-pack", icon: "code" },
   { number: "03", title: "Keep every classification explainable.", body: "Confidence, drivers, underlying measurements and methodology version stay attached to the published state, giving you an auditable reference layer instead of an opaque label.", cta: "Review methodology →", href: "/methodology/reference", icon: "card" },
 ] as const;
 
@@ -290,7 +292,23 @@ function JsonBlock({ payload, prismReady, complete = false }: { payload: JsonPay
   const containerRef = useRef<HTMLPreElement | null>(null);
   const jsonText = complete ? prettyJson(payload) : compactJson(payload);
   useEffect(() => { if (containerRef.current) window.Prism?.highlightAllUnder?.(containerRef.current); }, [jsonText, prismReady]);
-  return <pre ref={containerRef} className={complete ? "ua3-json ua3-json-complete" : "ua3-json"}><code className="language-json">{jsonText}</code></pre>;
+  return <pre ref={containerRef} tabIndex={complete ? 0 : undefined} className={complete ? "ua3-json ua3-json-complete" : "ua3-json"}><code className="language-json">{jsonText}</code></pre>;
+}
+
+function JsonTree({ payload, prismReady }: { payload: JsonPayload; prismReady: boolean }) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return <JsonBlock payload={payload} prismReady={prismReady} complete />;
+  }
+  return (
+    <div className="ua3-json-tree" aria-label="Full published JSON tree">
+      {Object.entries(payload as Record<string, unknown>).map(([key, value]) => (
+        <details key={key} className="ua3-json-tree-node">
+          <summary tabIndex={0}><span>{key}</span><span className="ua3-json-tree-type">{Array.isArray(value) ? `array · ${value.length}` : value && typeof value === "object" ? "object" : typeof value}</span></summary>
+          <JsonBlock payload={value} prismReady={prismReady} complete />
+        </details>
+      ))}
+    </div>
+  );
 }
 
 function toHeroPanelSnapshot(chain: HomeChainSnapshot): HeroPanelSnapshot {
@@ -319,7 +337,12 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
   const selectedChain = snapshots.find((snapshot) => snapshot.id === selectedChainId) ?? snapshots[0];
   const selectedExample = exampleKind === "high" ? examples.high : examples.low;
   const preview = useMemo(() => (selectedChain ? previewPayload(selectedArtifact, selectedExample, selectedChain) : null), [selectedArtifact, selectedChain, selectedExample]);
-  const completeJson = useMemo(() => (selectedChain ? selectedChain.artifacts[selectedArtifact] : null), [selectedArtifact, selectedChain]);
+  const completeJson = useMemo(() => {
+    if (!selectedChain) return null;
+    if (selectedArtifact === "Meta" && selectedExample?.fullPayload) return selectedExample.fullPayload;
+    return selectedChain.artifacts[selectedArtifact];
+  }, [selectedArtifact, selectedChain, selectedExample]);
+  const completeTitle = selectedArtifact === "Meta" && selectedExample ? `Meta ${selectedExample.sourceDate}.json` : `${selectedArtifact} latest.json`;
   const ethereumSnapshot = snapshots.find((snapshot) => snapshot.id === "ethereum") ?? snapshots[1] ?? selectedChain;
   const heroPanelSnapshot = heroSnapshot ?? (ethereumSnapshot ? toHeroPanelSnapshot(ethereumSnapshot) : null);
   const closeModal = useCallback(() => {
@@ -450,7 +473,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title"><div className="ua3-wrap"><p className="ua3-label ua3-step-label">Plans</p><h2 id="pricing-title" className="ua3-step-title">Choose the plan that matches your workflow.</h2><p className="ua3-body">Use Free to inspect the format. Start with Basic if one chain covers your workflow. Choose Pro when you need the same daily reference layer across all four chains.</p><div className="ua3-plan-grid">{plans.map((plan) => <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}><div className="ua3-plan-head"><h3>{plan.name}</h3>{plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}</div><p className="ua3-plan-price">{plan.price}</p><p className="ua3-body-small">{plan.summary}</p>{plan.id === "free" ? <Link href="/analyst-kit" className="ua3-button ua3-button-quiet ua3-button-full">{plan.cta}</Link> : <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>}</article>)}</div><p className="ua3-card-note ua3-pricing-note">Start with the smallest plan that fits the number of chains you actually use. Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p></div></section>
+      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title"><div className="ua3-wrap"><p className="ua3-label ua3-step-label">Plans</p><h2 id="pricing-title" className="ua3-step-title">Choose the plan that matches your workflow.</h2><p className="ua3-body">Use Free to inspect the format. Start with Basic if one chain covers your workflow. Choose Pro when you need the same daily reference layer across all four chains.</p><div className="ua3-plan-grid">{plans.map((plan) => <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}><div className="ua3-plan-head"><h3>{plan.name}</h3>{plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}</div><p className="ua3-plan-price">{plan.price}</p><p className="ua3-body-small">{plan.summary}</p>{plan.id === "free" ? <Link href="/api/v1/sample-pack" className="ua3-button ua3-button-quiet ua3-button-full">{plan.cta}</Link> : <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>}</article>)}</div><p className="ua3-card-note ua3-pricing-note">Start with the smallest plan that fits the number of chains you actually use. Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p></div></section>
 
       <div className="ua3-transition" aria-hidden="true" />
 
@@ -513,7 +536,7 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
       <div className="ua3-transition" aria-hidden="true" />
 
-      {modalOpen ? <div className="ua3-modal-backdrop" onClick={closeModal}><div ref={modalRef} tabIndex={-1} className="ua3-modal" role="dialog" aria-modal="true" aria-labelledby="json-modal-title" onClick={(event) => event.stopPropagation()}><div className="ua3-modal-head"><div><p className="ua3-label">Complete JSON</p><h2 id="json-modal-title">{selectedArtifact} latest.json</h2></div><div className="ua3-modal-actions"><button type="button" className="ua3-button ua3-button-quiet" onClick={copyModalJson}>{copied ? "Copied" : "Copy to clipboard"}</button><button type="button" autoFocus className="ua3-button ua3-button-primary" onClick={closeModal}>Close</button></div></div><JsonBlock payload={completeJson} prismReady={prismReady} complete /></div></div> : null}
+      {modalOpen ? <div className="ua3-modal-backdrop" onClick={closeModal}><div ref={modalRef} tabIndex={-1} className="ua3-modal" role="dialog" aria-modal="true" aria-labelledby="json-modal-title" onClick={(event) => event.stopPropagation()}><div className="ua3-modal-head"><div><p className="ua3-label">Complete published JSON</p><h2 id="json-modal-title">{completeTitle}</h2><p className="ua3-modal-explainer">This is the full published file — the compact preview above shows the most commonly used fields.</p></div><div className="ua3-modal-actions"><button type="button" className="ua3-button ua3-button-quiet" onClick={copyModalJson}>{copied ? "Copied" : "Copy to clipboard"}</button><button type="button" autoFocus className="ua3-button ua3-button-primary" onClick={closeModal}>Close</button></div></div><JsonTree payload={completeJson} prismReady={prismReady} /></div></div> : null}
 
       <style>{ua3Styles}</style>
     </main>
@@ -631,21 +654,28 @@ const ua3Styles = `
 .ua3-toggle { border: 1px solid var(--border-subtle); border-radius: 999px; background: transparent; color: var(--text-secondary); padding: 8px 12px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; cursor: pointer; }
 .ua3-toggle-active { border-color: var(--accent-action); color: var(--accent-action); background: rgba(16,224,160,.08); }
 .ua3-json { margin: 0; min-height: 320px; max-height: 520px; overflow: auto; border: 1px solid var(--border-subtle); border-radius: 8px; background: #0A0C0E; padding: 18px; color: var(--text-secondary); font-family: var(--mono); font-size: 13px; line-height: 1.55; }
-.ua3-json-complete { max-height: 70vh; }
+.ua3-json-complete { min-height: 0; max-height: 46vh; }
 .ua3-json .token.property { color: #7DD3FC; }
 .ua3-json .token.string { color: #86EFAC; }
 .ua3-json .token.number, .ua3-json .token.boolean, .ua3-json .token.null { color: #FCD34D; }
 .ua3-json .token.punctuation, .ua3-json .token.operator { color: #6B7280; }
 .ua3-json-open { margin-top: 16px; }
+.ua3-json-tree { max-height: 62vh; overflow: auto; display: grid; gap: 8px; padding-right: 4px; }
+.ua3-json-tree-node { border: 1px solid var(--border-subtle); border-radius: 8px; background: rgba(255,255,255,.025); overflow: hidden; }
+.ua3-json-tree-node summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; cursor: pointer; color: #7DD3FC; font-family: var(--mono); font-size: 13px; }
+.ua3-json-tree-node summary:focus-visible { outline: 2px solid var(--accent-action); outline-offset: -2px; }
+.ua3-json-tree-node .ua3-json { border: 0; border-top: 1px solid var(--border-subtle); border-radius: 0; }
+.ua3-json-tree-type { color: var(--text-tertiary); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
 .ua3-plan-card-recommended { transform: scale(1.03); border-color: var(--accent-action); background: var(--bg-elevated-2); box-shadow: 0 24px 64px rgba(16,224,160,.14); }
 .ua3-plan-badge { border: 1px solid var(--accent-action); border-radius: 999px; padding: 5px 10px; color: var(--accent-action); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
 .ua3-plan-price { margin: 28px 0 0; color: var(--text-primary); font-size: 40px; font-weight: 700; line-height: 1; }
 .ua3-pricing-note { max-width: 760px; }
 .ua3-form { margin: 0; }
 .ua3-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,.7); }
-.ua3-modal { width: min(800px, 100%); max-height: calc(100vh - 48px); overflow: hidden; border: 1px solid var(--border-emphasis); border-radius: 16px; background: var(--bg-base); padding: 22px; box-shadow: 0 32px 100px rgba(0,0,0,.6); }
+.ua3-modal { width: min(900px, 100%); max-height: calc(100vh - 48px); overflow: hidden; border: 1px solid var(--border-emphasis); border-radius: 16px; background: var(--bg-base); padding: 22px; box-shadow: 0 32px 100px rgba(0,0,0,.6); }
 .ua3-modal-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .ua3-modal-head h2 { margin: 6px 0 0; font-size: 24px; }
+.ua3-modal-explainer { max-width: 620px; margin: 10px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
 .ua3-modal-actions { display: flex; gap: 10px; }
 @media (max-width: 1120px) {
   .ua3-confidence-explainer-grid { grid-template-columns: 1fr; }
