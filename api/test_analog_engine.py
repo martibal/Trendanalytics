@@ -43,7 +43,9 @@ class AnalogEngineRegressionTests(unittest.TestCase):
         self.assertGreater(result["diagnostics"]["candidate_days"], 0)
         self.assertGreater(result["diagnostics"]["k_returned"], 0)
         self.assertLessEqual(result["diagnostics"]["k_returned"], cfg.k_analogs)
-        self.assertIn("1", {str(k) for k in result["forward_stats"].keys()})
+        self.assertEqual(result["forward_stats"]["horizons"], [1, 3, 7])
+        self.assertIn("by_horizon", result["forward_stats"])
+        self.assertIn("1", {str(k) for k in result["forward_stats"]["by_horizon"].keys()})
 
     def test_main_function_handles_empty_input(self) -> None:
         result = analog_engine.compute_analogs_and_forward_stats(pd.DataFrame({"date": []}))
