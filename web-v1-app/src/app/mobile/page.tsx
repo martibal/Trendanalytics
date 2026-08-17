@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import HomePage from "../page";
 
 export const metadata = {
   title: "Urd Atlas",
@@ -6,5 +6,9 @@ export const metadata = {
 };
 
 export default function MobilePage() {
-  redirect("/");
+  return (
+    <div className="ua-force-mobile-route">
+      <HomePage />
+    </div>
+  );
 }
