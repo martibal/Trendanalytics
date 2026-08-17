@@ -1,0 +1,299 @@
+/* Function-based visual differentiation for Urd Atlas landing surfaces.
+   These rules deliberately separate explanation, live data, actions,
+   commercial decisions, process steps, raw code, and trust evidence. */
+
+:root {
+  --accent-action: #10E0A0;
+  --accent-explain: #6B8FE0;
+  --accent-trust: #E0B85C;
+  --accent-trust-rgb: 224, 184, 92;
+  --font-explain: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-display-numeric: "Inter", system-ui, sans-serif;
+}
+
+/* Decorative micro-labels are interface typography, not code. */
+main [class*="font-mono"][class*="uppercase"],
+.ta-modal [class*="font-mono"][class*="uppercase"] {
+  font-family: var(--sans) !important;
+}
+
+/* CATEGORY 1 — explanation: marginal-note treatment, never a closed card. */
+.ta-modal section,
+.ta-modal details {
+  background: transparent !important;
+  border: 0 !important;
+  border-left: 3px solid var(--accent-explain) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 4px 0 4px 20px !important;
+}
+
+.ta-modal h3,
+.ta-modal section > div:first-child,
+.ta-modal details > summary {
+  font-family: var(--font-explain) !important;
+  text-transform: none !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* CATEGORY 2 — live data: retained cards, asymmetric identity and measurable scale cues. */
+#latest-surface a[href^="/chains/"] {
+  position: relative;
+  overflow: visible;
+}
+
+#latest-surface a[href^="/chains/"]::before {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.055);
+  color: var(--text-primary);
+  font-family: var(--font-display-numeric);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+#latest-surface a[href^="/chains/"] > div:first-child {
+  padding-left: 46px;
+}
+
+#latest-surface a[href="/chains/bitcoin"]::before {
+  content: "₿";
+  border-radius: 50%;
+}
+
+#latest-surface a[href="/chains/ethereum"]::before {
+  content: "Ξ";
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+#latest-surface a[href="/chains/arbitrum"]::before {
+  content: "A";
+  clip-path: polygon(25% 7%, 75% 7%, 100% 50%, 75% 93%, 25% 93%, 0 50%);
+}
+
+#latest-surface a[href="/chains/base"]::before {
+  content: "B";
+  border-radius: 4px;
+}
+
+#latest-surface a[href^="/chains/"] [class*="grid-cols-2"] > div > div:nth-child(2),
+#latest-surface a[href^="/chains/"] [class*="text-[22px]"],
+#latest-surface a[href^="/chains/"] [class*="text-[26px]"] {
+  border-left: 2px solid rgba(107,143,224,.58);
+  padding-left: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mobile chain cards use the same four unmistakable identifiers. */
+main.lg\:hidden a[href^="/chains/"] {
+  position: relative;
+}
+main.lg\:hidden a[href^="/chains/"]::before {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.055);
+  color: var(--text-primary);
+  font-family: var(--font-display-numeric);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+main.lg\:hidden a[href^="/chains/"] > div:first-child { padding-left: 46px; }
+main.lg\:hidden a[href="/chains/bitcoin"]::before { content: "₿"; border-radius: 50%; }
+main.lg\:hidden a[href="/chains/ethereum"]::before { content: "Ξ"; clip-path: polygon(50% 0,100% 50%,50% 100%,0 50%); }
+main.lg\:hidden a[href="/chains/arbitrum"]::before { content: "A"; clip-path: polygon(25% 7%,75% 7%,100% 50%,75% 93%,25% 93%,0 50%); }
+main.lg\:hidden a[href="/chains/base"]::before { content: "B"; border-radius: 4px; }
+main.lg\:hidden a[href^="/chains/"] [class*="grid-cols-2"] > div > div:nth-child(2) {
+  border-left: 2px solid rgba(107,143,224,.58);
+  padding-left: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* CATEGORY 3 — actions: clear hierarchy and no full-pill CTAs. Badges remain pills. */
+main button,
+main a[class*="rounded-full"] {
+  border-radius: 8px !important;
+}
+
+main button[class*="bg-cyan-400"],
+main a[class*="bg-cyan-400"] {
+  background: var(--accent-action) !important;
+  color: #04140F !important;
+  border-color: var(--accent-action) !important;
+  font-weight: 600 !important;
+}
+
+main a[class*="border"][class*="bg-white"],
+main button[class*="border"][class*="bg-white"] {
+  border-radius: 8px !important;
+}
+
+/* Text-only navigation remains text-only rather than masquerading as a button. */
+#latest-surface a[href="/track-record"],
+main a[href="/methodology"],
+main a[href="/service"] {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* CATEGORY 4 — pricing decisions: a dedicated heavier card language. */
+#plans [class*="xl:grid-cols-3"] > div,
+#plans-mobile [class*="space-y-3"] > div {
+  border-radius: 12px !important;
+  padding: 32px 28px !important;
+  background: var(--bg-elevated-1) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 18px 48px rgba(0,0,0,.16) !important;
+}
+
+#plans [class*="text-3xl"][class*="font-black"],
+#plans-mobile [class*="text-3xl"],
+#plans-mobile [class*="text-[26px]"] {
+  font-family: var(--font-display-numeric) !important;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2.35rem, 4vw, 3.5rem) !important;
+  line-height: 1 !important;
+  letter-spacing: -.045em !important;
+}
+
+#plans [class*="rounded-full"],
+#plans-mobile [class*="rounded-full"] {
+  border-radius: 8px !important;
+}
+
+/* CATEGORY 5 — process: drawn step numerals rather than another card grid. */
+details[class*="mb-10"] [class*="lg:grid-cols-2"] > div {
+  position: relative;
+  overflow: hidden;
+  border: 0 !important;
+  border-top: 1px solid rgba(255,255,255,.11) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 22px 4px 20px 64px !important;
+  box-shadow: none !important;
+}
+
+details[class*="mb-10"] [class*="lg:grid-cols-2"] > div > div:first-child > span:first-child {
+  position: absolute;
+  left: 2px;
+  top: 12px;
+  font-family: var(--font-display-numeric) !important;
+  font-size: 48px !important;
+  font-weight: 300 !important;
+  line-height: 1 !important;
+  letter-spacing: -.06em !important;
+  opacity: .35;
+}
+
+details[class*="mb-10"] [class*="lg:grid-cols-2"] > div::after {
+  content: "";
+  position: absolute;
+  left: 34px;
+  top: 42px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(107,143,224,.50);
+  border-radius: 50%;
+  background: rgba(107,143,224,.08);
+}
+
+/* CATEGORY 6 — raw code stays the only intentionally code-like surface. */
+main code,
+main pre,
+.ta-modal code,
+.ta-modal pre {
+  font-family: var(--mono) !important;
+}
+
+/* CATEGORY 7 — trust evidence: gold, heavier frame and repeated circle motif. */
+section.w-full > div:nth-of-type(2) > div {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--accent-trust) !important;
+  background: linear-gradient(180deg, rgba(var(--accent-trust-rgb),.06), transparent 60%), #0a121f !important;
+  padding: 28px !important;
+}
+
+section.w-full > div:nth-of-type(2) > div::after {
+  content: "";
+  position: absolute;
+  right: 22px;
+  bottom: 20px;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(var(--accent-trust-rgb),.58);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 8px rgba(var(--accent-trust-rgb),.035);
+  pointer-events: none;
+}
+
+section.w-full > div:nth-of-type(2) [class*="uppercase"] {
+  color: var(--accent-trust) !important;
+}
+
+section.w-full > div:nth-of-type(2) [class*="tabular"],
+section.w-full > div:nth-of-type(2) [class*="text-"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mobile published archive is trust evidence, not another generic card. */
+main.lg\:hidden section:first-of-type > div[class*="border-cyan-400"] {
+  position: relative;
+  border-color: var(--accent-trust) !important;
+  background: linear-gradient(180deg, rgba(var(--accent-trust-rgb),.07), transparent 65%) !important;
+}
+main.lg\:hidden section:first-of-type > div[class*="border-cyan-400"] [class*="uppercase"] {
+  color: var(--accent-trust) !important;
+}
+main.lg\:hidden section:first-of-type > div[class*="border-cyan-400"] [class*="text-5xl"] {
+  color: var(--accent-trust) !important;
+  font-family: var(--font-display-numeric) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Structural break: a deliberate diagonal separator before pricing. */
+#plans {
+  position: relative;
+  margin-top: 44px;
+}
+#plans::before {
+  content: "";
+  position: absolute;
+  left: 1.5%;
+  right: 1.5%;
+  top: -25px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(107,143,224,.65) 18%, rgba(224,184,92,.58) 82%, transparent);
+  transform: rotate(-2.4deg);
+  transform-origin: center;
+  pointer-events: none;
+}
+
+/* Compact mobile adjustments keep the functional distinctions readable. */
+@media (max-width: 767px) {
+  #plans-mobile [class*="space-y-3"] > div {
+    padding: 24px 20px !important;
+  }
+
+  main.lg\:hidden a[href^="/chains/"]::before {
+    top: 17px;
+    left: 17px;
+  }
+
+  details[class*="mb-10"] [class*="lg:grid-cols-2"] > div {
+    padding-left: 60px !important;
+  }
+}

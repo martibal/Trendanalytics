@@ -8,6 +8,7 @@ import SiteNavbar from "@/components/site/SiteNavbar";
 import ThemeProvider from "@/components/site/ThemeProvider";
 
 import "./globals.css";
+import "./functional-visual-design.css";
 
 export const metadata: Metadata = {
   title: "Urd Atlas",

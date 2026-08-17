@@ -1,14 +1,10 @@
-import HomePage from "../page";
+import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "Urd Atlas Mobile Preview",
-  description: "Mobile-first preview of the Urd Atlas homepage.",
+  title: "Urd Atlas",
+  description: "Canonical responsive Urd Atlas homepage.",
 };
 
 export default function MobilePage() {
-  return (
-    <div className="ua-force-mobile-route">
-      <HomePage />
-    </div>
-  );
+  redirect("/");
 }
