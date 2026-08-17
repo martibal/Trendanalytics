@@ -1,299 +1,402 @@
-/* Function-based visual differentiation for Urd Atlas landing surfaces.
-   These rules deliberately separate explanation, live data, actions,
-   commercial decisions, process steps, raw code, and trust evidence. */
+/* Function-based visual differentiation for the current UA3 homepage.
+   Seven functional categories intentionally receive seven distinct treatments. */
 
-:root {
+.ua3 {
   --accent-action: #10E0A0;
   --accent-explain: #6B8FE0;
   --accent-trust: #E0B85C;
   --accent-trust-rgb: 224, 184, 92;
   --font-explain: "Playfair Display", Georgia, "Times New Roman", serif;
   --font-display-numeric: "Inter", system-ui, sans-serif;
+  --radius-button-functional: 8px;
 }
 
-/* Decorative micro-labels are interface typography, not code. */
-main [class*="font-mono"][class*="uppercase"],
-.ta-modal [class*="font-mono"][class*="uppercase"] {
+/* Typography roles: monospace is reserved for actual code / field names. */
+.ua3 .ua3-category,
+.ua3 .ua3-label,
+.ua3 .ua3-step-label,
+.ua3 .ua3-button,
+.ua3 .ua3-toggle,
+.ua3 .ua3-status-badge,
+.ua3 .ua3-gauge-label,
+.ua3 .ua3-plan-badge,
+.ua3 .ua3-regime-question,
+.ua3-hero-panel-label,
+.ua3-hero-panel-offer-label,
+.ua3-hero-panel-primary {
   font-family: var(--sans) !important;
 }
 
+.ua3 code,
+.ua3 pre,
+.ua3 .ua3-value-field,
+.ua3 .ua3-json,
+.ua3 .ua3-json-tree-node summary,
+.ua3 .ua3-confidence-formula-card code {
+  font-family: var(--mono) !important;
+}
+
+.ua3 .ua3-data-medium,
+.ua3 .ua3-data-small,
+.ua3 .ua3-gauge-value,
+.ua3 .ua3-plan-price,
+.ua3-hero-panel-stat,
+.ua3-hero-panel-price-row strong {
+  font-family: var(--font-display-numeric) !important;
+  font-variant-numeric: tabular-nums;
+}
+
 /* CATEGORY 1 — explanation: marginal-note treatment, never a closed card. */
-.ta-modal section,
-.ta-modal details {
+.ua3 .ua3-regime-card,
+.ua3 .ua3-confidence-explainer-card,
+.ua3 .ua3-regime-axis-note,
+.ua3 .ua3-confidence-warning {
   background: transparent !important;
   border: 0 !important;
   border-left: 3px solid var(--accent-explain) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+}
+
+.ua3 .ua3-regime-card,
+.ua3 .ua3-confidence-explainer-card {
+  padding: 6px 0 6px 20px !important;
+}
+
+.ua3 .ua3-regime-axis-note,
+.ua3 .ua3-confidence-warning {
   padding: 4px 0 4px 20px !important;
 }
 
-.ta-modal h3,
-.ta-modal section > div:first-child,
-.ta-modal details > summary {
+.ua3 .ua3-regime-card::before {
+  display: none !important;
+}
+
+.ua3 .ua3-regime-card h3,
+.ua3 .ua3-confidence-explainer-card h3,
+.ua3 .ua3-info-title {
   font-family: var(--font-explain) !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.015em !important;
   text-transform: none !important;
-  letter-spacing: -0.01em !important;
 }
 
-/* CATEGORY 2 — live data: retained cards, asymmetric identity and measurable scale cues. */
-#latest-surface a[href^="/chains/"] {
+.ua3 .ua3-confidence-formula-card {
+  border-left-color: var(--accent-explain) !important;
+}
+
+/* CATEGORY 2 — live data: cards remain, but their internal grammar is distinct. */
+.ua3 .ua3-chain-card {
+  position: relative !important;
+  overflow: visible !important;
+  padding: 22px 20px 20px 68px !important;
+  border-radius: 12px !important;
+}
+
+.ua3 .ua3-chain-card::before {
+  content: "";
+  position: absolute !important;
+  left: 20px !important;
+  top: 20px !important;
+  z-index: 2 !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 34px !important;
+  height: 34px !important;
+  margin: 0 !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  background: rgba(255,255,255,.055) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-display-numeric) !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+}
+
+.ua3 .ua3-chain-card[data-chain="bitcoin"]::before {
+  content: "₿" !important;
+  border-radius: 50% !important;
+}
+.ua3 .ua3-chain-card[data-chain="ethereum"]::before {
+  content: "Ξ" !important;
+  border-radius: 0 !important;
+  clip-path: polygon(50% 0,100% 50%,50% 100%,0 50%);
+}
+.ua3 .ua3-chain-card[data-chain="arbitrum"]::before {
+  content: "A" !important;
+  border-radius: 0 !important;
+  clip-path: polygon(25% 7%,75% 7%,100% 50%,75% 93%,25% 93%,0 50%);
+}
+.ua3 .ua3-chain-card[data-chain="base"]::before {
+  content: "■" !important;
+  border-radius: 4px !important;
+}
+
+.ua3 .ua3-chain-top {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+}
+
+.ua3 .ua3-chain-top > div:first-child {
+  min-width: 0;
+  padding-left: 0 !important;
+}
+
+.ua3 .ua3-chain-bottom {
+  display: grid !important;
+  grid-template-columns: minmax(80px,.8fr) minmax(72px,1.2fr) !important;
+  align-items: end !important;
+  gap: 14px !important;
+  margin-top: 28px !important;
+}
+
+.ua3 .ua3-chain-bottom > div:first-child {
+  justify-self: stretch;
+  text-align: right;
+}
+
+.ua3 .ua3-chain-bottom .ua3-data-medium {
+  margin-top: 0 !important;
+}
+
+.ua3 .ua3-metric-card,
+.ua3 .ua3-mini-card {
   position: relative;
-  overflow: visible;
+  border-radius: 10px !important;
 }
 
-#latest-surface a[href^="/chains/"]::before {
-  position: absolute;
-  top: 18px;
-  left: 18px;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255,255,255,.16);
-  background: rgba(255,255,255,.055);
-  color: var(--text-primary);
-  font-family: var(--font-display-numeric);
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1;
+.ua3 .ua3-metric-card .ua3-data-medium,
+.ua3 .ua3-mini-card .ua3-data-small {
+  border-left: 2px solid rgba(107,143,224,.62);
+  padding-left: 10px;
 }
 
-#latest-surface a[href^="/chains/"] > div:first-child {
-  padding-left: 46px;
+.ua3 .ua3-progress {
+  border-radius: 2px !important;
+}
+.ua3 .ua3-progress-fill {
+  border-radius: 2px !important;
 }
 
-#latest-surface a[href="/chains/bitcoin"]::before {
-  content: "₿";
-  border-radius: 50%;
-}
-
-#latest-surface a[href="/chains/ethereum"]::before {
-  content: "Ξ";
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-}
-
-#latest-surface a[href="/chains/arbitrum"]::before {
-  content: "A";
-  clip-path: polygon(25% 7%, 75% 7%, 100% 50%, 75% 93%, 25% 93%, 0 50%);
-}
-
-#latest-surface a[href="/chains/base"]::before {
-  content: "B";
-  border-radius: 4px;
-}
-
-#latest-surface a[href^="/chains/"] [class*="grid-cols-2"] > div > div:nth-child(2),
-#latest-surface a[href^="/chains/"] [class*="text-[22px]"],
-#latest-surface a[href^="/chains/"] [class*="text-[26px]"] {
-  border-left: 2px solid rgba(107,143,224,.58);
-  padding-left: 9px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Mobile chain cards use the same four unmistakable identifiers. */
-main.lg\:hidden a[href^="/chains/"] {
-  position: relative;
-}
-main.lg\:hidden a[href^="/chains/"]::before {
-  position: absolute;
-  top: 18px;
-  left: 18px;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255,255,255,.16);
-  background: rgba(255,255,255,.055);
-  color: var(--text-primary);
-  font-family: var(--font-display-numeric);
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1;
-}
-main.lg\:hidden a[href^="/chains/"] > div:first-child { padding-left: 46px; }
-main.lg\:hidden a[href="/chains/bitcoin"]::before { content: "₿"; border-radius: 50%; }
-main.lg\:hidden a[href="/chains/ethereum"]::before { content: "Ξ"; clip-path: polygon(50% 0,100% 50%,50% 100%,0 50%); }
-main.lg\:hidden a[href="/chains/arbitrum"]::before { content: "A"; clip-path: polygon(25% 7%,75% 7%,100% 50%,75% 93%,25% 93%,0 50%); }
-main.lg\:hidden a[href="/chains/base"]::before { content: "B"; border-radius: 4px; }
-main.lg\:hidden a[href^="/chains/"] [class*="grid-cols-2"] > div > div:nth-child(2) {
-  border-left: 2px solid rgba(107,143,224,.58);
-  padding-left: 9px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* CATEGORY 3 — actions: clear hierarchy and no full-pill CTAs. Badges remain pills. */
-main button,
-main a[class*="rounded-full"] {
-  border-radius: 8px !important;
-}
-
-main button[class*="bg-cyan-400"],
-main a[class*="bg-cyan-400"] {
-  background: var(--accent-action) !important;
-  color: #04140F !important;
-  border-color: var(--accent-action) !important;
+/* CATEGORY 3 — actions: primary, secondary and tertiary hierarchy. */
+.ua3 .ua3-button,
+.ua3 .ua3-toggle,
+.ua3-hero-panel-primary {
+  border-radius: var(--radius-button-functional) !important;
+  text-transform: none !important;
+  letter-spacing: .015em !important;
   font-weight: 600 !important;
 }
 
-main a[class*="border"][class*="bg-white"],
-main button[class*="border"][class*="bg-white"] {
-  border-radius: 8px !important;
+.ua3 .ua3-button-primary,
+.ua3-hero-panel-primary,
+.ua3 .ua3-plan-card:first-child .ua3-button-quiet {
+  border-color: var(--accent-action) !important;
+  background: var(--accent-action) !important;
+  color: #04140F !important;
 }
 
-/* Text-only navigation remains text-only rather than masquerading as a button. */
-#latest-surface a[href="/track-record"],
-main a[href="/methodology"],
-main a[href="/service"] {
-  text-decoration: underline;
-  text-underline-offset: 4px;
+.ua3 .ua3-button-quiet {
+  border: 1.5px solid var(--text-secondary) !important;
+  background: transparent !important;
+  color: var(--text-primary) !important;
 }
 
-/* CATEGORY 4 — pricing decisions: a dedicated heavier card language. */
-#plans [class*="xl:grid-cols-3"] > div,
-#plans-mobile [class*="space-y-3"] > div {
+.ua3 .ua3-modal-actions .ua3-button-primary {
+  border-color: var(--text-secondary) !important;
+  background: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+.ua3-hero-panel-secondary-actions a,
+.ua3 .ua3-regime-axis-note a,
+.ua3 .ua3-confidence-warning a {
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  color: var(--text-primary) !important;
+  text-decoration: underline !important;
+  text-underline-offset: 4px !important;
+}
+
+/* Badges keep pill geometry deliberately; controls do not. */
+.ua3 .ua3-status-badge,
+.ua3 .ua3-plan-badge,
+.ua3 .ua3-compliance-pill {
+  border-radius: 999px !important;
+}
+
+/* CATEGORY 4 — pricing decisions: heavier, roomier, dedicated card class. */
+.ua3 .ua3-plan-card {
   border-radius: 12px !important;
   padding: 32px 28px !important;
   background: var(--bg-elevated-1) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 18px 48px rgba(0,0,0,.16) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 18px 48px rgba(0,0,0,.18) !important;
 }
 
-#plans [class*="text-3xl"][class*="font-black"],
-#plans-mobile [class*="text-3xl"],
-#plans-mobile [class*="text-[26px]"] {
-  font-family: var(--font-display-numeric) !important;
-  font-variant-numeric: tabular-nums;
-  font-size: clamp(2.35rem, 4vw, 3.5rem) !important;
-  line-height: 1 !important;
-  letter-spacing: -.045em !important;
+.ua3 .ua3-plan-card-recommended {
+  transform: none !important;
+  border-color: color-mix(in srgb, var(--accent-action) 70%, var(--border-subtle)) !important;
+  background: linear-gradient(180deg, rgba(16,224,160,.045), transparent 55%), var(--bg-elevated-1) !important;
 }
 
-#plans [class*="rounded-full"],
-#plans-mobile [class*="rounded-full"] {
-  border-radius: 8px !important;
+.ua3 .ua3-plan-price {
+  font-size: clamp(44px, 5vw, 64px) !important;
+  line-height: .95 !important;
+  letter-spacing: -.05em !important;
 }
 
-/* CATEGORY 5 — process: drawn step numerals rather than another card grid. */
-details[class*="mb-10"] [class*="lg:grid-cols-2"] > div {
-  position: relative;
-  overflow: hidden;
+/* CATEGORY 5 — process steps: drawn sequence, not generic cards. */
+.ua3 .ua3-step-card {
+  position: relative !important;
+  overflow: visible !important;
   border: 0 !important;
-  border-top: 1px solid rgba(255,255,255,.11) !important;
+  border-top: 1px solid rgba(255,255,255,.14) !important;
   border-radius: 0 !important;
   background: transparent !important;
-  padding: 22px 4px 20px 64px !important;
   box-shadow: none !important;
+  padding: 28px 12px 24px 76px !important;
 }
 
-details[class*="mb-10"] [class*="lg:grid-cols-2"] > div > div:first-child > span:first-child {
-  position: absolute;
-  left: 2px;
-  top: 12px;
+.ua3 .ua3-step-number {
+  position: absolute !important;
+  left: 0 !important;
+  top: 18px !important;
+  margin: 0 !important;
+  color: var(--text-primary) !important;
   font-family: var(--font-display-numeric) !important;
   font-size: 48px !important;
   font-weight: 300 !important;
   line-height: 1 !important;
   letter-spacing: -.06em !important;
-  opacity: .35;
+  opacity: .35 !important;
 }
 
-details[class*="mb-10"] [class*="lg:grid-cols-2"] > div::after {
-  content: "";
-  position: absolute;
-  left: 34px;
-  top: 42px;
-  width: 18px;
-  height: 18px;
-  border: 1px solid rgba(107,143,224,.50);
-  border-radius: 50%;
-  background: rgba(107,143,224,.08);
+.ua3 .ua3-step-heading {
+  margin-top: 0 !important;
+  align-items: center !important;
 }
 
-/* CATEGORY 6 — raw code stays the only intentionally code-like surface. */
-main code,
-main pre,
-.ta-modal code,
-.ta-modal pre {
-  font-family: var(--mono) !important;
-}
-
-/* CATEGORY 7 — trust evidence: gold, heavier frame and repeated circle motif. */
-section.w-full > div:nth-of-type(2) > div {
+.ua3 .ua3-step-icon {
+  width: 26px !important;
+  height: 26px !important;
+  margin-left: -34px !important;
+  margin-right: 8px !important;
+  color: var(--accent-explain) !important;
   position: relative;
-  overflow: hidden;
-  border: 1px solid var(--accent-trust) !important;
-  background: linear-gradient(180deg, rgba(var(--accent-trust-rgb),.06), transparent 60%), #0a121f !important;
-  padding: 28px !important;
+  z-index: 2;
 }
 
-section.w-full > div:nth-of-type(2) > div::after {
+/* CATEGORY 6 — raw JSON/code stays intentionally code-like and unchanged in spirit. */
+.ua3 .ua3-json,
+.ua3 .ua3-json-tree-node {
+  background: #0A0C0E !important;
+}
+
+/* CATEGORY 7 — trust evidence: gold frame, trust numbers, repeated circle motif. */
+.ua3 .ua3-hero-network-panel {
+  position: relative !important;
+  overflow: hidden !important;
+  border: 1px solid var(--accent-trust) !important;
+  background: linear-gradient(180deg, rgba(var(--accent-trust-rgb),.065), transparent 60%), rgba(16,25,28,.72) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 24px 64px rgba(0,0,0,.38) !important;
+}
+
+.ua3 .ua3-hero-network-panel::after {
   content: "";
   position: absolute;
   right: 22px;
-  bottom: 20px;
+  top: 22px;
   width: 42px;
   height: 42px;
-  border: 1px solid rgba(var(--accent-trust-rgb),.58);
+  border: 1px solid rgba(var(--accent-trust-rgb),.62);
   border-radius: 50%;
-  box-shadow: inset 0 0 0 8px rgba(var(--accent-trust-rgb),.035);
+  box-shadow: inset 0 0 0 8px rgba(var(--accent-trust-rgb),.04);
   pointer-events: none;
 }
 
-section.w-full > div:nth-of-type(2) [class*="uppercase"] {
+.ua3 .ua3-hero-panel-label,
+.ua3 .ua3-hero-panel-stat {
   color: var(--accent-trust) !important;
 }
 
-section.w-full > div:nth-of-type(2) [class*="tabular"],
-section.w-full > div:nth-of-type(2) [class*="text-"] {
+.ua3 .ua3-hero-panel-stat {
   font-variant-numeric: tabular-nums;
 }
 
-/* Mobile published archive is trust evidence, not another generic card. */
-main.lg\:hidden section:first-of-type > div[class*="border-cyan-400"] {
+/* Structural form break: diagonal divider between Build-or-buy and Pricing. */
+.ua3 #pricing {
   position: relative;
-  border-color: var(--accent-trust) !important;
-  background: linear-gradient(180deg, rgba(var(--accent-trust-rgb),.07), transparent 65%) !important;
 }
-main.lg\:hidden section:first-of-type > div[class*="border-cyan-400"] [class*="uppercase"] {
-  color: var(--accent-trust) !important;
-}
-main.lg\:hidden section:first-of-type > div[class*="border-cyan-400"] [class*="text-5xl"] {
-  color: var(--accent-trust) !important;
-  font-family: var(--font-display-numeric) !important;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Structural break: a deliberate diagonal separator before pricing. */
-#plans {
-  position: relative;
-  margin-top: 44px;
-}
-#plans::before {
+.ua3 #pricing::before {
   content: "";
   position: absolute;
-  left: 1.5%;
-  right: 1.5%;
-  top: -25px;
+  left: 2%;
+  right: 2%;
+  top: -1px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(107,143,224,.65) 18%, rgba(224,184,92,.58) 82%, transparent);
-  transform: rotate(-2.4deg);
+  background: linear-gradient(90deg, transparent, rgba(107,143,224,.68) 18%, rgba(var(--accent-trust-rgb),.60) 82%, transparent);
+  transform: rotate(-2.5deg);
   transform-origin: center;
   pointer-events: none;
 }
 
-/* Compact mobile adjustments keep the functional distinctions readable. */
+/* Functional micro-labels are interface text, not code. */
+.ua3 .ua3-category,
+.ua3 .ua3-label,
+.ua3 .ua3-step-label,
+.ua3 .ua3-regime-question,
+.ua3 .ua3-hero-panel-label,
+.ua3 .ua3-hero-panel-offer-label {
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+
 @media (max-width: 767px) {
-  #plans-mobile [class*="space-y-3"] > div {
-    padding: 24px 20px !important;
+  .ua3 .ua3-chain-card {
+    padding: 16px 12px 16px 56px !important;
   }
 
-  main.lg\:hidden a[href^="/chains/"]::before {
-    top: 17px;
-    left: 17px;
+  .ua3 .ua3-chain-card::before {
+    left: 12px !important;
+    top: 14px !important;
+    width: 32px !important;
+    height: 32px !important;
   }
 
-  details[class*="mb-10"] [class*="lg:grid-cols-2"] > div {
-    padding-left: 60px !important;
+  .ua3 .ua3-chain-top {
+    display: block !important;
+  }
+
+  .ua3 .ua3-chain-top .ua3-status-badge {
+    margin-top: 10px !important;
+  }
+
+  .ua3 .ua3-chain-bottom {
+    grid-template-columns: minmax(70px,.9fr) minmax(64px,1.1fr) !important;
+    margin-top: 16px !important;
+  }
+
+  .ua3 .ua3-plan-card {
+    padding: 28px 22px !important;
+  }
+
+  .ua3 .ua3-plan-price {
+    font-size: 46px !important;
+  }
+
+  .ua3 .ua3-step-card {
+    padding: 24px 8px 22px 68px !important;
+  }
+
+  .ua3 .ua3-step-number {
+    font-size: 44px !important;
+  }
+
+  .ua3 .ua3-regime-card,
+  .ua3 .ua3-confidence-explainer-card {
+    padding-left: 18px !important;
   }
 }
