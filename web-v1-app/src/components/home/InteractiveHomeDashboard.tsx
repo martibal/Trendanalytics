@@ -5,13 +5,14 @@ import Script from "next/script";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import HeroNetworkStatePanel, { type HeroPanelSnapshot } from "./HeroNetworkStatePanel";
+import type { HeroPanelSnapshot } from "./HeroNetworkStatePanel";
 
 export type HomeLabel = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 export type Artifact = "Meta" | "Gold" | "Derived" | "Briefs";
 type CheckoutPlan = "basic" | "pro";
 type JsonPayload = unknown;
 type ExampleKind = "high" | "low";
+type InfoId = "regime" | "confidence" | "demand" | "friction" | "capacity" | "dataQuality" | "labelConfidence" | "dataLag";
 
 declare global {
   interface Window {
@@ -66,8 +67,6 @@ type Props = {
   heroSnapshot?: HeroPanelSnapshot;
 };
 
-type InfoId = "regime" | "confidence" | "demand" | "friction" | "capacity" | "dataQuality" | "labelConfidence" | "dataLag";
-
 const info: Record<InfoId, { title: string; body: string }> = {
   regime: { title: "Regime / status", body: "The regime is the daily network-state label for a chain. It is produced from network activity, friction and capacity evidence. It is not a price view." },
   confidence: { title: "Confidence", body: "A combined evidence-strength score. It blends data quality with how clearly the observed evidence supports the published label. It is not a probability that the label is correct." },
@@ -79,24 +78,18 @@ const info: Record<InfoId, { title: string; body: string }> = {
   dataLag: { title: "Data lag", body: "How old the underlying observation is at publication time. BTC and ETH are normally T+1; ARB and Base are normally T+7." },
 };
 
-const artifactCards: Array<{ name: Artifact; icon: string; what: string; use: string }> = [
-  { name: "Meta", icon: "◎", what: "Regime, confidence and score vector.", use: "Use it as the daily state row you join to your own data." },
-  { name: "Gold", icon: "▦", what: "Daily measurements behind the state row.", use: "Use it to inspect the raw evidence behind the label." },
-  { name: "Derived", icon: "⌁", what: "Moving averages and feature context.", use: "Use it when you want feature engineering without rebuilding it." },
-  { name: "Briefs", icon: "✦", what: "Readable context from the same evidence.", use: "Use it in reports, internal notes and dashboards." },
+const artifacts: Array<{ name: Artifact; number: string; what: string; use: string }> = [
+  { name: "Meta", number: "01", what: "Regime, confidence and score vector.", use: "The daily state row you join to your own data." },
+  { name: "Gold", number: "02", what: "Daily measurements behind the state row.", use: "Inspect the raw evidence behind the label." },
+  { name: "Derived", number: "03", what: "Moving averages and feature context.", use: "Use feature engineering without rebuilding it." },
+  { name: "Briefs", number: "04", what: "Readable context from the same evidence.", use: "Drop the evidence into notes, reports and dashboards." },
 ];
 
 const plans: Array<{ id: "free" | CheckoutPlan; name: string; price: string; summary: string; cta: string; recommended?: boolean }> = [
-  { id: "free", name: "Free", price: "$0", summary: "Best for evaluating the format: inspect the public CSV and examples before paying. No authenticated daily delivery.", cta: "Download free sample pack" },
-  { id: "basic", name: "Basic", price: "$49/mo", summary: "Best starting point for most analysts: authenticated daily delivery for one selected chain, with 90 days of history available immediately on subscribe.", cta: "Start Basic", recommended: true },
-  { id: "pro", name: "Pro", price: "$149/mo", summary: "Best for multi-chain workflows: authenticated daily delivery for Bitcoin, Ethereum, Arbitrum and Base, with the full published history available immediately across all four chains.", cta: "Start Pro" },
+  { id: "free", name: "Free", price: "$0", summary: "Inspect the public sample pack and the published format before paying.", cta: "Download sample" },
+  { id: "basic", name: "Basic", price: "$49/mo", summary: "One selected chain with authenticated daily delivery and 90 days of history on subscribe.", cta: "Start Basic", recommended: true },
+  { id: "pro", name: "Pro", price: "$149/mo", summary: "All four chains with authenticated daily delivery and the full published history.", cta: "Start Pro" },
 ];
-
-const gettingStarted = [
-  { number: "01", title: "Skip the classification build.", body: "Use a finished daily network-state layer instead of spending analyst and engineering time on ingestion, baselines, chain-specific rules, confidence logic and ongoing maintenance.", cta: "See what is delivered →", href: "#today-status", icon: "plug" },
-  { number: "02", title: "Add one row to the data you already use.", body: "Regime, confidence and evidence arrive on the same date + chain key, so you can join the row into existing analysis, dashboards and reporting without changing your core workflow.", cta: "Download free sample pack →", href: "/api/v1/sample-pack", icon: "code" },
-  { number: "03", title: "Keep every classification explainable.", body: "Confidence, drivers, underlying measurements and methodology version stay attached to the published state, giving you an auditable reference layer instead of an opaque label.", cta: "Review methodology →", href: "/methodology/reference", icon: "card" },
-] as const;
 
 const regimeExplainers: Array<{ label: Exclude<HomeLabel, "UNKNOWN/DEGRADED">; plain: string; evidence: string }> = [
   { label: "STABLE", plain: "No unusual network condition dominates the evidence.", evidence: "Demand, Friction and Capacity do not combine strongly enough to trigger another regime." },
@@ -148,51 +141,30 @@ function previewPayload(selectedArtifact: Artifact, selectedExample: HomeConfide
 }
 
 function statusColor(label: HomeLabel) {
-  if (label === "STABLE") return "var(--status-stable)";
-  if (label === "CHEAP") return "var(--status-cheap)";
-  if (label === "HEATING") return "var(--status-heating)";
-  if (label === "CONGESTED") return "var(--status-congested)";
-  return "var(--status-unknown)";
+  if (label === "STABLE") return "var(--signal-stable)";
+  if (label === "CHEAP") return "var(--signal-cheap)";
+  if (label === "HEATING") return "var(--signal-heating)";
+  if (label === "CONGESTED") return "var(--signal-congested)";
+  return "var(--signal-unknown)";
 }
 
 function toneStyle(label: HomeLabel): CSSProperties {
   return { "--status-color": statusColor(label) } as CSSProperties;
 }
 
-function LucideIcon({ name }: { name: "card" | "plug" | "code" }) {
-  if (name === "card") {
-    return <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2" /><path d="M2 10h20M6 15h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
-  }
-  if (name === "plug") {
-    return <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 22v-5M9 8V2M15 8V2M7 8h10v4a5 5 0 0 1-10 0V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-  }
-  return <svg className="ua3-step-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-function FieldCode({ children }: { children: string }) {
-  return <code className="ua3-value-field">{children}</code>;
-}
-
-function HeroValueStrip() {
+function SignatureLine({ className = "" }: { className?: string }) {
   return (
-    <div className="ua3-value-wrap">
-      <p className="ua3-value-title">When a KPI moves, ask whether the network moved with it.</p>
-      <div className="ua3-value-strip" aria-label="Practical uses">
-        <div className="ua3-value-column">
-          <h2>Your model&apos;s error rate doubled on Tuesday.</h2>
-          <p>Before changing the model, check whether the chain itself moved into a different operating state.</p>
-        </div>
-        <div className="ua3-value-column">
-          <h2>Join the network context to that date.</h2>
-          <p>Add <FieldCode>regime</FieldCode> and <FieldCode>confidence_score</FieldCode> on date + chain to see whether Tuesday was <FieldCode>STABLE</FieldCode>, <FieldCode>HEATING</FieldCode>, <FieldCode>CONGESTED</FieldCode> or <FieldCode>CHEAP</FieldCode>.</p>
-        </div>
-        <div className="ua3-value-column">
-          <h2>Separate a regime shift from noise.</h2>
-          <p>Keep confidence, drivers and underlying measurements attached so the change can be investigated and explained instead of guessed at.</p>
-        </div>
-      </div>
-    </div>
+    <svg className={`ua-signature ${className}`} viewBox="0 0 1200 90" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 52 C72 48 93 60 143 54 C198 47 220 51 267 49 C311 47 328 18 346 68 C365 14 382 74 403 45 C431 48 462 54 503 50 C553 45 583 57 627 53 C681 49 704 52 749 46 C781 42 795 63 812 34 C829 66 844 24 865 52 C909 55 953 46 1001 50 C1064 56 1114 44 1200 51" />
+    </svg>
   );
+}
+
+function SpecimenIcon({ type }: { type: Artifact }) {
+  if (type === "Meta") return <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="9"/><path d="M16 5v22M5 16h22"/></svg>;
+  if (type === "Gold") return <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h22v16H5zM11 8v16M21 8v16M5 14h22M5 20h22"/></svg>;
+  if (type === "Derived") return <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 23c5 0 6-14 12-14s7 14 12 14M4 16h24"/></svg>;
+  return <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 25V7h18v18H7zM11 12h10M11 16h10M11 20h6"/></svg>;
 }
 
 function InfoButton({ id, activeInfo, setActiveInfo }: { id: InfoId; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
@@ -200,92 +172,57 @@ function InfoButton({ id, activeInfo, setActiveInfo }: { id: InfoId; activeInfo:
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const popoverId = `ua3-info-${id}`;
-
   const closeAndRestoreFocus = useCallback(() => {
     setActiveInfo(null);
     window.setTimeout(() => triggerRef.current?.focus(), 0);
   }, [setActiveInfo]);
 
   useEffect(() => {
-    if (!open) return;
-    window.setTimeout(() => closeRef.current?.focus(), 0);
+    if (open) window.setTimeout(() => closeRef.current?.focus(), 0);
   }, [open]);
 
   return (
-    <span
-      className="ua3-info"
-      onKeyDown={(event) => {
-        if (event.key !== "Escape" || !open) return;
-        event.preventDefault();
-        event.stopPropagation();
-        closeAndRestoreFocus();
-      }}
-    >
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-label={`Explain ${info[id].title}`}
-        aria-expanded={open}
-        aria-controls={popoverId}
-        onClick={(event) => { event.stopPropagation(); if (open) closeAndRestoreFocus(); else setActiveInfo(id); }}
-        className="ua3-info-button"
-      >?</button>
+    <span className="ua-info">
+      <button ref={triggerRef} type="button" aria-label={`Explain ${info[id].title}`} aria-expanded={open} aria-controls={popoverId} onClick={(event) => { event.stopPropagation(); open ? closeAndRestoreFocus() : setActiveInfo(id); }} className="ua-info-trigger">?</button>
       {open ? (
-        <span id={popoverId} className="ua3-info-popover" role="dialog" aria-label={info[id].title}>
-          <button ref={closeRef} type="button" aria-label="Close explanation" className="ua3-info-close" onClick={(event) => { event.stopPropagation(); closeAndRestoreFocus(); }}>×</button>
-          <span className="ua3-info-title">{info[id].title}</span>
-          <span className="ua3-info-body">{info[id].body}</span>
+        <span id={popoverId} className="ua-info-popover" role="dialog" aria-label={info[id].title}>
+          <button ref={closeRef} type="button" aria-label="Close explanation" className="ua-info-close" onClick={(event) => { event.stopPropagation(); closeAndRestoreFocus(); }}>×</button>
+          <strong>{info[id].title}</strong>
+          <span>{info[id].body}</span>
         </span>
       ) : null}
     </span>
   );
 }
 
-function StatusBadge({ label, activeInfo, setActiveInfo }: { label: HomeLabel; activeInfo?: InfoId | null; setActiveInfo?: (value: InfoId | null) => void }) {
+function StatusMark({ label }: { label: HomeLabel }) {
+  return <span className="ua-status-mark" style={toneStyle(label)}><span />{label}</span>;
+}
+
+function InstrumentScale({ chain, activeInfo, setActiveInfo }: { chain: HomeChainSnapshot; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
+  const values = [
+    { id: "demand" as const, label: "Demand", value: chain.demand },
+    { id: "friction" as const, label: "Friction", value: chain.friction },
+    { id: "capacity" as const, label: "Capacity", value: chain.capacity },
+  ];
   return (
-    <span className="ua3-status-badge" style={toneStyle(label)}>
-      <span className="ua3-status-dot" />
-      {label}
-      {activeInfo !== undefined && setActiveInfo ? <InfoButton id="regime" activeInfo={activeInfo} setActiveInfo={setActiveInfo} /> : null}
-    </span>
-  );
-}
-
-function ProgressBar({ value }: { value: number | null }) {
-  const width = clampPercent(value);
-  return <div className="ua3-progress"><div className="ua3-progress-fill" style={{ width: `${width}%` }} /></div>;
-}
-
-function Sparkline() {
-  return <svg aria-hidden="true" viewBox="0 0 120 34" className="ua3-sparkline"><path d="M2 24 L14 22 L25 16 L36 18 L48 9 L60 22 L73 17 L86 23 L99 11 L118 13" fill="none" stroke="var(--accent-action)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /><path d="M2 24 L14 22 L25 16 L36 18 L48 9 L60 22 L73 17 L86 23 L99 11 L118 13" fill="none" stroke="var(--accent-action)" strokeOpacity="0.18" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-function ConfidenceGauge({ chain, activeInfo, setActiveInfo }: { chain: HomeChainSnapshot; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
-  const percent = clampPercent(chain.confidenceValue);
-  return (
-    <div className="ua3-confidence-block">
-      <div className="ua3-gauge" style={{ "--pct": `${percent}%` } as CSSProperties}>
-        <div className="ua3-gauge-inner">
-          <span className="ua3-gauge-value">{chain.confidence}</span>
-          <span className="ua3-gauge-label">Confidence</span>
-          <InfoButton id="confidence" activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
-        </div>
+    <div className="ua-instrument" aria-label="Demand, friction and capacity on one shared scale">
+      <div className="ua-instrument-scale" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+      <div className="ua-instrument-track">
+        {values.map((item) => {
+          const position = item.value == null ? 50 : Math.max(0, Math.min(100, item.value));
+          return <span key={item.id} className={`ua-needle ua-needle-${item.id}`} style={{ left: `${position}%` }} aria-hidden="true" />;
+        })}
       </div>
-      <div className="ua3-confidence-text"><p className="ua3-label">Evidence strength</p><p>Use confidence to decide how much weight to place on the row. It is not the probability that the label is correct.</p></div>
+      <div className="ua-instrument-readings">
+        {values.map((item) => <div key={item.id}><p className="ua-micro">{item.label} <InfoButton id={item.id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></p><strong>{metric(item.value)}</strong></div>)}
+      </div>
     </div>
   );
 }
 
-function SecondaryMetric({ id, label, value, activeInfo, setActiveInfo }: { id: InfoId; label: string; value: number | null; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
-  return <div className="ua3-metric-card"><div className="ua3-metric-head"><p className="ua3-label">{label}</p><InfoButton id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><p className="ua3-data-medium">{metric(value)}</p><ProgressBar value={value == null ? null : value / 100} /></div>;
-}
-
-function TertiaryMetric({ id, label, value, activeInfo, setActiveInfo }: { id: InfoId; label: string; value: string; activeInfo: InfoId | null; setActiveInfo: (value: InfoId | null) => void }) {
-  return <div className="ua3-mini-card"><div className="ua3-metric-head"><p className="ua3-label">{label}</p><InfoButton id={id} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><p className="ua3-data-small">{value}</p></div>;
-}
-
 function CheckoutButton({ plan, children }: { plan: CheckoutPlan; children: string }) {
-  return <form action={`/api/v1/checkout?plan=${plan}`} method="post" className="ua3-form"><button type="submit" className="ua3-button ua3-button-primary ua3-button-full">{children}</button></form>;
+  return <form action={`/api/v1/checkout?plan=${plan}`} method="post" className="ua-form"><button type="submit" className="ua-action ua-action-filled">{children}</button></form>;
 }
 
 function JsonBlock({ payload, prismReady, complete = false }: { payload: JsonPayload; prismReady: boolean; complete?: boolean }) {
@@ -296,31 +233,12 @@ function JsonBlock({ payload, prismReady, complete = false }: { payload: JsonPay
 }
 
 function JsonTree({ payload, prismReady }: { payload: JsonPayload; prismReady: boolean }) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return <JsonBlock payload={payload} prismReady={prismReady} complete />;
-  }
-  return (
-    <div className="ua3-json-tree" aria-label="Full published JSON tree">
-      {Object.entries(payload as Record<string, unknown>).map(([key, value]) => (
-        <details key={key} className="ua3-json-tree-node">
-          <summary tabIndex={0}><span>{key}</span><span className="ua3-json-tree-type">{Array.isArray(value) ? `array · ${value.length}` : value && typeof value === "object" ? "object" : typeof value}</span></summary>
-          <JsonBlock payload={value} prismReady={prismReady} complete />
-        </details>
-      ))}
-    </div>
-  );
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return <JsonBlock payload={payload} prismReady={prismReady} complete />;
+  return <div className="ua-json-tree" aria-label="Full published JSON tree">{Object.entries(payload as Record<string, unknown>).map(([key, value]) => <details key={key}><summary><span>{key}</span><small>{Array.isArray(value) ? `array · ${value.length}` : value && typeof value === "object" ? "object" : typeof value}</small></summary><JsonBlock payload={value} prismReady={prismReady} complete /></details>)}</div>;
 }
 
-function toHeroPanelSnapshot(chain: HomeChainSnapshot): HeroPanelSnapshot {
-  return {
-    name: chain.name,
-    asOf: chain.asOf,
-    lag: chain.lag,
-    regime: chain.regime,
-    confidence: chain.confidence,
-    confidenceValue: chain.confidenceValue,
-    oneLiner: chain.oneLiner,
-  };
+function formatRows(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? new Intl.NumberFormat("en-US").format(value) : "—";
 }
 
 export default function InteractiveHomeDashboard({ snapshots, lastRun, examples, heroSnapshot }: Props) {
@@ -343,61 +261,33 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
     return selectedChain.artifacts[selectedArtifact];
   }, [selectedArtifact, selectedChain, selectedExample]);
   const completeTitle = selectedArtifact === "Meta" && selectedExample ? `Meta ${selectedExample.sourceDate}.json` : `${selectedArtifact} latest.json`;
-  const ethereumSnapshot = snapshots.find((snapshot) => snapshot.id === "ethereum") ?? snapshots[1] ?? selectedChain;
-  const heroPanelSnapshot = heroSnapshot ?? (ethereumSnapshot ? toHeroPanelSnapshot(ethereumSnapshot) : null);
+
   const closeModal = useCallback(() => {
     setModalOpen(false);
     window.setTimeout(() => modalTriggerRef.current?.focus(), 0);
   }, []);
 
   useEffect(() => {
+    const sections = Array.from(document.querySelectorAll<HTMLElement>(".ua3-section"));
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => { if (entry.isIntersecting) entry.target.classList.add("ua-visible"); });
+    }, { threshold: 0.08 });
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     if (!activeInfo) return;
-    function closeOnOutsidePointer(event: PointerEvent) {
-      const target = event.target;
-      if (target instanceof Element && !target.closest(".ua3-info")) setActiveInfo(null);
-    }
-    function closeInfoOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setActiveInfo(null);
-    }
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    document.addEventListener("keydown", closeInfoOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
-      document.removeEventListener("keydown", closeInfoOnEscape);
-    };
+    const close = (event: PointerEvent) => { if (event.target instanceof Element && !event.target.closest(".ua-info")) setActiveInfo(null); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
   }, [activeInfo]);
 
   useEffect(() => {
     if (!modalOpen) return;
-    const modal = modalRef.current;
-    function handleModalKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeModal();
-        return;
-      }
-      if (event.key !== "Tab" || !modal) return;
-      const focusable = Array.from(modal.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      )).filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
-      if (focusable.length === 0) {
-        event.preventDefault();
-        modal.focus();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || !modal.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (active === last || !modal.contains(active))) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-    document.addEventListener("keydown", handleModalKeyDown);
-    return () => document.removeEventListener("keydown", handleModalKeyDown);
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") closeModal(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [modalOpen, closeModal]);
 
   async function copyModalJson() {
@@ -410,296 +300,135 @@ export default function InteractiveHomeDashboard({ snapshots, lastRun, examples,
 
   if (!selectedChain) return null;
 
+  const observationNumber = formatRows(heroSnapshot?.consecutiveRows);
+  const methodologyVersion = heroSnapshot?.methodologyVersionLabel ?? selectedChain.methodologyVersion ?? "—";
+
   return (
     <main className="ua3">
       <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" strategy="afterInteractive" onLoad={() => setPrismReady(true)} />
       <Script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js" strategy="afterInteractive" onLoad={() => setPrismReady(true)} />
 
-      <section className="ua3-section ua3-hero" aria-labelledby="hero-title">
-        <div className="ua3-wrap ua3-hero-grid">
-          <div className="ua3-hero-left">
-            <p className="ua3-category">DAILY NETWORK-STATE CLASSIFICATION</p>
-            <h1 id="hero-title" className="ua3-display">Add a daily network-regime column to the blockchain data you already use.</h1>
-            <p className="ua3-body ua3-hero-copy">Urd Atlas delivers one versioned daily row per chain — regime, confidence and evidence — so analysts can segment, filter and explain network conditions without building and maintaining the classification layer themselves.</p>
-            <HeroValueStrip />
-            <div className="ua3-compliance-row" aria-label="Product boundary"><span className="ua3-compliance-pill">No price data</span><span className="ua3-compliance-pill">No forecasts</span><span className="ua3-compliance-pill">No recommendations</span></div>
-            <p className="ua3-body-small">Bitcoin, Ethereum, Arbitrum and Base. Deterministic, chain-aware and versioned. <Link href="/validation">See the validation evidence →</Link></p>
-          </div>
-          <div className="ua3-hero-glow" aria-label="Hero network-state row preview">
-            {heroPanelSnapshot ? <HeroNetworkStatePanel snapshot={heroPanelSnapshot} /> : null}
+      <section className="ua3-section ua-night ua-hero ua-visible" aria-labelledby="hero-title">
+        <SignatureLine className="ua-hero-trace" />
+        <div className="ua-shell ua-hero-inner">
+          <p className="ua-micro">DAILY OBSERVATION · NO {observationNumber}</p>
+          <h1 id="hero-title">Add a daily network-regime column to the blockchain data you already use.</h1>
+          <p className="ua-lede">Urd Atlas publishes one versioned observation per chain — regime, confidence and evidence — so analysts can separate a network-state shift from ordinary noise without maintaining the classification layer themselves.</p>
+          <a href="/api/v1/sample-pack" className="ua-action ua-action-instrument" download>Inspect the sample pack</a>
+          <p className="ua-boundary">Bitcoin · Ethereum · Arbitrum · Base · No price data · No forecasts · No recommendations</p>
+        </div>
+      </section>
+
+      <SignatureLine className="ua-divider" />
+
+      <section className="ua3-section ua-paper ua-value" aria-labelledby="value-title">
+        <div className="ua-shell ua-paper-inset">
+          <p className="ua-micro">A PRACTICAL QUESTION</p>
+          <h2 id="value-title">When Tuesday changes, ask whether the network changed with it.</h2>
+          <div className="ua-editorial-ledger">
+            <article><p className="ua-field">01 / MODEL ERROR</p><div><h3>Your model&apos;s error rate doubled on Tuesday.</h3><p>Before changing the model, check whether the chain itself moved into a different operating state.</p></div></article>
+            <article><p className="ua-field">02 / JOIN KEY</p><div><h3>Add network context to that date.</h3><p>Join <code>regime</code> and <code>confidence_score</code> on date + chain and inspect whether Tuesday was STABLE, HEATING, CONGESTED or CHEAP.</p></div></article>
+            <article><p className="ua-field">03 / EXPLANATION</p><div><h3>Keep the evidence attached.</h3><p>Confidence, drivers and underlying measurements stay with the row so the change can be investigated instead of guessed at.</p></div></article>
           </div>
         </div>
       </section>
 
-      <div className="ua3-transition" aria-hidden="true" />
+      <SignatureLine className="ua-divider ua-divider-invert" />
 
-      <section className="ua3-section ua3-start" aria-labelledby="start-title"><div className="ua3-wrap"><h2 id="start-title" className="ua3-step-title">What you are buying.</h2><div className="ua3-start-grid">{gettingStarted.map((step) => <article key={step.number} className="ua3-card ua3-step-card"><p className="ua3-step-number">{step.number}</p><div className="ua3-step-heading"><LucideIcon name={step.icon} /><h3>{step.title}</h3></div><p className="ua3-body-small">{step.body}</p><Link href={step.href} className="ua3-button ua3-button-quiet">{step.cta}</Link></article>)}</div></div></section>
-
-      <div className="ua3-transition" aria-hidden="true" />
-
-      <section id="today-status" className="ua3-section ua3-status" aria-labelledby="status-title"><div className="ua3-wrap"><div className="ua3-section-head"><div><p className="ua3-label ua3-step-label">Published network state</p><h2 id="status-title" className="ua3-step-title">Today&apos;s state — four chains, updated {lastRun}.</h2></div><p className="ua3-body-small ua3-help-copy">Select any term marked with ? to see a plain-language explanation.</p></div><div className="ua3-chain-grid" role="group" aria-label="Chain selector">{snapshots.map((chain) => { const active = chain.id === selectedChainId; return <button key={chain.id} data-chain={chain.id} type="button" aria-pressed={active} onClick={() => setSelectedChainId(chain.id)} className={active ? "ua3-card ua3-chain-card ua3-chain-card-active" : "ua3-card ua3-chain-card"} style={toneStyle(chain.regime)}><div className="ua3-chain-top"><div><p className="ua3-label">{chain.ticker}</p><h3>{chain.name}</h3></div><StatusBadge label={chain.regime} /></div><div className="ua3-chain-bottom"><div><p className="ua3-data-medium">{chain.confidence}</p><p className="ua3-body-small">confidence</p></div><Sparkline /></div></button>; })}</div><div className="ua3-detail-panel"><div className="ua3-card ua3-detail-summary"><div className="ua3-detail-head"><div><p className="ua3-label">{selectedChain.ticker} · {selectedChain.asOf} · {selectedChain.lag}</p><h3>{selectedChain.name}</h3></div><StatusBadge label={selectedChain.regime} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><p className="ua3-body-small ua3-one-liner">{selectedChain.oneLiner}</p><ConfidenceGauge chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-status-metrics"><div className="ua3-secondary-grid"><SecondaryMetric id="demand" label="Demand" value={selectedChain.demand} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="friction" label="Friction" value={selectedChain.friction} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><SecondaryMetric id="capacity" label="Capacity" value={selectedChain.capacity} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div><div className="ua3-tertiary-grid"><TertiaryMetric id="dataQuality" label="Data quality" value={pct(selectedChain.dataQuality)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="labelConfidence" label="Label confidence" value={pct(selectedChain.labelConfidence)} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /><TertiaryMetric id="dataLag" label="Data lag" value={selectedChain.lag} activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div></div></div></div></section>
-
-      <div className="ua3-transition" aria-hidden="true" />
-
-      <section className="ua3-section ua3-files" aria-labelledby="files-title"><div className="ua3-wrap ua3-files-grid"><div><p className="ua3-label ua3-step-label">Delivered evidence</p><h2 id="files-title" className="ua3-step-title">One daily row. Four delivered files.</h2><p className="ua3-body">Each layer has the same date and chain key, so it can be inspected by humans or joined into a workflow.</p></div><div className="ua3-artifact-grid" role="group" aria-label="Artifact selector">{artifactCards.map((artifact) => <button key={artifact.name} type="button" aria-pressed={selectedArtifact === artifact.name} onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua3-card ua3-artifact-card ua3-artifact-card-active" : "ua3-card ua3-artifact-card"}><span className="ua3-artifact-icon">{artifact.icon}</span><h3>{artifact.name}</h3><p className="ua3-body-small">{artifact.what}</p><p className="ua3-card-note">{artifact.use}</p></button>)}</div></div><div className="ua3-wrap ua3-preview-panel"><div><p className="ua3-label">Example preview</p><div className="ua3-toggle-row" role="group" aria-label="Confidence example selector">{(["high", "low"] as const).map((kind) => <button key={kind} type="button" aria-pressed={exampleKind === kind} onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua3-toggle ua3-toggle-active" : "ua3-toggle"}>{kind} confidence</button>)}</div><p className="ua3-body-small">Switch the confidence example, then inspect how the selected JSON layer changes.</p></div><div><JsonBlock payload={preview} prismReady={prismReady} /><button ref={modalTriggerRef} type="button" aria-haspopup="dialog" className="ua3-button ua3-button-quiet ua3-json-open" onClick={() => setModalOpen(true)}>View complete JSON →</button></div></div></section>
-
-      <div className="ua3-transition" aria-hidden="true" />
-
-      <section className="ua3-section ua3-start" aria-labelledby="build-buy-title">
-        <div className="ua3-wrap">
-          <p className="ua3-label ua3-step-label">Build or buy</p>
-          <h2 id="build-buy-title" className="ua3-step-title">You could build this yourself. The question is whether you should.</h2>
-          <p className="ua3-body">The alternative to Urd Atlas is not raw data alone. It is the ingestion, normalization, chain-specific feature work, historical baselines, classification rules, confidence logic and ongoing maintenance needed to turn that raw data into a dependable daily state row.</p>
-          <div className="ua3-start-grid" style={{ marginTop: 32 }}>
-            <article className="ua3-card ua3-step-card">
-              <p className="ua3-step-number">01</p>
-              <div className="ua3-step-heading"><LucideIcon name="plug" /><h3>Build and maintain the data layer</h3></div>
-              <p className="ua3-body-small">Source four different chains, handle schema differences, aggregate daily measurements, validate freshness and keep the pipeline running when source data changes.</p>
-            </article>
-            <article className="ua3-card ua3-step-card">
-              <p className="ua3-step-number">02</p>
-              <div className="ua3-step-heading"><LucideIcon name="code" /><h3>Define and validate the methodology</h3></div>
-              <p className="ua3-body-small">Choose chain-aware proxies, historical baselines, regime thresholds, confidence gates and validation tests — then version the method when it changes.</p>
-            </article>
-            <article className="ua3-card ua3-step-card">
-              <p className="ua3-step-number">03</p>
-              <div className="ua3-step-heading"><LucideIcon name="card" /><h3>Or connect the finished layer</h3></div>
-              <p className="ua3-body-small">Basic is $49/month for one chain. Pro is $149/month for all four. Compare that subscription cost with the analyst and engineering time required to recreate, validate and maintain the same layer.</p>
-              <Link href="#pricing" className="ua3-button ua3-button-quiet">Compare plans →</Link>
-            </article>
-          </div>
+      <section className="ua3-section ua-night ua-dataset" aria-labelledby="dataset-title">
+        <SignatureLine className="ua-dataset-trace" />
+        <div className="ua-dataset-frame">
+          <div className="ua-dataset-heading"><p className="ua-micro">SPECIMEN / DATASET</p><h2 id="dataset-title">Dataset at a glance.</h2></div>
+          <div className="ua-dataset-fact"><strong>{observationNumber}</strong><div><p>consecutive daily rows</p><span>Published since {heroSnapshot?.firstPublishedLabel ?? "Dec 2024"}, no gaps</span></div></div>
+          <div className="ua-dataset-fact"><strong>4</strong><div><p>chains covered</p><span>Bitcoin · Ethereum · Arbitrum · Base</span></div></div>
+          <div className="ua-dataset-fact"><strong>{methodologyVersion}</strong><div><p>methodology</p><span>Deterministic and versioned; history is never silently rewritten</span></div></div>
         </div>
       </section>
 
-      <div className="ua3-transition" aria-hidden="true" />
+      <SignatureLine className="ua-divider" />
 
-      <section id="pricing" className="ua3-section ua3-pricing" aria-labelledby="pricing-title"><div className="ua3-wrap"><p className="ua3-label ua3-step-label">Plans</p><h2 id="pricing-title" className="ua3-step-title">Choose the plan that matches your workflow.</h2><p className="ua3-body">Use Free to inspect the format. Start with Basic if one chain covers your workflow. Choose Pro when you need the same daily reference layer across all four chains.</p><div className="ua3-plan-grid">{plans.map((plan) => <article key={plan.id} className={plan.recommended ? "ua3-card ua3-plan-card ua3-plan-card-recommended" : "ua3-card ua3-plan-card"}><div className="ua3-plan-head"><h3>{plan.name}</h3>{plan.recommended ? <span className="ua3-plan-badge">Recommended start</span> : null}</div><p className="ua3-plan-price">{plan.price}</p><p className="ua3-body-small">{plan.summary}</p>{plan.id === "free" ? <Link href="/api/v1/sample-pack" className="ua3-button ua3-button-quiet ua3-button-full">{plan.cta}</Link> : <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>}</article>)}</div><p className="ua3-card-note ua3-pricing-note">Start with the smallest plan that fits the number of chains you actually use. Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p></div></section>
-
-      <div className="ua3-transition" aria-hidden="true" />
-
-      <section className="ua3-section ua3-regimes" aria-labelledby="regime-explainer-title">
-        <div className="ua3-wrap">
-          <div className="ua3-regime-head">
-            <div>
-              <p className="ua3-label ua3-step-label">How to read the label</p>
-              <h2 id="regime-explainer-title" className="ua3-step-title">Four labels. One question: what kind of network day was it?</h2>
+      <section id="today-status" className="ua3-section ua-paper ua-state" aria-labelledby="status-title">
+        <div className="ua-shell ua-paper-inset">
+          <div className="ua-section-heading"><div><p className="ua-micro">PUBLISHED NETWORK STATE</p><h2 id="status-title">Today&apos;s state — updated {lastRun}.</h2></div><p>Select a specimen to inspect the observation.</p></div>
+          <div className="ua-specimen-strip" role="group" aria-label="Chain selector">
+            {snapshots.map((chain) => {
+              const active = chain.id === selectedChainId;
+              return <button key={chain.id} data-chain={chain.id} type="button" aria-pressed={active} onClick={() => setSelectedChainId(chain.id)} className={active ? "ua-specimen-tag ua-specimen-active" : "ua-specimen-tag"} style={toneStyle(chain.regime)}><span className="ua-micro">{chain.ticker}</span><strong>{chain.name}</strong><span className="ua-specimen-date">{chain.asOf} · {chain.lag}</span><StatusMark label={chain.regime} /><span className="ua-specimen-confidence">{chain.confidence} confidence</span></button>;
+            })}
+          </div>
+          <div className="ua-observation-sheet">
+            <div className="ua-observation-summary">
+              <p className="ua-micro">SELECTED OBSERVATION / {selectedChain.ticker}</p>
+              <div className="ua-observation-title"><h3>{selectedChain.name}</h3><StatusMark label={selectedChain.regime} /></div>
+              <p>{selectedChain.oneLiner}</p>
+              <div className="ua-confidence-readout"><div><strong>{selectedChain.confidence}</strong><span>headline confidence</span></div><InfoButton id="confidence" activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></div>
+              <div className="ua-quality-ledger"><span>Data quality <b>{pct(selectedChain.dataQuality)}</b> <InfoButton id="dataQuality" activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></span><span>Label confidence <b>{pct(selectedChain.labelConfidence)}</b> <InfoButton id="labelConfidence" activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></span><span>Data lag <b>{selectedChain.lag}</b> <InfoButton id="dataLag" activeInfo={activeInfo} setActiveInfo={setActiveInfo} /></span></div>
             </div>
-            <p className="ua3-body-small ua3-regime-intro">Each label is relative to that chain&apos;s own recent history. The same absolute fee or activity level can therefore mean something different on Bitcoin, Ethereum, Arbitrum and Base.</p>
-          </div>
-          <div className="ua3-regime-grid">
-            {regimeExplainers.map((item) => (
-              <article key={item.label} className="ua3-card ua3-regime-card" style={toneStyle(item.label)}>
-                <div className="ua3-regime-card-head"><StatusBadge label={item.label} /><span className="ua3-regime-question">Network state</span></div>
-                <h3>{item.plain}</h3>
-                <p className="ua3-body-small">{item.evidence}</p>
-              </article>
-            ))}
-          </div>
-          <div className="ua3-regime-axis-note">
-            <strong>Demand</strong> = activity · <strong>Friction</strong> = cost/failure burden · <strong>Capacity</strong> = pressure on usable network room.
-            <Link href="/methodology/reference"> See the exact chain-specific rules →</Link>
+            <InstrumentScale chain={selectedChain} activeInfo={activeInfo} setActiveInfo={setActiveInfo} />
           </div>
         </div>
       </section>
 
-      <div className="ua3-transition" aria-hidden="true" />
+      <SignatureLine className="ua-divider ua-divider-invert" />
 
-      <section className="ua3-section ua3-confidence-explainer" aria-labelledby="confidence-explainer-title">
-        <div className="ua3-wrap">
-          <div className="ua3-confidence-explainer-head">
-            <div>
-              <p className="ua3-label ua3-step-label">How to read confidence</p>
-              <h2 id="confidence-explainer-title" className="ua3-step-title">Confidence is evidence strength — not probability.</h2>
-            </div>
-            <p className="ua3-body-small ua3-confidence-explainer-intro">A displayed confidence of 74% does not mean there is a 74% chance the regime label is correct. It means the combined confidence score is 0.74 under the published methodology.</p>
+      <section className="ua3-section ua-night ua-files" aria-labelledby="files-title">
+        <div className="ua-shell">
+          <div className="ua-section-heading"><div><p className="ua-micro">DELIVERED EVIDENCE</p><h2 id="files-title">One daily row. Four delivered files.</h2></div><p>Each layer carries the same date + chain key.</p></div>
+          <div className="ua-artifact-strip" role="group" aria-label="Artifact selector">
+            {artifacts.map((artifact) => <button key={artifact.name} type="button" aria-pressed={selectedArtifact === artifact.name} onClick={() => setSelectedArtifact(artifact.name)} className={selectedArtifact === artifact.name ? "ua-artifact ua-artifact-active" : "ua-artifact"}><span className="ua-artifact-number">{artifact.number}</span><SpecimenIcon type={artifact.name} /><h3>{artifact.name}</h3><p>{artifact.what}</p><small>{artifact.use}</small></button>)}
           </div>
-          <div className="ua3-confidence-explainer-grid">
-            <article className="ua3-card ua3-confidence-explainer-card">
-              <p className="ua3-label">01 · Data quality</p>
-              <h3>Is the evidence complete and fresh enough?</h3>
-              <p className="ua3-body-small">Data quality measures the reliability of the observation surface: required metric coverage, recent coverage, history, density and freshness relative to the chain&apos;s publication-lag policy.</p>
-            </article>
-            <article className="ua3-card ua3-confidence-explainer-card">
-              <p className="ua3-label">02 · Label confidence</p>
-              <h3>How clearly does the evidence support this label?</h3>
-              <p className="ua3-body-small">Label confidence measures separation and support inside the regime rules — including rule margin, driver strength, trend, coherence and label-specific evidence.</p>
-            </article>
-            <article className="ua3-card ua3-confidence-explainer-card ua3-confidence-formula-card">
-              <p className="ua3-label">03 · Headline confidence</p>
-              <h3><code>sqrt(data quality × label confidence)</code></h3>
-              <p className="ua3-body-small">The geometric mean prevents one strong component from fully hiding a weak one. If the combined score falls below 0.40, Urd Atlas withholds the stronger regime claim and publishes <strong>UNKNOWN/DEGRADED</strong>.</p>
-            </article>
+          <div className="ua-json-layout">
+            <div className="ua-json-controls"><p className="ua-micro">EXAMPLE PREVIEW</p><div className="ua-segmented">{(["high", "low"] as const).map((kind) => <button key={kind} type="button" aria-pressed={exampleKind === kind} onClick={() => setExampleKind(kind)} className={exampleKind === kind ? "ua-segment-active" : ""}>{kind} confidence</button>)}</div><p>Switch the confidence example, then inspect the selected layer.</p><button ref={modalTriggerRef} type="button" aria-haspopup="dialog" className="ua-text-action" onClick={() => setModalOpen(true)}>View complete JSON →</button></div>
+            <JsonBlock payload={preview} prismReady={prismReady} />
           </div>
-          <div className="ua3-confidence-warning"><strong>Read 74% as:</strong> “the data are sufficiently reliable and the evidence supports this label clearly under the defined methodology” — not “74% probability that this is the true regime.” <Link href="/methodology/reference">See the exact confidence methodology →</Link></div>
         </div>
       </section>
 
-      <div className="ua3-transition" aria-hidden="true" />
+      <SignatureLine className="ua-divider" />
 
-      {modalOpen ? <div className="ua3-modal-backdrop" onClick={closeModal}><div ref={modalRef} tabIndex={-1} className="ua3-modal" role="dialog" aria-modal="true" aria-labelledby="json-modal-title" onClick={(event) => event.stopPropagation()}><div className="ua3-modal-head"><div><p className="ua3-label">Complete published JSON</p><h2 id="json-modal-title">{completeTitle}</h2><p className="ua3-modal-explainer">This is the full published file — the compact preview above shows the most commonly used fields.</p></div><div className="ua3-modal-actions"><button type="button" className="ua3-button ua3-button-quiet" onClick={copyModalJson}>{copied ? "Copied" : "Copy to clipboard"}</button><button type="button" autoFocus className="ua3-button ua3-button-primary" onClick={closeModal}>Close</button></div></div><JsonTree payload={completeJson} prismReady={prismReady} /></div></div> : null}
+      <section className="ua3-section ua-paper ua-reading" aria-labelledby="reading-title">
+        <div className="ua-shell ua-paper-inset">
+          <p className="ua-micro">FIELD NOTES / INTERPRETATION</p>
+          <h2 id="reading-title">How to read the label and confidence.</h2>
+          <div className="ua-field-journal">
+            {regimeExplainers.map((item, index) => <article key={item.label}><span className="ua-journal-number">0{index + 1}</span><div><StatusMark label={item.label} /><h3>{item.plain}</h3><p>{item.evidence}</p></div></article>)}
+            <article><span className="ua-journal-number">05</span><div><p className="ua-micro">CONFIDENCE</p><h3>Evidence strength — not probability.</h3><p>Headline confidence is <code>sqrt(data quality × label confidence)</code>. If the combined score falls below 0.40, Urd Atlas withholds the stronger regime claim and publishes UNKNOWN/DEGRADED.</p></div></article>
+          </div>
+          <p className="ua-reading-note"><strong>Demand</strong> = activity · <strong>Friction</strong> = cost/failure burden · <strong>Capacity</strong> = pressure on usable network room. <Link href="/methodology/reference">See the exact chain-specific rules →</Link></p>
+        </div>
+      </section>
 
-      <style>{ua3Styles}</style>
+      <SignatureLine className="ua-divider ua-divider-invert" />
+
+      <section className="ua3-section ua-night ua-build" aria-labelledby="build-title">
+        <div className="ua-shell">
+          <p className="ua-micro">BUILD OR BUY</p>
+          <h2 id="build-title">You could build this yourself. The question is whether you should.</h2>
+          <p className="ua-lede ua-build-lede">The alternative is ingestion, normalization, chain-specific feature work, historical baselines, classification rules, confidence logic and ongoing maintenance.</p>
+          <div className="ua-flow">
+            <article><span>01</span><h3>Build the data layer</h3><p>Source four chains, normalize schemas, aggregate daily measurements and keep the pipeline healthy.</p></article>
+            <div className="ua-flow-line"><SignatureLine /></div>
+            <article><span>02</span><h3>Define the methodology</h3><p>Choose chain-aware proxies, baselines, thresholds, confidence gates and validation tests.</p></article>
+            <div className="ua-flow-line"><SignatureLine /></div>
+            <article><span>03</span><h3>Or connect the finished layer</h3><p>Join one versioned row per day and keep the evidence attached.</p><Link href="#pricing" className="ua-text-action">Compare plans →</Link></article>
+          </div>
+        </div>
+      </section>
+
+      <SignatureLine className="ua-divider" />
+
+      <section id="pricing" className="ua3-section ua-paper ua-pricing" aria-labelledby="pricing-title">
+        <div className="ua-shell ua-paper-inset">
+          <p className="ua-micro">ACCESS / PLANS</p>
+          <h2 id="pricing-title">Choose the access level that matches your workflow.</h2>
+          <div className="ua-price-table">
+            {plans.map((plan) => <article key={plan.id} className={plan.recommended ? "ua-price-row ua-price-recommended" : "ua-price-row"}><div><span className="ua-micro">{plan.recommended ? "RECOMMENDED START" : "PLAN"}</span><h3>{plan.name}</h3></div><strong>{plan.price}</strong><p>{plan.summary}</p><div>{plan.id === "free" ? <a href="/api/v1/sample-pack" className="ua-action ua-action-outline" download>{plan.cta}</a> : <CheckoutButton plan={plan.id}>{plan.cta}</CheckoutButton>}</div></article>)}
+          </div>
+          <p className="ua-price-note">Start with the smallest plan that fits the number of chains you actually use. Chain access is priced as delivery and access, not as a claim that every chain has identical variation.</p>
+        </div>
+      </section>
+
+      {modalOpen ? <div className="ua-modal-backdrop" onClick={closeModal}><div ref={modalRef} tabIndex={-1} className="ua-modal" role="dialog" aria-modal="true" aria-labelledby="json-modal-title" onClick={(event) => event.stopPropagation()}><div className="ua-modal-head"><div><p className="ua-micro">COMPLETE PUBLISHED JSON</p><h2 id="json-modal-title">{completeTitle}</h2></div><div><button type="button" className="ua-action ua-action-outline" onClick={copyModalJson}>{copied ? "Copied" : "Copy"}</button><button type="button" autoFocus className="ua-action ua-action-filled" onClick={closeModal}>Close</button></div></div><JsonTree payload={completeJson} prismReady={prismReady} /></div></div> : null}
     </main>
   );
 }
-
-const ua3Styles = `
-.ua3 { --radius-card: 12px; --radius-badge: 6px; --radius-button: 999px; min-height: 100vh; background: var(--bg-base); color: var(--text-primary); overflow: hidden; }
-.ua3-wrap { width: min(1440px, calc(100% - 48px)); margin: 0 auto; }
-.ua3-hero .ua3-wrap { width: min(1312px, calc(100% - 128px)); }
-.ua3-section { padding: 96px 0; }
-.ua3-hero { padding: 80px 0; min-height: auto; display: block; background: radial-gradient(circle at 78% 42%, var(--accent-depth-glow), transparent 44%), var(--bg-base); }
-.ua3-start { background: linear-gradient(rgba(16, 224, 160, 0.03), rgba(16, 224, 160, 0.03)), var(--bg-base); }
-.ua3-status { background: var(--bg-base); }
-.ua3-regimes { background: linear-gradient(rgba(16, 224, 160, 0.025), rgba(16, 224, 160, 0.025)), var(--bg-base); }
-.ua3-regime-head { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr); gap: 48px; align-items: end; }
-.ua3-regime-intro { margin: 0; max-width: 560px; }
-.ua3-regime-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 36px; }
-.ua3-regime-card { position: relative; overflow: hidden; padding: 24px; border-top: 3px solid var(--status-color); }
-.ua3-regime-card::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(145deg, rgba(255,255,255,.025), transparent 45%); }
-.ua3-regime-card-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
-.ua3-regime-question { color: var(--text-tertiary); font-family: var(--mono); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; }
-.ua3-regime-card h3, .ua3-regime-card p { position: relative; }
-.ua3-regime-axis-note { margin-top: 24px; padding: 16px 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
-.ua3-regime-axis-note strong { color: var(--text-primary); }
-.ua3-regime-axis-note a { color: var(--accent-action); text-decoration: none; }
-.ua3-confidence-explainer { background: var(--bg-base); }
-.ua3-confidence-explainer-head { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); gap: 48px; align-items: end; }
-.ua3-confidence-explainer-intro { margin: 0; max-width: 580px; }
-.ua3-confidence-explainer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 36px; }
-.ua3-confidence-explainer-card { padding: 24px; }
-.ua3-confidence-explainer-card h3 { margin-top: 18px; }
-.ua3-confidence-formula-card { border-color: color-mix(in srgb, var(--accent-action) 55%, var(--border-subtle)); background: linear-gradient(rgba(16,224,160,.05), rgba(16,224,160,.05)), var(--bg-elevated-1); }
-.ua3-confidence-formula-card code { color: #7DD3FC; font-family: var(--mono); font-size: .72em; line-height: 1.5; }
-.ua3-confidence-warning { margin-top: 24px; padding: 16px 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
-.ua3-confidence-warning strong { color: var(--text-primary); }
-.ua3-confidence-warning a { color: var(--accent-action); text-decoration: none; }
-.ua3-files { background: linear-gradient(rgba(76, 110, 245, 0.04), rgba(76, 110, 245, 0.04)), var(--bg-base); }
-.ua3-pricing { background: linear-gradient(rgba(245, 247, 248, 0.02), rgba(245, 247, 248, 0.02)), var(--bg-base); }
-.ua3-transition { height: 1px; width: 100%; background: linear-gradient(to bottom, transparent 0%, var(--accent-depth-line) 50%, transparent 100%); opacity: 0.4; }
-.ua3-hero-grid { display: grid; grid-template-columns: minmax(0, 760px) minmax(380px, 1fr); align-items: stretch; gap: 80px; }
-.ua3-hero-left { min-width: 0; }
-.ua3-hero-glow { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 100%; background: radial-gradient(circle at center, var(--accent-depth-glow), transparent 62%); }
-.ua3-category { display: inline-flex; align-items: center; border-radius: var(--radius-badge); padding: 4px 10px; border: 1px solid rgba(16, 224, 160, 0.3); background: rgba(16, 224, 160, 0.12); color: var(--accent-action); font-size: 11px; font-weight: 500; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--mono); }
-.ua3-display { max-width: 860px; margin: 24px 0 0; color: var(--text-primary); font-size: 52px; font-weight: 600; line-height: 1.1; letter-spacing: -0.045em; }
-.ua3-step-title { margin: 0; color: var(--text-primary); font-size: 36px; font-weight: 600; line-height: 1.2; letter-spacing: -0.035em; }
-.ua3 h3 { margin: 0; color: var(--text-primary); font-size: 22px; font-weight: 600; line-height: 1.3; letter-spacing: -0.02em; }
-.ua3-body { max-width: 720px; margin: 24px 0 0; color: var(--text-secondary); font-size: 16px; font-weight: 400; line-height: 1.5; }
-.ua3-body-small { margin: 16px 0 0; color: var(--text-secondary); font-size: 14px; font-weight: 400; line-height: 1.5; }
-.ua3-label { margin: 0; color: var(--text-tertiary); font-family: var(--mono); font-size: 11px; font-weight: 500; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; }
-.ua3-step-label { margin-bottom: 12px; color: var(--accent-action); }
-.ua3-hero-copy { max-width: 640px; }
-.ua3-value-wrap { padding: 32px 0; margin-top: 40px; margin-bottom: 40px; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
-.ua3-value-title { margin: 0 0 18px; color: var(--text-primary); font-size: 16px; font-weight: 600; line-height: 1.5; }
-.ua3-value-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
-.ua3-value-column h2 { margin: 0 0 8px; color: var(--text-primary); font-size: 16px; font-weight: 600; line-height: 1.5; letter-spacing: 0; }
-.ua3-value-column p { margin: 0; color: var(--text-secondary); font-size: 14px; font-weight: 400; line-height: 1.5; }
-.ua3-value-field { font-family: var(--mono); font-size: 13px; color: #7DD3FC; background: rgba(125, 211, 252, 0.08); padding: 1px 5px; border-radius: 4px; }
-.ua3-compliance-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
-.ua3-compliance-pill { border-radius: 20px; padding: 6px 14px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); color: var(--text-secondary); font-family: var(--mono); font-size: 11px; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; }
-.ua3-button { display: inline-flex; align-items: center; justify-content: center; width: fit-content; border-radius: var(--radius-button); padding: 12px 18px; font-family: var(--mono); font-size: 11px; font-weight: 700; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; transition: transform .2s ease, background-color .2s ease, border-color .2s ease; cursor: pointer; }
-.ua3-button:hover { transform: translateY(-1px); }
-.ua3-button-primary { margin-top: 32px; border: 1px solid var(--accent-action); background: var(--accent-action); color: var(--accent-action-text); }
-.ua3-button-primary:hover { background: var(--accent-action-hover); border-color: var(--accent-action-hover); }
-.ua3-button-quiet { margin-top: 24px; border: 1px solid var(--border-subtle); background: rgba(255,255,255,0.04); color: var(--text-primary); }
-.ua3-button-full { width: 100%; }
-.ua3-card { border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--bg-elevated-1); }
-.ua3-start-grid, .ua3-chain-grid, .ua3-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 32px; }
-.ua3-chain-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.ua3-step-card, .ua3-plan-card { padding: 24px; }
-.ua3-step-number { margin: 0; color: var(--accent-action); font-family: var(--mono); font-size: 12px; }
-.ua3-step-heading { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
-.ua3-step-icon { width: 22px; height: 22px; color: var(--accent-action); }
-.ua3-section-head { display: flex; align-items: end; justify-content: space-between; gap: 48px; }
-.ua3-help-copy { max-width: 320px; }
-.ua3-chain-card { padding: 22px; text-align: left; cursor: pointer; }
-.ua3-chain-card-active { border-color: var(--status-color); box-shadow: 0 0 0 1px color-mix(in srgb, var(--status-color) 45%, transparent), 0 24px 64px rgba(0,0,0,0.26); }
-.ua3-chain-top, .ua3-chain-bottom, .ua3-detail-head, .ua3-metric-head, .ua3-plan-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.ua3-chain-bottom { align-items: end; margin-top: 34px; }
-.ua3-status-badge { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--status-color) 48%, transparent); background: color-mix(in srgb, var(--status-color) 16%, transparent); color: var(--status-color); font-family: var(--mono); font-size: 11px; font-weight: 700; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
-.ua3-status-dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; box-shadow: 0 0 14px currentColor; }
-.ua3-data-medium { margin: 16px 0 0; color: var(--text-primary); font-size: 28px; font-weight: 700; line-height: 1; }
-.ua3-data-small { margin: 16px 0 0; color: var(--text-primary); font-size: 22px; font-weight: 700; line-height: 1; }
-.ua3-sparkline { width: 118px; max-width: 44%; height: auto; opacity: .9; }
-.ua3-detail-panel { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 20px; margin-top: 24px; padding: 24px; border: 1px solid var(--border-subtle); border-radius: 20px; background: rgba(255,255,255,0.03); }
-.ua3-detail-summary { padding: 24px; }
-.ua3-one-liner { margin-top: 28px; max-width: 520px; }
-.ua3-confidence-block { display: flex; align-items: center; gap: 20px; margin-top: 32px; }
-.ua3-gauge { width: 138px; height: 138px; flex: 0 0 auto; border-radius: 999px; background: conic-gradient(var(--accent-action) var(--pct), rgba(255,255,255,0.08) 0); padding: 10px; }
-.ua3-gauge-inner { display: grid; place-items: center; align-content: center; height: 100%; border-radius: 999px; background: var(--bg-elevated-1); text-align: center; }
-.ua3-gauge-value { color: var(--text-primary); font-size: 32px; font-weight: 700; line-height: 1; }
-.ua3-gauge-label { margin-top: 8px; color: var(--text-tertiary); font-family: var(--mono); font-size: 11px; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; }
-.ua3-confidence-text p:last-child { margin: 8px 0 0; color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
-.ua3-status-metrics { display: grid; gap: 16px; }
-.ua3-secondary-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
-.ua3-tertiary-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
-.ua3-metric-card, .ua3-mini-card { padding: 20px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--bg-elevated-2); }
-.ua3-mini-card { background: rgba(255,255,255,0.035); }
-.ua3-progress { height: 6px; margin-top: 22px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
-.ua3-progress-fill { height: 100%; border-radius: inherit; background: var(--accent-action); }
-.ua3-info { position: relative; display: inline-flex; }
-.ua3-info-button, .ua3-info-close { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--border-subtle); border-radius: 999px; background: rgba(255,255,255,0.06); color: var(--text-secondary); font: inherit; cursor: pointer; }
-.ua3-info-popover { position: absolute; z-index: 50; top: calc(100% + 10px); right: 0; width: min(300px, calc(100vw - 32px)); padding: 18px; border: 1px solid var(--border-emphasis); border-radius: 14px; background: var(--bg-elevated-2); box-shadow: 0 24px 64px rgba(0,0,0,0.45); color: var(--text-secondary); }
-.ua3-info-close { position: absolute; top: 10px; right: 10px; }
-.ua3-info-title { display: block; padding-right: 28px; color: var(--text-primary); font-weight: 700; }
-.ua3-info-body { display: block; margin-top: 8px; font-size: 13px; line-height: 1.5; }
-.ua3-files-grid { display: grid; grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr); gap: 48px; }
-.ua3-artifact-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
-.ua3-artifact-card { padding: 20px; text-align: left; cursor: pointer; }
-.ua3-artifact-card-active { border-color: var(--accent-action); background: var(--bg-elevated-2); }
-.ua3-artifact-icon { display: inline-flex; margin-bottom: 18px; color: var(--accent-action); font-size: 22px; }
-.ua3-card-note { margin: 16px 0 0; color: var(--text-tertiary); font-size: 13px; line-height: 1.45; }
-.ua3-preview-panel { display: grid; grid-template-columns: minmax(260px, .6fr) minmax(0, 1.4fr); gap: 32px; margin-top: 32px; padding: 24px; border: 1px solid var(--border-subtle); border-radius: 18px; background: rgba(255,255,255,0.03); }
-.ua3-toggle-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-.ua3-toggle { border: 1px solid var(--border-subtle); border-radius: 999px; background: transparent; color: var(--text-secondary); padding: 8px 12px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; cursor: pointer; }
-.ua3-toggle-active { border-color: var(--accent-action); color: var(--accent-action); background: rgba(16,224,160,.08); }
-.ua3-json { margin: 0; min-height: 320px; max-height: 520px; overflow: auto; border: 1px solid var(--border-subtle); border-radius: 8px; background: #0A0C0E; padding: 18px; color: var(--text-secondary); font-family: var(--mono); font-size: 13px; line-height: 1.55; }
-.ua3-json-complete { min-height: 0; max-height: 46vh; }
-.ua3-json .token.property { color: #7DD3FC; }
-.ua3-json .token.string { color: #86EFAC; }
-.ua3-json .token.number, .ua3-json .token.boolean, .ua3-json .token.null { color: #FCD34D; }
-.ua3-json .token.punctuation, .ua3-json .token.operator { color: #6B7280; }
-.ua3-json-open { margin-top: 16px; }
-.ua3-json-tree { max-height: 62vh; overflow: auto; display: grid; gap: 8px; padding-right: 4px; }
-.ua3-json-tree-node { border: 1px solid var(--border-subtle); border-radius: 8px; background: rgba(255,255,255,.025); overflow: hidden; }
-.ua3-json-tree-node summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; cursor: pointer; color: #7DD3FC; font-family: var(--mono); font-size: 13px; }
-.ua3-json-tree-node summary:focus-visible { outline: 2px solid var(--accent-action); outline-offset: -2px; }
-.ua3-json-tree-node .ua3-json { border: 0; border-top: 1px solid var(--border-subtle); border-radius: 0; }
-.ua3-json-tree-type { color: var(--text-tertiary); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
-.ua3-plan-card-recommended { transform: scale(1.03); border-color: var(--accent-action); background: var(--bg-elevated-2); box-shadow: 0 24px 64px rgba(16,224,160,.14); }
-.ua3-plan-badge { border: 1px solid var(--accent-action); border-radius: 999px; padding: 5px 10px; color: var(--accent-action); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
-.ua3-plan-price { margin: 28px 0 0; color: var(--text-primary); font-size: 40px; font-weight: 700; line-height: 1; }
-.ua3-pricing-note { max-width: 760px; }
-.ua3-form { margin: 0; }
-.ua3-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,.7); }
-.ua3-modal { width: min(900px, 100%); max-height: calc(100vh - 48px); overflow: hidden; border: 1px solid var(--border-emphasis); border-radius: 16px; background: var(--bg-base); padding: 22px; box-shadow: 0 32px 100px rgba(0,0,0,.6); }
-.ua3-modal-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
-.ua3-modal-head h2 { margin: 6px 0 0; font-size: 24px; }
-.ua3-modal-explainer { max-width: 620px; margin: 10px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
-.ua3-modal-actions { display: flex; gap: 10px; }
-@media (max-width: 1120px) {
-  .ua3-confidence-explainer-grid { grid-template-columns: 1fr; }
-  .ua3-confidence-explainer-head { grid-template-columns: 1fr; gap: 18px; align-items: start; }
-  .ua3-regime-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ua3-regime-head { grid-template-columns: 1fr; gap: 18px; align-items: start; }
-  .ua3-hero .ua3-wrap { width: min(1000px, calc(100% - 48px)); }
-  .ua3-hero-grid { grid-template-columns: 1fr; gap: 44px; }
-  .ua3-hero-glow { justify-content: flex-start; min-height: auto; }
-  .ua3-start-grid, .ua3-chain-grid, .ua3-plan-grid, .ua3-secondary-grid, .ua3-tertiary-grid, .ua3-artifact-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .ua3-detail-panel, .ua3-files-grid, .ua3-preview-panel { grid-template-columns: 1fr; }
-}
-@media (max-width: 767px) {
-  .ua3-regime-grid { grid-template-columns: 1fr; }
-  .ua3-regime-card { padding: 20px; }
-  .ua3-wrap, .ua3-hero .ua3-wrap { width: calc(100% - 32px); }
-  .ua3-section { padding: 64px 0; }
-  .ua3-hero { padding: 64px 0; }
-  .ua3-display { font-size: 40px; }
-  .ua3-step-title { font-size: 30px; }
-  .ua3-value-strip { grid-template-columns: 1fr; gap: 24px; }
-  .ua3-start-grid, .ua3-chain-grid, .ua3-plan-grid, .ua3-secondary-grid, .ua3-tertiary-grid, .ua3-artifact-grid { grid-template-columns: 1fr; }
-  .ua3-section-head, .ua3-modal-head, .ua3-modal-actions, .ua3-confidence-block { flex-direction: column; align-items: flex-start; }
-  .ua3-gauge { width: 128px; height: 128px; }
-  .ua3-plan-card-recommended { transform: none; }
-}
-`;
