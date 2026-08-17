@@ -41,7 +41,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,SOFT,WONK,wght@9..144,0..100,0..1,300..700&family=IBM+Plex+Mono:wght@300;400;500&family=Inter:wght@300;400;500&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=IBM+Plex+Mono:wght@300;400;500&family=Inter:wght@300;400;500&display=swap"
         />
       </head>
       <body className="min-h-dvh overflow-x-hidden bg-background text-foreground antialiased">
