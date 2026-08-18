@@ -134,8 +134,6 @@ function Timeline({ histories, snapshots, selected, onSelect }: { histories: Rec
   const root = useRef<HTMLDivElement>(null);
   const cursorDate = allDates[cursorIndex] ?? selected.date;
 
-  useEffect(() => { const i = allDates.indexOf(selected.date); if (i >= 0) setCursorIndex(i); }, [allDates, selected.date]);
-
   const choose = (chainIndex = focusChain) => {
     const chain = snapshots[chainIndex] ?? snapshots[0];
     if (chain && cursorDate) onSelect({ chain: chain.id, date: cursorDate });
@@ -194,7 +192,9 @@ export default function EditorialReferenceInstrument({ snapshots, histories, las
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const chain = params.get("chain"); const date = params.get("date");
-    if (chain && date && snapshots.some((c) => c.id === chain) && (histories[chain] ?? []).some((p) => p.date === date)) setSelected({ chain, date });
+    if (chain && date && snapshots.some((c) => c.id === chain) && (histories[chain] ?? []).some((p) => p.date === date)) {
+      queueMicrotask(() => setSelected({ chain, date }));
+    }
     const pop = () => { const p = new URLSearchParams(window.location.search); const c = p.get("chain"); const d = p.get("date"); if (c && d && snapshots.some((s) => s.id === c)) setSelected({ chain: c, date: d }); };
     window.addEventListener("popstate", pop); return () => window.removeEventListener("popstate", pop);
   }, [histories, snapshots]);
@@ -207,7 +207,10 @@ export default function EditorialReferenceInstrument({ snapshots, histories, las
   useEffect(() => {
     if (!selectedChain || !selected.date) return;
     const latest = selected.date === selectedChain.dateIso ? selectedChain.artifacts[artifact] : null;
-    if (latest) { setArtifactPayload(latest); return; }
+    if (latest) {
+      queueMicrotask(() => setArtifactPayload(latest));
+      return;
+    }
     let cancelled = false;
     fetch(artifactUrl(artifact, selected.chain, selected.date)).then((r) => r.ok ? r.json() : null).then((payload) => { if (!cancelled) setArtifactPayload(payload); }).catch(() => { if (!cancelled) setArtifactPayload(null); });
     return () => { cancelled = true; };
@@ -234,7 +237,7 @@ export default function EditorialReferenceInstrument({ snapshots, histories, las
 
     <section className="ua5-zone ua5-dark ua5-context" aria-labelledby="ua5-context-title"><div className="ua5-shell ua5-context-grid"><header><p className="ua5-kicker">§02 / WHY IT MATTERS</p><h2 id="ua5-context-title">Your metric changed. What else changed that day?</h2></header><div className="ua5-context-demo"><table><thead><tr><th>Date</th><th>Model error</th>{contextAdded && <><th>Network state</th><th>Confidence</th></>}</tr></thead><tbody>{sampleRows.map((row) => <tr key={row.date}><td>{row.date}</td><td>{row.error}</td>{contextAdded && <><td>{row.regime}</td><td>{row.confidence}</td></>}</tr>)}</tbody></table>{!contextAdded && <button type="button" className="ua5-secondary" onClick={() => setContextAdded(true)}>Add network context</button>}{contextAdded && <p className="ua5-context-conclusion">Your model changed on the same date the network entered a different operating regime.</p>}<small>Illustrative example — model_error is a synthetic metric standing in for your own data.</small></div></div></section>
 
-    <section className="ua5-zone ua5-dark ua5-history" aria-labelledby="ua5-history-title"><div className="ua5-shell"><div className="ua5-section-head"><p className="ua5-kicker">§03 / HISTORICAL REGIME EXPLORER</p><h2 id="ua5-history-title">Four chains. One classification language.</h2><p>Move across actual published history, then select the observation you want to inspect.</p></div><Timeline histories={histories} snapshots={snapshots} selected={selected} onSelect={selectObservation} /></div></section>
+    <section className="ua5-zone ua5-dark ua5-history" aria-labelledby="ua5-history-title"><div className="ua5-shell"><div className="ua5-section-head"><p className="ua5-kicker">§03 / HISTORICAL REGIME EXPLORER</p><h2 id="ua5-history-title">Four chains. One classification language.</h2><p>Move across actual published history, then select the observation you want to inspect.</p></div><Timeline key={`${selected.chain}:${selected.date}`} histories={histories} snapshots={snapshots} selected={selected} onSelect={selectObservation} /></div></section>
 
     <section className="ua5-zone ua5-dark ua5-anatomy" aria-labelledby="ua5-anatomy-title"><div className="ua5-shell ua5-anatomy-grid"><header><p className="ua5-kicker">§04 / OBSERVATION ANATOMY</p><h2 id="ua5-anatomy-title">Why did it classify this date this way?</h2></header><div className="ua5-anatomy-copy"><span className={statusClass(selectedPoint.regime)}>{selectedPoint.regime}</span><p>{selectedPoint.oneLiner}</p><div className="ua5-drivers">{drivers.slice(0, 4).map((driver, i) => <button key={i} type="button" onClick={() => setOpenDriver(openDriver === i ? null : i)}>Driver {String(i + 1).padStart(2, "0")}{openDriver === i && <small>{typeof driver === "string" ? driver : JSON.stringify(driver)}</small>}</button>)}</div></div><div className="ua5-rulers"><Axis label="Demand" value={selectedPoint.demand} /><Axis label="Friction" value={selectedPoint.friction} /><Axis label="Capacity" value={selectedPoint.capacity} /></div></div></section>
 
