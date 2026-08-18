@@ -15,25 +15,13 @@ export const metadata: Metadata = {
   description: "On-chain reference data for BTC, ETH, ARB, and BASE. No price data. No forecasts. No recommendations.",
 };
 
-function AuthProvider({
-  children,
-}: Readonly<{
-  children: ReactNode;
-}>) {
+function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-  if (!publishableKey) {
-    return <Fragment>{children}</Fragment>;
-  }
-
+  if (!publishableKey) return <Fragment>{children}</Fragment>;
   return <ClerkProvider publishableKey={publishableKey}>{children}</ClerkProvider>;
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
@@ -41,7 +29,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,460..560&family=IBM+Plex+Mono:wght@300;400;500&family=Inter:wght@400..450&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,460..560&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap"
         />
       </head>
       <body className="min-h-dvh overflow-x-hidden bg-background text-foreground antialiased">
