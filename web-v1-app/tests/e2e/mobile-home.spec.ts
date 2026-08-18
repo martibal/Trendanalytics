@@ -1,99 +1,66 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("mobile homepage from-scratch composition", () => {
+test.describe("editorial reference data instrument homepage", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("puts the problem, solution, proof and live product into the opening mobile sequence", async ({ page }) => {
+  test("shows a real observation and the add-network-context demonstration", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
     await expect(page.getByRole("heading", { name: "Know whether Tuesday was you — or the network." })).toBeVisible();
-    await expect(page.getByText(/one versioned daily observation per chain/i)).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Dataset at a glance." })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Today's published network state." })).toBeVisible();
+    await expect(page.locator(".ua5-observation").first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Inspect the sample pack" })).toHaveAttribute("href", "/api/v1/sample-pack");
 
-    const stateTop = await page.locator("#today-status").evaluate((element) => element.getBoundingClientRect().top + window.scrollY);
-    expect(stateTop).toBeLessThan(1.5 * 844 + 180);
-
-    const sampleLink = page.getByRole("link", { name: "Inspect the sample pack" });
-    await expect(sampleLink).toHaveAttribute("href", "/api/v1/sample-pack");
+    await expect(page.getByRole("heading", { name: "Your metric changed. What else changed that day?" })).toBeVisible();
+    const add = page.getByRole("button", { name: "Add network context" });
+    await add.click();
+    await expect(page.getByText("Network state", { exact: true })).toBeVisible();
+    await expect(page.getByText(/model_error is a synthetic metric/i)).toBeVisible();
   });
 
-  test("uses confidence-weighted unequal chain widths and one shared instrument scale", async ({ page }) => {
+  test("renders the historical regime explorer with keyboard selection", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
-    const strip = page.getByRole("group", { name: "Confidence-weighted chain timeline" });
-    await expect(strip).toBeVisible();
-    const slices = strip.locator(".ua4-chain-slice");
-    await expect(slices).toHaveCount(4);
-
-    const widths = await slices.evaluateAll((elements) => elements.map((element) => Math.round(element.getBoundingClientRect().width)));
-    expect(new Set(widths).size).toBeGreaterThan(1);
-
-    const confidenceBySlice = await slices.evaluateAll((elements) => elements.map((element) => ({
-      width: element.getBoundingClientRect().width,
-      confidence: Number.parseFloat(element.querySelector("strong")?.textContent ?? "0"),
-    })));
-    const highest = [...confidenceBySlice].sort((a, b) => b.confidence - a.confidence)[0];
-    const lowest = [...confidenceBySlice].sort((a, b) => a.confidence - b.confidence)[0];
-    expect(highest.width).toBeGreaterThan(lowest.width);
-
-    const axis = page.getByLabel("Demand, friction and capacity on a shared zero to one hundred scale");
-    await expect(axis).toBeVisible();
-    await expect(axis.locator(".ua4-axis-point")).toHaveCount(3);
+    const explorer = page.getByLabel(/Historical regime explorer/i);
+    await expect(explorer).toBeVisible();
+    await explorer.focus();
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/chain=.*&date=/);
+    await expect(page.locator(".ua5-lane.is-focused")).toHaveCount(1);
   });
 
-  test("uses the asymmetric file mosaic, overlapped JSON and a real pricing table", async ({ page }) => {
+  test("uses real high and degraded examples without a confidence slider", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
-    const stage = page.getByTestId("ua4-files-stage");
-    await expect(stage).toBeVisible();
-    await expect(stage.locator(".ua4-file")).toHaveCount(4);
-
-    const meta = stage.locator(".ua4-file-meta");
-    const gold = stage.locator(".ua4-file-gold");
-    const metaBox = await meta.boundingBox();
-    const goldBox = await gold.boundingBox();
-    expect(metaBox?.height ?? 0).toBeGreaterThan(goldBox?.height ?? 0);
-
-    const preview = stage.locator(".ua4-json-preview");
-    const previewBox = await preview.boundingBox();
-    expect(previewBox?.x ?? 0).toBeGreaterThan(metaBox?.x ?? 0);
-    expect(previewBox?.x ?? 0).toBeLessThan((metaBox?.x ?? 0) + (metaBox?.width ?? 0));
-
-    const table = page.getByTestId("ua4-pricing-table");
-    await expect(table).toBeVisible();
-    await expect(table.locator("thead th")).toHaveCount(4);
-    await expect(table.locator("tbody tr")).toHaveCount(5);
-    const basicTop = await table.locator("thead .ua4-basic-col").evaluate((element) => window.getComputedStyle(element).borderTopWidth);
-    expect(Number.parseFloat(basicTop)).toBeGreaterThanOrEqual(4);
+    await expect(page.getByRole("heading", { name: "Confidence is evidence strength — not probability." })).toBeVisible();
+    await expect(page.locator('input[type="range"]')).toHaveCount(0);
+    await page.getByRole("button", { name: "Degraded" }).click();
+    await expect(page.getByText("UNKNOWN/DEGRADED", { exact: true })).toBeVisible();
   });
 
-  test("renders the semantic regime plane, confidence overlap and balance-scale metaphor", async ({ page }) => {
+  test("keeps artifact exploration distinct from the sample download", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
-    const plane = page.getByRole("img", { name: /Regime map with Friction/i });
-    await expect(plane).toBeVisible();
-    for (const label of ["CHEAP", "STABLE", "HEATING", "CONGESTED"]) {
-      await expect(plane.getByText(label, { exact: true })).toBeVisible();
-    }
-    await expect(page.locator(".ua4-confidence-venn .ua4-circle")).toHaveCount(2);
-    await expect(page.getByRole("img", { name: /Balance scale comparing/i })).toBeVisible();
-    await expect(page.locator(".ua4-ref")).toHaveCount(8);
-    await expect(page.locator(".ua4-rift path")).toHaveCount(1);
+    const artifactNav = page.getByRole("navigation", { name: "Artifact representation" });
+    await expect(artifactNav.getByRole("button")).toHaveCount(4);
+    await artifactNav.getByRole("button", { name: /gold.json/i }).click();
+    await expect(page.locator(".ua5-code pre")).toBeVisible();
+
+    await expect(page.getByRole("heading", { name: "Inspect the files before you pay." })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Download sample pack" })).toHaveAttribute("href", "/api/v1/sample-pack");
   });
 
-  test("opens complete JSON from the overlapped preview", async ({ page }) => {
+  test("uses a decision ledger and lightweight subscribe actions instead of pricing cards", async ({ page }) => {
     await page.goto("http://localhost:3000/mobile");
-    const openJson = page.getByRole("button", { name: /View complete JSON/i });
-    await openJson.click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await expect(dialog.locator("pre")).toBeVisible();
-    await dialog.getByRole("button", { name: "Close" }).click();
-    await expect(dialog).toHaveCount(0);
+    await expect(page.locator(".ua5-price-ledger")).toBeVisible();
+    await expect(page.locator(".ua5-subscribe-list > div")).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "Start Basic" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start Pro" })).toBeVisible();
+    await expect(page.locator(".ua4-scale-illustration")).toHaveCount(0);
+    await expect(page.locator(".ua4-confidence-venn")).toHaveCount(0);
   });
 
   test("honors reduced motion", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("http://localhost:3000/mobile");
-    const cta = page.getByRole("link", { name: "Inspect the sample pack" });
-    const transition = await cta.evaluate((element) => window.getComputedStyle(element).transitionDuration);
+    const marker = page.locator(".ua5-ruler-track > i").first();
+    const transition = await marker.evaluate((element) => window.getComputedStyle(element).transitionDuration);
     expect(transition.split(",").every((value) => Number.parseFloat(value) === 0)).toBeTruthy();
   });
 });
