@@ -14,7 +14,6 @@ on:
   workflow_run:
     workflows:
       - Daily Pipeline Publish
-      - CI
     types:
       - completed
 
@@ -91,24 +90,13 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const title = "[Production Healthcheck] Failure";
-
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             const shortSha = context.sha.slice(0, 12);
             const now = new Date().toISOString();
-
-            const simulated =
-              context.eventName === "workflow_dispatch" &&
-              String(context.payload.inputs?.simulate_failure || "false") === "true";
-
-            const trigger =
-              context.eventName === "workflow_run"
-                ? `${context.payload.workflow_run?.name || "Upstream workflow"} completed successfully`
-                : "Manual workflow dispatch";
-
+            const simulated = context.eventName === "workflow_dispatch" && String(context.payload.inputs?.simulate_failure || "false") === "true";
+            const trigger = context.eventName === "workflow_run" ? `${context.payload.workflow_run?.name || "Upstream workflow"} completed successfully` : "Manual workflow dispatch";
             const body = [
-              simulated
-                ? "Manual failure simulation was requested to verify the production healthcheck alert path."
-                : "The post-deploy production healthcheck failed.",
+              simulated ? "Manual failure simulation was requested to verify the production healthcheck alert path." : "The post-deploy production healthcheck failed.",
               "",
               `- UTC: ${now}`,
               `- Workflow: ${context.workflow}`,
@@ -125,34 +113,12 @@ jobs:
               "",
               "Do not paste secrets, full API keys, Stripe secrets, database URLs, or webhook secrets into this issue.",
             ].join("\n");
-
-            const existingIssues = await github.rest.issues.listForRepo({
-              owner,
-              repo,
-              state: "open",
-              per_page: 100,
-            });
-
-            const existing = existingIssues.data.find((issue) => {
-              return !issue.pull_request && issue.title === title;
-            });
-
+            const existingIssues = await github.rest.issues.listForRepo({ owner, repo, state: "open", per_page: 100 });
+            const existing = existingIssues.data.find((issue) => !issue.pull_request && issue.title === title);
             if (existing) {
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: existing.number,
-                body,
-              });
-
+              await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body });
               core.notice(`Updated existing production healthcheck issue #${existing.number}`);
             } else {
-              const created = await github.rest.issues.create({
-                owner,
-                repo,
-                title,
-                body,
-              });
-
+              const created = await github.rest.issues.create({ owner, repo, title, body });
               core.notice(`Created production healthcheck issue #${created.data.number}`);
             }
