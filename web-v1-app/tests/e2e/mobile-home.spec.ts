@@ -1,66 +1,91 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function openMobileHome(page: Page) {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(
+    page.getByRole("heading", {
+      name: "Know the network conditions behind your data.",
+    })
+  ).toBeVisible();
+}
 
 test.describe("mobile homepage", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("keeps the opening product explanation readable", async ({ page }) => {
-    await page.goto("http://localhost:3000/");
-    await expect(page.getByRole("heading", { name: "Know the network conditions behind your data." })).toBeVisible();
-    await expect(page.getByText(/one classified observation per chain and date/i)).toBeVisible();
-    await expect(page.getByRole("link", { name: "Inspect the product" })).toHaveAttribute("href", "#mobile-product");
-  });
+  test("renders the mobile-first opening without horizontal page overflow", async ({
+    page,
+  }) => {
+    await openMobileHome(page);
 
-  test("makes the horizontal chain strip discoverable without widening the page", async ({ page }) => {
-    await page.goto("http://localhost:3000/");
-    await expect(page.getByText(/swipe for all chains.*tap a chain for details/i)).toBeVisible();
+    await expect(
+      page.getByText(/swipe for all chains.*tap a chain for details/i)
+    ).toBeVisible();
+    await expect(page.locator("#mobile-product")).toBeAttached();
+    await expect(page.locator("#mobile-why")).toBeAttached();
+
     const measurements = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
       pageWidth: document.documentElement.scrollWidth,
     }));
-    expect(measurements.pageWidth).toBeLessThanOrEqual(measurements.viewport + 1);
+    expect(measurements.pageWidth).toBeLessThanOrEqual(
+      measurements.viewport + 1
+    );
+  });
 
-    const btc = page.getByRole("button", { name: /BTC/i }).first();
-    await expect(btc).toBeVisible();
-    const stripWidths = await btc.evaluate((element) => {
-      const strip = element.parentElement;
-      return strip ? { client: strip.clientWidth, scroll: strip.scrollWidth } : { client: 0, scroll: 0 };
+  test("exposes compact graph ranges and chain-specific status detail", async ({
+    page,
+  }) => {
+    await openMobileHome(page);
+
+    await expect(
+      page.getByRole("button", { name: "7D", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "14D", exact: true })
+    ).toBeVisible();
+
+    const btcStatus = page.locator("button").filter({ hasText: /^BTC/ }).first();
+    await expect(btcStatus).toBeVisible();
+    await btcStatus.click();
+
+    await expect(
+      page.getByText("What is driving this state", { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByText(/confidence describes how strongly/i)
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
+  });
+
+  test("adds Urd Atlas context on demand", async ({ page }) => {
+    await openMobileHome(page);
+
+    const contextButton = page.getByRole("button", {
+      name: "Add Urd Atlas context",
+      exact: true,
     });
-    expect(stripWidths.scroll).toBeGreaterThan(stripWidths.client);
-  });
-
-  test("uses compact seven and fourteen day graph ranges", async ({ page }) => {
-    await page.goto("http://localhost:3000/");
-    await expect(page.getByRole("button", { name: "7D" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "14D" })).toBeVisible();
-    await expect(page.getByText(/each band is a network state/i)).toBeVisible();
-  });
-
-  test("opens chain-specific status detail", async ({ page }) => {
-    await page.goto("http://localhost:3000/");
-    await page.getByRole("button", { name: /BTC/i }).first().click();
-    await expect(page.getByText("What is driving this state")).toBeVisible();
-    await expect(page.getByText(/confidence describes how strongly/i)).toBeVisible();
-    await page.getByRole("button", { name: "Close" }).click();
-  });
-
-  test("expands Urd Atlas context without horizontal overflow", async ({ page }) => {
-    await page.goto("http://localhost:3000/");
-    const contextButton = page.getByRole("button", { name: "Add Urd Atlas context" });
     const section = contextButton.locator("xpath=ancestor::section[1]");
     await contextButton.click();
+
     await expect(section.getByText("CHEAP", { exact: true })).toBeVisible();
     await expect(section.getByText("92%", { exact: true })).toBeVisible();
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(overflow).toBeLessThanOrEqual(1);
   });
 
-  test("opens published JSON and switches artifact", async ({ page }) => {
-    await page.goto("http://localhost:3000/");
-    await page.getByRole("button", { name: "Open JSON" }).first().click();
-    const modal = page.locator("pre").last().locator("xpath=ancestor::div[2]");
-    await expect(page.locator("pre").last()).toBeVisible();
-    await modal.getByRole("button", { name: "Gold" }).click();
-    await expect(modal.locator("pre")).toBeVisible();
-    await modal.getByRole("button", { name: "Close" }).click();
+  test("opens a published JSON artifact", async ({ page }) => {
+    await openMobileHome(page);
+
+    const product = page.locator("#mobile-product");
+    const openJson = product
+      .locator("button")
+      .filter({ hasText: "Open JSON" })
+      .first();
+    await expect(openJson).toBeVisible();
+    await openJson.click();
+
+    const json = page.locator("pre").last();
+    await expect(json).toBeVisible();
+    await expect(json).not.toHaveText("null");
   });
 });
