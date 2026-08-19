@@ -13,8 +13,12 @@ test.describe("mobile homepage", () => {
   test("makes the horizontal chain strip discoverable without widening the page", async ({ page }) => {
     await page.goto("http://localhost:3000/");
     await expect(page.getByText(/swipe for all chains.*tap a chain for details/i)).toBeVisible();
-    const measurements = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, pageWidth: document.documentElement.scrollWidth }));
+    const measurements = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      pageWidth: document.documentElement.scrollWidth,
+    }));
     expect(measurements.pageWidth).toBeLessThanOrEqual(measurements.viewport + 1);
+
     const btc = page.getByRole("button", { name: /BTC/i }).first();
     await expect(btc).toBeVisible();
     const stripWidths = await btc.evaluate((element) => {
@@ -41,9 +45,11 @@ test.describe("mobile homepage", () => {
 
   test("expands Urd Atlas context without horizontal overflow", async ({ page }) => {
     await page.goto("http://localhost:3000/");
-    await page.getByRole("button", { name: "Add Urd Atlas context" }).click();
-    await expect(page.getByText("CHEAP", { exact: true })).toBeVisible();
-    await expect(page.getByText("92%", { exact: true })).toBeVisible();
+    const contextButton = page.getByRole("button", { name: "Add Urd Atlas context" });
+    const section = contextButton.locator("xpath=ancestor::section[1]");
+    await contextButton.click();
+    await expect(section.getByText("CHEAP", { exact: true })).toBeVisible();
+    await expect(section.getByText("92%", { exact: true })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
@@ -51,9 +57,10 @@ test.describe("mobile homepage", () => {
   test("opens published JSON and switches artifact", async ({ page }) => {
     await page.goto("http://localhost:3000/");
     await page.getByRole("button", { name: "Open JSON" }).first().click();
+    const modal = page.locator("pre").last().locator("xpath=ancestor::div[2]");
     await expect(page.locator("pre").last()).toBeVisible();
-    await page.getByRole("button", { name: "Gold" }).last().click();
-    await expect(page.locator("pre").last()).toBeVisible();
-    await page.getByRole("button", { name: "Close" }).last().click();
+    await modal.getByRole("button", { name: "Gold" }).click();
+    await expect(modal.locator("pre")).toBeVisible();
+    await modal.getByRole("button", { name: "Close" }).click();
   });
 });
