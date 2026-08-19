@@ -41,6 +41,18 @@ const ENDPOINT_INVENTORY = [
     authRequirement: "none",
   },
   {
+    path: "/api/v1/home-history",
+    methods: ["GET"],
+    classification: "public product endpoint",
+    launchStatus: "stable",
+    stability: "stable",
+    intendedUser: "website visitors and technical evaluators",
+    primaryUseCase: "Read recent per-chain network-state history used by the interactive homepage chart.",
+    dataReturned: "Up to 90 published observations per supported chain with date, regime label, and confidence.",
+    artifactSource: "published meta window artifacts",
+    authRequirement: "none",
+  },
+  {
     path: "/api/v1/summary/[chain]",
     methods: ["GET"],
     classification: "public product endpoint",
