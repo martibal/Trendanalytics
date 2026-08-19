@@ -1,6 +1,7 @@
 import CheckoutRedirectGuard from "@/components/home/CheckoutRedirectGuard";
 import InteractiveHomeDashboard, { type HomeChainSnapshot, type HomeLabel } from "@/components/home/InteractiveHomeDashboard";
 import MobileHomeExperience from "@/components/home/MobileHomeExperience";
+import PublicationFreshnessStrip from "@/components/home/PublicationFreshnessStrip";
 import styles from "@/components/home/MobileHomeExperience.module.css";
 import type { HeroPanelSnapshot } from "@/components/home/HeroNetworkStatePanel";
 import { readStorageObject } from "@/lib/storage";
@@ -29,6 +30,7 @@ type MetaLatest = {
   methodology_version?: string;
 };
 type DatasetJson = { published_at?: string; computed_at_utc?: string };
+type SourceFreshnessJson = { last_run_at_utc?: string; generated_at_utc?: string; last_run_date?: string };
 
 const CHAINS = [
   { id: "bitcoin", ticker: "BTC", name: "Bitcoin", lag: "T+1" },
@@ -69,6 +71,15 @@ function formatDate(value:string|undefined){
   const d=new Date(value.includes("T")?value:`${value}T00:00:00Z`);
   return Number.isNaN(d.getTime())?value:d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"});
 }
+function formatRunTimestamp(value:string|undefined){
+  if(!value)return "—";
+  const d=new Date(value.includes("T")?value:`${value}T00:00:00Z`);
+  if(Number.isNaN(d.getTime()))return value;
+  return new Intl.DateTimeFormat("en-GB",{
+    day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",
+    hour12:false,timeZone:"Europe/Oslo",timeZoneName:"short",
+  }).format(d);
+}
 function dimensionLabel(value:string|undefined,fallback:string){
   if(!value)return fallback;
   return value.toLowerCase().split(/[_\s-]+/).filter(Boolean).map(part=>part[0].toUpperCase()+part.slice(1)).join(" ");
@@ -106,8 +117,13 @@ async function getSnapshot(chain:(typeof CHAINS)[number]):Promise<HomeChainSnaps
   };
 }
 async function getLastRun(){
-  const dataset=await readJson<DatasetJson>("data/published/v1/dataset.json");
-  return formatDate(dataset?.published_at??dataset?.computed_at_utc);
+  const [freshness,dataset]=await Promise.all([
+    readJson<SourceFreshnessJson>("data/published/v1/source-freshness.json"),
+    readJson<DatasetJson>("data/published/v1/dataset.json"),
+  ]);
+  return formatRunTimestamp(
+    freshness?.last_run_at_utc??freshness?.generated_at_utc??freshness?.last_run_date??dataset?.published_at??dataset?.computed_at_utc
+  );
 }
 async function getHeroSnapshot():Promise<HeroPanelSnapshot>{
   const latest=await readJson<MetaLatest>("data/published/v1/meta/bitcoin/latest.json");
@@ -131,6 +147,7 @@ export default async function HomePage(){
   ]);
   return <>
     <CheckoutRedirectGuard />
+    <PublicationFreshnessStrip snapshots={snapshots} lastRun={lastRun} />
     <MobileHomeExperience snapshots={snapshots} lastRun={lastRun} consecutiveRows={heroSnapshot.consecutiveRows} />
     <div className={styles.desktopOnly}>
       <InteractiveHomeDashboard snapshots={snapshots} lastRun={lastRun} examples={{high:null,low:null}} heroSnapshot={heroSnapshot}/>
