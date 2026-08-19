@@ -9,7 +9,7 @@ import styles from "./MobileHomeExperience.module.css";
 type Props = {
   snapshots: HomeChainSnapshot[];
   lastRun: string;
-  consecutiveRows: number | null;
+  consecutiveRows: number | null | undefined;
 };
 
 type HistoryRow = { date: string; label: HomeLabel; confidence: number | null };
@@ -48,9 +48,6 @@ function axisDetail(chain:HomeChainSnapshot){
 }
 function confidenceCopy(chain:HomeChainSnapshot){
   return `${chain.confidence} confidence describes how strongly the published evidence supports this ${chain.name} classification. It is evidence strength for this observation, not a forecast probability.`;
-}
-function methodologyLabel(value:string){
-  return /^v/i.test(value)?value:`v${value}`;
 }
 
 export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}:Props){
@@ -120,8 +117,8 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
       <div className={styles.chartBlock}>
         <p className={styles.chartGuide}>Each band is a network state — read left to right.</p>
         <div className={styles.chartControls}>
-          <div>{snapshots.map(c=><button key={c.id} type="button" className={c.id===selectedId?styles.active:""} onClick={()=>chooseChain(c.id)}>{c.ticker}</button>)}</div>
-          <div>{([7,14] as Range[]).map(r=><button key={r} type="button" className={range===r?styles.active:""} onClick={()=>{setRange(r);setPointIndex(null)}}>{r}D</button>)}</div>
+          <div>{snapshots.map(c=><button key={c.id} className={c.id===selectedId?styles.active:""} onClick={()=>chooseChain(c.id)}>{c.ticker}</button>)}</div>
+          <div>{([7,14] as Range[]).map(r=><button key={r} className={range===r?styles.active:""} onClick={()=>{setRange(r);setPointIndex(null)}}>{r}D</button>)}</div>
         </div>
         <svg ref={chartRef} className={styles.chart} viewBox="0 0 360 260" preserveAspectRatio="none" onClick={chartClick}>
           <line x1="0" y1="58" x2="360" y2="58" className={styles.gridline}/><line x1="0" y1="132" x2="360" y2="132" className={styles.gridline}/><line x1="0" y1="214" x2="360" y2="214" className={styles.gridline}/>
@@ -142,7 +139,7 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
           <div className={styles.recordMain}><div><small>Model error</small><strong>4.3%</strong></div><div><small>Chain</small><strong>BTC</strong></div></div>
           {contextOpen?<div className={styles.added}><div><small>Regime</small><strong>CHEAP</strong></div><div><small>Confidence</small><strong>92%</strong></div></div>:null}
         </div>
-        <button className={styles.contextButton} type="button" onClick={()=>setContextOpen(v=>!v)}>{contextOpen?"Remove Urd Atlas context":"Add Urd Atlas context"}</button>
+        <button className={styles.contextButton} onClick={()=>setContextOpen(v=>!v)}>{contextOpen?"Remove Urd Atlas context":"Add Urd Atlas context"}</button>
         <p className={styles.takeaway}>Now you know the anomaly happened while the network was in a different operating regime.</p>
       </section>
 
@@ -161,14 +158,14 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
       <h2>This is what you actually receive.</h2>
       <p className={styles.productIntro}>Urd Atlas publishes one classified observation for each supported chain and date, together with the data needed to inspect why it was published.</p>
       <div className={styles.deliveryMeta}><span>{selected.name.toUpperCase()}</span><span>{selected.asOf}</span></div>
-      <button className={styles.deliveryToggle} type="button" onClick={()=>setLayersOpen(v=>!v)}>{layersOpen?"Hide file layers ↑":"Show file layers ↓"}</button>
-      {layersOpen?<div className={styles.layers}>{artifacts.map((a,i)=><button key={a} type="button" onClick={()=>openArtifact(a)}><span>0{i+1}</span><span><strong>{artifactCopy[a].title}</strong><small>{artifactCopy[a].body}</small></span><em>Open JSON</em></button>)}</div>:null}
+      <button className={styles.deliveryToggle} onClick={()=>setLayersOpen(v=>!v)}>{layersOpen?"Hide file layers ↑":"Show file layers ↓"}</button>
+      {layersOpen?<div className={styles.layers}>{artifacts.map((a,i)=><button key={a} onClick={()=>openArtifact(a)}><span>0{i+1}</span><span><strong>{artifactCopy[a].title}</strong><small>{artifactCopy[a].body}</small></span><em>Open JSON</em></button>)}</div>:null}
       <p className={styles.deliveryFoot}>The regime is the compact output. The four files let you inspect, reproduce and use the evidence behind it.</p>
     </section>
 
     <section className={styles.trust}>
       <p>— Provenance</p><h2>Built to be referenced, not silently revised.</h2>
-      <div><article><strong>{consecutiveRows??"—"}</strong><span>Published Bitcoin days</span></article><article><strong>4 chains</strong><span>Bitcoin, Ethereum, Arbitrum, Base</span></article><article><strong>{methodologyLabel(selected.methodologyVersion)}</strong><span>Current methodology</span></article><article><strong>Versioned</strong><span>Corrections are disclosed rather than silently overwritten.</span></article></div>
+      <div><article><strong>{consecutiveRows??"—"}</strong><span>Published Bitcoin days</span></article><article><strong>4 chains</strong><span>Bitcoin, Ethereum, Arbitrum, Base</span></article><article><strong>v{selected.methodologyVersion}</strong><span>Current methodology</span></article><article><strong>Versioned</strong><span>Corrections are disclosed rather than silently overwritten.</span></article></div>
     </section>
 
     <div className={styles.editorial}>
@@ -180,8 +177,8 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
       <section className={styles.pricing} id="mobile-pricing">
         <h2>Simple coverage.</h2><p>The free sample is enough to test the join. Subscribe when you need daily coverage and history.</p>
         <div className={styles.plan}><h3>Free</h3><strong>$0</strong><p>Representative files for inspecting the schema.</p><a href="/api/v1/sample-pack">Inspect sample</a></div>
-        <div className={`${styles.plan} ${styles.recommended}`}><h3>Basic</h3><strong>$49/mo</strong><p>One selected chain, daily delivery and 90 days of history.</p><form action="/api/v1/checkout?plan=basic" method="post"><button type="submit">Start Basic</button></form></div>
-        <div className={styles.plan}><h3>Pro</h3><strong>$149/mo</strong><p>All four chains with the full published history.</p><form action="/api/v1/checkout?plan=pro" method="post"><button type="submit">Start Pro</button></form></div>
+        <div className={`${styles.plan} ${styles.recommended}`}><h3>Basic</h3><strong>$49/mo</strong><p>One selected chain, daily delivery and 90 days of history.</p><form action="/api/v1/checkout?plan=basic" method="post"><button>Start Basic</button></form></div>
+        <div className={styles.plan}><h3>Pro</h3><strong>$149/mo</strong><p>All four chains with the full published history.</p><form action="/api/v1/checkout?plan=pro" method="post"><button>Start Pro</button></form></div>
       </section>
 
       <section className={styles.details}>
@@ -195,7 +192,7 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
     <section className={styles.final}><h2>When the network changes, your data should know.</h2><p>Give each supported chain and date a network-state reference you can inspect and join.</p><a href="/api/v1/sample-pack">Inspect the sample</a></section>
 
     {statusOpen?<div className={styles.statusModal} onClick={()=>setStatusOpen(false)}><div onClick={e=>e.stopPropagation()}>
-      <header><small>{selected.name.toUpperCase()} · {selected.asOf}</small><button type="button" onClick={()=>setStatusOpen(false)}>Close</button></header>
+      <header><small>{selected.name.toUpperCase()} · {selected.asOf}</small><button onClick={()=>setStatusOpen(false)}>Close</button></header>
       <div className={styles.statusState}><strong>{selected.regime}</strong><span>{selected.confidence} confidence</span></div>
       <p>{selected.oneLiner}</p>
       <h4>What is driving this state</h4>
@@ -205,12 +202,12 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
     </div></div>:null}
 
     {jsonOpen?<div className={styles.jsonModal} onClick={()=>setJsonOpen(false)}><div onClick={e=>e.stopPropagation()}>
-      <header><strong>{artifactCopy[artifact].title} · {selected.name}</strong><button type="button" onClick={()=>setJsonOpen(false)}>Close</button></header>
-      <nav>{artifacts.map(a=><button key={a} type="button" className={a===artifact?styles.active:""} onClick={()=>setArtifact(a)}>{artifactCopy[a].title}</button>)}</nav>
+      <header><strong>{artifactCopy[artifact].title} · {selected.name}</strong><button onClick={()=>setJsonOpen(false)}>Close</button></header>
+      <nav>{artifacts.map(a=><button key={a} className={a===artifact?styles.active:""} onClick={()=>setArtifact(a)}>{artifactCopy[a].title}</button>)}</nav>
       <pre>{JSON.stringify(selected.artifacts[artifact]??null,null,2)}</pre>
     </div></div>:null}
 
-    <div className={styles.sticky}><div><strong>Basic — $49/mo</strong><span>one chain · 90 days included</span></div><form action="/api/v1/checkout?plan=basic" method="post"><button type="submit">Start now</button></form></div>
+    <div className={styles.sticky}><div><strong>Basic — $49/mo</strong><span>one chain · 90 days included</span></div><form action="/api/v1/checkout?plan=basic" method="post"><button>Start now</button></form></div>
     <p className={styles.lastRun}>Last run: {lastRun}</p>
   </div>;
 }
