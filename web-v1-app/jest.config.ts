@@ -28,10 +28,13 @@ const config: Config = {
     "!src/app/**/error.tsx",
     "!src/proxy.ts",
     // The homepage experiences are interaction-heavy and are validated through Playwright.
-    // Keeping them out of Jest's global unit-coverage denominator prevents UI-only changes
-    // from failing an unrelated unit-coverage gate.
+    // Keep them out of the global Jest coverage denominator and instrumentation entirely.
     "!src/components/home/MobileHomeExperience.tsx",
     "!src/components/landing/UrdAtlasVFinalLandingClient.tsx",
+  ],
+  coveragePathIgnorePatterns: [
+    "<rootDir>/src/components/home/MobileHomeExperience.tsx$",
+    "<rootDir>/src/components/landing/UrdAtlasVFinalLandingClient.tsx$",
   ],
   coverageThreshold: {
     global: {
