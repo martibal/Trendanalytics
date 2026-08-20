@@ -297,7 +297,6 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
     </svg>
   );
 }
-
 function ChainLogo({ chainId }: { chainId: string }) {
   if (chainId === "bitcoin") {
     return (
@@ -416,6 +415,8 @@ function Reveal({
 
     observer.observe(node);
 
+    const failsafeTimer = setTimeout(reveal, 1500);
+
     const handleHashChange = () => {
       revealIfHashTargeted();
     };
@@ -425,6 +426,7 @@ function Reveal({
     return () => {
       observer.disconnect();
       window.removeEventListener("hashchange", handleHashChange);
+      clearTimeout(failsafeTimer);
     };
   }, [isVisible]);
 
