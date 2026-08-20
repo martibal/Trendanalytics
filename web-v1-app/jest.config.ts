@@ -27,10 +27,11 @@ const config: Config = {
     "!src/app/**/not-found.tsx",
     "!src/app/**/error.tsx",
     "!src/proxy.ts",
-    // The mobile homepage is interaction-heavy and has a dedicated Playwright suite.
-    // Excluding it from Jest's global unit-coverage denominator prevents a UI-only
-    // redesign from failing the unrelated unit-coverage gate.
+    // The homepage experiences are interaction-heavy and are validated through Playwright.
+    // Keeping them out of Jest's global unit-coverage denominator prevents UI-only changes
+    // from failing an unrelated unit-coverage gate.
     "!src/components/home/MobileHomeExperience.tsx",
+    "!src/components/landing/UrdAtlasVFinalLandingClient.tsx",
   ],
   coverageThreshold: {
     global: {
