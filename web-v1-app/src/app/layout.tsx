@@ -10,6 +10,7 @@ import ThemeProvider from "@/components/site/ThemeProvider";
 import "./globals.css";
 import "./functional-visual-design.css";
 import "./contrast-hardening.css";
+import "./landing-emergency-contrast.css";
 
 export const metadata: Metadata = {
   title: "Urd Atlas",
