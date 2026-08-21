@@ -11,6 +11,7 @@ import "./globals.css";
 import "./functional-visual-design.css";
 import "./contrast-hardening.css";
 import "./landing-emergency-contrast.css";
+import "./landing-info-anchor.css";
 
 export const metadata: Metadata = {
   title: "Urd Atlas",
