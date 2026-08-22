@@ -13,6 +13,9 @@
 //      til /mobile. Løsningen: sett en 2-timers cookie "urd-force-desktop".
 //      isMobileRequest() respekterer cookien og hopper over redirect.
 //   3. ?view=mobile fjerner cookien slik at mobil-redirect gjenopptas.
+//   4. Forsiden (/) redirectes aldri lenger til /mobile. Root-siden har allerede
+//      responsiv desktop/mobil-rendering, og UA-basert redirect kunne sende
+//      desktop-nettlesere til den eldre /mobile-forsiden.
 
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse, userAgent } from "next/server";
@@ -46,7 +49,9 @@ function mapToMobilePath(pathname: string): string | null {
   if (pathname.startsWith("/sign-in"))  return null;
   if (pathname.startsWith("/sign-up"))  return null;
 
-  if (pathname === "/") return "/mobile";
+  // Root has its own responsive desktop/mobile implementation.
+  // Never route it to the separate legacy /mobile homepage.
+  if (pathname === "/") return null;
 
   const chainMatch = pathname.match(
     /^\/chains\/(bitcoin|ethereum|arbitrum|base)$/
@@ -113,7 +118,7 @@ export default clerkMiddleware((_auth, req) => {
     return res;
   }
 
-  // Automatisk mobil-redirect
+  // Automatisk mobil-redirect for undersider. Forsiden håndterer responsivitet selv.
   if (isMobileRequest(req)) {
     const mobilePath = mapToMobilePath(pathname);
     if (mobilePath && mobilePath !== pathname) {
