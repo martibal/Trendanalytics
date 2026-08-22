@@ -126,14 +126,34 @@ function axisReading(axis: "Demand" | "Friction" | "Capacity", value: number | n
   if (value == null) {
     return `No display score is available for ${axis.toLowerCase()} in this ${chain.name} observation.`;
   }
-  const position = value >= 65 ? "above" : value <= 35 ? "below" : "near";
+
   if (axis === "Demand") {
-    return `The display score sits ${position} the neutral midpoint of 50 for ${chain.name}. Higher values describe hotter usage relative to the chain’s own history.`;
+    if (value >= 65) {
+      return `Network activity is running high for ${chain.name} relative to its recent history. Demand captures how strongly usage and transaction activity are pressing compared with the chain’s own recent baseline.`;
+    }
+    if (value <= 35) {
+      return `Network activity is subdued for ${chain.name} relative to its recent history. Demand tracks the strength of usage and transaction activity against the chain’s own recent baseline.`;
+    }
+    return `${chain.name} activity is close to its recent operating range. Demand tracks whether usage and transaction activity are materially stronger or weaker than the chain has seen recently.`;
   }
+
   if (axis === "Friction") {
-    return `The display score sits ${position} the neutral midpoint of 50 for ${chain.name}. Higher values describe greater cost or transaction-failure pressure in the smoothed scorecard.`;
+    if (value >= 65) {
+      return `Using ${chain.name} is comparatively difficult right now. Elevated friction points to greater fee or transaction-failure pressure than has been typical in the chain’s recent history.`;
+    }
+    if (value <= 35) {
+      return `Using ${chain.name} is comparatively easy right now. Low friction points to less fee or transaction-failure pressure than the chain has typically experienced recently.`;
+    }
+    return `Costs and execution conditions for ${chain.name} are close to their recent norm. Friction reflects whether fees or transaction-failure pressure are becoming unusually restrictive.`;
   }
-  return `The display score sits ${position} the neutral midpoint of 50 for ${chain.name}. Higher values describe tighter capacity pressure in the smoothed scorecard.`;
+
+  if (value >= 65) {
+    return `${chain.name} is operating with tighter headroom than usual. Elevated capacity pressure indicates that the network is closer to its recent operational limits.`;
+  }
+  if (value <= 35) {
+    return `${chain.name} has ample headroom relative to recent conditions. Low capacity pressure indicates that the network is operating comfortably inside its recent limits.`;
+  }
+  return `${chain.name} available capacity is close to its normal balance. There is little evidence that the network is currently operating under unusual capacity pressure.`;
 }
 
 export default function InteractiveHomeDashboard({ snapshots }: Props) {
