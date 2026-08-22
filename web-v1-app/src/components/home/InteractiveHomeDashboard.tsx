@@ -129,22 +129,22 @@ function axisReading(axis: "Demand" | "Friction" | "Capacity", value: number | n
 
   if (axis === "Demand") {
     if (value >= 65) {
-      return `Network activity is running high for ${chain.name} relative to its recent history. Demand captures how strongly usage and transaction activity are pressing compared with the chain’s own recent baseline.`;
+      return `Network activity is running high for ${chain.name} relative to its recent history — usage and transaction volume have picked up over the past several days.`;
     }
     if (value <= 35) {
-      return `Network activity is subdued for ${chain.name} relative to its recent history. Demand tracks the strength of usage and transaction activity against the chain’s own recent baseline.`;
+      return `Network activity is subdued for ${chain.name} relative to its recent history — usage and transaction volume are running below the levels seen in recent conditions.`;
     }
-    return `${chain.name} activity is close to its recent operating range. Demand tracks whether usage and transaction activity are materially stronger or weaker than the chain has seen recently.`;
+    return `${chain.name} activity is close to its recent operating range — usage and transaction volume aren’t showing an unusual shift right now.`;
   }
 
   if (axis === "Friction") {
     if (value >= 65) {
-      return `Using ${chain.name} is comparatively difficult right now. Elevated friction points to greater fee or transaction-failure pressure than has been typical in the chain’s recent history.`;
+      return `Costs and execution conditions for ${chain.name} are elevated relative to recent history — fees or transaction-failure rates are showing more pressure than usual right now.`;
     }
     if (value <= 35) {
-      return `Using ${chain.name} is comparatively easy right now. Low friction points to less fee or transaction-failure pressure than the chain has typically experienced recently.`;
+      return `Costs and execution conditions for ${chain.name} are unusually light relative to recent history — fees and transaction-failure rates are showing less pressure than usual right now.`;
     }
-    return `Costs and execution conditions for ${chain.name} are close to their recent norm. Friction reflects whether fees or transaction-failure pressure are becoming unusually restrictive.`;
+    return `Costs and execution conditions for ${chain.name} are close to their recent norm — fees and transaction-failure rates aren’t showing unusual pressure right now.`;
   }
 
   if (value >= 65) {
