@@ -13,6 +13,7 @@ import "./contrast-hardening.css";
 import "./landing-emergency-contrast.css";
 import "./landing-info-anchor.css";
 import "./home-editorial-v4.css";
+import "./home-hero-center.css";
 
 export const metadata: Metadata = {
   title: "Urd Atlas",
