@@ -70,6 +70,9 @@ jobs:
             --root data/published/v1/meta \
             --root web-v1-app/.private-data/published/v1/meta
 
+      - name: Validate native-denomination guardrails
+        run: cd .. && python pipeline/tools/validate_native_units.py --published-root data/published/v1
+
       - name: Run lint
         run: npm run lint
 
@@ -84,6 +87,9 @@ jobs:
 
       - name: Run pipeline determinism gate
         run: npm run check:pipeline-determinism
+
+      - name: Run pipeline environment parity gate
+        run: npm run check:pipeline-environment-parity
 
       - name: Run pipeline golden fixture gate
         run: npm run check:pipeline-golden-fixture
