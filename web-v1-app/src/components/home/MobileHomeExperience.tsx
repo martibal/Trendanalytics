@@ -4,6 +4,7 @@ import type { MouseEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import type { HomeChainSnapshot, HomeLabel, Artifact } from "./InteractiveHomeDashboard";
+import { homeAxisEvidenceSummary } from "./homeAxisEvidence";
 import styles from "./MobileHomeExperience.module.css";
 
 type Props = {
@@ -40,14 +41,15 @@ function statusClass(label:HomeLabel){
 }
 function axisValue(v:number|null){return v==null?"—":v.toFixed(1)}
 function axisDetail(chain:HomeChainSnapshot){
+  const meta=chain.artifacts.Meta;
   return [
-    ["Demand", chain.demandLabel || "Current context", axisValue(chain.demand)],
-    ["Friction", chain.frictionLabel || "Current context", axisValue(chain.friction)],
-    ["Capacity", chain.capacityLabel || "Current context", axisValue(chain.capacity)],
+    ["Demand", homeAxisEvidenceSummary(meta,"demand"), axisValue(chain.demand)],
+    ["Friction", homeAxisEvidenceSummary(meta,"friction"), axisValue(chain.friction)],
+    ["Capacity", homeAxisEvidenceSummary(meta,"capacity"), axisValue(chain.capacity)],
   ];
 }
 function evidenceScoreCopy(chain:HomeChainSnapshot){
-  return `${chain.confidence} Evidence score describes how strongly the available data and label-specific evidence support this ${chain.name} classification. It is an uncalibrated evidence-strength quantity, not the probability that the label is correct.`;
+  return `${chain.confidence} Evidence score describes how strongly the available data and label-specific evidence support this ${chain.name} classification. It is an uncalibrated evidence-strength quantity, not the probability that the label is correct. Classifier bands above are the regime evidence; the numeric axis values are smoothed display scores and are not the thresholds used to set the regime.`;
 }
 
 export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}:Props){
@@ -196,8 +198,8 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
       <header><small>{selected.name.toUpperCase()} · {selected.asOf}</small><button onClick={()=>setStatusOpen(false)}>Close</button></header>
       <div className={styles.statusState}><strong>{selected.regime}</strong><span>Evidence score {selected.confidence}</span></div>
       <p>{selected.oneLiner}</p>
-      <h4>What is driving this state</h4>
-      {axisDetail(selected).map(([name,label,value])=><div className={styles.driver} key={name}><b>{name}</b><span>{label} · {value}</span></div>)}
+      <h4>Classifier evidence behind this state</h4>
+      {axisDetail(selected).map(([name,label,value])=><div className={styles.driver} key={name}><b>{name}</b><span>{label} · Display {value}</span></div>)}
       <p className={styles.confidenceCopy}>{evidenceScoreCopy(selected)}</p>
       <a href="#mobile-product" onClick={()=>setStatusOpen(false)}>Inspect this observation</a>
     </div></div>:null}

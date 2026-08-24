@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { HeroPanelSnapshot } from "./HeroNetworkStatePanel";
 import HomeJsonFiles from "./HomeJsonFiles";
+import { homeAxisNarrative } from "./homeAxisEvidence";
 
 export type HomeLabel = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 export type Artifact = "Meta" | "Gold" | "Derived" | "Briefs";
@@ -61,20 +62,20 @@ type HistoryResponse = { chains?: Record<string, HistoryRow[]> };
 
 const regimeCopy: Record<HomeLabel, { short: string; detail: string }> = {
   STABLE: {
-    short: "Conditions are near the chain’s recent normal",
-    detail: "conditions sit broadly inside the operating range that has been normal for this chain in its own recent history",
+    short: "No stronger regime cleared the publication rules",
+    detail: "the current axis evidence did not meet the profile-specific corroboration required for HEATING, CONGESTED or CHEAP",
   },
   HEATING: {
-    short: "Activity and operating pressure are building",
-    detail: "activity or operating pressure is building relative to this chain’s own recent history",
+    short: "The profile-specific HEATING rule is met",
+    detail: "the current axis evidence meets the profile-specific HEATING rule relative to this chain’s recent history",
   },
   CONGESTED: {
-    short: "Fee and capacity pressure are elevated",
-    detail: "friction and capacity evidence point to elevated network pressure relative to this chain’s own recent history",
+    short: "The profile-specific CONGESTED rule is met",
+    detail: "the current friction and/or capacity evidence meets the profile-specific CONGESTED rule relative to this chain’s recent history",
   },
   CHEAP: {
-    short: "Transaction friction is low",
-    detail: "transaction friction is low relative to this chain’s own recent history",
+    short: "The profile-specific CHEAP rule is met",
+    detail: "the current low-friction evidence meets the profile-specific CHEAP rule relative to this chain’s recent history",
   },
   "UNKNOWN/DEGRADED": {
     short: "Evidence did not clear the publication gate",
@@ -121,26 +122,6 @@ function sentenceCase(value: string) {
 
 function displayScore(value: number | null) {
   return value == null ? "—" : value.toFixed(1);
-}
-
-function axisReading(axis: "Demand" | "Friction" | "Capacity", value: number | null, chain: HomeChainSnapshot) {
-  if (value == null) return `No display score is available for ${axis.toLowerCase()} in this ${chain.name} observation.`;
-
-  if (axis === "Demand") {
-    if (value >= 65) return `Network activity is running high for ${chain.name} relative to its recent history — usage and transaction volume have picked up over the past several days.`;
-    if (value <= 35) return `Network activity is subdued for ${chain.name} relative to its recent history — usage and transaction volume are running below the levels seen in recent conditions.`;
-    return `${chain.name} activity is close to its recent operating range — usage and transaction volume aren’t showing an unusual shift right now.`;
-  }
-
-  if (axis === "Friction") {
-    if (value >= 65) return `Costs and execution conditions for ${chain.name} are elevated relative to recent history — fees or transaction-failure rates are showing more pressure than usual right now.`;
-    if (value <= 35) return `Costs and execution conditions for ${chain.name} are unusually light relative to recent history — fees and transaction-failure rates are showing less pressure than usual right now.`;
-    return `Costs and execution conditions for ${chain.name} are close to their recent norm — fees and transaction-failure rates aren’t showing unusual pressure right now.`;
-  }
-
-  if (value >= 65) return `${chain.name} is operating with tighter headroom than usual. Elevated capacity pressure indicates that the network is closer to its recent operational limits.`;
-  if (value <= 35) return `${chain.name} has ample headroom relative to recent conditions. Low capacity pressure indicates that the network is operating comfortably inside its recent limits.`;
-  return `${chain.name} available capacity is close to its normal balance. There is little evidence that the network is currently operating under unusual capacity pressure.`;
 }
 
 export default function InteractiveHomeDashboard({ snapshots }: Props) {
@@ -239,10 +220,11 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
           <div className="ua6-class-copy">
             <p>The latest {selectedChain.name} observation is <strong>{selectedChain.regime}</strong> for {selectedChain.asOf}. {sentenceCase(regimeCopy[selectedChain.regime].detail)}. {evidenceScoreCopy(selectedChain)}</p>
             <div className="ua6-axis-lines">
-              <div className="ua6-axis-line"><b>Demand</b><strong>{displayScore(selectedChain.demand)}</strong><span>{axisReading("Demand", selectedChain.demand, selectedChain)}</span></div>
-              <div className="ua6-axis-line"><b>Friction</b><strong>{displayScore(selectedChain.friction)}</strong><span>{axisReading("Friction", selectedChain.friction, selectedChain)}</span></div>
-              <div className="ua6-axis-line"><b>Capacity</b><strong>{displayScore(selectedChain.capacity)}</strong><span>{axisReading("Capacity", selectedChain.capacity, selectedChain)}</span></div>
+              <div className="ua6-axis-line"><b>Demand</b><strong>{displayScore(selectedChain.demand)}</strong><span>{homeAxisNarrative(selectedChain.artifacts.Meta, "demand", selectedChain.demand)}</span></div>
+              <div className="ua6-axis-line"><b>Friction</b><strong>{displayScore(selectedChain.friction)}</strong><span>{homeAxisNarrative(selectedChain.artifacts.Meta, "friction", selectedChain.friction)}</span></div>
+              <div className="ua6-axis-line"><b>Capacity</b><strong>{displayScore(selectedChain.capacity)}</strong><span>{homeAxisNarrative(selectedChain.artifacts.Meta, "capacity", selectedChain.capacity)}</span></div>
             </div>
+            <p><strong>How to read the rows:</strong> classifier bands and trend are the regime evidence. The numeric score beside each axis is a smoothed scorecard display value and can sit closer to neutral 50 without contradicting a HIGH/LOW classifier band.</p>
             <p><strong>Publication guardrail:</strong> HEATING, CONGESTED and CHEAP require their profile-specific corroborating axis evidence. Constant, near-constant or insufficient historical distributions cannot manufacture HIGH/LOW axis bands, and low evidence is published as UNKNOWN/DEGRADED rather than overstated.</p>
           </div>
         </div>
