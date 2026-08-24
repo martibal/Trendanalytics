@@ -124,36 +124,22 @@ function displayScore(value: number | null) {
 }
 
 function axisReading(axis: "Demand" | "Friction" | "Capacity", value: number | null, chain: HomeChainSnapshot) {
-  if (value == null) {
-    return `No display score is available for ${axis.toLowerCase()} in this ${chain.name} observation.`;
-  }
+  if (value == null) return `No display score is available for ${axis.toLowerCase()} in this ${chain.name} observation.`;
 
   if (axis === "Demand") {
-    if (value >= 65) {
-      return `Network activity is running high for ${chain.name} relative to its recent history — usage and transaction volume have picked up over the past several days.`;
-    }
-    if (value <= 35) {
-      return `Network activity is subdued for ${chain.name} relative to its recent history — usage and transaction volume are running below the levels seen in recent conditions.`;
-    }
+    if (value >= 65) return `Network activity is running high for ${chain.name} relative to its recent history — usage and transaction volume have picked up over the past several days.`;
+    if (value <= 35) return `Network activity is subdued for ${chain.name} relative to its recent history — usage and transaction volume are running below the levels seen in recent conditions.`;
     return `${chain.name} activity is close to its recent operating range — usage and transaction volume aren’t showing an unusual shift right now.`;
   }
 
   if (axis === "Friction") {
-    if (value >= 65) {
-      return `Costs and execution conditions for ${chain.name} are elevated relative to recent history — fees or transaction-failure rates are showing more pressure than usual right now.`;
-    }
-    if (value <= 35) {
-      return `Costs and execution conditions for ${chain.name} are unusually light relative to recent history — fees and transaction-failure rates are showing less pressure than usual right now.`;
-    }
+    if (value >= 65) return `Costs and execution conditions for ${chain.name} are elevated relative to recent history — fees or transaction-failure rates are showing more pressure than usual right now.`;
+    if (value <= 35) return `Costs and execution conditions for ${chain.name} are unusually light relative to recent history — fees and transaction-failure rates are showing less pressure than usual right now.`;
     return `Costs and execution conditions for ${chain.name} are close to their recent norm — fees and transaction-failure rates aren’t showing unusual pressure right now.`;
   }
 
-  if (value >= 65) {
-    return `${chain.name} is operating with tighter headroom than usual. Elevated capacity pressure indicates that the network is closer to its recent operational limits.`;
-  }
-  if (value <= 35) {
-    return `${chain.name} has ample headroom relative to recent conditions. Low capacity pressure indicates that the network is operating comfortably inside its recent limits.`;
-  }
+  if (value >= 65) return `${chain.name} is operating with tighter headroom than usual. Elevated capacity pressure indicates that the network is closer to its recent operational limits.`;
+  if (value <= 35) return `${chain.name} has ample headroom relative to recent conditions. Low capacity pressure indicates that the network is operating comfortably inside its recent limits.`;
   return `${chain.name} available capacity is close to its normal balance. There is little evidence that the network is currently operating under unusual capacity pressure.`;
 }
 
@@ -179,9 +165,7 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
   );
 
   const selectedChain = snapshots.find((chain) => chain.id === selectedChainId) ?? snapshots[0];
-  const metaChain = snapshots[0];
-
-  if (!selectedChain || !metaChain) return null;
+  if (!selectedChain) return null;
 
   return (
     <main className="ua6">
@@ -237,9 +221,7 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
                   </button>
                   {open ? (
                     <div className="ua6-status-detail">
-                      <p>
-                        {chain.name} is currently <strong>{chain.regime}</strong>. {sentenceCase(regimeCopy[chain.regime].detail)}. {recentContext(recent, chain)} {evidenceScoreCopy(chain)} {chain.lag} publication.
-                      </p>
+                      <p>{chain.name} is currently <strong>{chain.regime}</strong>. {sentenceCase(regimeCopy[chain.regime].detail)}. {recentContext(recent, chain)} {evidenceScoreCopy(chain)} {chain.lag} publication.</p>
                     </div>
                   ) : null}
                 </div>
@@ -250,50 +232,6 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
       </section>
 
       <HomeJsonFiles chain={selectedChain.name} date={selectedChain.asOf} artifacts={selectedChain.artifacts} />
-
-      <section className="ua6-join">
-        <div className="ua6-shell ua6-join-grid">
-          <div className="ua6-join-copy">
-            <h2>Read your own metric beside the network state from the same day</h2>
-            <p>When a model error, failed-transaction rate, user metric or research series moves, the Urd Atlas row gives that observation a dated record of what the chain was doing at the same time, so the network&apos;s conditions are right there in the same table.</p>
-          </div>
-          <div className="ua6-specimen">
-            <div className="ua6-specimen-head"><span>Example join</span><span>DATE + CHAIN</span></div>
-            <div className="ua6-data-table" role="table" aria-label="Illustrative join example">
-              <div className="ua6-data-row ua6-data-head" role="row"><span>Date</span><span>Your metric</span><span>Network state</span><span>Evidence</span></div>
-              <div className="ua6-data-row" role="row"><span>18 Aug</span><span>2.1%</span><span>STABLE</span><span>Strong</span></div>
-              <div className="ua6-data-row" role="row"><span>19 Aug</span><span>2.2%</span><span>HEATING</span><span>Strong</span></div>
-              <div className="ua6-data-row" role="row"><span>20 Aug</span><span className="ua6-emph">4.3%</span><span className="ua6-emph">CONGESTED</span><span>Strong</span></div>
-            </div>
-            <p className="ua6-reading">If a model error doubles on 20 Aug during a move into CONGESTED, network conditions belong in the investigation. The row adds contemporaneous context; it does not by itself establish causation, forecast what happens next or turn the classification into a recommendation.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="ua6-meta">
-        <div className="ua6-shell">
-          <div className="ua6-meta-head">
-            <h2>The daily Meta row is the part most workflows use</h2>
-            <p>The published classification stays compact enough to join directly to a table. Evidence score, axis context, methodology version and provenance stay attached so the observation can be traced and audited later.</p>
-          </div>
-          <div className="ua6-meta-layout">
-            <div className="ua6-meta-record" aria-label={`Latest ${metaChain.name} Meta observation`}>
-              <div className="ua6-meta-line"><span>chain</span><b>{metaChain.id}</b><small>{metaChain.asOf}</small></div>
-              <div className="ua6-meta-line"><span>regime</span><b>{metaChain.regime}</b><small>{regimeCopy[metaChain.regime].short.toLowerCase()}</small></div>
-              <div className="ua6-meta-line"><span>evidence score</span><b>{metaChain.confidenceValue == null ? "—" : metaChain.confidenceValue.toFixed(3)}</b><small>{evidenceLabel(metaChain.confidenceValue).toLowerCase()}</small></div>
-              <div className="ua6-meta-line"><span>demand</span><b>{displayScore(metaChain.demand)}</b><small>{metaChain.demandLabel.toLowerCase()}</small></div>
-              <div className="ua6-meta-line"><span>friction</span><b>{displayScore(metaChain.friction)}</b><small>{metaChain.frictionLabel.toLowerCase()}</small></div>
-              <div className="ua6-meta-line"><span>capacity</span><b>{displayScore(metaChain.capacity)}</b><small>{metaChain.capacityLabel.toLowerCase()}</small></div>
-              <div className="ua6-meta-line"><span>methodology</span><b>{metaChain.methodologyVersion}</b><small>deterministic publication</small></div>
-            </div>
-            <div className="ua6-layers">
-              <div className="ua6-layer"><b>Point-in-time</b><p>The observation date, publication timing and chain identity remain explicit so downstream work can preserve when the information was actually available.</p></div>
-              <div className="ua6-layer"><b>Versioned</b><p>Methodology changes are explicit and provenance stays attached instead of silently rewriting the meaning of an older row.</p></div>
-              <div className="ua6-layer"><b>Descriptive</b><p>The row records network conditions. It does not establish causation, forecast price or convert the classification into a recommendation.</p></div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <section className="ua6-classification" id="ua6-method">
         <div className="ua6-shell ua6-class-grid">
