@@ -7,6 +7,15 @@ import { enforcePreAuthRateLimit } from "@/lib/security/preAuthRateLimit";
 
 export const revalidate = 300;
 
+const EVIDENCE_SCORE_SEMANTICS = {
+  canonical_term: "evidence_score",
+  range: "0..1",
+  interpretation: "Structured support from data quality and label-specific evidence.",
+  calibration: "uncalibrated",
+  probability_interpretation: false,
+  legacy_field_note: "confidence_score is retained as a backward-compatible alias for evidence_score.",
+} as const;
+
 type MetaLatest = {
   updated_through?: string;
   date?: string;
@@ -193,7 +202,14 @@ function heroDisplayAsOf(hero?: LandingHero | null): string | null {
   return hero?.display_asof ?? hero?.asof?.display ?? hero?.asof?.latest_available ?? null;
 }
 
-function confidenceBand(value?: number | null): "Good" | "Caution" | "Degraded" | "—" {
+function evidenceBand(value?: number | null): "Strong" | "Moderate" | "Limited" | "—" {
+  if (typeof value !== "number") return "—";
+  if (value >= 0.7) return "Strong";
+  if (value >= 0.4) return "Moderate";
+  return "Limited";
+}
+
+function legacyConfidenceBand(value?: number | null): "Good" | "Caution" | "Degraded" | "—" {
   if (typeof value !== "number") return "—";
   if (value >= 0.7) return "Good";
   if (value >= 0.4) return "Caution";
@@ -221,7 +237,7 @@ export async function GET(request: Request) {
       const meta = metaRead.value;
       const degradation = chainDegradationFromMetaRead(metaRead);
 
-      const confidenceScore =
+      const evidenceScore =
         typeof meta?.confidence?.confidence_score === "number"
           ? meta.confidence.confidence_score
           : null;
@@ -241,8 +257,11 @@ export async function GET(request: Request) {
         profile_label: meta?.profile?.label ?? chain.name,
         status_label: meta?.status?.label ?? null,
         one_liner: meta?.status?.one_liner ?? null,
-        confidence_score: confidenceScore,
-        confidence_band: confidenceBand(confidenceScore),
+        evidence_score: evidenceScore,
+        evidence_band: evidenceBand(evidenceScore),
+        score_semantics: EVIDENCE_SCORE_SEMANTICS,
+        confidence_score: evidenceScore,
+        confidence_band: legacyConfidenceBand(evidenceScore),
         lag_days: lagDays,
         as_of: asOf,
         expected_delay_days: expectedDelayDays(chain.id),
@@ -271,6 +290,7 @@ export async function GET(request: Request) {
             methodology_version: dataset.methodology_version ?? null,
           }
         : null,
+      evidence_score_semantics: EVIDENCE_SCORE_SEMANTICS,
       product_boundary: {
         descriptive_only: true,
         includes_price_data: false,

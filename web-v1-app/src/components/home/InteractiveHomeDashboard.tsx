@@ -77,7 +77,7 @@ const regimeCopy: Record<HomeLabel, { short: string; detail: string }> = {
   },
   "UNKNOWN/DEGRADED": {
     short: "Evidence is too weak for a reliable state",
-    detail: "the available evidence is too weak to support one of the normal published states with enough confidence",
+    detail: "the available evidence is too weak to support one of the normal published states",
   },
 };
 
@@ -109,9 +109,9 @@ function recentContext(rows: HistoryRow[], chain: HomeChainSnapshot) {
   return `Across the last ${last.length} published observations, ${chain.name} moved from ${first.label} on ${shortDate(first.date)} to ${latest.label} on ${shortDate(latest.date)}. ${latest.label} appeared on ${latestCount} of those ${last.length} dates.`;
 }
 
-function confidenceCopy(chain: HomeChainSnapshot) {
-  if (chain.confidenceValue == null) return "No confidence score is available for this published observation.";
-  return `${chain.confidence} confidence reflects ${evidenceLabel(chain.confidenceValue).toLowerCase()} support in the available data for this published state.`;
+function evidenceScoreCopy(chain: HomeChainSnapshot) {
+  if (chain.confidenceValue == null) return "No evidence score is available for this published observation.";
+  return `The ${chain.confidence} evidence score reflects ${evidenceLabel(chain.confidenceValue).toLowerCase()} support from data quality and label-specific evidence. The score carries no probability calibration.`;
 }
 
 function sentenceCase(value: string) {
@@ -229,14 +229,14 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
                     </span>
                     <span className="ua6-status-meta">
                       <b>{evidenceLabel(chain.confidenceValue)}</b>
-                      <small>{chain.confidence} · {chain.asOf}</small>
+                      <small>Evidence {chain.confidence} · {chain.asOf}</small>
                     </span>
                     <span className="ua6-status-plus" aria-hidden="true">+</span>
                   </button>
                   {open ? (
                     <div className="ua6-status-detail">
                       <p>
-                        {chain.name} is currently <strong>{chain.regime}</strong>. {sentenceCase(regimeCopy[chain.regime].detail)}. {recentContext(recent, chain)} {confidenceCopy(chain)} {chain.lag} publication.
+                        {chain.name} is currently <strong>{chain.regime}</strong>. {sentenceCase(regimeCopy[chain.regime].detail)}. {recentContext(recent, chain)} {evidenceScoreCopy(chain)} {chain.lag} publication.
                       </p>
                     </div>
                   ) : null}
@@ -276,7 +276,7 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
             <div className="ua6-meta-record" aria-label={`Latest ${metaChain.name} Meta observation`}>
               <div className="ua6-meta-line"><span>chain</span><b>{metaChain.id}</b><small>{metaChain.asOf}</small></div>
               <div className="ua6-meta-line"><span>regime</span><b>{metaChain.regime}</b><small>{regimeCopy[metaChain.regime].short.toLowerCase()}</small></div>
-              <div className="ua6-meta-line"><span>confidence</span><b>{metaChain.confidenceValue == null ? "—" : metaChain.confidenceValue.toFixed(3)}</b><small>{evidenceLabel(metaChain.confidenceValue).toLowerCase()}</small></div>
+              <div className="ua6-meta-line"><span>evidence score</span><b>{metaChain.confidenceValue == null ? "—" : metaChain.confidenceValue.toFixed(3)}</b><small>{evidenceLabel(metaChain.confidenceValue).toLowerCase()}</small></div>
               <div className="ua6-meta-line"><span>demand</span><b>{displayScore(metaChain.demand)}</b><small>{metaChain.demandLabel.toLowerCase()}</small></div>
               <div className="ua6-meta-line"><span>friction</span><b>{displayScore(metaChain.friction)}</b><small>{metaChain.frictionLabel.toLowerCase()}</small></div>
               <div className="ua6-meta-line"><span>capacity</span><b>{displayScore(metaChain.capacity)}</b><small>{metaChain.capacityLabel.toLowerCase()}</small></div>
@@ -295,7 +295,7 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
         <div className="ua6-shell ua6-class-grid">
           <h2>How the latest {selectedChain.name} state is assembled</h2>
           <div className="ua6-class-copy">
-            <p>The latest {selectedChain.name} observation is <strong>{selectedChain.regime}</strong> for {selectedChain.asOf}. {sentenceCase(regimeCopy[selectedChain.regime].detail)}. {confidenceCopy(selectedChain)}</p>
+            <p>The latest {selectedChain.name} observation is <strong>{selectedChain.regime}</strong> for {selectedChain.asOf}. {sentenceCase(regimeCopy[selectedChain.regime].detail)}. {evidenceScoreCopy(selectedChain)}</p>
             <div className="ua6-axis-lines">
               <div className="ua6-axis-line"><b>Demand</b><strong>{displayScore(selectedChain.demand)}</strong><span>{axisReading("Demand", selectedChain.demand, selectedChain)}</span></div>
               <div className="ua6-axis-line"><b>Friction</b><strong>{displayScore(selectedChain.friction)}</strong><span>{axisReading("Friction", selectedChain.friction, selectedChain)}</span></div>
