@@ -70,8 +70,23 @@ jobs:
             --root data/published/v1/meta \
             --root web-v1-app/.private-data/published/v1/meta
 
+      - name: Validate repository scratch-file hygiene
+        run: node scripts/repo-scratch-file-check.mjs
+
       - name: Validate native-denomination guardrails
         run: cd .. && python pipeline/tools/validate_native_units.py --published-root data/published/v1
+
+      - name: Audit threshold sensitivity
+        run: cd .. && python pipeline/tools/audit_threshold_sensitivity.py --published-root data/published/v1 --output-json /tmp/threshold-sensitivity.json --output-csv /tmp/threshold-sensitivity.csv
+
+      - name: Audit analog-distance robustness
+        run: cd .. && python pipeline/tools/audit_analog_distance.py --published-root data/published/v1 --report /tmp/analog-distance.json
+
+      - name: Guard feature raw-source selection
+        run: cd .. && python pipeline/tools/audit_feature_source_selection.py
+
+      - name: Validate independent regime-review protocol
+        run: cd .. && python pipeline/tools/validate_regime_expert_review.py docs/regime-expert-review-template.csv --allow-pending
 
       - name: Verify public evidence-score terminology
         run: npm run check:evidence-score-terminology
