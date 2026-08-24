@@ -17,7 +17,7 @@ import "./home-hero-center.css";
 
 export const metadata: Metadata = {
   title: "Urd Atlas",
-  description: "On-chain reference data for BTC, ETH, ARB, and BASE. No price data. No forecasts. No recommendations.",
+  description: "Deterministic, versioned on-chain network-state reference data for BTC, ETH, ARB, and BASE, with Evidence scores and provenance. No forecasts or recommendations.",
 };
 
 function AuthProvider({

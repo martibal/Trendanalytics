@@ -76,8 +76,8 @@ const regimeCopy: Record<HomeLabel, { short: string; detail: string }> = {
     detail: "transaction friction is low relative to this chain’s own recent history",
   },
   "UNKNOWN/DEGRADED": {
-    short: "Evidence is too weak for a reliable state",
-    detail: "the available evidence is too weak to support one of the normal published states",
+    short: "Evidence did not clear the publication gate",
+    detail: "the available evidence did not support publishing one of the stronger named states",
   },
 };
 
@@ -110,8 +110,8 @@ function recentContext(rows: HistoryRow[], chain: HomeChainSnapshot) {
 }
 
 function evidenceScoreCopy(chain: HomeChainSnapshot) {
-  if (chain.confidenceValue == null) return "No evidence score is available for this published observation.";
-  return `The ${chain.confidence} evidence score reflects ${evidenceLabel(chain.confidenceValue).toLowerCase()} support from data quality and label-specific evidence. The score carries no probability calibration.`;
+  if (chain.confidenceValue == null) return "No Evidence score is available for this published observation.";
+  return `The ${chain.confidence} Evidence score reflects ${evidenceLabel(chain.confidenceValue).toLowerCase()} support from data quality and label-specific evidence. It is an uncalibrated evidence-strength quantity, not the probability that the label is correct.`;
 }
 
 function sentenceCase(value: string) {
@@ -189,6 +189,7 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
           <Link className="ua6-brand" href="/">URD ATLAS</Link>
           <nav className="ua6-nav-links" aria-label="Primary">
             <a href="#ua6-data">Data</a>
+            <Link href="/validation">Validation</Link>
             <Link href="/methodology/reference">Methodology</Link>
             <Link href="/plans">Pricing</Link>
             <a href="/api/v1/sample-pack" download>Inspect sample</a>
@@ -200,8 +201,8 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
         <div className="ua6-shell ua6-hero-grid">
           <div className="ua6-hero-copy">
             <h1>Urd Atlas</h1>
-            <p>Urd Atlas publishes the daily network state of Bitcoin, Ethereum, Arbitrum and Base as one row you join to your own data by date and chain.</p>
-            <p className="ua6-hero-sub">Each chain is evaluated against its own recent history. The published state carries the evidence strength and provenance needed to trace the classification later.</p>
+            <p>Urd Atlas publishes a deterministic daily network-state row for Bitcoin, Ethereum, Arbitrum and Base that you join to your own data by date and chain.</p>
+            <p className="ua6-hero-sub">Each chain is evaluated against its own recent history. Stronger labels require corroborating demand, friction and capacity evidence; weak or non-informative evidence is withheld rather than forced into a dramatic state. Every row carries its Evidence score, methodology version and provenance.</p>
             <div className="ua6-hero-actions">
               <a href="/api/v1/sample-pack" download>Inspect free sample</a>
               <a href="#ua6-data">See the published structure</a>
@@ -261,7 +262,7 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
               <div className="ua6-data-row" role="row"><span>19 Aug</span><span>2.2%</span><span>HEATING</span><span>Strong</span></div>
               <div className="ua6-data-row" role="row"><span>20 Aug</span><span className="ua6-emph">4.3%</span><span className="ua6-emph">CONGESTED</span><span>Strong</span></div>
             </div>
-            <p className="ua6-reading">If a model error doubles on 20 Aug during a move into CONGESTED, the chain itself belongs in the investigation. The same error during an ordinary STABLE day would point the first review toward the model, application or data feed.</p>
+            <p className="ua6-reading">If a model error doubles on 20 Aug during a move into CONGESTED, network conditions belong in the investigation. The row adds contemporaneous context; it does not by itself establish causation, forecast what happens next or turn the classification into a recommendation.</p>
           </div>
         </div>
       </section>
@@ -270,7 +271,7 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
         <div className="ua6-shell">
           <div className="ua6-meta-head">
             <h2>The daily Meta row is the part most workflows use</h2>
-            <p>The published classification stays compact enough to join directly to a table. Every field needed to audit it later stays attached to the same row.</p>
+            <p>The published classification stays compact enough to join directly to a table. Evidence score, axis context, methodology version and provenance stay attached so the observation can be traced and audited later.</p>
           </div>
           <div className="ua6-meta-layout">
             <div className="ua6-meta-record" aria-label={`Latest ${metaChain.name} Meta observation`}>
@@ -284,8 +285,8 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
             </div>
             <div className="ua6-layers">
               <div className="ua6-layer"><b>Gold</b><p>The normalized daily measurements that form the analytical base for each supported chain.</p></div>
-              <div className="ua6-layer"><b>Derived</b><p>The rolling history used to judge how unusual the latest observation is for that chain.</p></div>
-              <div className="ua6-layer"><b>Brief</b><p>A readable account generated from the same published state when the full analytical payload is unnecessary.</p></div>
+              <div className="ua6-layer"><b>Derived</b><p>Robust chain-relative baselines, rolling context and derived features used to judge how unusual an observation is.</p></div>
+              <div className="ua6-layer"><b>Brief</b><p>A readable account generated from the same published state and evidence trail when the full analytical payload is unnecessary.</p></div>
             </div>
           </div>
         </div>
@@ -301,6 +302,7 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
               <div className="ua6-axis-line"><b>Friction</b><strong>{displayScore(selectedChain.friction)}</strong><span>{axisReading("Friction", selectedChain.friction, selectedChain)}</span></div>
               <div className="ua6-axis-line"><b>Capacity</b><strong>{displayScore(selectedChain.capacity)}</strong><span>{axisReading("Capacity", selectedChain.capacity, selectedChain)}</span></div>
             </div>
+            <p><strong>Publication guardrail:</strong> HEATING, CONGESTED and CHEAP require their profile-specific corroborating axis evidence. Constant, near-constant or insufficient historical distributions cannot manufacture HIGH/LOW axis bands, and low evidence is published as UNKNOWN/DEGRADED rather than overstated.</p>
           </div>
         </div>
       </section>
@@ -309,7 +311,8 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
         <div className="ua6-shell ua6-access-row">
           <div>
             <h2>Test the sample against data you already understand before adding recurring delivery.</h2>
-            <p>Single Chain is $49 a month and Research is $149 a month. The public sample lets you check the schema and the date + chain join first.</p>
+            <p>Basic is $49 a month for one chain and Pro is $149 a month for all four. The public sample lets you check the schema and the date + chain join first.</p>
+            <p>Validation now covers threshold sensitivity, analog-distance robustness, longer-baseline context, raw-source selection and conservative publication gates. Separate scheduled checks cross-check BTC/ETH transaction counts against an external series and probe Arbitrum/Base source schemas for upstream drift. These controls test consistency and drift; they are not a claim of objective ground truth.</p>
           </div>
           <div className="ua6-access-links">
             <a href="/api/v1/sample-pack" download>Inspect sample</a>

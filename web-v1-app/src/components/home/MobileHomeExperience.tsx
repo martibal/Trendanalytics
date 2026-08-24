@@ -18,10 +18,10 @@ type Range = 7 | 14;
 
 const artifacts: Artifact[] = ["Meta","Gold","Derived","Briefs"];
 const artifactCopy: Record<Artifact,{title:string;body:string}> = {
-  Meta:{title:"Meta",body:"The classification layer you join to your own data."},
+  Meta:{title:"Meta",body:"The classification layer you join to your own data, including the Evidence score and methodology version."},
   Gold:{title:"Gold",body:"The normalized daily network measurements behind the observation."},
-  Derived:{title:"Derived",body:"Rolling baselines and historical context calculated from Gold."},
-  Briefs:{title:"Brief",body:"A readable explanation generated from the same published evidence."},
+  Derived:{title:"Derived",body:"Robust chain-relative baselines, rolling context and derived features calculated from Gold."},
+  Briefs:{title:"Brief",body:"A readable explanation generated from the same published state and evidence trail."},
 };
 
 function yFor(label:HomeLabel){
@@ -46,8 +46,8 @@ function axisDetail(chain:HomeChainSnapshot){
     ["Capacity", chain.capacityLabel || "Current context", axisValue(chain.capacity)],
   ];
 }
-function confidenceCopy(chain:HomeChainSnapshot){
-  return `${chain.confidence} confidence describes how strongly the published evidence supports this ${chain.name} classification. It is evidence strength for this observation, not a forecast probability.`;
+function evidenceScoreCopy(chain:HomeChainSnapshot){
+  return `${chain.confidence} Evidence score describes how strongly the available data and label-specific evidence support this ${chain.name} classification. It is an uncalibrated evidence-strength quantity, not the probability that the label is correct.`;
 }
 
 export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}:Props){
@@ -102,7 +102,7 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
       <p className={`${styles.statusHint} ${hintHidden?styles.hidden:""}`}>Swipe for all chains · Tap a chain for details →</p>
       <div className={styles.statusStrip} onScroll={e=>{if(e.currentTarget.scrollLeft>18)setHintHidden(true)}} onTouchMove={()=>setHintHidden(true)}>
         {snapshots.map(chain=><button key={chain.id} type="button" className={`${styles.statusPill} ${styles[statusClass(chain.regime)]}`} onClick={()=>chooseChain(chain.id,true)}>
-          <strong>{chain.ticker}</strong><span>{chain.regime}</span><small>{chain.confidence}</small>
+          <strong>{chain.ticker}</strong><span>{chain.regime}</span><small>Evidence {chain.confidence}</small>
         </button>)}
       </div>
     </section>
@@ -110,8 +110,8 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
     <section className={styles.hero}>
       <p className={styles.kicker}>Daily blockchain network-state reference data</p>
       <h1>Know the network conditions behind your data.</h1>
-      <p className={styles.heroDek}>One classified observation per chain and date.</p>
-      <p className={styles.heroExplain}><strong>Join Urd Atlas to the data you already use.</strong> Each row adds a regime, confidence and evidence so you can see whether a change in your own metric happened alongside a change in network conditions.</p>
+      <p className={styles.heroDek}>One deterministic, versioned observation per chain and date.</p>
+      <p className={styles.heroExplain}><strong>Join Urd Atlas to the data you already use.</strong> Each row adds a regime, an uncalibrated Evidence score and the provenance needed to see whether a change in your own metric happened alongside a change in network conditions.</p>
       <div className={styles.heroActions}><a className={styles.primary} href="#mobile-product">Inspect the product</a><a className={styles.textLink} href="#mobile-why">See why it helps</a></div>
 
       <div className={styles.chartBlock}>
@@ -126,7 +126,7 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
           {points?<polyline points={points} className={styles.line}/>:null}
           {visible.length>1?<><line x1={cursorX} y1="0" x2={cursorX} y2="260" className={styles.cursor}/><circle cx={cursorX} cy={yFor(regime)} r="5" className={styles.dot}/></>:null}
         </svg>
-        <div className={styles.chartNote}><small>{selected.name.toUpperCase()} · {date}</small><strong>{regime}</strong><p>{point?`Published ${regime} for this ${selected.name} date.`:selected.oneLiner}</p><span>{confidence} confidence</span></div>
+        <div className={styles.chartNote}><small>{selected.name.toUpperCase()} · {date}</small><strong>{regime}</strong><p>{point?`Published ${regime} for this ${selected.name} date.`:selected.oneLiner}</p><span>Evidence score {confidence}</span></div>
       </div>
     </section>
 
@@ -137,18 +137,18 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
         <div className={`${styles.record} ${contextOpen?styles.expanded:""}`}>
           <div className={styles.recordHead}><span>16 AUG</span><span>YOUR DATA</span></div>
           <div className={styles.recordMain}><div><small>Model error</small><strong>4.3%</strong></div><div><small>Chain</small><strong>BTC</strong></div></div>
-          {contextOpen?<div className={styles.added}><div><small>Regime</small><strong>CHEAP</strong></div><div><small>Confidence</small><strong>92%</strong></div></div>:null}
+          {contextOpen?<div className={styles.added}><div><small>Regime</small><strong>CHEAP</strong></div><div><small>Evidence score</small><strong>92%</strong></div></div>:null}
         </div>
         <button className={styles.contextButton} onClick={()=>setContextOpen(v=>!v)}>{contextOpen?"Remove Urd Atlas context":"Add Urd Atlas context"}</button>
-        <p className={styles.takeaway}>Now you know the anomaly happened while the network was in a different operating regime.</p>
+        <p className={styles.takeaway}>Now you know the anomaly happened while the network was in a different operating regime. That is investigation context, not proof that the network caused the anomaly.</p>
       </section>
 
       <section className={styles.section} id="mobile-why">
         <h2>What you get every day.</h2><p>Three pieces of context that can be joined directly to your own chain-level data.</p>
         <div className={styles.benefits}>
-          <div><strong>Network regime</strong><p>A compact classification of current operating conditions.</p><code>e.g. CHEAP · HEATING · CONGESTED · STABLE</code></div>
-          <div><strong>Confidence</strong><p>How strongly the available evidence supports that published state.</p><code>e.g. 91% — evidence strength, not probability</code></div>
-          <div><strong>Evidence + provenance</strong><p>The measurements, derived context and versioning behind the observation.</p><code>e.g. median_tx_fee_native · methodology_version</code></div>
+          <div><strong>Network regime</strong><p>A compact classification of current operating conditions relative to that chain&apos;s own recent history.</p><code>e.g. CHEAP · HEATING · CONGESTED · STABLE</code></div>
+          <div><strong>Evidence score</strong><p>How strongly the available data and label-specific evidence support the published state.</p><code>e.g. 91% — uncalibrated evidence strength, not probability</code></div>
+          <div><strong>Evidence trail + provenance</strong><p>The measurements, derived context and versioning behind the observation.</p><code>e.g. median_tx_fee_native · methodology_version</code></div>
         </div>
       </section>
     </div>
@@ -156,7 +156,7 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
     <section className={styles.product} id="mobile-product">
       <p className={styles.productKicker}>One published observation</p>
       <h2>This is what you actually receive.</h2>
-      <p className={styles.productIntro}>Urd Atlas publishes one classified observation for each supported chain and date, together with the data needed to inspect why it was published.</p>
+      <p className={styles.productIntro}>Urd Atlas publishes one classified observation for each supported chain and date, together with the data needed to inspect why it was published. Stronger named states require corroborating axis evidence; weak or non-informative evidence is withheld rather than forced into a dramatic classification.</p>
       <div className={styles.deliveryMeta}><span>{selected.name.toUpperCase()}</span><span>{selected.asOf}</span></div>
       <button className={styles.deliveryToggle} onClick={()=>setLayersOpen(v=>!v)}>{layersOpen?"Hide file layers ↑":"Show file layers ↓"}</button>
       {layersOpen?<div className={styles.layers}>{artifacts.map((a,i)=><button key={a} onClick={()=>openArtifact(a)}><span>0{i+1}</span><span><strong>{artifactCopy[a].title}</strong><small>{artifactCopy[a].body}</small></span><em>Open JSON</em></button>)}</div>:null}
@@ -183,9 +183,10 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
 
       <section className={styles.details}>
         <h2>More detail when you want it.</h2>
-        <details><summary>How the classification is produced <span>Expand</span></summary><p>Measurements are normalized against chain-relative baselines. Demand, friction and capacity are scored and confidence is gated.</p></details>
-        <details><summary>Why confidence can be low <span>Expand</span></summary><p>Confidence measures evidence strength. Weak evidence can result in UNKNOWN / DEGRADED instead of an overstated claim.</p></details>
-        <details><summary>What the subscription replaces <span>Expand</span></summary><p>Ingestion, normalization, baselines, derived features, confidence rules, testing, versioning and publication are maintained upstream.</p></details>
+        <details><summary>How the classification is produced <span>Expand</span></summary><p>Measurements are normalized against robust, chain-relative baselines. Demand, friction and capacity are scored, and HEATING, CONGESTED and CHEAP require profile-specific corroborating axis evidence before publication.</p></details>
+        <details><summary>Why the Evidence score can be limited <span>Expand</span></summary><p>The Evidence score measures uncalibrated evidence strength, not label probability. Low evidence is gated to UNKNOWN / DEGRADED, while constant, near-constant or insufficient historical distributions cannot create HIGH / LOW axis bands.</p></details>
+        <details><summary>How the method is validated <span>Expand</span></summary><p>Automated checks cover threshold sensitivity, analog-distance robustness, longer-baseline context, raw-source selection and conservative publication gates. Separate scheduled checks cross-check BTC/ETH transaction counts against an external series and probe Arbitrum/Base source schemas for upstream drift. These controls test consistency and drift, not objective ground truth.</p></details>
+        <details><summary>What the subscription replaces <span>Expand</span></summary><p>Ingestion, normalization, baselines, derived features, evidence gates, testing, versioning and publication are maintained upstream.</p></details>
       </section>
     </div>
 
@@ -193,11 +194,11 @@ export default function MobileHomeExperience({snapshots,lastRun,consecutiveRows}
 
     {statusOpen?<div className={styles.statusModal} onClick={()=>setStatusOpen(false)}><div onClick={e=>e.stopPropagation()}>
       <header><small>{selected.name.toUpperCase()} · {selected.asOf}</small><button onClick={()=>setStatusOpen(false)}>Close</button></header>
-      <div className={styles.statusState}><strong>{selected.regime}</strong><span>{selected.confidence} confidence</span></div>
+      <div className={styles.statusState}><strong>{selected.regime}</strong><span>Evidence score {selected.confidence}</span></div>
       <p>{selected.oneLiner}</p>
       <h4>What is driving this state</h4>
       {axisDetail(selected).map(([name,label,value])=><div className={styles.driver} key={name}><b>{name}</b><span>{label} · {value}</span></div>)}
-      <p className={styles.confidenceCopy}>{confidenceCopy(selected)}</p>
+      <p className={styles.confidenceCopy}>{evidenceScoreCopy(selected)}</p>
       <a href="#mobile-product" onClick={()=>setStatusOpen(false)}>Inspect this observation</a>
     </div></div>:null}
 
