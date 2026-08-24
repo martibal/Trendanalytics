@@ -82,8 +82,17 @@ jobs:
       - name: Audit analog-distance robustness
         run: cd .. && python pipeline/tools/audit_analog_distance.py --published-root data/published/v1 --report /tmp/analog-distance.json
 
+      - name: Audit longer-baseline context
+        run: cd .. && python pipeline/tools/audit_baseline_context.py --published-root data/published/v1 --report /tmp/baseline-context.json
+
+      - name: Audit conservative publication bias
+        run: cd .. && python pipeline/tools/audit_conservative_bias.py
+
       - name: Guard feature raw-source selection
         run: cd .. && python pipeline/tools/audit_feature_source_selection.py
+
+      - name: Guard production pipeline runner decision
+        run: cd .. && python pipeline/tools/audit_pipeline_runner_contract.py
 
       - name: Validate independent regime-review protocol
         run: cd .. && python pipeline/tools/validate_regime_expert_review.py docs/regime-expert-review-template.csv --allow-pending

@@ -1,0 +1,44 @@
+name: External Data Cross-check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: external-data-crosscheck
+  cancel-in-progress: false
+
+jobs:
+  crosscheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cross-check BTC/ETH transaction counts against Coin Metrics
+        run: >
+          python pipeline/tools/audit_external_crosscheck.py
+          --published-root data/published/v1/gold
+          --tolerance 0.10
+          --lookback-days 7
+          --report reports/external-data-crosscheck.json
+
+      - name: Upload cross-check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-data-crosscheck
+          path: reports/external-data-crosscheck.json
+          if-no-files-found: warn
+          retention-days: 14

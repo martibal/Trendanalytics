@@ -8,10 +8,14 @@ on:
         required: false
         default: ""
         type: string
+  schedule:
+    - cron: "43 4 * * *"
   pull_request:
     paths:
       - ".github/workflows/l2-source-schema-probe.yml"
       - "pipeline/tools/l2_source_schema_probe.py"
+      - "pipeline/tools/audit_live_l2_schema_report.py"
+      - "pipeline/src/feature_daily_agg.py"
 
 jobs:
   probe:
@@ -126,10 +130,15 @@ jobs:
           $files = "${{ steps.download.outputs.files }}" -split ';'
           python .\pipeline\tools\l2_source_schema_probe.py @files --output .\reports\l2-source-schema-probe.json
 
+      - name: Fail on live upstream schema drift
+        shell: pwsh
+        run: python .\pipeline\tools\audit_live_l2_schema_report.py .\reports\l2-source-schema-probe.json
+
       - name: Upload schema probe report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: l2-source-schema-probe
           path: reports/l2-source-schema-probe.json
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
