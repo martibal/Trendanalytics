@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { HeroPanelSnapshot } from "./HeroNetworkStatePanel";
+import HomeJsonFiles from "./HomeJsonFiles";
 
 export type HomeLabel = "STABLE" | "HEATING" | "CONGESTED" | "CHEAP" | "UNKNOWN/DEGRADED";
 export type Artifact = "Meta" | "Gold" | "Derived" | "Briefs";
@@ -248,7 +249,9 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
         </div>
       </section>
 
-      <section className="ua6-join" id="ua6-data">
+      <HomeJsonFiles chain={selectedChain.name} date={selectedChain.asOf} artifacts={selectedChain.artifacts} />
+
+      <section className="ua6-join">
         <div className="ua6-shell ua6-join-grid">
           <div className="ua6-join-copy">
             <h2>Read your own metric beside the network state from the same day</h2>
@@ -284,9 +287,9 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
               <div className="ua6-meta-line"><span>methodology</span><b>{metaChain.methodologyVersion}</b><small>deterministic publication</small></div>
             </div>
             <div className="ua6-layers">
-              <div className="ua6-layer"><b>Gold</b><p>The normalized daily measurements that form the analytical base for each supported chain.</p></div>
-              <div className="ua6-layer"><b>Derived</b><p>Robust chain-relative baselines, rolling context and derived features used to judge how unusual an observation is.</p></div>
-              <div className="ua6-layer"><b>Brief</b><p>A readable account generated from the same published state and evidence trail when the full analytical payload is unnecessary.</p></div>
+              <div className="ua6-layer"><b>Point-in-time</b><p>The observation date, publication timing and chain identity remain explicit so downstream work can preserve when the information was actually available.</p></div>
+              <div className="ua6-layer"><b>Versioned</b><p>Methodology changes are explicit and provenance stays attached instead of silently rewriting the meaning of an older row.</p></div>
+              <div className="ua6-layer"><b>Descriptive</b><p>The row records network conditions. It does not establish causation, forecast price or convert the classification into a recommendation.</p></div>
             </div>
           </div>
         </div>
