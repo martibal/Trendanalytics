@@ -23,7 +23,7 @@ import json
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 import pandas as pd
 
@@ -94,6 +94,25 @@ def _seed_incremental_chain_from_published(repo_root: Path, out_root: Path, chai
     return copied
 
 
+def _seed_incremental_staging_from_published(
+    repo_root: Path,
+    out_root: Path,
+    chains: Iterable[str],
+) -> Dict[str, int]:
+    """Seed every publishable chain before an incremental subset is recomputed.
+
+    The publisher emits all supported chains, while an incremental run may recompute only
+    chains with a complete new RAW day. Seeding only the active subset leaves an inactive
+    chain's version-controlled calculated META free to overwrite newer canonical history.
+    Seed the full supported set first; active chains can then append/recompute their new
+    dates without risking a rollback for a skipped chain.
+    """
+    result: Dict[str, int] = {}
+    for chain in chains:
+        result[str(chain)] = _seed_incremental_chain_from_published(repo_root, out_root, str(chain))
+    return result
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True, help="Repo root (main folder)")
@@ -144,6 +163,20 @@ def main() -> None:
     if unsupported:
         raise SystemExit(f"Unsupported chain(s) in --chains: {','.join(unsupported)}")
 
+    # Important: publish_artifacts.py emits the full supported chain set even when this
+    # incremental export is asked to recompute only chains with complete new RAW data.
+    # Seed every supported META chain from canonical first so an inactive chain can never
+    # be rolled back by stale data/calculated/meta files during that global publish.
+    if mode == "incremental":
+        seeded_all = _seed_incremental_staging_from_published(repo_root, out_root, SUPPORTED_CHAINS)
+        for chain, seeded in seeded_all.items():
+            if seeded:
+                print(
+                    f"[META_INCREMENTAL_SEED] chain={chain} copied={seeded} "
+                    f"source={repo_root / 'data' / 'published' / 'v1' / 'meta' / chain}",
+                    flush=True,
+                )
+
     for chain in chains:
         gs = _load_gold_status(chain)
         df = _load_gold_df(chain, "daily")
@@ -158,15 +191,6 @@ def main() -> None:
 
         ch_out = out_root / chain
         ch_out.mkdir(parents=True, exist_ok=True)
-
-        if mode == "incremental":
-            seeded = _seed_incremental_chain_from_published(repo_root, out_root, chain)
-            if seeded:
-                print(
-                    f"[META_INCREMENTAL_SEED] chain={chain} copied={seeded} "
-                    f"source={repo_root / 'data' / 'published' / 'v1' / 'meta' / chain}",
-                    flush=True,
-                )
 
         cur = start
         while cur <= end:
