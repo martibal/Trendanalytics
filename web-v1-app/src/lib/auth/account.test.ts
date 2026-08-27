@@ -3,6 +3,8 @@
  * @jest-environment node
  */
 
+import { CURRENT_TERMS_VERSION } from "@/lib/legal/termsVersion";
+
 export {};
 
 const authMock = jest.fn();
@@ -29,8 +31,8 @@ jest.mock("@/lib/db", () => ({
 
 describe("lib/auth/account", () => {
   const originalEnv = process.env;
-  const TERMS_VERSION = "2026-04-13";
-  const TERMS_ACCEPTED_AT = "2026-04-13T19:45:00.000Z";
+  const TERMS_VERSION = CURRENT_TERMS_VERSION;
+  const TERMS_ACCEPTED_AT = "2026-08-27T12:00:00.000Z";
 
   beforeEach(() => {
     jest.resetModules();
