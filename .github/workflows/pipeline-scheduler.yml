@@ -1,0 +1,174 @@
+name: Daily Pipeline Scheduler
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/pipeline.yml'
+      - '.github/workflows/pipeline-scheduler.yml'
+  schedule:
+    # Primary targets are 08:00 and 20:00 Europe/Oslo. GitHub cron is UTC and
+    # has no timezone/DST support, so both possible UTC hours are scheduled.
+    # Off-hour retries make a dropped/delayed :00 event non-fatal. The gate
+    # below ensures only the correct Oslo-time slot can dispatch the pipeline.
+    - cron: '0 6 * * *'
+    - cron: '17 6 * * *'
+    - cron: '34 6 * * *'
+    - cron: '51 6 * * *'
+    - cron: '0 7 * * *'
+    - cron: '17 7 * * *'
+    - cron: '34 7 * * *'
+    - cron: '51 7 * * *'
+    - cron: '0 18 * * *'
+    - cron: '17 18 * * *'
+    - cron: '34 18 * * *'
+    - cron: '51 18 * * *'
+    - cron: '0 19 * * *'
+    - cron: '17 19 * * *'
+    - cron: '34 19 * * *'
+    - cron: '51 19 * * *'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: daily-pipeline-scheduler
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Sync freshness state to latest main
+        shell: bash
+        run: |
+          git fetch origin main --prune
+          git reset --hard origin/main
+
+      - name: Decide whether this Oslo publication slot still needs a run
+        id: slot
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE_EXPR: ${{ github.event.schedule }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+
+          output = Path(os.environ['GITHUB_OUTPUT'])
+          event_name = os.environ.get('EVENT_NAME', '')
+          schedule_expr = (os.environ.get('SCHEDULE_EXPR') or '').strip()
+
+          def emit(should_run: bool, reason: str) -> None:
+              with output.open('a', encoding='utf-8') as fh:
+                  fh.write(f"should_run={'true' if should_run else 'false'}\n")
+                  fh.write(f"reason={reason}\n")
+              print(f"[SCHEDULER] should_run={should_run} reason={reason}")
+
+          # A push touching the scheduler/pipeline workflow is an intentional
+          # smoke/force trigger and must dispatch immediately.
+          if event_name == 'push':
+              emit(True, 'workflow-change-force-trigger')
+              raise SystemExit(0)
+
+          if event_name != 'schedule':
+              emit(False, f'unsupported-event:{event_name}')
+              raise SystemExit(0)
+
+          parts = schedule_expr.split()
+          if len(parts) < 2:
+              emit(False, f'invalid-schedule:{schedule_expr}')
+              raise SystemExit(0)
+
+          minute = int(parts[0])
+          hour = int(parts[1])
+          now_utc = datetime.now(timezone.utc)
+
+          # Resolve the intended cron occurrence rather than the actual runner
+          # start time, because GitHub may delay a scheduled event substantially.
+          candidate = now_utc.replace(hour=hour, minute=minute, second=0, microsecond=0)
+          if candidate > now_utc + timedelta(minutes=5):
+              candidate -= timedelta(days=1)
+
+          oslo = ZoneInfo('Europe/Oslo')
+          intended_local = candidate.astimezone(oslo)
+
+          if intended_local.hour not in (8, 20):
+              emit(False, f'dst-shadow:{intended_local.isoformat()}')
+              raise SystemExit(0)
+
+          slot_start_local = intended_local.replace(minute=0, second=0, microsecond=0)
+          slot_start_utc = slot_start_local.astimezone(timezone.utc)
+
+          dataset_path = Path('data/published/v1/dataset.json')
+          last_run = None
+          if dataset_path.exists():
+              try:
+                  payload = json.loads(dataset_path.read_text(encoding='utf-8-sig'))
+                  raw = payload.get('computed_at_utc')
+                  if raw:
+                      last_run = datetime.fromisoformat(str(raw).replace('Z', '+00:00'))
+                      if last_run.tzinfo is None:
+                          last_run = last_run.replace(tzinfo=timezone.utc)
+                      last_run = last_run.astimezone(timezone.utc)
+              except Exception as exc:
+                  print(f'[SCHEDULER] freshness parse warning: {exc}')
+
+          if last_run is not None and last_run >= slot_start_utc:
+              emit(False, f'already-published:{last_run.isoformat()}')
+              raise SystemExit(0)
+
+          emit(True, f'due:{slot_start_local.isoformat()}')
+          PY
+
+      - name: Dispatch Daily Pipeline Publish if no run is already active
+        if: steps.slot.outputs.should_run == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflowId = 'pipeline.yml';
+            const recent = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: workflowId,
+              branch: 'main',
+              per_page: 20,
+            });
+
+            const activeStatuses = new Set([
+              'queued',
+              'in_progress',
+              'waiting',
+              'requested',
+              'pending',
+            ]);
+
+            const active = recent.data.workflow_runs.find((run) => activeStatuses.has(run.status));
+            if (active) {
+              core.notice(`Daily Pipeline Publish already active (${active.status}): ${active.html_url}`);
+              return;
+            }
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: workflowId,
+              ref: 'main',
+              inputs: {
+                simulate_failure: 'false',
+              },
+            });
+
+            core.notice(`Dispatched Daily Pipeline Publish. Gate: ${{ steps.slot.outputs.reason }}`);
