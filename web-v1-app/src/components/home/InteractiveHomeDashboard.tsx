@@ -167,8 +167,8 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
         <div className="ua6-shell ua6-hero-grid">
           <div className="ua6-hero-copy">
             <h1>Urd Atlas</h1>
-            <p>Urd Atlas publishes a deterministic daily network-state row for Bitcoin, Ethereum, Arbitrum and Base that you join to your own data by date and chain.</p>
-            <p className="ua6-hero-sub">Each chain is evaluated against its own recent history. Stronger labels require corroborating demand, friction and capacity evidence; weak or non-informative evidence is withheld rather than forced into a dramatic state. Every row carries its Evidence score, methodology version and provenance.</p>
+            <p>Daily, deterministic network-state reference data for Bitcoin, Ethereum, Arbitrum and Base — one joinable row per chain and date.</p>
+            <p className="ua6-hero-sub">Each chain is evaluated against its own recent history. Stronger labels require corroborating demand, friction and capacity evidence; weak evidence is withheld rather than forced into a dramatic state. Every row carries its Evidence score, methodology version and provenance.</p>
             <div className="ua6-hero-actions">
               <a href="/api/v1/sample-pack" download>Inspect free sample</a>
               <a href="#ua6-data">See the published structure</a>
@@ -224,8 +224,7 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
               <div className="ua6-axis-line"><b>Friction</b><strong>{displayScore(selectedChain.friction)}</strong><span>{homeAxisNarrative(selectedChain.artifacts.Meta, "friction", selectedChain.friction)}</span></div>
               <div className="ua6-axis-line"><b>Capacity</b><strong>{displayScore(selectedChain.capacity)}</strong><span>{homeAxisNarrative(selectedChain.artifacts.Meta, "capacity", selectedChain.capacity)}</span></div>
             </div>
-            <p><strong>How to read the rows:</strong> classifier bands and trend are the regime evidence. The numeric score beside each axis is a smoothed scorecard display value and can sit closer to neutral 50 without contradicting a HIGH/LOW classifier band.</p>
-            <p><strong>Publication guardrail:</strong> HEATING, CONGESTED and CHEAP require their profile-specific corroborating axis evidence. Constant, near-constant or insufficient historical distributions cannot manufacture HIGH/LOW axis bands, and low evidence is published as UNKNOWN/DEGRADED rather than overstated.</p>
+            <p><strong>How to read it:</strong> classifier bands and trend are the regime evidence, while the numeric axis values are smoothed scorecard displays. Stronger named states require corroborating evidence, and constant, near-constant or insufficient distributions cannot manufacture HIGH/LOW bands.</p>
           </div>
         </div>
       </section>
@@ -233,9 +232,9 @@ export default function InteractiveHomeDashboard({ snapshots }: Props) {
       <section className="ua6-access" id="ua6-access">
         <div className="ua6-shell ua6-access-row">
           <div>
-            <h2>Test the sample against data you already understand before adding recurring delivery.</h2>
-            <p>Basic is $49 a month for one chain and Pro is $149 a month for all four. The public sample lets you check the schema and the date + chain join first.</p>
-            <p>Validation now covers threshold sensitivity, analog-distance robustness, longer-baseline context, raw-source selection and conservative publication gates. Separate scheduled checks cross-check BTC/ETH transaction counts against an external series and probe Arbitrum/Base source schemas for upstream drift. These controls test consistency and drift; they are not a claim of objective ground truth.</p>
+            <h2>Inspect the schema first. Subscribe only when it fits your workflow.</h2>
+            <p>Basic is $49 a month for one chain and Pro is $149 a month for all four. The public sample lets you check the schema and the date + chain join before paying for recurring delivery.</p>
+            <p>Validation, source checks, provenance and methodology are public so the operational contract can be audited before you rely on it.</p>
           </div>
           <div className="ua6-access-links">
             <a href="/api/v1/sample-pack" download>Inspect sample</a>
