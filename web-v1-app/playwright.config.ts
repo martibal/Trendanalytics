@@ -2,7 +2,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3000;
-const baseURL = `http://127.0.0.1:${PORT}`;
+const baseURL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -18,14 +18,14 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    // Exercise the same production-mode client runtime that Vercel serves.
-    // A cold GitHub Actions runner can need more than three minutes for the
-    // production build before Next starts listening, so this timeout must cover
-    // the build as well as server startup.
-    command: `npm run build && npm run start -- -p ${PORT}`,
+    // Mobile Home E2E verifies browser hydration and interactions. Keep it on
+    // the same localhost origin as Next's dev server so HMR and client events
+    // are exercised without crossing the auth middleware readiness path.
+    // The production build itself is already a separate required CI gate.
+    command: `npm run dev -- -p ${PORT}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 360000,
+    timeout: 120000,
     stdout: "pipe",
     stderr: "pipe",
   },
