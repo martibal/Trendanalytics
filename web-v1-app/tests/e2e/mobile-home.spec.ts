@@ -1,8 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function openMobileHome(page: Page) {
+  const clientReady = page.waitForRequest(
+    (request) => request.url().includes("/api/v1/home-history"),
+    { timeout: 15000 }
+  );
+
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Urd Atlas" })).toBeVisible();
+  await clientReady;
 }
 
 test.describe("mobile homepage", () => {

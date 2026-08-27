@@ -18,10 +18,12 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: `npm run dev -- --webpack -p ${PORT}`,
+    // Exercise the same production-mode client runtime that Vercel serves.
+    // The development HMR socket is intentionally not part of this regression test.
+    command: `npm run build && npm run start -- -p ${PORT}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 120000,
+    timeout: 180000,
     stdout: "pipe",
     stderr: "pipe",
   },
