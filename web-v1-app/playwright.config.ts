@@ -19,11 +19,13 @@ export default defineConfig({
   },
   webServer: {
     // Exercise the same production-mode client runtime that Vercel serves.
-    // The development HMR socket is intentionally not part of this regression test.
+    // A cold GitHub Actions runner can need more than three minutes for the
+    // production build before Next starts listening, so this timeout must cover
+    // the build as well as server startup.
     command: `npm run build && npm run start -- -p ${PORT}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 180000,
+    timeout: 360000,
     stdout: "pipe",
     stderr: "pipe",
   },
