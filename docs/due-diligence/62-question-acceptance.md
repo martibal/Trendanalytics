@@ -28,14 +28,14 @@ Dated provider evidence: `docs/due-diligence/provider-verification-2026-08-27.md
 | 31 | Explicit price/no setup/no usage-fee statement | `/terms` | commercial contract | PASS |
 | 35 | Post-cancellation retention right | `/terms` §6 | legal/commercial policy | PASS |
 | 36 | Mid-period upgrade/downgrade/proration behavior | `/terms` §7 + dated live Stripe portal evidence | repository + provider | PASS — self-service plan switching is disabled; cancellation is at period end; portal proration is none |
-| 37 | Taxes/MVA visible before purchase | `/terms` §4 + dated live Stripe tax/checkout evidence | provider + commercial setup | BLOCKED — live checkout has `automatic_tax.enabled=false`; Stripe Tax setup is pending |
+| 37 | Taxes/MVA visible before purchase | `/terms` §4 + dated live Stripe tax/checkout evidence | provider + commercial setup | BLOCKED — live Stripe Tax setup is pending, no Stripe Tax registration is recorded, and checkout does not enable automatic tax |
 | 39 | Governing law | `/terms` §22 | legal | PASS, legal review recommended |
 | 42 | Positive excerpt/attribution policy | `/terms` §10 | license contract | PASS |
 | 43 | Automation / AI / downstream model policy | `/terms` §11 | license contract | PASS |
 | 44 | Privacy policy names actual processors | `/privacy`, `/subprocessors` | privacy docs | PASS subject to final provider inventory review |
 | 45 | Wind-down/export policy | `/terms` §20, `/service` | service contract | PASS |
 | 46 | Security/privacy incident notification policy | `/privacy`, `/terms`, `/security` | privacy/security | PASS subject to legal review |
-| 47 | Encryption/security statement | `/security` + dated provider evidence | security docs + provider settings | MANUAL — public assurance boundary is accurate; remaining account-/plan-specific settings require dated verification |
+| 47 | Encryption/security statement | `/security` + dated provider evidence | security docs + provider/account evidence | PASS — Supabase SSL/TLS verified directly; Supabase/Vercel at-rest controls are provider-documented; Upstash plan-specific at-rest encryption is explicitly not claimed |
 | 48 | Vendor × data-category matrix | `/subprocessors` | privacy/vendor inventory | PASS subject to inventory confirmation |
 | 51 | Responsible disclosure | `/security/reporting`, `/.well-known/security.txt` | security | PASS |
 | 52 | GDPR-oriented notice | `/privacy` | privacy/legal | PASS subject to legal review |
@@ -43,11 +43,11 @@ Dated provider evidence: `docs/due-diligence/provider-verification-2026-08-27.md
 
 ### Closeout count for the 27 targeted questions
 
-- PASS: 25
-- MANUAL: 1 (Q47)
+- PASS: 26
+- MANUAL: 0
 - BLOCKED: 1 (Q37)
 
-No targeted question remains unanswered. Q37 is explicitly blocked because the required live tax/VAT behavior is not configured, not because the answer is unknown. Q47 is explicitly manual because the public statement is complete but account-/plan-specific provider settings are not all independently evidenced.
+No targeted question remains unanswered. Q37 is the sole remaining blocked item because the required live tax/VAT determination and Stripe configuration are not complete. Q47 is closed because the public security statement is now limited to evidenced controls and explicitly avoids claiming the plan-specific Upstash at-rest feature.
 
 ## Automated release checks to maintain
 
@@ -67,13 +67,12 @@ The following should become or remain build/pipeline gates:
 ## Provider/account closeout still required before declaring 62/62 complete
 
 - Complete the operator's tax/VAT determination and configure Stripe Tax/checkout accordingly if collection is required; then verify the customer-visible amount before purchase confirmation (Q37).
-- Record account-side evidence for material encryption/storage settings that are configurable by provider plan/account and are not independently visible through the current connected management APIs (Q47).
 - Confirm the final production subprocessor inventory, including any email/observability provider not represented in repository code.
 - Complete legal review of governing-law, retention-after-cancellation, excerpt/attribution, GDPR and incident-notification language before representing an institutional legal review as complete.
 
-## Additional provider finding from 2026-08-27
+## Supabase verification note from 2026-08-27
 
-The connected Supabase project named `trendanalytics-prod` is in region `eu-west-1`, but its management API currently reports `INACTIVE`, and a direct table-listing request timed out. This finding is recorded in the dated provider evidence file and should be operationally checked before the project is used as evidence of an active production database. It is not, by itself, proof that the public website is unavailable.
+The connected Supabase project named `trendanalytics-prod` is in region `eu-west-1`. Its management API currently reports `INACTIVE`, but a subsequent direct SQL query succeeded and returned PostgreSQL `ssl=on` with `ssl_min_protocol_version=TLSv1.2`. The earlier table-listing timeout must therefore not be treated as proof that the database is unreachable. The dated provider evidence file records the stronger direct verification.
 
 ## Release rule
 
