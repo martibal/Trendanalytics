@@ -1,4 +1,3 @@
-﻿// src/app/privacy/page.tsx
 import Link from "next/link";
 import type { ReactNode } from "react";
 import "server-only";
@@ -6,126 +5,28 @@ import "server-only";
 export const revalidate = 0;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="border-t border-[var(--line)] pt-8 pb-6">
-      <h2 className="ua-h3 mb-4">{title}</h2>
-      <div className="space-y-3 text-sm leading-7 text-[var(--ink2)] max-w-3xl">{children}</div>
-    </section>
-  );
+  return <section className="border-t border-[var(--line)] pt-8 pb-6"><h2 className="ua-h3 mb-4">{title}</h2><div className="space-y-3 text-sm leading-7 text-[var(--ink2)] max-w-3xl">{children}</div></section>;
 }
 
 export default function PrivacyPage() {
   return (
     <main className="ua-page">
-
-      <header className="hero border-b border-[var(--line)]">
-        <div className="page-shell">
-          <div className="eyebrow mb-4">Privacy Policy</div>
-          <h1 className="ua-h1">How your data is handled</h1>
-          <p className="lead mt-4 max-w-2xl">
-            This page describes how Urd Atlas handles account, billing, usage, and
-            authenticated access data across the public website, subscriber dashboard, and API.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-4 text-sm text-[var(--ink2)]">
-            <span>The public website and subscriber system are different surfaces with different data-handling implications.</span>
-          </div>
-        </div>
-      </header>
-
-      <div className="page-shell py-12">
-        <div style={{ maxWidth: "760px" }}>
-
-          <Section title="1. Scope">
-            <p>This Privacy Policy applies to Urd Atlas public pages, subscriber account pages, authenticated JSON delivery, and related support, billing, and operational workflows.</p>
-            <p>The legal operator of Urd Atlas is MARTIN BALSTAD, organisation number 937 581 254, Norway. Privacy, support, billing, and legal requests can be sent to <a href="mailto:support@urdatlas.com" className="text-link">support@urdatlas.com</a>.</p>
-            <p>It covers the handling of account information, entitlement state, usage data, API access data, billing-related metadata, and technical service-operation metadata.</p>
-          </Section>
-
-          <Section title="2. Public Website vs Subscriber System">
-            <p>Urd Atlas has two distinct product surfaces: the public read-only website, which exposes descriptive pages and public API routes, and the subscriber system, which includes dashboard access, account state, API keys, and entitlement-gated file delivery.</p>
-            <p>Privacy handling may differ depending on whether a user is only visiting public pages or using subscriber functionality that requires authentication and account-linked access.</p>
-          </Section>
-
-          <Section title="3. What Data May Be Processed">
-            <p>Depending on how you use the service, Urd Atlas may process:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>account identifiers and authentication-linked user IDs,</li>
-              <li>email address and subscriber profile information,</li>
-              <li>subscription status, billing state, and entitlement scope,</li>
-              <li>API key metadata such as prefix, last-used timestamp, and key status,</li>
-              <li>request metadata needed for delivery, rate limiting, security, and abuse prevention,</li>
-              <li>support or contact information you voluntarily provide.</li>
-            </ul>
-          </Section>
-
-          <Section title="4. Authentication and Identity">
-            <p>Urd Atlas uses Clerk for authentication and account session handling. Authentication data is therefore also subject to Clerk&apos;s own product and privacy terms.</p>
-            <p>The site may process account-linked identifiers needed to determine whether a user has access to subscriber-only features such as dashboard routes, API keys, or authenticated file delivery.</p>
-          </Section>
-
-          <Section title="5. Billing and Payments">
-            <p>Urd Atlas uses Stripe for billing, checkout, and subscription processing.</p>
-            <p>Payment card details are not stored directly by Urd Atlas. Billing-related metadata such as customer identifiers, subscription identifiers, plan information, and webhook status may be processed to operate the subscriber service.</p>
-          </Section>
-
-          <Section title="6. API Access, Keys, and Security Logging">
-            <p>Authenticated file delivery requires API keys. Urd Atlas may process API key metadata and request metadata needed for authentication and entitlement enforcement, security monitoring, rate limiting, abuse prevention, and subscriber support.</p>
-            <p>Secret API keys should only be displayed once at creation and should not be recoverable in plaintext afterward.</p>
-          </Section>
-
-          <Section title="7. Public Website Analytics and Operational Data">
-            <p>Urd Atlas may process limited operational and technical information necessary to operate the public website and API, such as route usage, availability signals, error states, freshness information, response timing, and delivery diagnostics.</p>
-            <p>Urd Atlas does not use advertising cookies and does not require behavioral profiling to provide the service. If analytics or diagnostics are used, they are intended for aggregate product operation, reliability, abuse prevention, and performance monitoring rather than advertising or resale of user profiles.</p>
-            <p>The product is not designed to collect unnecessary personal content. Public blockchain analytics content is descriptive and does not require user profiling to function.</p>
-          </Section>
-
-          <Section title="8. Published Data and Traceability Metadata">
-            <p>Public routes may expose dataset version, methodology version, source mode, freshness context, chain-specific lag, and canonical contract fields.</p>
-            <p>These fields are part of the product&apos;s transparency model and are intended to describe the published analytics state rather than identify end users.</p>
-          </Section>
-
-          <Section title="9. Why Data Is Processed">
-            <p>Data may be processed to:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>provide access to subscriber-only features,</li>
-              <li>operate billing and entitlement workflows,</li>
-              <li>deliver authenticated files within plan scope,</li>
-              <li>protect the service against misuse or abuse,</li>
-              <li>maintain service health, reliability, and support workflows,</li>
-              <li>comply with legal or contractual obligations where applicable.</li>
-            </ul>
-          </Section>
-
-          <Section title="10. Data Sharing">
-            <p>Urd Atlas may rely on third-party processors and infrastructure providers, including services used for authentication, billing, deployment, hosting, storage, and rate limiting.</p>
-            <p>Data is shared only to the extent reasonably necessary to provide or secure the service, or where required by law.</p>
-          </Section>
-
-          <Section title="11. Retention">
-            <p>Subscriber account metadata, billing references, API key metadata, and operational logs may be retained for as long as reasonably necessary to provide the service, investigate misuse, maintain business records, or comply with legal obligations.</p>
-          </Section>
-
-          <Section title="12. Security">
-            <p>Urd Atlas uses route protection, entitlement checks, key status enforcement, and rate limiting as part of its security model.</p>
-            <p>No online system can guarantee absolute security, but the product is designed to reduce exposure of sensitive access credentials and restrict delivery to authorized scope.</p>
-          </Section>
-
-          <Section title="13. Your Rights and Requests">
-            <p>Depending on applicable law, users may have rights related to access, correction, deletion, restriction, or objection in relation to their personal data.</p>
-            <p>Requests are handled according to the operator&apos;s applicable legal obligations and the service records required to operate, secure, and support the platform.</p>
-          </Section>
-
-          <Section title="14. Related Documents">
-            <p>Terms governing use of the service are available at <Link href="/terms" className="text-link">Terms of Service</Link>.</p>
-            <p>System health and freshness are documented at <Link href="/status" className="text-link">System Status</Link>.</p>
-            <p>Methodology and descriptive product boundaries are documented at <Link href="/methodology" className="text-link">Methodology</Link>, <Link href="/about" className="text-link">About</Link>, <Link href="/glossary" className="text-link">Glossary</Link>, and <Link href="/api-docs" className="text-link">API Docs</Link>.</p>
-          </Section>
-
-        </div>
-      </div>
+      <header className="hero border-b border-[var(--line)]"><div className="page-shell"><div className="eyebrow mb-4">Privacy Policy</div><h1 className="ua-h1">How personal data is handled</h1><p className="lead mt-4 max-w-3xl">This notice explains the controller, data categories, purposes, legal bases, processors, retention approach, security safeguards and rights that apply to Urd Atlas users.</p></div></header>
+      <div className="page-shell py-12"><div style={{maxWidth:"800px"}}>
+        <Section title="1. Controller and contact"><p>The data controller for Urd Atlas is <strong>MARTIN BALSTAD</strong>, organisation number 937 581 254, Norway.</p><p>Privacy, access, deletion, support and legal requests can be sent to <a href="mailto:support@urdatlas.com" className="text-link">support@urdatlas.com</a>.</p></Section>
+        <Section title="2. Scope"><p>This notice applies to the public website, subscriber accounts, dashboard, authenticated JSON delivery, billing workflows, support communication and operational/security logging used to provide Urd Atlas.</p><p>Public blockchain observations published by Urd Atlas describe blockchain activity and are not collected in order to profile Urd Atlas customers.</p></Section>
+        <Section title="3. Data categories"><ul className="list-disc pl-5 space-y-1"><li>Account identifiers, email address and authentication-linked profile data.</li><li>Subscription, plan, billing-state and entitlement metadata.</li><li>API-key metadata such as key ID, non-secret prefix/last four characters, status and last-used information; full API-key secrets are not designed to be stored recoverably in plaintext.</li><li>Request and security metadata needed for delivery, rate limiting, abuse prevention, troubleshooting and incident response.</li><li>Support, privacy or legal correspondence that you choose to send.</li><li>Provider-side billing/payment data processed by Stripe; Urd Atlas does not store payment-card details directly.</li></ul></Section>
+        <Section title="4. Purposes and legal bases"><p><strong>Contract / steps at your request:</strong> account access, subscriber entitlements, API delivery, checkout, billing and customer-portal functionality are processed as necessary to provide the service you request.</p><p><strong>Legitimate interests:</strong> bounded operational logging, service security, abuse prevention, rate limiting, reliability diagnostics and support investigation are processed to protect and operate the service, balanced against user privacy.</p><p><strong>Legal obligation:</strong> billing/business records and disclosures may be retained or processed where Norwegian or other applicable law requires it.</p><p><strong>Consent:</strong> Urd Atlas does not rely on behavioral-advertising consent to operate the product. If an optional feature later requires consent, that purpose should be stated separately rather than silently folded into this notice.</p></Section>
+        <Section title="5. Authentication and billing"><p>Clerk provides authentication and session handling. Stripe provides checkout, subscription billing, invoices and customer-portal functions. Their processing is also governed by their own privacy terms.</p><p>A current list of production providers and the principal data categories they handle is published at <Link href="/subprocessors" className="text-link">Subprocessors</Link>.</p></Section>
+        <Section title="6. API access and security logging"><p>Authenticated subscriber delivery requires API keys. Urd Atlas may process key identifiers, status, account linkage, request path, request ID, response status, timing and bounded client/request metadata needed for entitlement enforcement, security, rate limiting and customer support.</p><p>Ordinary operational evidence should not retain full API secrets, complete browser sessions, payment-card data, unbounded headers or unnecessary personal content.</p></Section>
+        <Section title="7. Retention"><p>Retention is tied to the operational/legal purpose rather than indefinite collection. Active account and entitlement records are kept while the account/service relationship is active and for a reasonable period afterward where needed for billing, dispute handling, security or legal records.</p><p>Billing references may be retained for the period required by applicable accounting/tax law. Security and request logs are kept only as long as reasonably needed for service operation, abuse investigation and incident evidence. Support correspondence may be retained while a matter is open and for a reasonable follow-up period.</p><p>Where a user has a valid deletion right, data that is not required for an overriding legal/security purpose should be deleted or de-linked after the request is verified.</p></Section>
+        <Section title="8. International processing"><p>Some service providers may process data in jurisdictions outside Norway or the EEA as part of their global infrastructure. Where GDPR transfer rules apply, the relevant provider/controller relationship must rely on an applicable transfer mechanism, such as an adequacy decision or contractual safeguards provided by the processor.</p></Section>
+        <Section title="9. Security"><p>Urd Atlas uses HTTPS delivery, authentication, entitlement checks, API-key hashing, route protections, rate limiting and provider-managed encryption controls as part of its security model. No internet service can guarantee absolute security.</p><p>More detail is available at <Link href="/security" className="text-link">Security</Link> and <Link href="/security/reporting" className="text-link">Responsible Disclosure</Link>.</p></Section>
+        <Section title="10. Security incidents"><p>Security incidents are assessed separately from ordinary service/data-freshness issues. Where GDPR or other applicable law requires notification to a regulator or affected individuals, Urd Atlas follows the applicable threshold and timing requirements and communicates the nature of the incident, likely consequences and mitigation where required.</p></Section>
+        <Section title="11. Your rights"><p>Depending on the applicable law and circumstances, you may have rights to access, rectification, erasure, restriction, objection and data portability, and to withdraw consent where consent is the legal basis.</p><p>Requests can be sent to <a href="mailto:support@urdatlas.com" className="text-link">support@urdatlas.com</a>. Identity may need to be verified before account-linked information is disclosed or deleted.</p><p>You also have the right to complain to the Norwegian Data Protection Authority (Datatilsynet) or another competent supervisory authority where applicable.</p></Section>
+        <Section title="12. Advertising and profiling"><p>Urd Atlas does not require behavioral advertising or sale of user profiles to provide the service. If analytics/diagnostics are used, their intended purpose is product operation, reliability, security and aggregate performance rather than advertising resale.</p></Section>
+        <Section title="13. Related documents"><p>See <Link href="/terms" className="text-link">Terms of Service</Link>, <Link href="/subprocessors" className="text-link">Subprocessors</Link>, <Link href="/security" className="text-link">Security</Link>, <Link href="/status" className="text-link">Status</Link> and the <Link href="/trust" className="text-link">Trust center</Link>.</p></Section>
+      </div></div>
     </main>
   );
 }
-
-
-
