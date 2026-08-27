@@ -41,9 +41,9 @@ if (Test-Path -LiteralPath $schemaContractScript) {
 Write-Step "Running published-data sync"
 Invoke-Native $RepoRoot "powershell" @("-NoProfile","-ExecutionPolicy","Bypass","-File",$SyncScriptPath,"-SourceRoot",$SourceRoot,"-TargetRoot",$TargetRoot)
 if (-not $SkipBuild) { Write-Step "Running production build"; Invoke-Native $WebAppRoot "npm" @("run","build") } else { Write-Step "Skipping build" }
-if (-not $SkipPush) { Write-Step "Running audit gates"; Invoke-Native $WebAppRoot "npm" @("run","check:audit-gates:no-build") } else { Write-Step "Skipping audit gates inside publish script because -SkipPush was provided" }
+if (-not $SkipPush) { Write-Step "Running audit gates"; Invoke-Native $WebAppRoot "npm" @("run","check:audit-gates:no-build") } else { Write-Step "Skipping audit gates inside publish-web-data because -SkipPush was provided" }
 
-Write-Step "Staging canonical and mirrored published data"
+Write-Step "Staging sync script and published data"
 Invoke-Native $RepoRoot "git" @("add","--","data/published/v1","web-v1-app/.private-data/published/v1","sync-published-data.ps1")
 Push-Location $RepoRoot
 try {
@@ -53,6 +53,8 @@ try {
     if ($SkipPush) { Write-Step "Skipping commit/push because -SkipPush was provided"; return }
     $finalCommitMessage = $CommitMessage
     if ([string]::IsNullOrWhiteSpace($finalCommitMessage)) { $finalCommitMessage = "Update published data snapshot $(Get-CurrentTimestampForCommit)" }
+    Write-Step "Creating commit"
     Invoke-Native $RepoRoot "git" @("commit","-m",$finalCommitMessage)
+    Write-Step "Pushing to origin/$Branch"
     Invoke-Native $RepoRoot "git" @("push","origin",$Branch)
 } finally { Pop-Location }
