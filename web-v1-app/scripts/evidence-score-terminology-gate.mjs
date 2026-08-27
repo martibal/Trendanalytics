@@ -1,23 +1,35 @@
-// This file is intentionally small: it protects the public naming contract for REQ-04.
+// Protect the public Evidence score naming/semantics contract without requiring
+// customer copy to contain arbitrary literal marker phrases.
 import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const checks = [
-  ["src/components/home/InteractiveHomeDashboard.tsx", ["evidence score", "Evidence ", "probability calibration"]],
-  ["src/app/api/v1/landing/route.ts", ["evidence_score", "probability_interpretation: false", "legacyConfidenceBand"]],
-  ["src/app/api/v1/summary/[chain]/route.ts", ["evidence_score", "probability_interpretation: false", "legacyConfidenceBand"]],
-];
-
 const errors = [];
-for (const [relativePath, markers] of checks) {
+
+function read(relativePath) {
   const target = path.join(root, relativePath);
   if (!fs.existsSync(target)) {
     errors.push(`${relativePath}: missing`);
-    continue;
+    return "";
   }
-  const content = fs.readFileSync(target, "utf8");
-  for (const marker of markers) {
+  return fs.readFileSync(target, "utf8");
+}
+
+const homePath = "src/components/home/InteractiveHomeDashboard.tsx";
+const home = read(homePath);
+if (home) {
+  if (!/evidence score/iu.test(home)) errors.push(`${homePath}: missing Evidence score terminology`);
+  if (!/uncalibrated/iu.test(home)) errors.push(`${homePath}: missing uncalibrated semantics`);
+  if (!/not\s+(?:a|the)?\s*probability/iu.test(home)) errors.push(`${homePath}: missing non-probability interpretation`);
+}
+
+for (const relativePath of [
+  "src/app/api/v1/landing/route.ts",
+  "src/app/api/v1/summary/[chain]/route.ts",
+]) {
+  const content = read(relativePath);
+  if (!content) continue;
+  for (const marker of ["evidence_score", "probability_interpretation: false", "legacyConfidenceBand"]) {
     if (!content.includes(marker)) errors.push(`${relativePath}: missing marker ${marker}`);
   }
 }

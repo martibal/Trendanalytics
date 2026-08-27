@@ -1,0 +1,85 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Urd Atlas API",
+    "version": "1.0.0",
+    "description": "Public reference endpoints and authenticated subscriber artifact delivery for Urd Atlas descriptive on-chain reference data."
+  },
+  "servers": [{"url": "https://www.urdatlas.com"}],
+  "components": {
+    "securitySchemes": {
+      "ApiKey": {"type": "apiKey", "in": "header", "name": "X-API-Key"}
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {"type": "string"},
+          "message": {"type": "string"},
+          "detail": {"type": ["string", "null"]}
+        },
+        "required": ["code", "message"]
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/status": {
+      "get": {
+        "summary": "Read public publication status and freshness",
+        "responses": {"200": {"description": "Current public status JSON"}, "429": {"description": "Rate limited", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}}
+      }
+    },
+    "/api/v1/landing": {
+      "get": {"summary": "Read public landing snapshot", "responses": {"200": {"description": "Landing snapshot"}, "429": {"description": "Rate limited"}}}
+    },
+    "/api/v1/summary/{chain}": {
+      "get": {
+        "summary": "Read public chain summary",
+        "parameters": [{"name": "chain", "in": "path", "required": true, "schema": {"type": "string", "enum": ["bitcoin", "ethereum", "arbitrum", "base"]}}],
+        "responses": {"200": {"description": "Chain summary"}, "404": {"description": "Unknown or unavailable chain"}, "429": {"description": "Rate limited"}}
+      }
+    },
+    "/api/v1/analyst-kit/{chain}/regime-calendar": {
+      "get": {
+        "summary": "Download public regime-calendar CSV",
+        "parameters": [{"name": "chain", "in": "path", "required": true, "schema": {"type": "string", "enum": ["bitcoin", "ethereum", "arbitrum", "base"]}}],
+        "responses": {"200": {"description": "CSV calendar"}, "429": {"description": "Rate limited"}}
+      }
+    },
+    "/api/v1/files/{genre}/{chain}/{window}/latest.json": {
+      "get": {
+        "summary": "Fetch an entitled subscriber bundle",
+        "security": [{"ApiKey": []}],
+        "parameters": [
+          {"name": "genre", "in": "path", "required": true, "schema": {"type": "string", "enum": ["gold", "derived", "meta"]}},
+          {"name": "chain", "in": "path", "required": true, "schema": {"type": "string", "enum": ["bitcoin", "ethereum", "arbitrum", "base"]}},
+          {"name": "window", "in": "path", "required": true, "schema": {"type": "string", "enum": ["latest", "7d", "30d", "90d", "180d", "365d"]}}
+        ],
+        "responses": {"200": {"description": "Published JSON artifact or bundle"}, "401": {"description": "Missing/invalid key"}, "403": {"description": "Not entitled"}, "404": {"description": "Artifact unavailable"}, "429": {"description": "Rate limited"}}
+      }
+    },
+    "/api/v1/files/{genre}/{chain}/manifest.json": {
+      "get": {
+        "summary": "Discover the full published archive (Pro)",
+        "security": [{"ApiKey": []}],
+        "parameters": [
+          {"name": "genre", "in": "path", "required": true, "schema": {"type": "string", "enum": ["gold", "derived", "meta"]}},
+          {"name": "chain", "in": "path", "required": true, "schema": {"type": "string", "enum": ["bitcoin", "ethereum", "arbitrum", "base"]}}
+        ],
+        "responses": {"200": {"description": "Archive manifest"}, "401": {"description": "Missing/invalid key"}, "403": {"description": "Pro entitlement required"}, "429": {"description": "Rate limited"}}
+      }
+    },
+    "/api/v1/files/{genre}/{chain}/{date}.json": {
+      "get": {
+        "summary": "Fetch an original published day file (Pro)",
+        "security": [{"ApiKey": []}],
+        "parameters": [
+          {"name": "genre", "in": "path", "required": true, "schema": {"type": "string", "enum": ["gold", "derived", "meta"]}},
+          {"name": "chain", "in": "path", "required": true, "schema": {"type": "string", "enum": ["bitcoin", "ethereum", "arbitrum", "base"]}},
+          {"name": "date", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}}
+        ],
+        "responses": {"200": {"description": "Original published day JSON"}, "401": {"description": "Missing/invalid key"}, "403": {"description": "Pro entitlement required"}, "404": {"description": "Date unavailable"}, "429": {"description": "Rate limited"}}
+      }
+    }
+  }
+}

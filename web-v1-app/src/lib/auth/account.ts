@@ -13,7 +13,7 @@ import {
 } from "@/lib/auth/entitlements";
 import { db } from "@/lib/db";
 
-const TERMS_VERSION = "2026-04-13";
+const TERMS_VERSION = "2026-08-27";
 const TERMS_ACCEPTANCE_COOKIE = "ua_terms_acceptance_pending";
 
 function shouldLogAccountDebug(): boolean {
