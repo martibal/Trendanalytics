@@ -1,8 +1,6 @@
 import CheckoutRedirectGuard from "@/components/home/CheckoutRedirectGuard";
 import InteractiveHomeDashboard, { type HomeChainSnapshot, type HomeLabel } from "@/components/home/InteractiveHomeDashboard";
-import MobileHomeExperience from "@/components/home/MobileHomeExperience";
 import PublicationFreshnessStrip from "@/components/home/PublicationFreshnessStrip";
-import styles from "@/components/home/MobileHomeExperience.module.css";
 import type { HeroPanelSnapshot } from "@/components/home/HeroNetworkStatePanel";
 import { readStorageObject } from "@/lib/storage";
 
@@ -148,9 +146,6 @@ export default async function HomePage(){
   return <>
     <CheckoutRedirectGuard />
     <PublicationFreshnessStrip snapshots={snapshots} lastRun={lastRun} />
-    <MobileHomeExperience snapshots={snapshots} lastRun={lastRun} consecutiveRows={heroSnapshot.consecutiveRows} />
-    <div className={styles.desktopOnly}>
-      <InteractiveHomeDashboard snapshots={snapshots} lastRun={lastRun} examples={{high:null,low:null}} heroSnapshot={heroSnapshot}/>
-    </div>
+    <InteractiveHomeDashboard snapshots={snapshots} lastRun={lastRun} examples={{high:null,low:null}} heroSnapshot={heroSnapshot}/>
   </>;
 }

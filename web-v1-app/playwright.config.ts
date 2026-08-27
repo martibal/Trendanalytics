@@ -2,7 +2,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3000;
-const baseURL = `http://127.0.0.1:${PORT}`;
+const baseURL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -18,7 +18,11 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: `npm run dev -- --webpack -p ${PORT}`,
+    // Mobile Home E2E verifies browser hydration and interactions. Keep it on
+    // the same localhost origin as Next's dev server so HMR and client events
+    // are exercised without crossing the auth middleware readiness path.
+    // The production build itself is already a separate required CI gate.
+    command: `npm run dev -- -p ${PORT}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
