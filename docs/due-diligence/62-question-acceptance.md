@@ -1,11 +1,13 @@
 # 62-question due-diligence acceptance matrix
 
-Status: active hardening checklist. The purpose is to prevent customer-facing due-diligence answers from drifting away from the actual implementation.
+Status: active closeout checklist. The purpose is to prevent customer-facing due-diligence answers from drifting away from the actual implementation or live provider configuration.
 
 Legend:
-- PASS = public/technical evidence exists and matches current implementation.
+- PASS = public/technical/provider evidence exists and matches current implementation.
 - MANUAL = requires provider/account or legal verification in addition to repository changes.
 - BLOCKED = not yet complete and must not be described publicly as complete.
+
+Dated provider evidence: `docs/due-diligence/provider-verification-2026-08-27.md`.
 
 ## Previously partial / unanswered questions targeted by this hardening pass
 
@@ -15,7 +17,7 @@ Legend:
 | 6 | Exact source provider/dataset family per chain | `/methodology/sources` | docs + pipeline | PASS |
 | 10 | Failed-transaction aggregation semantics | `/methodology/transaction-semantics` | docs + field contract | PASS |
 | 12 | Current changelog aligned to active confidence method | `/methodology/changelog`, `src/lib/methodologyVersion.ts` | docs + source-of-truth | PASS |
-| 13 | Every public row artifact self-describes schema version | `pipeline/tools/ensure_artifact_schema_versions.py`, `/api-docs/versioning` | pipeline + data | PASS after next publication/backfill |
+| 13 | Every public row artifact self-describes schema version | published Gold/Derived/Meta/Briefs + `dataset.json.schema_versions` | pipeline + published data | PASS — verified after 2026-08-27 publication |
 | 14 | Breaking-change definition and notice period | `/api-docs/versioning` | public contract | PASS |
 | 15 | Representative no-payment current sample | landing `#ua6-data`, `/api-docs/samples` | live public data | PASS |
 | 20 | Public product demo | `/demo` | public product walkthrough | PASS |
@@ -25,19 +27,27 @@ Legend:
 | 30 | Source late/missing/incomplete decision matrix | `/methodology/sources` | public policy | PASS |
 | 31 | Explicit price/no setup/no usage-fee statement | `/terms` | commercial contract | PASS |
 | 35 | Post-cancellation retention right | `/terms` §6 | legal/commercial policy | PASS |
-| 36 | Mid-period upgrade/downgrade/proration behavior | `/terms` §7 + live Stripe portal | repository + provider | MANUAL |
-| 37 | Taxes/MVA visible before purchase | `/terms` §4 + live Stripe tax configuration | provider | MANUAL |
+| 36 | Mid-period upgrade/downgrade/proration behavior | `/terms` §7 + dated live Stripe portal evidence | repository + provider | PASS — self-service plan switching is disabled; cancellation is at period end; portal proration is none |
+| 37 | Taxes/MVA visible before purchase | `/terms` §4 + dated live Stripe tax/checkout evidence | provider + commercial setup | BLOCKED — live checkout has `automatic_tax.enabled=false`; Stripe Tax setup is pending |
 | 39 | Governing law | `/terms` §22 | legal | PASS, legal review recommended |
 | 42 | Positive excerpt/attribution policy | `/terms` §10 | license contract | PASS |
 | 43 | Automation / AI / downstream model policy | `/terms` §11 | license contract | PASS |
-| 44 | Privacy policy names actual processors | `/privacy`, `/subprocessors` | privacy docs | PASS subject to provider inventory review |
+| 44 | Privacy policy names actual processors | `/privacy`, `/subprocessors` | privacy docs | PASS subject to final provider inventory review |
 | 45 | Wind-down/export policy | `/terms` §20, `/service` | service contract | PASS |
 | 46 | Security/privacy incident notification policy | `/privacy`, `/terms`, `/security` | privacy/security | PASS subject to legal review |
-| 47 | Encryption/security statement | `/security` | security docs + provider settings | MANUAL for provider-setting verification |
+| 47 | Encryption/security statement | `/security` + dated provider evidence | security docs + provider settings | MANUAL — public assurance boundary is accurate; remaining account-/plan-specific settings require dated verification |
 | 48 | Vendor × data-category matrix | `/subprocessors` | privacy/vendor inventory | PASS subject to inventory confirmation |
 | 51 | Responsible disclosure | `/security/reporting`, `/.well-known/security.txt` | security | PASS |
 | 52 | GDPR-oriented notice | `/privacy` | privacy/legal | PASS subject to legal review |
 | 53 | Public operator/founder accountability | `/operator` | public company/operator info | PASS |
+
+### Closeout count for the 27 targeted questions
+
+- PASS: 25
+- MANUAL: 1 (Q47)
+- BLOCKED: 1 (Q37)
+
+No targeted question remains unanswered. Q37 is explicitly blocked because the required live tax/VAT behavior is not configured, not because the answer is unknown. Q47 is explicitly manual because the public statement is complete but account-/plan-specific provider settings are not all independently evidenced.
 
 ## Automated release checks to maintain
 
@@ -54,16 +64,17 @@ The following should become or remain build/pipeline gates:
 9. Required trust routes exist: `/security`, `/subprocessors`, `/security/reporting`, `/privacy`, `/terms`, `/operator`, `/api-docs/versioning`, `/api-docs/rate-limits`, `/methodology/evidence-score`, `/methodology/sources`.
 10. A methodology/schema-breaking change updates the public changelog/version documentation in the same release.
 
-## Provider/account checks that cannot be proven from Git alone
+## Provider/account closeout still required before declaring 62/62 complete
 
-Before declaring 62/62 complete, record evidence for:
+- Complete the operator's tax/VAT determination and configure Stripe Tax/checkout accordingly if collection is required; then verify the customer-visible amount before purchase confirmation (Q37).
+- Record account-side evidence for material encryption/storage settings that are configurable by provider plan/account and are not independently visible through the current connected management APIs (Q47).
+- Confirm the final production subprocessor inventory, including any email/observability provider not represented in repository code.
+- Complete legal review of governing-law, retention-after-cancellation, excerpt/attribution, GDPR and incident-notification language before representing an institutional legal review as complete.
 
-- Stripe automatic-tax / VAT behavior in live checkout, including what the customer sees before purchase confirmation.
-- Stripe customer-portal upgrade/downgrade configuration and actual proration timing.
-- Actual encryption-at-rest / region settings for each production provider where configuration is account-side.
-- Final production subprocessor inventory (including any email/observability provider not represented in repository code).
-- Legal review of governing-law, retention-after-cancellation, excerpt/attribution, GDPR and incident-notification language if institutional customers are targeted.
+## Additional provider finding from 2026-08-27
+
+The connected Supabase project named `trendanalytics-prod` is in region `eu-west-1`, but its management API currently reports `INACTIVE`, and a direct table-listing request timed out. This finding is recorded in the dated provider evidence file and should be operationally checked before the project is used as evidence of an active production database. It is not, by itself, proof that the public website is unavailable.
 
 ## Release rule
 
-Do not convert a MANUAL item to PASS based only on intended policy text. Attach dated evidence from the relevant production provider/account or a completed legal review where the fact depends on those systems.
+Do not convert a MANUAL or BLOCKED item to PASS based only on intended policy text. Attach dated evidence from the relevant production provider/account or a completed legal review where the fact depends on those systems. A negative provider result may make an answer complete, but it does not satisfy an acceptance criterion that requires the underlying capability to be configured.
