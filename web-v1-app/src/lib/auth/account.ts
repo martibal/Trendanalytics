@@ -12,9 +12,8 @@ import {
   type EntitlementInput,
 } from "@/lib/auth/entitlements";
 import { db } from "@/lib/db";
-import { CURRENT_TERMS_VERSION } from "@/lib/legal/termsVersion";
 
-const TERMS_VERSION = CURRENT_TERMS_VERSION;
+const TERMS_VERSION = "2026-08-27";
 const TERMS_ACCEPTANCE_COOKIE = "ua_terms_acceptance_pending";
 
 function shouldLogAccountDebug(): boolean {
