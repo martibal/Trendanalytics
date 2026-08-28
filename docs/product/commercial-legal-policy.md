@@ -4,14 +4,17 @@ Status: active internal source of truth for public Terms/checkout documentation.
 
 ## Standard plans
 
-- Basic: USD 49/month, one selected chain, latest/7d/30d/90d Gold/Derived/Meta plus latest per-chain Briefs.
-- Pro: USD 149/month, all four chains, standard windows through 365d plus complete published archive.
+Customer-facing names are **Single Chain** and **Research**. Internal application/Stripe identifiers `basic` and `pro` may remain in code and metadata but are not customer-facing plan names.
+
+- Single Chain: USD 49/month, one selected chain, latest/7d/30d/90d Gold/Derived/Meta plus latest per-chain Briefs.
+- Research: USD 149/month, all four chains, standard windows through 365d plus complete published archive.
 - No separate Urd Atlas setup fee.
 - No separate Urd Atlas per-request usage fee on the standard plans.
-- Applicable taxes must be visible in the Stripe confirmation flow before purchase when Urd Atlas is required/configured to collect them.
+- Current live checkout has Stripe Automatic Tax disabled and no Stripe Tax registrations. The amount shown before confirmation is the amount charged under the current configuration. This is not a legal determination about future tax-registration obligations.
 
 ## Cancellation and retained data
 
+- The live Stripe Customer Portal schedules cancellation at period end with no cancellation proration.
 - A cancellation scheduled for period end leaves access active through the already-paid period unless entitlement state requires otherwise.
 - Immediate cancellation/refund may end subscriber delivery when Stripe/Urd Atlas entitlement becomes inactive.
 - Files lawfully downloaded while an entitlement was active may be retained and used internally after cancellation.
@@ -20,10 +23,10 @@ Status: active internal source of truth for public Terms/checkout documentation.
 
 ## Plan changes
 
-- Basic -> Pro: intended to take effect immediately when the Stripe plan change is confirmed; Stripe may apply proration.
-- Pro -> Basic: intended to take effect at the next renewal so already-paid Pro access is not removed mid-period.
-- Pro -> Basic requires selection of the one chain that remains entitled for the next Basic period.
-- The amount charged/credited is the amount shown by Stripe before confirmation.
+- Self-service Single Chain ↔ Research switching is currently disabled in the live Stripe Customer Portal.
+- The live portal therefore performs no self-service plan-change proration.
+- Customers requesting a plan change must contact support; any manually arranged charge, credit, entitlement scope and effective date must be confirmed before the change is applied.
+- A future self-service plan-switching flow must be verified against live Stripe configuration and documented publicly before it is represented as available.
 
 ## Attribution and external excerpts
 
@@ -62,11 +65,16 @@ Security/privacy incidents are distinct from ordinary freshness/availability inc
 
 Target at least 30 calendar days' public notice for planned breaking API/schema changes. Critical security, legal, corruption-repair or data-integrity fixes may use a shorter timeline but require prompt changelog disclosure.
 
-## Items requiring external/account-level verification
+## Production security boundary
 
-These are not deemed complete solely by repository text:
+Urd Atlas uses server-side Prisma/Postgres access for subscriber/account state. Supabase `public` tables are not intended as a client-facing Data API. RLS is enabled on those tables and privileges for `anon` and `authenticated` are revoked. Any future client-side Supabase table access requires an explicit access model and reviewed RLS policies before privileges are granted.
 
-1. Stripe tax/MVA configuration and customer-location behavior in live checkout.
-2. Stripe customer-portal plan-switch configuration and proration behavior.
-3. Provider encryption/region settings where provider-specific configuration, not code, controls the fact.
-4. Final legal review of Terms/Privacy before higher-risk institutional sales.
+## Items requiring ongoing external/account-level review
+
+These are ongoing governance items rather than claims inferred from repository text:
+
+1. Reassess tax/VAT obligations as sales footprint changes; configure registrations/checkout before representing collection as enabled.
+2. Re-verify Stripe portal behavior before documenting future self-service plan changes.
+3. Re-run provider security/advisor checks after material infrastructure or schema changes.
+4. Confirm the final production subprocessor inventory whenever a provider is added or removed.
+5. Obtain professional legal review before representing Terms/Privacy as externally reviewed for institutional procurement.
