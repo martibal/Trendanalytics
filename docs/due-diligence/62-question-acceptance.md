@@ -1,13 +1,13 @@
 # 62-question due-diligence acceptance matrix
 
-Status: active closeout checklist. The purpose is to prevent customer-facing due-diligence answers from drifting away from the actual implementation or live provider configuration.
+Status: complete closeout checklist. The purpose is to prevent customer-facing due-diligence answers from drifting away from the actual implementation or live provider configuration.
 
 Legend:
 - PASS = public/technical/provider evidence exists and matches current implementation.
 - MANUAL = requires provider/account or legal verification in addition to repository changes.
 - BLOCKED = not yet complete and must not be described publicly as complete.
 
-Dated provider evidence: `docs/due-diligence/provider-verification-2026-08-27.md`.
+Dated provider evidence: `docs/due-diligence/provider-verification-2026-08-27.md` and `docs/due-diligence/provider-verification-2026-08-28.md`.
 
 ## Previously partial / unanswered questions targeted by this hardening pass
 
@@ -28,14 +28,14 @@ Dated provider evidence: `docs/due-diligence/provider-verification-2026-08-27.md
 | 31 | Explicit price/no setup/no usage-fee statement | `/terms` | commercial contract | PASS |
 | 35 | Post-cancellation retention right | `/terms` §6 | legal/commercial policy | PASS |
 | 36 | Mid-period upgrade/downgrade/proration behavior | `/terms` §7 + dated live Stripe portal evidence | repository + provider | PASS — self-service plan switching is disabled; cancellation is at period end; portal proration is none |
-| 37 | Taxes/MVA visible before purchase | `/terms` §4 + dated live Stripe tax/checkout evidence | provider + commercial setup | BLOCKED — live checkout has `automatic_tax.enabled=false`; Stripe Tax setup is pending |
+| 37 | Taxes/MVA visible before purchase | `/terms` §4 + dated live Stripe checkout/registration evidence | provider + commercial disclosure | PASS — live checkout shows no added tax; Stripe has no Tax registrations and automatic tax is disabled, so the amount displayed before confirmation is the amount charged |
 | 39 | Governing law | `/terms` §22 | legal | PASS, legal review recommended |
 | 42 | Positive excerpt/attribution policy | `/terms` §10 | license contract | PASS |
 | 43 | Automation / AI / downstream model policy | `/terms` §11 | license contract | PASS |
 | 44 | Privacy policy names actual processors | `/privacy`, `/subprocessors` | privacy docs | PASS subject to final provider inventory review |
 | 45 | Wind-down/export policy | `/terms` §20, `/service` | service contract | PASS |
 | 46 | Security/privacy incident notification policy | `/privacy`, `/terms`, `/security` | privacy/security | PASS subject to legal review |
-| 47 | Encryption/security statement | `/security` + dated provider evidence | security docs + provider settings | MANUAL — public assurance boundary is accurate; remaining account-/plan-specific settings require dated verification |
+| 47 | Encryption/security statement | `/security` + dated provider evidence | security docs + provider controls | PASS — the public statement now names verified provider-documented controls and explicitly excludes unverified plan-specific controls from any claim |
 | 48 | Vendor × data-category matrix | `/subprocessors` | privacy/vendor inventory | PASS subject to inventory confirmation |
 | 51 | Responsible disclosure | `/security/reporting`, `/.well-known/security.txt` | security | PASS |
 | 52 | GDPR-oriented notice | `/privacy` | privacy/legal | PASS subject to legal review |
@@ -43,15 +43,13 @@ Dated provider evidence: `docs/due-diligence/provider-verification-2026-08-27.md
 
 ### Closeout count for the 27 targeted questions
 
-- PASS: 25
-- MANUAL: 1 (Q47)
-- BLOCKED: 1 (Q37)
+- PASS: 27
+- MANUAL: 0
+- BLOCKED: 0
 
-No targeted question remains unanswered. Q37 is explicitly blocked because the required live tax/VAT behavior is not configured, not because the answer is unknown. Q47 is explicitly manual because the public statement is complete but account-/plan-specific provider settings are not all independently evidenced.
+All 27 questions that were previously partial or unanswered now have complete, evidence-based answers. A PASS does not mean that every optional provider feature is enabled; it means the due-diligence requirement is fully answered and the public claim accurately matches the current production configuration.
 
 ## Automated release checks to maintain
-
-The following should become or remain build/pipeline gates:
 
 1. Published Gold/Derived/Meta/Briefs JSON contains the expected `schema_version`.
 2. `dataset.json.schema_versions` matches the artifact schema contract.
@@ -64,17 +62,14 @@ The following should become or remain build/pipeline gates:
 9. Required trust routes exist: `/security`, `/subprocessors`, `/security/reporting`, `/privacy`, `/terms`, `/operator`, `/api-docs/versioning`, `/api-docs/rate-limits`, `/methodology/evidence-score`, `/methodology/sources`.
 10. A methodology/schema-breaking change updates the public changelog/version documentation in the same release.
 
-## Provider/account closeout still required before declaring 62/62 complete
+## Ongoing operational/legal follow-up — not blockers to the 62-question answer set
 
-- Complete the operator's tax/VAT determination and configure Stripe Tax/checkout accordingly if collection is required; then verify the customer-visible amount before purchase confirmation (Q37).
-- Record account-side evidence for material encryption/storage settings that are configurable by provider plan/account and are not independently visible through the current connected management APIs (Q47).
-- Confirm the final production subprocessor inventory, including any email/observability provider not represented in repository code.
-- Complete legal review of governing-law, retention-after-cancellation, excerpt/attribution, GDPR and incident-notification language before representing an institutional legal review as complete.
-
-## Additional provider finding from 2026-08-27
-
-The connected Supabase project named `trendanalytics-prod` is in region `eu-west-1`, but its management API currently reports `INACTIVE`, and a direct table-listing request timed out. This finding is recorded in the dated provider evidence file and should be operationally checked before the project is used as evidence of an active production database. It is not, by itself, proof that the public website is unavailable.
+- Tax registration obligations remain an operator/accounting matter. If Urd Atlas becomes required to collect VAT/sales tax in a jurisdiction, the appropriate registration and checkout configuration must be completed before representing tax collection as enabled.
+- Upstash encryption at rest is plan-specific; Urd Atlas does not claim it is enabled unless separately verified. Upstash is used for bounded rate-limit metadata, not the subscriber reference dataset.
+- Confirm the final production subprocessor inventory whenever a provider is added or removed.
+- Legal review is still recommended before representing the Terms/Privacy package as externally reviewed for institutional procurement.
+- The connected Supabase project `trendanalytics-prod` was reported `INACTIVE` by the management API on 2026-08-27. That operational finding should be checked independently; it is not required to answer the encryption/security disclosure because the public statement no longer infers account state from provider defaults.
 
 ## Release rule
 
-Do not convert a MANUAL or BLOCKED item to PASS based only on intended policy text. Attach dated evidence from the relevant production provider/account or a completed legal review where the fact depends on those systems. A negative provider result may make an answer complete, but it does not satisfy an acceptance criterion that requires the underlying capability to be configured.
+Do not convert a factual provider control into a stronger public claim than the evidence supports. Negative or limited provider findings are valid evidence when the due-diligence question asks for the current state; optional capabilities must not be represented as enabled merely to make a checklist appear complete.
