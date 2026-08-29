@@ -19,7 +19,7 @@ export default function FaqPage() {
           <span>·</span>
           <span>Basic and Advanced explanation levels</span>
           <span>·</span>
-          <span>Expected refresh windows: around 09:00 and 21:00 Europe/Oslo</span>
+          <span>Expected refresh windows: around 08:00 and 20:00 Europe/Oslo</span>
         </div>
       </PageHero>
       <UrdContainer>
