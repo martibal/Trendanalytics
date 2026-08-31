@@ -1,0 +1,110 @@
+name: Phase 0 TED Real Outcome Run
+
+on:
+  push:
+    branches:
+      - phase0-ted-real-run
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phase0:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout isolated runner branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime
+        run: pip install requests pandas numpy pyarrow
+
+      - name: Reconstruct and verify frozen v6 artifact
+        shell: bash
+        run: |
+          mkdir -p phase0_real_run/frozen
+          cat phase0_real_run/frozen_zip.part1.b64 \
+              phase0_real_run/frozen_zip.part2.b64 \
+              phase0_real_run/frozen_zip.part3.b64 \
+              phase0_real_run/frozen_zip.part4.b64 | base64 -d > /tmp/phase0_v6.zip
+          echo "7520b783a14e50d27a6b1b207f25c02d940c7c74929df7202e6fc88d6f350f22  /tmp/phase0_v6.zip" | sha256sum -c -
+          unzip -q /tmp/phase0_v6.zip -d phase0_real_run/frozen
+          python phase0_real_run/frozen/test_phase0_v6.py
+
+      - name: Fetch real TED outcome data
+        run: |
+          python phase0_real_run/fetch_ted_phase0.py \
+            --frozen-dir phase0_real_run/frozen \
+            --out phase0_real_run/ted_normalized.csv \
+            --log phase0_real_run/fetch_log.json
+
+      - name: Build frozen monthly panel
+        run: |
+          python phase0_real_run/frozen/build_phase0_panel.py \
+            --source phase0_real_run/ted_normalized.csv \
+            --prereg phase0_real_run/frozen/phase0_preregistration.json \
+            --country-registry phase0_real_run/frozen/nis2_country_registry.json \
+            --cpv-definitions phase0_real_run/frozen/cpv_definitions.json \
+            --out-panel phase0_real_run/phase0_panel.csv \
+            --out-meta phase0_real_run/phase0_panel_meta.json
+
+      - name: Run frozen hard gate
+        id: gate
+        shell: bash
+        run: |
+          set +e
+          python phase0_real_run/frozen/regulatory_demand_phase0_v6.py \
+            --panel phase0_real_run/phase0_panel.csv \
+            --panel-meta phase0_real_run/phase0_panel_meta.json \
+            --prereg phase0_real_run/frozen/phase0_preregistration.json \
+            --country-registry phase0_real_run/frozen/nis2_country_registry.json \
+            --cpv-definitions phase0_real_run/frozen/cpv_definitions.json \
+            --out phase0_real_run/phase0_results.json
+          RC=$?
+          set -e
+          echo "$RC" | tee phase0_real_run/gate_exit_code.txt
+          if [ "$RC" -ne 0 ] && [ "$RC" -ne 2 ]; then
+            echo "Frozen engine failed with unexpected exit code $RC"
+            exit "$RC"
+          fi
+
+      - name: Print frozen verdict
+        if: always()
+        run: |
+          echo "=== GATE EXIT CODE ==="
+          cat phase0_real_run/gate_exit_code.txt 2>/dev/null || true
+          echo "=== PHASE 0 RESULTS ==="
+          python -m json.tool phase0_real_run/phase0_results.json 2>/dev/null || true
+          echo "=== FETCH SUMMARY ==="
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path('phase0_real_run/fetch_log.json')
+          if p.exists():
+              d=json.loads(p.read_text())
+              print(json.dumps({k:v for k,v in d.items() if k!='audit'},indent=2))
+          PY
+
+      - name: Compress audit source
+        if: always()
+        run: gzip -9 -f phase0_real_run/ted_normalized.csv 2>/dev/null || true
+
+      - name: Upload complete Phase 0 result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase0-ted-real-result
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            phase0_real_run/phase0_results.json
+            phase0_real_run/gate_exit_code.txt
+            phase0_real_run/phase0_panel.csv
+            phase0_real_run/phase0_panel_meta.json
+            phase0_real_run/fetch_log.json
+            phase0_real_run/ted_normalized.csv.gz
