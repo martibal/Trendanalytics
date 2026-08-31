@@ -29,8 +29,11 @@ def search(title):
  if not ex:raise RuntimeError('dataset not found '+title)
  return ex[0]
 def resource(ds):
- xs=[r for r in (ds.get('resources') or []) if str(r.get('format','')).lower() in ('xlsx','xls')];xs.sort(key=lambda x:str(x.get('last_modified') or x.get('created_at') or ''),reverse=True)
- if not xs:raise RuntimeError('no xlsx');return xs[0]
+ xs=[r for r in (ds.get('resources') or []) if str(r.get('format','')).lower() in ('xlsx','xls')]
+ xs.sort(key=lambda x:str(x.get('last_modified') or x.get('created_at') or ''),reverse=True)
+ if not xs:
+  raise RuntimeError('no xlsx')
+ return xs[0]
 def load(title):
  ds=search(title);res=resource(ds);rr=s.get(res['url'],timeout=120);rr.raise_for_status();xf=pd.ExcelFile(io.BytesIO(rr.content));best=max(((sh,pd.read_excel(xf,sheet_name=sh)) for sh in xf.sheet_names),key=lambda z:len(z[1]));sh,df=best
  cols=[str(c) for c in df.columns];bad=[c for c in cols if any(t in norm(c) for t in FORB)]
@@ -51,7 +54,6 @@ def pdf_info(doc):
  head=text[:6000];m=re.search(r'Brussels,\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})',head,re.I)
  if not m:raise RuntimeError('cannot parse document date '+doc)
  date=pd.to_datetime(m.group(1),dayfirst=True).date()
- # normalize whitespace/dash variants before code extraction
  z=text.upper().replace('–','-').replace('—','-');z=re.sub(r'\s*[-]\s*','-',z)
  codes=set()
  for q in re.finditer(r'([A-Z]{2}-C\d{2}-I\d+(?:\.\d+)?(?:-[A-Z0-9]+)?)',z):
@@ -60,11 +62,9 @@ def pdf_info(doc):
 
 projects,mp=load('Dataset Estrutura de Missão PRR - Projetos');contracts,mc=load('Dataset Estrutura de Missão PRR - Contratos Públicos');invest,mi=load('Dataset Estrutura de Missão PRR - Investimentos')
 pc=col(projects,'cd_projeto');pi=col(projects,'cd_investimento');cc=col(contracts,'cd_projeto');cd=col(contracts,'dt_assinatura_contrato');co=col(contracts,'ds_contrato');ic=col(invest,'Código do Investimento');ides=col(invest,'Descrição detalhada do Investimento');iname=col(invest,'Designação do Investimento')
-# top-level PRR projects are exactly the project codes without operation slash
 p=projects[[pc,pi]].copy();p['_project']=p[pc].astype(str).str.strip();p['_inv']=p[pi].map(invnorm);p=p.loc[~p['_project'].str.contains('/',regex=False)&p['_inv'].notna()].drop_duplicates('_project')
 c=contracts[[cc,cd,co]].copy();c['_project']=c[cc].astype(str).str.strip();c['_date']=pd.to_datetime(c[cd],errors='coerce',dayfirst=True);c=c.loc[c['_date'].notna()].merge(p[['_project','_inv']],on='_project',how='inner')
 i=invest[[ic,iname,ides]].copy();i['_inv']=i[ic].map(invnorm);i=i.loc[i['_inv'].notna()].drop_duplicates('_inv')
-# official full-plan versions; first appearance is conservative public observability timestamp
 versions=[]
 for d in DOCS:
  try:versions.append(pdf_info(d))
@@ -73,18 +73,14 @@ valid=[v for v in versions if v.get('date')];valid.sort(key=lambda v:v['date'])
 first_public={}
 for v in valid:
  for code in v['codes']:first_public.setdefault(code,pd.Timestamp(v['date']))
-# Map current investment descriptions and contracts to official first public appearance
 c['_public']=c['_inv'].map(first_public);observable=c.loc[c['_public'].notna()].copy();observable['_lead']=(observable['_date']-observable['_public']).dt.days
-# first downstream contract per investment, excluding contracts before public appearance for the first-after metric
 post=observable.loc[observable['_lead']>=0].copy();first=post.groupby('_inv')['_lead'].min().sort_values()
-# category prediction from investment public description -> contract object
 idict={r['_inv']:cats(str(r[iname])+' '+str(r[ides])) for _,r in i.iterrows()};evaln=hits=0
 for _,r in post.iterrows():
  pcats=idict.get(r['_inv'],set());ccats=cats(r[co])
  if pcats and ccats:evaln+=1;hits+=int(bool(pcats&ccats))
 catrate=hits/evaln if evaln else None
 share90=float((first>=90).mean()) if len(first) else None;med=float(first.median()) if len(first) else None
-# Pre-existing thresholds from the prior test, with impossible 10% denominator gate removed as a schema-level bug.
 lead_ok=bool(len(first)>=30 and med is not None and med>=90 and share90 is not None and share90>=0.60)
 cat_ok=bool(evaln>=100 and catrate is not None and catrate>=0.60)
 coverage_ok=bool(len(first)>=30)
