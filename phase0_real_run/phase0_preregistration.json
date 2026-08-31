@@ -1,0 +1,80 @@
+{
+  "specification_version": "PHASE0_LOCKED_V6",
+  "frozen": true,
+  "freeze_date": "2026-08-31",
+  "locked_input_hashes": {
+    "nis2_country_registry_sha256": "a719f44fea61abac1963947d0df5b93a0a1de1bcd5f83ef1c7436948a89959fc",
+    "cpv_definitions_sha256": "ad2c53421c20871db3b178c920cdfa4fe9f933578f5f36d9b0be0b9df46f89db"
+  },
+  "global_parameters": {
+    "min_effect_pp": 10.0,
+    "commercial_lead_days": 90,
+    "leave_one_country_out_min_share_passing": 0.8,
+    "alternative_baseline_tolerance_pp": 5.0
+  },
+  "panel_policy": {
+    "buyer_scope": "ALL_TED_BUYERS_CONSERVATIVE",
+    "buyer_scope_note": "No post-outcome sector filtering is allowed in the primary gate. This is deliberately conservative and avoids unstable historical MAIN_ACTIVITY mappings. Sector-filtered analysis may be exploratory only and cannot rescue a failed primary gate.",
+    "distinct_notice_counting": true,
+    "zero_fill_country_month_arm": true
+  },
+  "benchmarks": {
+    "NIS1": {
+      "design": "matched_cpv_prepost",
+      "catalyst_known_date": "2016-07-06",
+      "pre_window_start": "2016-05-01",
+      "pre_window_end": "2018-04-01",
+      "effect_window_start": "2018-05-01",
+      "effect_window_end": "2020-04-01",
+      "treated_definition_id": "NIS_TREATED_V1",
+      "control_definition_id": "IT_NEUTRAL_CONTROL_V1",
+      "balanced_country_min_share": 0.8,
+      "alternative_baseline_start": "2017-05-01",
+      "alternative_baseline_end": "2018-04-01"
+    },
+    "GDPR": {
+      "design": "matched_cpv_prepost",
+      "catalyst_known_date": "2016-04-27",
+      "pre_window_start": "2016-05-01",
+      "pre_window_end": "2018-04-01",
+      "effect_window_start": "2018-05-01",
+      "effect_window_end": "2020-04-01",
+      "treated_definition_id": "GDPR_TREATED_V1",
+      "control_definition_id": "IT_NEUTRAL_CONTROL_V1",
+      "balanced_country_min_share": 0.8,
+      "alternative_baseline_start": "2017-05-01",
+      "alternative_baseline_end": "2018-04-01"
+    },
+    "NIS2": {
+      "design": "staggered_ddd_fixed_precatalyst_baseline_with_anticipation_guard",
+      "analysis_cutoff_date": "2026-08-31",
+      "catalyst_known_date": "2022-12-14",
+      "treated_definition_id": "NIS_TREATED_V1",
+      "control_definition_id": "IT_NEUTRAL_CONTROL_V1",
+      "normalization_baseline_start": "2021-01-01",
+      "normalization_baseline_end": "2022-11-01",
+      "alternative_baseline_start": "2022-01-01",
+      "alternative_baseline_end": "2022-11-01",
+      "min_baseline_months": 10,
+      "effect_event_month_start": 0,
+      "effect_event_month_end": 11,
+      "lead_sustain_months": 3,
+      "comparative_pretrend_event_month_start": -12,
+      "comparative_pretrend_event_month_end": -3,
+      "comparative_pretrend_abs_max_pp": 7.5,
+      "direct_pretrend_event_month_start": -12,
+      "direct_pretrend_event_month_end": -3,
+      "direct_pretrend_slope_abs_max_pp_per_month": 0.5,
+      "direct_pretrend_country_pass_share": 0.8,
+      "late_anticipation_event_month_start": -2,
+      "late_anticipation_event_month_end": -1,
+      "late_anticipation_signal_threshold_pp": 10.0,
+      "late_anticipation_policy": "DIAGNOSTIC_ONLY: a T-2/T-1 signal neither passes nor fails the NIS2 benchmark and cannot rescue a failed post-treatment Phase 0 gate.",
+      "primary_anticipation_buffer_months": 12,
+      "robustness_anticipation_buffer_months": 18,
+      "min_not_yet_treated_controls_per_att": 2,
+      "min_att_observations": 12,
+      "min_treated_countries": 4
+    }
+  }
+}
