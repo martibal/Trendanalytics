@@ -1,0 +1,27 @@
+name: Funded Procurement Diagnostic
+
+on:
+  push:
+    branches: [phase0-funded-procurement-diagnostic]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas openpyxl requests
+      - name: Run safe linkage-unit diagnostic
+        run: python phase0_funded_procurement_diagnostic.py
+      - name: Upload diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: funded-procurement-diagnostic
+          retention-days: 30
+          path: /tmp/funded_procurement_diagnostic.json
