@@ -3,6 +3,7 @@
 
 Output schema: notice_id, publication_date, buyer_country, cpv_code.
 No buyer names, contacts, emails, phones or addresses are requested or persisted.
+This file is transport/ingest only; it does not alter any frozen Phase 0 parameter.
 """
 from __future__ import annotations
 
@@ -64,9 +65,14 @@ def normalize_cpvs(v, allowed):
 
 
 def extract_notices(data):
-    for key in ("notices","results","items"):
-        v=data.get(key) if isinstance(data,dict) else None
-        if isinstance(v,list): return v
+    if not isinstance(data, dict):
+        return []
+    # Current Search API response is documented as a list of result/notices;
+    # accept the common wrapper names without guessing nested business fields.
+    for key in ("notices", "results", "items", "content"):
+        v=data.get(key)
+        if isinstance(v,list):
+            return v
     return []
 
 
@@ -76,14 +82,15 @@ def request_page(session, query, page, attempts=5):
         "fields": FIELDS,
         "limit": 100,
         "page": page,
-        "scope": "ALL"
+        "scope": "ALL",
+        "paginationMode": "PAGE_NUMBER"
     }
     last=None
     for attempt in range(attempts):
         try:
             r=session.post(API,json=payload,timeout=60)
             if r.status_code in (429,500,502,503,504):
-                last=f"HTTP {r.status_code}: {r.text[:500]}"
+                last=f"HTTP {r.status_code}: {r.text[:1000]}"
                 time.sleep(min(2**attempt,16)); continue
             r.raise_for_status()
             return r.json(), r.status_code
@@ -101,6 +108,26 @@ def month_iter(start_year, start_month, end_year, end_month):
         if m==13: y,m=y+1,1
 
 
+def date_query(y,m):
+    last=calendar.monthrange(y,m)[1]
+    # PD is the official alias of publication-date in the TED search field list.
+    return f"PD>={y:04d}{m:02d}01 AND PD<={y:04d}{m:02d}{last:02d}"
+
+
+def write_failure_log(path, audit, data=None, query=None, error=None):
+    payload={
+        "endpoint":API,
+        "fields_requested":FIELDS,
+        "personal_fields_requested":False,
+        "audit":audit,
+        "failed_query":query,
+        "error":error,
+        "raw_response_preview":data,
+    }
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text(json.dumps(payload,indent=2,default=str)[:200000],encoding="utf-8")
+
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--frozen-dir",required=True,type=Path)
@@ -113,36 +140,39 @@ def main():
     for d in cpv["definitions"].values(): allowed.update(d["codes"])
     cpv_expr=" ".join(sorted(allowed))
 
-    # Union of the two frozen required intervals. Query month-by-month to avoid any
-    # archive/page ceiling ambiguity; no result-count assumptions are made.
     intervals=[(2016,5,2020,4),(2021,1,2026,8)]
     rows=set(); audit=[]
     s=requests.Session(); s.headers.update({"User-Agent":"Phase0-Regulatory-Demand-Research/1.0"})
 
-    # Archive availability smoke probes independent of selected CPVs.
-    for label,q in [
-        ("archive_2016", "publication-date = (20160501 <> 20160531)"),
-        ("archive_2026", "publication-date = (20260801 <> 20260831)")
-    ]:
+    # Coverage probes do not contain frozen outcome CPVs; they only establish that
+    # the archive interval is queryable before zero-filled monthly cells can exist.
+    for label,y,m in [("archive_2016",2016,5),("archive_2026",2026,8)]:
+        q=date_query(y,m)
         data,status=request_page(s,q,1)
         ns=extract_notices(data)
         audit.append({"type":"archive_probe","label":label,"status":status,
+                      "query":q,
                       "response_keys":sorted(data.keys()) if isinstance(data,dict) else [],
                       "returned":len(ns)})
         if not ns:
-            raise RuntimeError(f"TED archive probe returned zero notices for {label}; aborting rather than zero-filling unknown source coverage")
+            write_failure_log(a.log,audit,data,q,
+                              f"Archive probe returned zero parsed notices for {label}")
+            print("TED_PROBE_RESPONSE=" + json.dumps(data,default=str)[:12000])
+            raise RuntimeError(
+                f"TED archive probe returned zero parsed notices for {label}; "
+                "aborting rather than zero-filling unknown source coverage"
+            )
 
     for sy,sm,ey,em in intervals:
         for y,m in month_iter(sy,sm,ey,em):
-            last=calendar.monthrange(y,m)[1]
-            q=(f"publication-date = ({y:04d}{m:02d}01 <> {y:04d}{m:02d}{last:02d}) "
-               f"AND classification-cpv IN ({cpv_expr})")
+            q=f"{date_query(y,m)} AND classification-cpv IN ({cpv_expr})"
             page=1; month_raw=0
             while True:
                 data,status=request_page(s,q,page)
                 notices=extract_notices(data)
                 if page==1:
                     audit.append({"type":"cpv_month","month":f"{y:04d}-{m:02d}","status":status,
+                                  "query":q,
                                   "response_keys":sorted(data.keys()) if isinstance(data,dict) else [],
                                   "first_page_returned":len(notices)})
                 if not notices: break
@@ -158,7 +188,12 @@ def main():
                         rows.add((nid,pdate,country,code))
                 if len(notices) < 100: break
                 page += 1
-                if page > 1000: raise RuntimeError(f"Pagination safety limit exceeded for {y}-{m:02d}")
+                if page > 150:  # PAGE_NUMBER mode has a documented 15k-query ceiling.
+                    write_failure_log(a.log,audit,data,q,"15k pagination ceiling reached")
+                    raise RuntimeError(
+                        f"TED PAGE_NUMBER ceiling reached for {y}-{m:02d}; "
+                        "must switch fetch transport to ITERATION without changing frozen analysis"
+                    )
                 time.sleep(0.05)
             audit[-1]["raw_notices_all_pages"]=month_raw
             audit[-1]["pages"]=page
