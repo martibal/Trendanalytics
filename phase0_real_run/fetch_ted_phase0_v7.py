@@ -97,6 +97,8 @@ def read_historical_zip(session, year, allowed, rows, audit):
             annual=0
             for name in names:
                 with z.open(name) as raw:
+                    # Detect delimiter/encoding via pandas python engine; read only whitelisted columns.
+                    # First get header only.
                     b=raw.read(65536)
                     enc="utf-8-sig"
                     try: txt=b.decode(enc)
@@ -109,6 +111,7 @@ def read_historical_zip(session, year, allowed, rows, audit):
                 required=["ID_NOTICE_CN","DT_DISPATCH","ISO_COUNTRY_CODE","CPV"]
                 miss=[c for c in required if c not in aliases]
                 if miss:raise RuntimeError(f"{year}/{name} missing {miss}; columns={list(df.columns)[:30]}")
+                # Immediately project and drop all other source columns.
                 use=[aliases[c] for c in required]
                 for opt in ("ADDITIONAL_CPVS","CANCELLED"):
                     if opt in aliases:use.append(aliases[opt])
