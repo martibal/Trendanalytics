@@ -117,6 +117,7 @@ def request_page(session, query, page, attempts=5):
                 continue
             r.raise_for_status()
             data = r.json()
+            # Defensive privacy guard: refuse unexpected requested-field configuration.
             if payload["fields"] != FIELDS:
                 raise RuntimeError("Field projection mutated unexpectedly.")
             return data
@@ -161,6 +162,7 @@ def main():
     s = requests.Session()
     s.headers["User-Agent"] = "Phase0-Regulatory-Demand-v8/1.0"
 
+    # Common privacy-safe Search API horizon at 2026-08-31.
     for y, m in month_iter(2016, 9, 2026, 8):
         last = calendar.monthrange(y, m)[1]
         query = (
