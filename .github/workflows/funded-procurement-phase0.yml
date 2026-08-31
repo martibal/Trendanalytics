@@ -1,0 +1,187 @@
+name: Funded Procurement Phase 0
+
+on:
+  push:
+    branches: [phase0-funded-procurement-test]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas openpyxl requests numpy
+      - name: Run one-shot data/mechanism test
+        shell: bash
+        run: |
+          python - <<'PY'
+          import io, json, re, unicodedata, requests, pandas as pd, numpy as np
+          from pathlib import Path
+
+          API='https://dados.gov.pt/api/1/datasets/'
+          OUT=Path('/tmp/funded_procurement_result.json')
+          session=requests.Session(); session.headers['User-Agent']='Funded-Procurement-Falsification/1.0'
+
+          def norm(s):
+              s=unicodedata.normalize('NFKD',str(s)).encode('ascii','ignore').decode().lower().strip()
+              return re.sub(r'[^a-z0-9]+',' ',s).strip()
+
+          def search_dataset(title):
+              r=session.get(API,params={'q':title,'page_size':50},timeout=30); r.raise_for_status(); j=r.json()
+              items=j.get('data') or j.get('results') or j.get('items') or []
+              exact=[x for x in items if norm(x.get('title'))==norm(title)]
+              if not exact:
+                  # deterministic fallback: title contains all requested non-stop words
+                  toks=[t for t in norm(title).split() if len(t)>3]
+                  exact=[x for x in items if all(t in norm(x.get('title')) for t in toks)]
+              if not exact: raise RuntimeError(f'Dataset not found: {title}; returned={[x.get("title") for x in items[:10]]}')
+              return exact[0]
+
+          def resource(ds):
+              rs=ds.get('resources') or []
+              xlsx=[r for r in rs if str(r.get('format','')).lower() in ('xlsx','xls')]
+              if not xlsx: raise RuntimeError(f'No XLSX resource for {ds.get("title")}')
+              # prefer latest/last modified
+              xlsx.sort(key=lambda x:str(x.get('last_modified') or x.get('created_at') or ''),reverse=True)
+              return xlsx[0]
+
+          # dados.gov.pt terms state government datasets on the portal are open-data resources and datasets
+          # must not contain personal data; this test relies on that source-level guarantee. Files exist only
+          # in runner memory and are never uploaded.
+          titles={
+            'projects':'Dataset Estrutura de Missão PRR - Projetos',
+            'contracts':'Dataset Estrutura de Missão PRR - Contratos Públicos',
+            'contractualisation':'Dataset Estrutura de Missão PRR - Contratualização',
+          }
+          meta={}; frames={}; schemas={}
+          forbidden_header_tokens=('email','e mail','telefone','telemovel','contacto','morada','nome pessoa','primeiro nome','apelido','data nascimento')
+          for key,title in titles.items():
+              ds=search_dataset(title); res=resource(ds)
+              meta[key]={'dataset_title':ds['title'],'dataset_id':ds.get('id'),'license':ds.get('license'),
+                         'organization':(ds.get('organization') or {}).get('name'),'resource_title':res.get('title'),
+                         'resource_url':res.get('url'),'resource_sha1':(res.get('checksum') or {}).get('value')}
+              b=session.get(res['url'],timeout=120).content
+              xf=pd.ExcelFile(io.BytesIO(b))
+              # Choose largest sheet deterministically after parsing; do not print row values.
+              best=None
+              for sh in xf.sheet_names:
+                  df=pd.read_excel(xf,sheet_name=sh)
+                  if best is None or len(df)>len(best[1]): best=(sh,df)
+              sh,df=best
+              cols=[str(c) for c in df.columns]
+              bad=[c for c in cols if any(t in norm(c) for t in forbidden_header_tokens)]
+              if bad: raise RuntimeError(f'PRIVACY_SCHEMA_FAIL {key}: forbidden-looking columns {bad}')
+              schemas[key]={'sheet':sh,'rows':len(df),'columns':cols}
+              frames[key]=df
+
+          def find_col(df, alternatives, required=True):
+              nc={c:norm(c) for c in df.columns}
+              for alt in alternatives:
+                  a=norm(alt)
+                  exact=[c for c,n in nc.items() if n==a]
+                  if exact:return exact[0]
+              for alt in alternatives:
+                  toks=norm(alt).split()
+                  hit=[c for c,n in nc.items() if all(t in n for t in toks)]
+                  if hit:return hit[0]
+              if required: raise RuntimeError(f'COLUMN_GATE_FAIL alternatives={alternatives}; columns={list(df.columns)}')
+              return None
+
+          p=frames['projects'].copy(); c=frames['contracts'].copy()
+          p_code=find_col(p,['codigo de operacao','codigo operacao','codigo projeto','id projeto','codigo'])
+          p_start=find_col(p,['data de inicio','data inicio','inicio do projeto','data inicio projeto'])
+          p_name=find_col(p,['nome do projeto','nome projeto','designacao projeto','designacao','nome'],False)
+          p_summary=find_col(p,['sumario','resumo','descricao projeto','descricao'],False)
+
+          c_code=find_col(c,['codigo de operacao','codigo operacao','codigo projeto','id projeto','codigo'])
+          c_date=find_col(c,['data de celebracao do contrato','data celebracao contrato','data do contrato','data contrato','data publicacao'],False)
+          c_obj=find_col(c,['objeto do contrato','objecto do contrato','objeto contrato','descricao contrato','descricao','objeto'],False)
+          c_cpv=find_col(c,['cpv','codigo cpv'],False)
+          c_value=find_col(c,['valor contratado','preco contratual','valor contrato','montante contrato'],False)
+
+          mapping={'project_code':p_code,'project_start':p_start,'project_name':p_name,'project_summary':p_summary,
+                   'contract_project_code':c_code,'contract_date':c_date,'contract_object':c_obj,'contract_cpv':c_cpv,'contract_value':c_value}
+          if c_date is None:
+              result={'verdict':'NO-GO_DATA','reason':'PRR public-contract dataset lacks a contract/procurement date required to establish commercial lead without joining to a source that may expose personal data.',
+                      'metadata':meta,'schemas':schemas,'column_mapping':mapping}
+              OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)); print(json.dumps(result,indent=2,ensure_ascii=False)); raise SystemExit(2)
+
+          p['_code']=p[p_code].astype(str).str.strip(); c['_code']=c[c_code].astype(str).str.strip()
+          p['_start']=pd.to_datetime(p[p_start],errors='coerce',dayfirst=True); c['_date']=pd.to_datetime(c[c_date],errors='coerce',dayfirst=True)
+          p=p.loc[p['_code'].ne('') & p['_start'].notna()].drop_duplicates('_code',keep='first')
+          c=c.loc[c['_code'].ne('') & c['_date'].notna()]
+          joined=c.merge(p[['_code','_start']+([p_name] if p_name else [])+([p_summary] if p_summary else [])],on='_code',how='inner')
+          joined['_lead_days']=(joined['_date']-joined['_start']).dt.days
+          linked_projects=joined['_code'].nunique(); total_projects=p['_code'].nunique(); linked_contracts=len(joined)
+          first=joined.groupby('_code')['_lead_days'].min()
+          post=first[first>=0]
+
+          # Locked broad category vocabulary, defined before inspecting any row values.
+          CAT={
+            'DIGITAL_IT':['software','sistema','digital','informat','tecnolog','dados','data ','cloud','ciber','cyber','plataforma','aplicacao','aplicação','interoperab','rede ','network'],
+            'CONSTRUCTION':['obra','construc','reabilit','edificio','edifício','empreitada','infraestrutura'],
+            'EQUIPMENT':['equipamento','hardware','mobiliario','mobiliário','veiculo','veículo','maquina','máquina'],
+            'CONSULTING_AUDIT':['consult','assessoria','auditor','estudo','assessment'],
+            'TRAINING':['formacao','formação','capacitacao','capacitação','treino','training'],
+          }
+          def cats(text):
+              s=norm(text); return {k for k,ws in CAT.items() if any(norm(w) in s for w in ws)}
+          category_metrics=None
+          if c_obj and (p_name or p_summary):
+              proj_text=p['_code'].map(lambda x:'')
+              pp=p.set_index('_code')
+              project_cat={code:cats(' '.join(str(pp.loc[code,col]) for col in (p_name,p_summary) if col)) for code in pp.index}
+              contract_cat=joined[c_obj].fillna('').map(cats)
+              pred=[]
+              for code,cc in zip(joined['_code'],contract_cat):
+                  pc=project_cat.get(code,set())
+                  pred.append(bool(pc and cc and pc.intersection(cc)))
+              arr=np.array(pred,dtype=bool)
+              category_metrics={'contracts_evaluable':int(len(arr)),'broad_category_overlap_rate':float(arr.mean()) if len(arr) else None}
+
+          metrics={
+            'total_projects_with_valid_start':int(total_projects),
+            'projects_linked_to_dated_procurement':int(linked_projects),
+            'linked_contracts_with_dates':int(linked_contracts),
+            'project_link_rate':float(linked_projects/total_projects) if total_projects else None,
+            'projects_with_first_contract_on_or_after_start':int(len(post)),
+            'median_days_start_to_first_contract':float(post.median()) if len(post) else None,
+            'p25_days':float(post.quantile(.25)) if len(post) else None,
+            'p75_days':float(post.quantile(.75)) if len(post) else None,
+            'share_first_contract_at_least_90d':float((post>=90).mean()) if len(post) else None,
+            'share_first_contract_at_least_180d':float((post>=180).mean()) if len(post) else None,
+            'contracts_before_project_start':int((joined['_lead_days']<0).sum()),
+            'category_metrics':category_metrics,
+          }
+
+          # Hard product gate. Lead is necessary but not sufficient: project start is only usable as
+          # historical proxy if the event was public at that time. This script therefore never emits full GO;
+          # it emits CONDITIONAL_GO only if quantitative mechanics pass, with public-timestamp gate still explicit.
+          lead_ok=(len(post)>=30 and metrics['share_first_contract_at_least_90d'] is not None and metrics['share_first_contract_at_least_90d']>=0.60 and metrics['median_days_start_to_first_contract']>=90)
+          cat_ok=(category_metrics is not None and category_metrics['contracts_evaluable']>=100 and category_metrics['broad_category_overlap_rate']>=0.60)
+          linkage_ok=(linked_projects>=30 and metrics['project_link_rate']>=0.10)
+          verdict='CONDITIONAL_GO_PUBLICATION_TIMESTAMP_REQUIRED' if (lead_ok and cat_ok and linkage_ok) else 'NO-GO'
+          result={'verdict':verdict,'hard_checks':{'lead_ok':lead_ok,'category_ok':cat_ok,'linkage_ok':linkage_ok},
+                  'publication_timestamp_gate':'UNRESOLVED: project start date is not automatically proof that the award/project record was publicly observable on that date.',
+                  'metrics':metrics,'metadata':meta,'schemas':schemas,'column_mapping':mapping}
+          OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)); print(json.dumps(result,indent=2,ensure_ascii=False))
+          raise SystemExit(0 if verdict.startswith('CONDITIONAL_GO') else 2)
+          PY
+          rc=$?
+          echo "$rc" > /tmp/funded_procurement_exit.txt
+          exit 0
+      - name: Upload audit result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: funded-procurement-phase0-result
+          retention-days: 30
+          path: |
+            /tmp/funded_procurement_result.json
+            /tmp/funded_procurement_exit.txt
